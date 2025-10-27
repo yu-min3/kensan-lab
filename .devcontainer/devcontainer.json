@@ -1,0 +1,25 @@
+{
+    "name": "k8s develop",
+    "build": {
+        "dockerfile": "Dockerfile"
+    },
+    "runArgs": [
+        "--userns=keep-id",
+        "-v",
+        "/run/podman/podman.sock:/var/run/docker.sock"
+    ],
+    "containerEnv": {
+        "DOCKER_HOST": "unix:///var/run/docker.sock"
+    },
+    // root のままが扱いやすい（rootless でも可。必要なら useradd して切り替え）
+    "remoteUser": "root",
+    "customizations": {
+        "vscode": {
+            "extensions": [
+                "ms-kubernetes-tools.vscode-kubernetes-tools",
+                "redhat.vscode-yaml",
+                "ms-azuretools.vscode-docker"
+            ]
+        }
+    }
+}

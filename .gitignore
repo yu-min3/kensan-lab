@@ -1,0 +1,11 @@
+archive/*
+.env
+*.env
+mcp-server-kubernetes/*
+CLAUDE.md
+temp.txt
+temp/*
+kubeconfig
+.claude
+.serena
+my_docs/*
