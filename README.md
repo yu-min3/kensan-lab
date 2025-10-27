@@ -36,3 +36,28 @@ sudo kubeadm token create --print-join-command
 
 出力されたコマンドを参加させたいworker nodeで実行
 
+# boostrap
+## cilium
+### 1. Helmリポジトリを追加
+```
+helm repo add cilium https://helm.cilium.io/
+helm repo update
+```
+
+### 2. YAMLマニフェストを生成し、platform-configリポジトリに保存
+### オプション: kubeProxyReplacement=true (kube-proxyの置き換え。e-BPFによる高速ネットワーキングのため採用)
+### k8s.cluster.cidr=10.244.0.0/16 (Podネットワーク範囲の指定)
+```
+helm template cilium cilium/cilium \
+  --namespace kube-system \
+  --create-namespace \
+  --set kubeProxyReplacement=true \
+  --set k8s.cluster.cidr=<cidr範囲> \
+  --set ipam.mode=kubernetes \
+  > base-infra/cilium/cilium.yaml
+  ```
+
+### 3.　接続テスト
+```
+cilium connectivity test
+```
