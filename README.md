@@ -61,3 +61,20 @@ helm template cilium cilium/cilium \
 ```
 cilium connectivity test
 ```
+
+## metallb
+### 1. 必要なyamlファイルを揃える
+```
+curl -L https://raw.githubusercontent.com/metallb/metallb/<metallbのバージョン>>/config/manifests/metallb-native.yaml  
+ > base-infra/metallb/metallb-controller.yaml
+kubectl create namespace metallb-system --dry-run=client -o yaml > base-infra/metallb/namespace.yaml
+```
+ipaddresspoolはリポジトリを参考にipを選択
+
+### 2. 適用
+```
+k apply -f base-infra/metallb/namespace.yaml
+k apply -f base-infra/metallb/metallb-controller.yaml 
+# ipaddresspoolはcontrollerの作成が完了してから
+k apply -f base-infra/metallb/ipaddresspool.yaml
+```
