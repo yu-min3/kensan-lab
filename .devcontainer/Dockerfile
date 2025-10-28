@@ -45,6 +45,12 @@ RUN curl -sSL -o argocd-linux-arm64 https://github.com/argoproj/argo-cd/releases
 # kustomizeのインストール
 RUN curl -s "https://raw.githubusercontent.com/kubernetes-sigs/kustomize/master/hack/install_kustomize.sh" | bash
 
+# kubeseal
+RUN wget https://github.com/bitnami-labs/sealed-secrets/releases/download/v0.26.0/kubeseal-0.26.0-linux-arm64.tar.gz && \
+    tar xfz kubeseal-0.26.0-linux-arm64.tar.gz && \
+    sudo install -m 755 kubeseal /usr/local/bin/kubeseal && \
+    rm kubeseal-0.26.0-linux-arm64.tar.gz kubeseal
+
 # helmのインストール
 RUN curl https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
 
