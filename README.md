@@ -78,3 +78,19 @@ k apply -f base-infra/metallb/metallb-controller.yaml
 # ipaddresspoolはcontrollerの作成が完了してから
 k apply -f base-infra/metallb/ipaddresspool.yaml
 ```
+
+# secret管理
+```
+# GHCRからのimagepull用secretのyamlファイルを作成
+kubectl create secret docker-registry ghcr-pull-secret \
+  --docker-server=ghcr.io \
+  --docker-username=<GitHubユーザー名> \
+  --docker-password=<PAT> \
+  --docker-email=<githubメールアドレス> \
+  --namespace=<利用するnamespace> \
+  --dry-run=client \
+  -o yaml > ghcr-secret-raw.yaml
+
+# sealed secretに変換
+kubeseal --format=yaml < ghcr-secret-raw.yaml > platform-config/base-infra/secrets/ghcr-pull-secret.yaml
+```
