@@ -5,13 +5,10 @@
     },
     "runArgs": [
         "--userns=keep-id",
-        "-v",
-        "/run/podman/podman.sock:/var/run/docker.sock"
+        "--privileged"
     ],
-    "containerEnv": {
-        "DOCKER_HOST": "unix:///var/run/docker.sock"
-    },
-    "remoteUser": "root",
+    "containerUser": "vscode", // イメージ内に存在する非ルートユーザー
+    "remoteUser": "vscode",
     "customizations": {
         "vscode": {
             "extensions": [
