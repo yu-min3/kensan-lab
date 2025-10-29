@@ -9,3 +9,4 @@ kubeconfig
 .claude
 .serena
 my_docs/*
+.DS_Store
