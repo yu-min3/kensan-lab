@@ -12,6 +12,10 @@ kind: CiliumL2AnnouncementPolicy
 metadata:
   name: platform-l2-policy
 spec:
+  # Which network interfaces to announce on
+  interfaces:
+    - wlan0
+
   # Only announce for LoadBalancer services using our IP pool
   loadBalancerIPs: true
 
