@@ -209,6 +209,7 @@ data:
   bpf-lb-acceleration: "disabled"
   enable-svc-source-range-check: "true"
   enable-l2-neigh-discovery: "false"
+  enable-l2-announcements: "true"
   k8s-require-ipv4-pod-cidr: "false"
   k8s-require-ipv6-pod-cidr: "false"
   enable-k8s-networkpolicy: "true"
