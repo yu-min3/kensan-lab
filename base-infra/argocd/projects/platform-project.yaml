@@ -10,35 +10,41 @@ spec:
 
   # Source repositories that applications can pull from
   sourceRepos:
-    - 'https://github.com/yu-min3/k8s-platform-config'
-    - '*'  # Allow Helm charts and other external sources
+    - "https://github.com/yu-min3/k8s-platform-config"
+    - "*" # Allow Helm charts and other external sources
 
   # Destinations where applications can be deployed
   destinations:
-    - namespace: 'kube-system'
-      server: 'https://kubernetes.default.svc'
-    - namespace: 'argocd'
-      server: 'https://kubernetes.default.svc'
-    - namespace: 'metallb-system'
-      server: 'https://kubernetes.default.svc'
-    - namespace: 'istio-system'
-      server: 'https://kubernetes.default.svc'
-    - namespace: 'monitoring'
-      server: 'https://kubernetes.default.svc'
-    - namespace: 'platform-auth'
-      server: 'https://kubernetes.default.svc'
-    - namespace: 'sealed-secrets'
-      server: 'https://kubernetes.default.svc'
+    - namespace: "kube-system"
+      server: "https://kubernetes.default.svc"
+    - namespace: "argocd"
+      server: "https://kubernetes.default.svc"
+    - namespace: "metallb-system"
+      server: "https://kubernetes.default.svc"
+    - namespace: "istio-system"
+      server: "https://kubernetes.default.svc"
+    - namespace: "monitoring"
+      server: "https://kubernetes.default.svc"
+    - namespace: "platform-auth"
+      server: "https://kubernetes.default.svc"
+    - namespace: "sealed-secrets"
+      server: "https://kubernetes.default.svc"
+    - namespace: "cilium-secrets"
+      server: "https://kubernetes.default.svc"
+    - namespace: "app-dev"
+      server: "https://kubernetes.default.svc"
+    - namespace: "app-prod"
+      server: "https://kubernetes.default.svc"
 
   # Allow all cluster-scoped resources (required for CNI, CRDs, etc.)
   clusterResourceWhitelist:
-    - group: '*'
-      kind: '*'
+    - group: "*"
+      kind: "*"
 
   # Namespace-scoped resources whitelist (allow all for platform components)
   namespaceResourceWhitelist:
-    - group: '*'
-      kind: '*'
+    - group: "*"
+      kind: "*"
 
   # Orphaned resources handling
   orphanedResources:
