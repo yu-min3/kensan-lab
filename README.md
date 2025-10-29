@@ -48,13 +48,15 @@ helm repo update
 ### オプション: kubeProxyReplacement=true (kube-proxyの置き換え。e-BPFによる高速ネットワーキングのため採用)
 ### k8s.cluster.cidr=10.244.0.0/16 (Podネットワーク範囲の指定)
 ```
-helm template cilium cilium/cilium \
-  --namespace kube-system \
-  --create-namespace \
-  --set kubeProxyReplacement=true \
-  --set k8s.cluster.cidr=<cidr範囲> \
-  --set ipam.mode=kubernetes \
-  > base-infra/cilium/cilium.yaml
+  helm template cilium cilium/cilium \
+    --namespace kube-system \
+    --create-namespace \
+    --set kubeProxyReplacement=true \
+    --set k8s.cluster.cidr=10.244.0.0/16 \
+    --set ipam.mode=kubernetes \
+    --set l2announcements.enabled=true \
+    --set externalIPs.enabled=true \
+    > base-infra/cilium/cilium.yaml
   ```
 
 ### 3.　接続テスト
@@ -62,22 +64,6 @@ helm template cilium cilium/cilium \
 cilium connectivity test
 ```
 
-## metallb
-### 1. 必要なyamlファイルを揃える
-```
-curl -L https://raw.githubusercontent.com/metallb/metallb/<metallbのバージョン>>/config/manifests/metallb-native.yaml  
- > base-infra/metallb/metallb-controller.yaml
-kubectl create namespace metallb-system --dry-run=client -o yaml > base-infra/metallb/namespace.yaml
-```
-ipaddresspoolはリポジトリを参考にipを選択
-
-### 2. 適用
-```
-k apply -f base-infra/metallb/namespace.yaml
-k apply -f base-infra/metallb/metallb-controller.yaml 
-# ipaddresspoolはcontrollerの作成が完了してから
-k apply -f base-infra/metallb/ipaddresspool.yaml
-```
 
 # secret管理
 ```
