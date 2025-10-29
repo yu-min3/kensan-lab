@@ -15,3 +15,5 @@ metadata:
 spec:
   ipAddressPools:
     - my-pool
+  interfaces:
+    - wlan0 # 指定しないと永続的でないpodのinterfaceを使ってしまう。nodeのinterfaceを指定する。
