@@ -1,0 +1,60 @@
+---
+# Istio Gateway for Production Environment
+apiVersion: gateway.networking.k8s.io/v1
+kind: Gateway
+metadata:
+  name: gateway-prod
+  namespace: istio-system
+spec:
+  gatewayClassName: istio
+  listeners:
+    - name: http
+      protocol: HTTP
+      port: 80
+      hostname: "*.yu-min3.com"
+      allowedRoutes:
+        namespaces:
+          from: Selector
+          selector:
+            matchLabels:
+              environment: production
+
+    - name: https
+      protocol: HTTPS
+      port: 443
+      hostname: "*.yu-min3.com"
+      allowedRoutes:
+        namespaces:
+          from: Selector
+          selector:
+            matchLabels:
+              environment: production
+      tls:
+        mode: Terminate
+        certificateRefs:
+          - name: wildcard-tls
+            kind: Secret
+---
+# Service for Production Gateway
+apiVersion: v1
+kind: Service
+metadata:
+  name: gateway-prod
+  namespace: istio-system
+  labels:
+    app: gateway-prod
+    istio: gateway
+spec:
+  type: LoadBalancer
+  loadBalancerIP: 192.168.0.241
+  selector:
+    istio.io/gateway-name: gateway-prod
+  ports:
+    - name: http
+      port: 80
+      targetPort: 80
+      protocol: TCP
+    - name: https
+      port: 443
+      targetPort: 443
+      protocol: TCP
