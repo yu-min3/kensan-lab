@@ -5,6 +5,8 @@ kind: Gateway
 metadata:
   name: gateway-dev
   namespace: istio-system
+  annotations:
+    argocd.argoproj.io/sync-wave: "2"  # Deploy after istiod (CRDs must be installed first)
 spec:
   gatewayClassName: istio
   listeners:
@@ -41,6 +43,8 @@ kind: Service
 metadata:
   name: gateway-dev
   namespace: istio-system
+  annotations:
+    argocd.argoproj.io/sync-wave: "2"  # Deploy after istiod
   labels:
     app: gateway-dev
     istio: gateway
