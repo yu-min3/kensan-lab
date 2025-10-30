@@ -19,6 +19,13 @@ spec:
   # Only announce for LoadBalancer services using our IP pool
   loadBalancerIPs: true
 
+  # Exclude control-plane nodes from L2 announcements (best practice)
+  # This prevents lease transitions between master and worker nodes
+  nodeSelector:
+    matchExpressions:
+      - key: node.kubernetes.io/exclude-from-external-load-balancers
+        operator: DoesNotExist
+
   # Which services to announce (empty means all LoadBalancer services with IPs from our pool)
   serviceSelector:
     matchLabels: {}
