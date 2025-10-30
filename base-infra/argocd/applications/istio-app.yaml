@@ -1,0 +1,30 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: istio
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: platform-project
+
+  source:
+    repoURL: 'https://github.com/yu-min3/k8s-platform-config'
+    targetRevision: HEAD
+    path: base-infra/istio
+
+  destination:
+    server: 'https://kubernetes.default.svc'
+    namespace: istio-system
+
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true
+    syncWaves:
+      - wave: 0  # Deploy istio-base first (CRDs)
+      - wave: 1  # Then istiod (Control Plane)
+      - wave: 2  # Finally gateways

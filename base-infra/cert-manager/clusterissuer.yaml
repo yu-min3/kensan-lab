@@ -1,0 +1,58 @@
+---
+# Let's Encrypt ClusterIssuer for Production
+# Uses DNS-01 challenge with AWS Route53
+apiVersion: cert-manager.io/v1
+kind: ClusterIssuer
+metadata:
+  name: letsencrypt-prod
+spec:
+  acme:
+    # Let's Encrypt production server
+    server: https://acme-v02.api.letsencrypt.org/directory
+
+    # Email for Let's Encrypt account notifications
+    email: admin@yu-min3.com  # TODO: 実際のメールアドレスに変更してください
+
+    # Private key for ACME account
+    privateKeySecretRef:
+      name: letsencrypt-prod
+
+    # DNS-01 challenge solver using Route53
+    solvers:
+      - dns01:
+          route53:
+            region: ap-northeast-1  # Tokyo region (必要に応じて変更)
+            # AWS credentials from Secret
+            accessKeyIDSecretRef:
+              name: route53-credentials
+              key: access-key-id
+            secretAccessKeySecretRef:
+              name: route53-credentials
+              key: secret-access-key
+---
+# Let's Encrypt ClusterIssuer for Staging (testing)
+# Use this for testing before using production issuer
+apiVersion: cert-manager.io/v1
+kind: ClusterIssuer
+metadata:
+  name: letsencrypt-staging
+spec:
+  acme:
+    # Let's Encrypt staging server (for testing, has higher rate limits)
+    server: https://acme-staging-v02.api.letsencrypt.org/directory
+
+    email: admin@yu-min3.com  # TODO: 実際のメールアドレスに変更してください
+
+    privateKeySecretRef:
+      name: letsencrypt-staging
+
+    solvers:
+      - dns01:
+          route53:
+            region: ap-northeast-1
+            accessKeyIDSecretRef:
+              name: route53-credentials
+              key: access-key-id
+            secretAccessKeySecretRef:
+              name: route53-credentials
+              key: secret-access-key
