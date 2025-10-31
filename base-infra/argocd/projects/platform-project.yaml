@@ -19,8 +19,6 @@ spec:
       server: "https://kubernetes.default.svc"
     - namespace: "argocd"
       server: "https://kubernetes.default.svc"
-    - namespace: "metallb-system"
-      server: "https://kubernetes.default.svc"
     - namespace: "istio-system"
       server: "https://kubernetes.default.svc"
     - namespace: "cert-manager"
