@@ -34,8 +34,9 @@ spec:
       tls:
         mode: Terminate
         certificateRefs:
-          - name: wildcard-tls
+          - group: ""
             kind: Secret
+            name: wildcard-tls
 ---
 # Service for Development Gateway
 apiVersion: v1
