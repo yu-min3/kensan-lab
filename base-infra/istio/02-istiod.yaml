@@ -65,8 +65,12 @@ metadata:
 data:
   original-values: |-
     {
-      "global": {
-        "istioNamespace": "istio-system"
+      "pilot": {
+        "env": {
+          "PILOT_ENABLE_GATEWAY_API": true,
+          "PILOT_ENABLE_GATEWAY_API_DEPLOYMENT_CONTROLLER": true,
+          "PILOT_ENABLE_GATEWAY_API_STATUS": true
+        }
       }
     }
   merged-values: |-
@@ -89,7 +93,11 @@ data:
       },
       "deploymentAnnotations": {},
       "deploymentLabels": {},
-      "env": {},
+      "env": {
+        "PILOT_ENABLE_GATEWAY_API": true,
+        "PILOT_ENABLE_GATEWAY_API_DEPLOYMENT_CONTROLLER": true,
+        "PILOT_ENABLE_GATEWAY_API_STATUS": true
+      },
       "envVarFrom": [],
       "experimental": {
         "stableValidationPolicy": false
@@ -227,6 +235,13 @@ data:
       "pdb": {
         "minAvailable": 1,
         "unhealthyPodEvictionPolicy": ""
+      },
+      "pilot": {
+        "env": {
+          "PILOT_ENABLE_GATEWAY_API": true,
+          "PILOT_ENABLE_GATEWAY_API_DEPLOYMENT_CONTROLLER": true,
+          "PILOT_ENABLE_GATEWAY_API_STATUS": true
+        }
       },
       "podAnnotations": {},
       "podLabels": {},
@@ -449,7 +464,11 @@ data:
           "enabled": false,
           "provider": "default"
         },
-        "env": {}
+        "env": {
+          "PILOT_ENABLE_GATEWAY_API": true,
+          "PILOT_ENABLE_GATEWAY_API_DEPLOYMENT_CONTROLLER": true,
+          "PILOT_ENABLE_GATEWAY_API_STATUS": true
+        }
       },
       "revision": "",
       "sidecarInjectorWebhook": {
@@ -2989,6 +3008,12 @@ spec:
           
           - name: CA_TRUSTED_NODE_ACCOUNTS
             value: "istio-system/ztunnel"
+          - name: PILOT_ENABLE_GATEWAY_API
+            value: "true"
+          - name: PILOT_ENABLE_GATEWAY_API_DEPLOYMENT_CONTROLLER
+            value: "true"
+          - name: PILOT_ENABLE_GATEWAY_API_STATUS
+            value: "true"
           - name: PILOT_TRACE_SAMPLING
             value: "1"
 # If externalIstiod is set via Values.Global, then enable the pilot env variable. However, if it's set via Values.pilot.env, then

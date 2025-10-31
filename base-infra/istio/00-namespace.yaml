@@ -3,5 +3,5 @@ kind: Namespace
 metadata:
   name: istio-system
   annotations:
-    argocd.argoproj.io/sync-wave: "-2"  # Create namespace first
+    argocd.argoproj.io/sync-wave: "-3"  # Create namespace first (before CRDs)
 spec: {}
