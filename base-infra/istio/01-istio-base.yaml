@@ -17677,9 +17677,10 @@ webhooks:
           - "*"
         resources:
           - "*"
-    # Fail open until the validation webhook is ready. The webhook controller
-    # will update this to `Fail` and patch in the `caBundle` when the webhook
-    # endpoint is ready.
-    failurePolicy: Ignore
+    # Changed from Ignore to Fail after initial bootstrap.
+    # Initial bootstrap requires Ignore to avoid chicken-and-egg problem,
+    # but after successful deployment this should be Fail for proper validation.
+    # See README.md for re-installation instructions.
+    failurePolicy: Fail
     sideEffects: None
     admissionReviewVersions: ["v1"]
