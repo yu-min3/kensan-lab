@@ -11,9 +11,11 @@ spec:
     path: base-infra/gateway-api
   destination:
     server: https://kubernetes.default.svc
+    namespace: kube-system  # CRDs are cluster-scoped, but ArgoCD requires a namespace context
   syncPolicy:
     automated:
-      prune: true
-      selfHeal: true
+      prune: true # Remove resources when removed from Git
+      selfHeal: true # Revert manual changes
     syncOptions:
-      - ServerSideApply=true
+      - CreateNamespace=true # kube-system already exists
+      - ServerSideApply=true # Use server-side apply for large manifests
