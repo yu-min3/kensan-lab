@@ -6,7 +6,7 @@ metadata:
   name: gateway-dev
   namespace: istio-system
   annotations:
-    argocd.argoproj.io/sync-wave: "2"  # Deploy after istiod (CRDs must be installed first)
+    argocd.argoproj.io/sync-wave: "2" # Deploy after istiod (CRDs must be installed first)
 spec:
   gatewayClassName: istio
   listeners:
@@ -37,29 +37,3 @@ spec:
           - group: ""
             kind: Secret
             name: wildcard-tls
----
-# Service for Development Gateway
-apiVersion: v1
-kind: Service
-metadata:
-  name: gateway-dev
-  namespace: istio-system
-  annotations:
-    argocd.argoproj.io/sync-wave: "2"  # Deploy after istiod
-  labels:
-    app: gateway-dev
-    istio: gateway
-spec:
-  type: LoadBalancer
-  loadBalancerIP: 192.168.0.242
-  selector:
-    istio.io/gateway-name: gateway-dev
-  ports:
-    - name: http
-      port: 80
-      targetPort: 80
-      protocol: TCP
-    - name: https
-      port: 443
-      targetPort: 443
-      protocol: TCP
