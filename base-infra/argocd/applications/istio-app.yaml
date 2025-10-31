@@ -26,7 +26,3 @@ spec:
     syncOptions:
       - CreateNamespace=true
       - ServerSideApply=true
-    syncWaves:
-      - wave: 0  # Deploy istio-base first (CRDs)
-      - wave: 1  # Then istiod (Control Plane)
-      - wave: 2  # Finally gateways
