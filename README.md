@@ -83,7 +83,70 @@
    kubectl get secret argocd-initial-admin-secret -n argocd -o jsonpath="{.data.password}" | base64 -d
    ```
 
-3. **GHCR用Sealed Secretsの作成**
+3. **Kubernetes Gateway API CRDsのデプロイ**
+   ```bash
+   # Gateway API CRDsをダウンロード
+   curl -sL https://github.com/kubernetes-sigs/gateway-api/releases/download/v1.2.0/standard-install.yaml \
+     -o base-infra/gateway-api/gateway-api-crds.yaml
+
+   # Argo CD経由でデプロイ（gateway-api-app.yamlをGitにcommit後）
+   # または手動適用:
+   kubectl apply -f base-infra/gateway-api/gateway-api-crds.yaml
+   ```
+
+4. **Istio Service Meshのデプロイ**
+   ```bash
+   # Istio Helmリポジトリ追加
+   helm repo add istio https://istio-release.storage.googleapis.com/charts
+   helm repo update
+
+   # istio-base (CRDs) を生成
+   helm template istio-base istio/base \
+     --namespace istio-system \
+     --version 1.27.3 \
+     > base-infra/istio/01-istio-base.yaml
+
+   # istiod (Control Plane) を生成（Gateway API サポート有効化）
+   helm template istiod istio/istiod \
+     --namespace istio-system \
+     --version 1.27.3 \
+     --set pilot.env.PILOT_ENABLE_GATEWAY_API=true \
+     --set pilot.env.PILOT_ENABLE_GATEWAY_API_STATUS=true \
+     --set pilot.env.PILOT_ENABLE_GATEWAY_API_DEPLOYMENT_CONTROLLER=true \
+     > base-infra/istio/02-istiod.yaml
+
+   # Argo CD経由でデプロイ（istio-app.yamlをGitにcommit後）
+   # デプロイ順序（ファイル名順で自動制御）:
+   # 1. 00-namespace.yaml  (istio-system namespace)
+   # 2. 01-istio-base.yaml (CRDs)
+   # 3. 02-istiod.yaml     (Control Plane)
+   # 4. gateway-dev.yaml   (Dev Gateway + Service)
+   # 5. gateway-prod.yaml  (Prod Gateway + Service)
+
+   # Istioステータス確認
+   kubectl get pods -n istio-system
+   kubectl get gateway -n istio-system
+   kubectl get svc -n istio-system -l istio=gateway
+   ```
+
+   **⚠️ 重要: Istio再インストール時の注意**
+
+   クラスタの完全な再構築やIstioの再インストールを行う場合、ValidatingWebhookのブートストラップ問題を回避するため、以下の手順を推奨します：
+
+   ```bash
+   # オプション1: 一時的にfailurePolicyをIgnoreに変更してデプロイ
+   # 1. base-infra/istio/02-istiod.yaml の failurePolicy: Fail を一時的に Ignore に変更
+   # 2. デプロイ完了後、Fail に戻してコミット
+
+   # オプション2: Webhookリソースを事前削除（既存環境の場合）
+   kubectl delete validatingwebhookconfiguration istio-validator-istio-system istiod-default-validator
+
+   # オプション3: ファイル名順序制御に依存（推奨）
+   # 現在の命名規則（00-namespace → 01-base → 02-istiod → gateway）により、
+   # 通常はブートストラップ問題は発生しません
+   ```
+
+5. **GHCR用Sealed Secretsの作成**
    ```bash
    # 生シークレット作成（temp/ディレクトリに保存 - git-ignored）
    kubectl create secret docker-registry ghcr-pull-secret \
