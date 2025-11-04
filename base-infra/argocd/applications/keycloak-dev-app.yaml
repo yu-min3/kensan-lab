@@ -1,0 +1,27 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: keycloak-dev
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "2"  # Deploy after Istio (depends on HTTPRoute)
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: platform-project
+
+  source:
+    repoURL: 'https://github.com/yu-min3/k8s-platform-config'
+    targetRevision: HEAD
+    path: base-infra/keycloak/overlays/dev
+
+  destination:
+    server: 'https://kubernetes.default.svc'
+    namespace: platform-auth-dev
+
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
