@@ -180,6 +180,7 @@ make clean    # ローカルイメージ削除
 
 ## ドキュメント
 
+- **[環境固有の設定変更ガイド](./docs/configuration.md)**: 別環境で使用する際に変更が必要な設定項目
 - **[プラットフォームアーキテクチャ](./docs/architecture/design.md)**: 設計原則、技術スタック、セキュリティモデル
 - **[リポジトリ構成](./docs/architecture/repository-structure.md)**: マルチリポジトリGitOps戦略とワークフロー
 - **[実装ロードマップ](./docs/roadmap.md)**: プロジェクトフェーズと現在の進捗

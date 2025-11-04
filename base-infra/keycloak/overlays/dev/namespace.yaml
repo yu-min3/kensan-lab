@@ -1,0 +1,7 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: platform-auth-dev
+  labels:
+    name: platform-auth-dev
+    environment: development
