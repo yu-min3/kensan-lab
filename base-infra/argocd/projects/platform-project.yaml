@@ -14,26 +14,9 @@ spec:
     - "*" # Allow Helm charts and other external sources
 
   # Destinations where applications can be deployed
+  # Using wildcard for all namespaces as this cluster is dedicated to infrastructure
   destinations:
-    - namespace: "kube-system"
-      server: "https://kubernetes.default.svc"
-    - namespace: "argocd"
-      server: "https://kubernetes.default.svc"
-    - namespace: "istio-system"
-      server: "https://kubernetes.default.svc"
-    - namespace: "cert-manager"
-      server: "https://kubernetes.default.svc"
-    - namespace: "monitoring"
-      server: "https://kubernetes.default.svc"
-    - namespace: "platform-auth"
-      server: "https://kubernetes.default.svc"
-    - namespace: "sealed-secrets"
-      server: "https://kubernetes.default.svc"
-    - namespace: "cilium-secrets"
-      server: "https://kubernetes.default.svc"
-    - namespace: "app-dev"
-      server: "https://kubernetes.default.svc"
-    - namespace: "app-prod"
+    - namespace: "*"
       server: "https://kubernetes.default.svc"
 
   # Allow all cluster-scoped resources (required for CNI, CRDs, etc.)
