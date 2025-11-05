@@ -182,7 +182,39 @@ kubectl apply -f base-infra/sealed-secret/ghcr-pull-secret-prod.yaml
 
 ## 6. Prometheus + Grafana 監視スタックのデプロイ
 
-Prometheus と Grafana を使用して、クラスターとアプリケーションのメトリクスを収集・可視化します。
+Prometheus と Grafana を使用して、クラスターとアプリケーションのメトリクスを収集・可視化する。
+
+### 6.1. Grafana 管理者パスワードの Sealed Secret 作成
+
+```bash
+# ランダムパスワード生成
+GRAFANA_PASSWORD=$(openssl rand -base64 32 | tr -d "=+/" | cut -c1-32)
+echo "Generated password: $GRAFANA_PASSWORD"
+
+# 生 Secret 作成（temp/ ディレクトリに保存 - git-ignored）
+kubectl create secret generic prometheus-grafana \
+  --from-literal=admin-user=admin \
+  --from-literal=admin-password="$GRAFANA_PASSWORD" \
+  --namespace=monitoring \
+  --dry-run=client -o yaml > temp/grafana-secret-raw.yaml
+
+# シークレットを暗号化
+kubeseal --format=yaml \
+  --controller-name=sealed-secrets \
+  --controller-namespace=kube-system \
+  < temp/grafana-secret-raw.yaml \
+  > base-infra/prometheus/grafana-sealed-secret.yaml
+
+# Sealed Secret を Git にコミット
+git add base-infra/prometheus/grafana-sealed-secret.yaml
+```
+
+**セキュリティ注意:**
+- `temp/` ディレクトリのファイルは Git に追跡されない（.gitignore で除外）
+- 暗号化された Sealed Secret のみを Git にコミットする
+- Sealed Secrets コントローラーがクラスター内で自動的に復号化する
+
+### 6.2. Prometheus マニフェスト生成
 
 ```bash
 # Prometheus Helm リポジトリ追加
@@ -190,9 +222,11 @@ helm repo add prometheus-community https://prometheus-community.github.io/helm-c
 helm repo update
 
 # kube-prometheus-stack マニフェスト生成
+# prometheus-values.yaml で admin.existingSecret を指定しているため、
+# Grafana は上記で作成した Sealed Secret を参照する
 helm template prometheus prometheus-community/kube-prometheus-stack \
   --namespace monitoring \
-  --values base-infra/prometheus/values.yaml \
+  --values docs/prometheus-values.yaml \
   > base-infra/prometheus/prometheus-stack.yaml
 ```
 
@@ -204,18 +238,52 @@ helm template prometheus prometheus-community/kube-prometheus-stack \
 - **Node Exporter**: ノードレベルメトリクス
 - **Kube State Metrics**: Kubernetes オブジェクト状態
 
+### 6.3. Platform Gateway と HTTPRoute の作成
+
+インフラ系サービス（Grafana、Prometheus UI）への外部アクセスを提供する。
+
+```bash
+# Platform Gateway の作成（base-infra/istio/gateway-platform.yaml）
+# - ホスト名: *.platform.yu-min3.com
+# - HTTP/HTTPS リスナー
+# - Cilium LoadBalancer で外部 IP 割り当て
+
+# HTTPRoute の作成
+# - base-infra/prometheus/httproute-grafana.yaml
+#   → https://grafana.platform.yu-min3.com
+# - base-infra/prometheus/httproute-prometheus.yaml
+#   → https://prometheus.platform.yu-min3.com
+```
+
+### 6.4. デプロイとアクセス
+
 **ステータス確認:**
 ```bash
 kubectl get pods -n monitoring
+kubectl get sealedsecret -n monitoring
+kubectl get secret prometheus-grafana -n monitoring
 ```
 
-**Grafana にアクセス（Port-forward 経由）:**
+**Grafana 管理者パスワードの取得:**
+```bash
+kubectl get secret prometheus-grafana -n monitoring \
+  -o jsonpath="{.data.admin-password}" | base64 -d
+echo  # 改行
+```
+
+**アクセス方法:**
+
+Port-forward 経由（開発用）:
 ```bash
 kubectl port-forward -n monitoring svc/prometheus-grafana 3000:80
 # ブラウザで http://localhost:3000 にアクセス
 # ユーザー名: admin
-# パスワード: admin (values.yaml で設定)
+# パスワード: 上記コマンドで取得
 ```
+
+HTTPRoute 経由（本番用）:
+- Grafana: `https://grafana.platform.yu-min3.com`
+- Prometheus UI: `https://prometheus.platform.yu-min3.com`
 
 **利用可能なデフォルトダッシュボード:**
 - Kubernetes / Compute Resources / Cluster

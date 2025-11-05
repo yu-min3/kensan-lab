@@ -56,8 +56,13 @@ prometheus:
 grafana:
   enabled: true
 
-  # Admin credentials (change in production!)
-  adminPassword: admin  # TODO: Use Sealed Secret in production
+  # Admin credentials: Use existing Secret (managed by Sealed Secrets)
+  # Secret name: prometheus-grafana (created from grafana-sealed-secret.yaml)
+  # Retrieve password with: kubectl get secret prometheus-grafana -n monitoring -o jsonpath="{.data.admin-password}" | base64 -d
+  admin:
+    existingSecret: prometheus-grafana
+    userKey: admin-user
+    passwordKey: admin-password
 
   # Resource limits for Raspberry Pi
   resources:
