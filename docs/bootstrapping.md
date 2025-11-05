@@ -224,19 +224,24 @@ helm repo update
 # kube-prometheus-stack マニフェスト生成
 # prometheus-values.yaml で admin.existingSecret を指定しているため、
 # Grafana は上記で作成した Sealed Secret を参照する
+# --include-crds: Prometheus Operator の CRD を含める（必須）
 helm template prometheus prometheus-community/kube-prometheus-stack \
   --namespace monitoring \
+  --include-crds \
   --values docs/prometheus-values.yaml \
   > base-infra/prometheus/prometheus-stack.yaml
 ```
 
-**デプロイされるコンポーネント:**
+**生成されるリソース:**
+- **CRD（CustomResourceDefinitions）**: PrometheusRule, ServiceMonitor, PodMonitor など（10個）
 - **Prometheus Operator**: CRD 管理
 - **Prometheus Server**: メトリクス収集・保存
 - **Alertmanager**: アラート管理
 - **Grafana**: ダッシュボード・可視化
 - **Node Exporter**: ノードレベルメトリクス
 - **Kube State Metrics**: Kubernetes オブジェクト状態
+
+**重要**: `--include-crds` フラグを指定しないと、PrometheusRule などのカスタムリソースがデプロイ時にエラーになる
 
 ### 6.3. Platform Gateway と HTTPRoute の作成
 
