@@ -15,16 +15,16 @@
 
 ---
 
-## 1. Cilium CNI + LoadBalancer のデプロイ
+## 1. Cilium CNI + LoadBalancer + Hubble UI のデプロイ
 
-Cilium は CNI プラグインとして機能し、kube-proxy を置き換えます。また、L2 アナウンスメントを使用した LoadBalancer 機能も提供します。
+Cilium は CNI プラグインとして機能し、kube-proxy を置き換えます。また、L2 アナウンスメントを使用した LoadBalancer 機能と、Hubble によるネットワーク可視化も提供します。
 
 ```bash
 # Helm リポジトリ追加
 helm repo add cilium https://helm.cilium.io/
 helm repo update
 
-# マニフェスト生成
+# マニフェスト生成（Hubble UI/Relay を含む）
 helm template cilium cilium/cilium \
   --namespace kube-system \
   --set kubeProxyReplacement=true \
@@ -35,10 +35,14 @@ helm template cilium cilium/cilium \
   --set l2announcements.enabled=true \
   --set externalIPs.enabled=true \
   --set devices=wlan0 \
+  --set hubble.enabled=true \
+  --set hubble.relay.enabled=true \
+  --set hubble.ui.enabled=true \
   > base-infra/cilium/cilium.yaml
 
 # ステータス確認
 kubectl get pods -n kube-system -l k8s-app=cilium
+kubectl get pods -n kube-system -l k8s-app=hubble-ui
 kubectl get ciliumloadbalancerippools
 ```
 
@@ -46,7 +50,20 @@ kubectl get ciliumloadbalancerippools
 - `kubeProxyReplacement=true`: kube-proxy を完全に置き換え
 - `l2announcements.enabled=true`: L2 レイヤーで LoadBalancer IP をアナウンス
 - `devices=wlan0`: 物理ネットワークインターフェース（環境に応じて変更）
+- `hubble.enabled=true`: Hubble Agent を有効化（各 Cilium Pod 内でフロー監視）
+- `hubble.relay.enabled=true`: Hubble Relay をデプロイ（クラスター全体のフロー集約）
+- `hubble.ui.enabled=true`: Hubble UI をデプロイ（Web ベースの可視化）
 - IP Pool: 192.168.0.240-249（`base-infra/cilium/lb-ippool.yaml` で定義）
+
+**Hubble UI へのアクセス:**
+- HTTPRoute 経由: `https://hubble.platform.yu-min3.com`（Platform Gateway を使用）
+- ポートフォワード: `kubectl port-forward -n kube-system svc/hubble-ui 8081:80`
+
+**Hubble の機能:**
+- サービス間のネットワークフローの可視化
+- ネットワークポリシーの動作確認
+- DNS クエリのトラブルシューティング
+- パケットドロップの原因調査
 
 ---
 
@@ -59,20 +76,56 @@ Argo CD は GitOps コントローラーとして、Git リポジトリの変更
 helm repo add argo https://argoproj.github.io/argo-helm
 helm repo update
 
-# マニフェスト生成（values.yaml を使用）
+# マニフェスト生成
 helm template argocd argo/argo-cd \
   --namespace argocd \
-  --values base-infra/argocd/values.yaml \
-  > base-infra/argocd/argocd.yaml
+  --set server.service.type=ClusterIP \
+  > base-infra/argocd/argocd-install.yaml
+
+# 生成されたマニフェストを編集
+# argocd-server Service の type: LoadBalancer を type: ClusterIP に変更
+# （Platform Gateway経由でアクセスするため）
 
 # 初期パスワード取得
 kubectl get secret argocd-initial-admin-secret -n argocd -o jsonpath="{.data.password}" | base64 -d
 ```
 
+**アクセス方法の変更（LoadBalancer → Platform Gateway）:**
+
+以前は直接LoadBalancerでアクセスしていましたが、現在はPlatform Gateway経由でアクセスします：
+
+```yaml
+# base-infra/argocd/httproute.yaml
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: argocd-route
+  namespace: argocd
+spec:
+  parentRefs:
+  - name: gateway-platform
+    namespace: istio-system
+  hostnames:
+  - "argocd.platform.yu-min3.com"
+  rules:
+  - matches:
+    - path:
+        type: PathPrefix
+        value: /
+    backendRefs:
+    - name: argocd-server
+      port: 80
+```
+
 **アクセス:**
-- URL: http://192.168.0.240（Cilium LoadBalancer 経由）
+- URL: https://argocd.platform.yu-min3.com（Platform Gateway 経由）
 - ユーザー名: admin
 - パスワード: 上記コマンドで取得
+
+**設定のポイント:**
+- `server.service.type=ClusterIP`: LoadBalancerではなくClusterIPで作成
+- HTTPRouteでPlatform Gatewayに接続
+- 他のプラットフォームサービス（Grafana、Prometheusなど）と統一的にアクセス可能
 
 ---
 
