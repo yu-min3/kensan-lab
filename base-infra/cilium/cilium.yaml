@@ -634,7 +634,7 @@ rules:
   - get
   - list
   - watch
-    # To perform CiliumNode garbage collector
+  # To perform CiliumNode garbage collector
   - delete
 - apiGroups:
   - cilium.io
