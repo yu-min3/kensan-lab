@@ -3,6 +3,8 @@ kind: Application
 metadata:
   name: gateway-api
   namespace: argocd
+  annotations:
+    argocd.argoproj.io/icon: "https://raw.githubusercontent.com/kubernetes/community/master/icons/svg/resources/labeled/api.svg"
 spec:
   project: platform-project
   source:
