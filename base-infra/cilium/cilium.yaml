@@ -717,11 +717,11 @@ rules:
   - list
   - watch
 - apiGroups:
-    - cilium.io
+  - cilium.io
   resources:
-    - ciliumpodippools
+  - ciliumpodippools
   verbs:
-    - create
+  - create
 - apiGroups:
   - cilium.io
   resources:
