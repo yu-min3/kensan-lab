@@ -3,10 +3,6 @@ kind: Application
 metadata:
   name: prometheus
   namespace: argocd
-  annotations:
-    argocd.argoproj.io/icon: "https://cncf-branding.netlify.app/img/projects/prometheus/icon/color/prometheus-icon-color.svg"
-    link.argocd.argoproj.io/prometheus: "https://prometheus.platform.yu-min3.com"
-    link.argocd.argoproj.io/grafana: "https://grafana.platform.yu-min3.com"
   finalizers:
     - resources-finalizer.argocd.argoproj.io
 spec:
