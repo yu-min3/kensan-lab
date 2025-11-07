@@ -14,7 +14,7 @@ spec:
     path: base-infra/argocd
     directory:
       recurse: false  # Don't recursively apply subdirectories
-      include: '{namespace.yaml,argocd-install.yaml}'  # Only these files
+      exclude: '{applications/*,projects/*,root-apps/*}'  # Exclude subdirectories
 
   destination:
     server: 'https://kubernetes.default.svc'
