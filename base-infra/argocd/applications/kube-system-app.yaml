@@ -3,6 +3,8 @@ kind: Application
 metadata:
   name: kube-system
   namespace: argocd
+  annotations:
+    argocd.argoproj.io/icon: "https://raw.githubusercontent.com/kubernetes/community/master/icons/svg/resources/labeled/ns.svg"
   finalizers:
     - resources-finalizer.argocd.argoproj.io
 spec:

@@ -3,6 +3,9 @@ kind: Application
 metadata:
   name: argocd
   namespace: argocd
+  annotations:
+    argocd.argoproj.io/icon: "https://cncf-branding.netlify.app/img/projects/argo/icon/color/argo-icon-color.svg"
+    link.argocd.argoproj.io/external-link: "https://argocd.platform.yu-min3.com"
   finalizers:
     - resources-finalizer.argocd.argoproj.io
 spec:

@@ -5,6 +5,7 @@ metadata:
   namespace: argocd
   annotations:
     argocd.argoproj.io/sync-wave: "0"  # Deploy after istio (wave -1)
+    argocd.argoproj.io/icon: "https://raw.githubusercontent.com/cncf/artwork/master/projects/cert-manager/icon/color/cert-manager-icon-color.svg"
   finalizers:
     - resources-finalizer.argocd.argoproj.io
 spec:
