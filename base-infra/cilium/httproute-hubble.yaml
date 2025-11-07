@@ -5,7 +5,9 @@ metadata:
   namespace: kube-system
 spec:
   parentRefs:
-  - name: gateway-platform
+  - group: gateway.networking.k8s.io
+    kind: Gateway
+    name: gateway-platform
     namespace: istio-system
   hostnames:
   - "hubble.platform.yu-min3.com"
@@ -15,5 +17,8 @@ spec:
         type: PathPrefix
         value: /
     backendRefs:
-    - name: hubble-ui
+    - group: ''
+      kind: Service
+      name: hubble-ui
       port: 80
+      weight: 1
