@@ -82,9 +82,10 @@ helm template argocd argo/argo-cd \
   --set server.service.type=ClusterIP \
   > base-infra/argocd/argocd-install.yaml
 
-# 生成されたマニフェストを編集
-# argocd-server Service の type: LoadBalancer を type: ClusterIP に変更
-# （Platform Gateway経由でアクセスするため）
+# ⚠️ 重要: Edge Termination 対応のための手動編集が必要
+# base-infra/argocd/argocd-install.yaml を開き、
+# argocd-cmd-params-cm ConfigMap の data セクションに以下を追加:
+#   server.insecure: "true"  # Run server without TLS (TLS termination is handled by Istio Gateway)
 
 # 初期パスワード取得
 kubectl get secret argocd-initial-admin-secret -n argocd -o jsonpath="{.data.password}" | base64 -d
