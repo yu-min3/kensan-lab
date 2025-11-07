@@ -529,7 +529,7 @@ rules:
   resourceNames:
   - cilium-config
   verbs:
-   # allow patching of the configmap to set annotations
+  # allow patching of the configmap to set annotations
   - patch
 - apiGroups:
   - ""
