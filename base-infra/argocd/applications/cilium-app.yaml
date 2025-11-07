@@ -24,3 +24,21 @@ spec:
     syncOptions:
       - CreateNamespace=false  # kube-system already exists
       - ServerSideApply=true   # Use server-side apply for large manifests
+
+  # Ignore Cilium runtime-generated CRs
+  ignoreDifferences:
+    - group: cilium.io
+      kind: CiliumNode
+      jqPathExpressions:
+        - .status
+        - .spec
+    - group: cilium.io
+      kind: CiliumEndpoint
+      jqPathExpressions:
+        - .status
+        - .spec
+    - group: cilium.io
+      kind: CiliumIdentity
+      jqPathExpressions:
+        - .status
+        - .spec
