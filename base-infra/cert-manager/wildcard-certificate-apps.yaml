@@ -1,0 +1,29 @@
+---
+# Wildcard certificate for *.apps.yu-min3.com
+# This certificate will be used by Application Gateways (prod/dev)
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: wildcard-apps-yu-min3-com
+  namespace: istio-system
+spec:
+  # Secret name where the certificate will be stored
+  secretName: wildcard-apps-tls
+
+  # Reference to ClusterIssuer
+  issuerRef:
+    name: letsencrypt-prod
+    kind: ClusterIssuer
+
+  # DNS names covered by this certificate
+  dnsNames:
+    - "*.app.yu-min3.com" # Wildcard for apps subdomain
+
+  # Private key settings
+  privateKey:
+    algorithm: RSA
+    encoding: PKCS1
+    size: 4096
+
+  # Certificate renewal settings
+  renewBefore: 720h # Renew 30 days before expiration (Let's Encrypt certs are valid for 90 days)
