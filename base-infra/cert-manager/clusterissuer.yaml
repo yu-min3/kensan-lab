@@ -11,7 +11,7 @@ spec:
     server: https://acme-v02.api.letsencrypt.org/directory
 
     # Email for Let's Encrypt account notifications
-    email: admin@yu-min3.com  # TODO: 実際のメールアドレスに変更してください
+    email: admin@yu-min3.com
 
     # Private key for ACME account
     privateKeySecretRef:
@@ -21,7 +21,7 @@ spec:
     solvers:
       - dns01:
           route53:
-            region: ap-northeast-1  # Tokyo region (必要に応じて変更)
+            region: ap-northeast-1 # Tokyo region (必要に応じて変更)
             # AWS credentials from Secret
             accessKeyIDSecretRef:
               name: route53-credentials
@@ -41,7 +41,7 @@ spec:
     # Let's Encrypt staging server (for testing, has higher rate limits)
     server: https://acme-staging-v02.api.letsencrypt.org/directory
 
-    email: admin@yu-min3.com  # TODO: 実際のメールアドレスに変更してください
+    email: admin@yu-min3.com
 
     privateKeySecretRef:
       name: letsencrypt-staging
