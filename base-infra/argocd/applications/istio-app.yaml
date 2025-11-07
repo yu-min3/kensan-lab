@@ -5,6 +5,7 @@ metadata:
   namespace: argocd
   annotations:
     argocd.argoproj.io/sync-wave: "-1"  # Deploy before cert-manager (creates istio-system namespace)
+    argocd.argoproj.io/icon: "https://cncf-branding.netlify.app/img/projects/istio/icon/color/istio-icon-color.svg"
   finalizers:
     - resources-finalizer.argocd.argoproj.io
 spec:
