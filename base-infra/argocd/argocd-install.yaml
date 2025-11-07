@@ -25108,8 +25108,7 @@ metadata:
     app.kubernetes.io/part-of: argocd
     app.kubernetes.io/version: "v3.1.9"
 spec:
-  type: LoadBalancer  
-  externalTrafficPolicy: Cluster
+  type: ClusterIP
   sessionAffinity: None
   ports:
   - name: http

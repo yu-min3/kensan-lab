@@ -5,3 +5,4 @@ metadata:
   labels:
     name: monitoring
     managed-by: argocd
+    platform: infrastructure  # Allow access from gateway-platform
