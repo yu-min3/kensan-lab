@@ -5,8 +5,6 @@ metadata:
   namespace: argocd
   annotations:
     argocd.argoproj.io/sync-wave: "2"  # Deploy after Istio (depends on HTTPRoute)
-    argocd.argoproj.io/icon: "https://www.keycloak.org/resources/images/icon.svg"
-    link.argocd.argoproj.io/external-link: "https://auth-dev.platform.yu-min3.com"
   finalizers:
     - resources-finalizer.argocd.argoproj.io
 spec:
