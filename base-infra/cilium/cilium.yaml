@@ -302,7 +302,7 @@ data:
   tofqdns-idle-connection-grace-period: "0s"
   tofqdns-max-deferred-connection-deletes: "10000"
   tofqdns-proxy-response-max-delay: "100ms"
-  tofqdns-preallocate-identities:  "true"
+  tofqdns-preallocate-identities: "true"
   agent-not-ready-taint-key: "node.cilium.io/agent-not-ready"
 
   mesh-auth-enabled: "true"
@@ -529,7 +529,7 @@ rules:
   resourceNames:
   - cilium-config
   verbs:
-   # allow patching of the configmap to set annotations
+  # allow patching of the configmap to set annotations
   - patch
 - apiGroups:
   - ""
@@ -634,7 +634,7 @@ rules:
   - get
   - list
   - watch
-    # To perform CiliumNode garbage collector
+  # To perform CiliumNode garbage collector
   - delete
 - apiGroups:
   - cilium.io
@@ -717,11 +717,11 @@ rules:
   - list
   - watch
 - apiGroups:
-    - cilium.io
+  - cilium.io
   resources:
-    - ciliumpodippools
+  - ciliumpodippools
   verbs:
-    - create
+  - create
 - apiGroups:
   - cilium.io
   resources:
