@@ -5,7 +5,9 @@ metadata:
   namespace: platform-auth-dev
 spec:
   parentRefs:
-  - name: gateway-platform
+  - group: gateway.networking.k8s.io
+    kind: Gateway
+    name: gateway-platform
     namespace: istio-system
   hostnames:
   - "auth-dev.platform.yu-min3.com"
@@ -15,5 +17,8 @@ spec:
         type: PathPrefix
         value: /
     backendRefs:
-    - name: keycloak
+    - group: ''
+      kind: Service
+      name: keycloak
       port: 8080
+      weight: 1
