@@ -5,10 +5,10 @@ metadata:
   namespace: platform-auth-prod
 spec:
   parentRefs:
-  - name: gateway-prod
+  - name: gateway-platform
     namespace: istio-system
   hostnames:
-  - "auth.yu-min3.com"
+  - "auth.platform.yu-min3.com"
   rules:
   - matches:
     - path:

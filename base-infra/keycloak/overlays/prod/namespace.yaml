@@ -5,3 +5,4 @@ metadata:
   labels:
     name: platform-auth-prod
     environment: production
+    platform: infrastructure  # Allow access from gateway-platform
