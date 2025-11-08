@@ -53,12 +53,12 @@ build: build-backend
 .PHONY: login
 login:
 	@echo "Logging in to GHCR..."
-	@echo "$(GITHUB_GHCR_PAT)" | docker login ghcr.io -u $(GITHUB_USER) --password-stdin
+	@echo "$(GITHUB_GHCR_PAT)" | $(CONTAINER_RUNTIME) login ghcr.io -u $(GITHUB_USER) --password-stdin
 
 .PHONY: push
 push: login
 	@echo "Pushing image: $(FULL_IMAGE)"
-	docker push $(FULL_IMAGE)
+	$(CONTAINER_RUNTIME) push $(FULL_IMAGE)
 
 .PHONY: all
 all: install build push
@@ -67,7 +67,7 @@ all: install build push
 .PHONY: clean
 clean:
 	@echo "Removing local image: $(FULL_IMAGE)"
-	docker rmi $(FULL_IMAGE) || true
+	$(CONTAINER_RUNTIME) rmi $(FULL_IMAGE) || true
 
 .PHONY: dev
 dev: build-backend
