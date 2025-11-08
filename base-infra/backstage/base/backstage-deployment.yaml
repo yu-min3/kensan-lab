@@ -25,9 +25,21 @@ spec:
           value: postgresql
         - name: POSTGRES_PORT
           value: "5432"
-        envFrom:
-        - secretRef:
-            name: backstage-secret
+        - name: POSTGRES_USER
+          valueFrom:
+            secretKeyRef:
+              name: postgresql-secret
+              key: POSTGRES_USER
+        - name: POSTGRES_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: postgresql-secret
+              key: POSTGRES_PASSWORD
+        - name: GITHUB_TOKEN
+          valueFrom:
+            secretKeyRef:
+              name: backstage-secret
+              key: GITHUB_TOKEN
         resources:
           requests:
             memory: "512Mi"
