@@ -31,11 +31,27 @@ catalog:
   rules:
     - allow: [Component, System, API, Resource, Location, Template]
   locations:
-    # App templates repository
+    # App templates repository (production)
     - type: url
       target: https://github.com/yu-min3/app-templates/blob/main/catalog-info.yaml
       rules:
         - allow: [Template]
+
+    # Local examples (for testing in Kubernetes)
+    # In Docker image, working directory is /app/packages/backend
+    # examples/ is copied to /app/examples (see Dockerfile line 64)
+    - type: file
+      target: ../../examples/entities.yaml
+
+    - type: file
+      target: ../../examples/template/template.yaml
+      rules:
+        - allow: [Template]
+
+    - type: file
+      target: ../../examples/org.yaml
+      rules:
+        - allow: [User, Group]
 
 auth:
   providers:
@@ -50,4 +66,6 @@ techdocs:
     type: 'local'
 
 permission:
-  enabled: true
+  # Phase 1: Permission Framework無効化（開発中は全員がフルアクセス）
+  # Phase 3でOAuth2 Proxy + Permission Frameworkを有効化予定
+  enabled: false

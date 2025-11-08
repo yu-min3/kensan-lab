@@ -78,19 +78,21 @@ catalog:
   rules:
     - allow: [Component, System, API, Resource, Location]
   locations:
-    # Local example data, file locations are relative to the backend process, typically `packages/backend`
+    # Local example data, file locations are relative to the backend execution directory
+    # When running 'make dev', the working directory is packages/backend/dist/packages/backend
+    # So we need to go up 5 levels: packages/backend/dist/packages/backend -> backstage-app/
     - type: file
-      target: ../../examples/entities.yaml
+      target: ../../../../../examples/entities.yaml
 
     # Local example template
     - type: file
-      target: ../../examples/template/template.yaml
+      target: ../../../../../examples/template/template.yaml
       rules:
         - allow: [Template]
 
     # Local example organizational data
     - type: file
-      target: ../../examples/org.yaml
+      target: ../../../../../examples/org.yaml
       rules:
         - allow: [User, Group]
 
@@ -110,4 +112,5 @@ kubernetes:
 # see https://backstage.io/docs/permissions/getting-started for more on the permission framework
 permission:
   # setting this to `false` will disable permissions
-  enabled: true
+  # Phase 1: Permission Framework無効化（開発中）
+  enabled: false
