@@ -13,3 +13,33 @@ my_docs/*
 
 # Only Sealed Secrets should be committed
 *-raw.yaml
+
+# Backstage app artifacts
+backstage-app/node_modules/
+backstage-app/.yarn/cache/
+backstage-app/.yarn/unplugged/
+backstage-app/.yarn/build-state.yml
+backstage-app/.yarn/install-state.gz
+backstage-app/dist/
+backstage-app/dist-types/
+backstage-app/packages/*/dist/
+backstage-app/packages/*/dist-types/
+backstage-app/packages/*/node_modules/
+backstage-app/packages/*/build/
+backstage-app/plugins/*/dist/
+backstage-app/plugins/*/dist-types/
+backstage-app/plugins/*/node_modules/
+backstage-app/plugins/*/build/
+backstage-app/*.log
+backstage-app/.backstage/
+backstage-app/playwright-report/
+backstage-app/test-results/
+backstage-app/coverage/
+backstage-app/.cache/
+backstage-app/site/
+backstage-app/e2e-test-report/
+backstage-app/*.local.yaml
+backstage-app/*-credentials.yaml
+backstage-app/*.session.sql
+backstage-app/*.swp
+backstage-app/.pnp.*

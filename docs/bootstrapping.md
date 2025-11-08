@@ -369,7 +369,150 @@ HTTPRoute 経由（本番用）:
 
 ---
 
-## 7. Keycloak 認証基盤のデプロイ
+## 7. Backstage 開発者ポータルのブートストラップ
+
+Backstage は開発者ポータルとして、サービスカタログ、テンプレート、ドキュメント、Kubernetes 情報を一元管理します。
+
+### 7.1. Backstage アプリケーションの作成
+
+```bash
+# リポジトリルートから実行
+cd /workspaces/k8s-platform-config/
+
+# Backstage CLI を使用してアプリを生成
+npx @backstage/create-app@latest --path backstage-app
+# App name: platform-backstage
+```
+
+**生成されるもの:**
+- `packages/app/` - フロントエンド（React）
+- `packages/backend/` - バックエンド（Node.js）
+- `app-config.yaml` - 基本設定
+- `.yarn/releases/yarn-4.4.1.cjs` - Yarn 4（バンドル版）
+
+**重要**: Backstage は単一コンテナデプロイです。`@backstage/plugin-app-backend` がフロントエンドを配信するため、バックエンドのみデプロイすれば OK。
+
+### 7.2. Kubernetes 対応のカスタマイズ
+
+**app-config.kubernetes.yaml の作成:**
+
+```yaml
+# Kubernetes 環境用設定（主要な変更点のみ）
+backend:
+  baseUrl: https://backstage.yu-min3.com
+  listen:
+    host: 0.0.0.0  # K8s 用に全インターフェースでリッスン
+  database:
+    client: pg     # SQLite から PostgreSQL へ
+    connection:
+      host: ${POSTGRES_HOST}
+      user: ${POSTGRES_USER}
+      password: ${POSTGRES_PASSWORD}
+
+integrations:
+  github:
+    - token: ${GITHUB_TOKEN}
+
+catalog:
+  locations:
+    - type: url
+      target: https://github.com/yu-min3/app-templates/blob/main/catalog-info.yaml
+      rules:
+        - allow: [Template]
+```
+
+**Dockerfile の修正（packages/backend/Dockerfile）:**
+
+```dockerfile
+# 最終行を変更して Kubernetes 用設定を追加
+CMD ["node", "packages/backend", "--config", "app-config.yaml", "--config", "app-config.kubernetes.yaml"]
+```
+
+**Makefile の作成（ビルド自動化）:**
+
+```makefile
+-include ../.env
+export
+
+REGISTRY ?= ghcr.io
+IMAGE_NAME ?= $(GITHUB_USER)/backstage
+TAG ?= latest
+
+.PHONY: build
+build:
+	node .yarn/releases/yarn-4.4.1.cjs workspace backend build
+	DOCKER_BUILDKIT=1 docker build -f packages/backend/Dockerfile -t $(REGISTRY)/$(IMAGE_NAME):$(TAG) .
+
+.PHONY: push
+push:
+	echo "$(GITHUB_GHCR_PAT)" | docker login ghcr.io -u $(GITHUB_USER) --password-stdin
+	docker push $(REGISTRY)/$(IMAGE_NAME):$(TAG)
+```
+
+### 7.3. Backstage 用 Sealed Secrets の作成
+
+**PostgreSQL Secret:**
+
+```bash
+# 生シークレット作成
+kubectl create secret generic postgresql-secret \
+  --namespace=backstage \
+  --from-literal=POSTGRES_USER=backstage \
+  --from-literal=POSTGRES_PASSWORD=<strong-password> \
+  --dry-run=client -o yaml > temp/backstage-postgresql-secret-raw.yaml
+
+# 暗号化
+kubeseal --format=yaml < temp/backstage-postgresql-secret-raw.yaml \
+  > base-infra/backstage/postgresql-secret.yaml
+```
+
+**Backstage Secret:**
+
+```bash
+# 生シークレット作成（DB 認証情報 + GitHub トークン）
+kubectl create secret generic backstage-secret \
+  --namespace=backstage \
+  --from-literal=POSTGRES_USER=backstage \
+  --from-literal=POSTGRES_PASSWORD=<strong-password> \
+  --from-literal=GITHUB_TOKEN=<github-pat> \
+  --dry-run=client -o yaml > temp/backstage-secret-raw.yaml
+
+# 暗号化
+kubeseal --format=yaml < temp/backstage-secret-raw.yaml \
+  > base-infra/backstage/backstage-secret.yaml
+```
+
+### 7.4. ビルドとデプロイ
+
+```bash
+cd backstage-app
+
+# 依存関係インストール（2GB+ メモリ必要）
+export NODE_OPTIONS="--max-old-space-size=4096"
+make install
+
+# Docker イメージビルド
+make build TAG=v1.0.0
+
+# GHCR にプッシュ
+make push TAG=v1.0.0
+
+# Kubernetes にデプロイ
+kubectl apply -f ../base-infra/backstage/
+```
+
+**デプロイされるリソース:**
+- `postgresql` StatefulSet（PostgreSQL 15）
+- `backstage` Deployment（バックエンド + フロントエンド）
+- HTTPRoute（Platform Gateway 経由でアクセス）
+
+**アクセス:**
+- URL: https://backstage.yu-min3.com
+- 認証: Guest プロバイダー（開発用）
+
+---
+
+## 8. Keycloak 認証基盤のデプロイ
 
 Keycloak は JWT ベースの認証を提供し、Istio Gateway と統合されます。
 
