@@ -10,6 +10,7 @@ kubeconfig
 .serena
 my_docs/*
 .DS_Store
+.vscode
 
 # Only Sealed Secrets should be committed
 *-raw.yaml

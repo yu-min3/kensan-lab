@@ -1,4 +1,3 @@
----
 # Wildcard certificate for *.yu-min3.com
 # This certificate will be used by Istio Gateways
 apiVersion: cert-manager.io/v1
@@ -17,8 +16,8 @@ spec:
 
   # DNS names covered by this certificate
   dnsNames:
-    - "*.yu-min3.com"      # Wildcard for all subdomains
-    - "yu-min3.com"        # Apex domain
+  - "*.yu-min3.com" # Wildcard for all subdomains
+  - "yu-min3.com" # Apex domain
 
   # Private key settings
   privateKey:
@@ -27,4 +26,4 @@ spec:
     size: 4096
 
   # Certificate renewal settings
-  renewBefore: 720h  # Renew 30 days before expiration (Let's Encrypt certs are valid for 90 days)
+  renewBefore: 720h # Renew 30 days before expiration (Let's Encrypt certs are valid for 90 days)

@@ -1,4 +1,3 @@
----
 # Wildcard certificate for *.apps.yu-min3.com
 # This certificate will be used by Application Gateways (prod/dev)
 apiVersion: cert-manager.io/v1
@@ -17,7 +16,7 @@ spec:
 
   # DNS names covered by this certificate
   dnsNames:
-    - "*.app.yu-min3.com" # Wildcard for apps subdomain
+  - "*.app.yu-min3.com" # Wildcard for apps subdomain
 
   # Private key settings
   privateKey:
