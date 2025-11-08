@@ -3,6 +3,8 @@ kind: Kustomization
 
 resources:
   - namespace.yaml
+  - ghcr-pull-secret.yaml
+  - serviceaccount.yaml
   - postgresql-secret.yaml
   - postgresql-statefulset.yaml
   - postgresql-service.yaml
