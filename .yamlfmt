@@ -1,0 +1,19 @@
+version: v0.10.0
+
+formatter:
+  type: basic
+
+  # Kubernetes style: lists not indented
+  indentless_arrays: true
+
+  # Basic settings
+  indent: 2
+  include_document_start: false
+  line_ending: lf
+  retain_line_breaks: true
+  max_line_length: 120
+  trim_trailing_whitespace: true
+
+  # Don't add extra indentation
+  drop_merge_tag: false
+  pad_line_comments: 1
