@@ -4,3 +4,4 @@ metadata:
   name: backstage
   labels:
     istio-injection: enabled
+    platform: infrastructure
