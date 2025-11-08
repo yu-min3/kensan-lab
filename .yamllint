@@ -1,0 +1,32 @@
+---
+# yamllint configuration for Kubernetes style
+extends: default
+
+rules:
+  # Kubernetes style: no indent for list items (dash at parent level)
+  indentation:
+    spaces: 2
+    indent-sequences: false  # This is the key setting!
+    check-multi-line-strings: false
+
+  # Line length is disabled for Kubernetes manifests (often auto-generated)
+  line-length: disable
+
+  # Allow multiple documents in one file (common in Kubernetes)
+  document-start: disable
+
+  # Allow empty values (common in Kubernetes)
+  empty-values:
+    forbid-in-block-mappings: false
+    forbid-in-flow-mappings: false
+
+  # Comments can be anywhere
+  comments:
+    min-spaces-from-content: 1
+
+  # Allow trailing spaces in comments
+  trailing-spaces: disable
+
+  # Truthy values (yes/no, on/off, etc.) are OK
+  truthy:
+    allowed-values: ['true', 'false', 'yes', 'no', 'on', 'off']

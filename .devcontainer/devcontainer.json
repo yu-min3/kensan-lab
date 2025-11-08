@@ -7,14 +7,15 @@
         "--userns=keep-id",
         "--privileged"
     ],
-    "containerUser": "vscode", // イメージ内に存在する非ルートユーザー
-    "remoteUser": "vscode",
+    "containerUser": "root", // イメージ内に存在する非ルートユーザー
+    "remoteUser": "root",
     "customizations": {
         "vscode": {
             "extensions": [
                 "ms-kubernetes-tools.vscode-kubernetes-tools",
                 "redhat.vscode-yaml",
-                "ms-azuretools.vscode-docker"
+                "ms-azuretools.vscode-docker",
+                "bluebrown.yamlfmt"
             ]
         }
     }

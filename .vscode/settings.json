@@ -1,0 +1,9 @@
+{
+  // Auto-format YAML files with yamlfmt on save (Kubernetes style)
+  "[yaml]": {
+    "editor.formatOnSave": true,
+    "editor.defaultFormatter": "bluebrown.yamlfmt",
+    "editor.insertSpaces": true,
+    "editor.tabSize": 2
+  }
+}
