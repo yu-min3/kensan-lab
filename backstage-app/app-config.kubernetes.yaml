@@ -1,0 +1,71 @@
+app:
+  title: Platform Engineering Portal
+  baseUrl: https://backstage.yu-min3.com
+
+organization:
+  name: Platform Team
+
+backend:
+  baseUrl: https://backstage.yu-min3.com
+  listen:
+    port: 7007
+    host: 0.0.0.0
+  cors:
+    origin: https://backstage.yu-min3.com
+    methods: [GET, HEAD, PATCH, POST, PUT, DELETE]
+    credentials: true
+  database:
+    client: pg
+    connection:
+      host: ${POSTGRES_HOST}
+      port: ${POSTGRES_PORT}
+      user: ${POSTGRES_USER}
+      password: ${POSTGRES_PASSWORD}
+
+integrations:
+  github:
+    - host: github.com
+      token: ${GITHUB_TOKEN}
+
+catalog:
+  rules:
+    - allow: [Component, System, API, Resource, Location, Template]
+  locations:
+    # App templates repository (production)
+    - type: url
+      target: https://github.com/yu-min3/app-templates/blob/main/catalog-info.yaml
+      rules:
+        - allow: [Template]
+
+    # Local examples (for testing in Kubernetes)
+    # In Docker image, working directory is /app/packages/backend
+    # examples/ is copied to /app/examples (see Dockerfile line 64)
+    - type: file
+      target: ../../examples/entities.yaml
+
+    - type: file
+      target: ../../examples/template/template.yaml
+      rules:
+        - allow: [Template]
+
+    - type: file
+      target: ../../examples/org.yaml
+      rules:
+        - allow: [User, Group]
+
+auth:
+  providers:
+    guest:
+      dangerouslyAllowOutsideDevelopment: true
+
+techdocs:
+  builder: 'local'
+  generator:
+    runIn: 'docker'
+  publisher:
+    type: 'local'
+
+permission:
+  # Phase 1: Permission Framework無効化（開発中は全員がフルアクセス）
+  # Phase 3でOAuth2 Proxy + Permission Frameworkを有効化予定
+  enabled: false
