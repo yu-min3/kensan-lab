@@ -99,10 +99,10 @@ tsc:
 .PHONY: deploy
 deploy: build push
 	@echo "Updating Kustomize overlay with tag: $(TAG)..."
-	cd ../base-infra/backstage/overlays/current && \
+	cd ../base-infra/backstage/overlays/prod && \
 		kustomize edit set image ghcr.io/$(GITHUB_USER)/backstage:$(TAG)
 	@echo "Deploying via Kustomize..."
-	kubectl apply -k ../base-infra/backstage/overlays/current
+	kubectl apply -k ../base-infra/backstage/overlays/prod
 	@echo "Waiting for rollout to complete..."
 	kubectl rollout status deployment/backstage -n backstage --timeout=5m
 	@echo ""
@@ -118,7 +118,7 @@ deploy: build push
 .PHONY: commit-deploy
 commit-deploy:
 	@echo "Committing Kustomize overlay change..."
-	cd .. && git add base-infra/backstage/overlays/current/kustomization.yaml
+	cd .. && git add base-infra/backstage/overlays/prod/kustomization.yaml
 	cd .. && git commit -m "Deploy Backstage $(TAG)"
 	cd .. && git push
 	@echo "✅ Committed and pushed"
@@ -127,11 +127,11 @@ commit-deploy:
 .PHONY: preview
 preview:
 	@echo "Previewing deployment with tag: $(TAG)..."
-	@cd ../base-infra/backstage/overlays/current && \
+	@cd ../base-infra/backstage/overlays/prod && \
 		kustomize edit set image ghcr.io/$(GITHUB_USER)/backstage:$(TAG)
 	@echo ""
 	@echo "Generated Deployment (image section):"
-	@kubectl kustomize ../base-infra/backstage/overlays/current | grep -A10 "kind: Deployment" | grep -A5 "containers:"
+	@kubectl kustomize ../base-infra/backstage/overlays/prod | grep -A10 "kind: Deployment" | grep -A5 "containers:"
 	@echo ""
 	@echo "Full manifests:"
-	@echo "  kubectl kustomize ../base-infra/backstage/overlays/current"
+	@echo "  kubectl kustomize ../base-infra/backstage/overlays/prod"
