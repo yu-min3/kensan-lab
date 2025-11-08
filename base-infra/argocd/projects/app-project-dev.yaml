@@ -4,55 +4,55 @@ metadata:
   name: app-project-dev
   namespace: argocd
   finalizers:
-    - resources-finalizer.argocd.argoproj.io
+  - resources-finalizer.argocd.argoproj.io
 spec:
   description: Development environment for application developers
 
   # Source repositories - app-* repositories created by Backstage
   sourceRepos:
-    - "https://github.com/yu-min3/app-*" # Only allow yu-min3 organization app repositories
-    - "*" # Allow external Helm charts if needed
+  - "https://github.com/yu-min3/app-*" # Only allow yu-min3 organization app repositories
+  - "*" # Allow external Helm charts if needed
 
   # Development namespaces
   destinations:
-    - namespace: "app-dev"
-      server: "https://kubernetes.default.svc"
-    - namespace: "app-dev-*" # Per-app isolated namespaces
-      server: "https://kubernetes.default.svc"
+  - namespace: "app-dev"
+    server: "https://kubernetes.default.svc"
+  - namespace: "app-dev-*" # Per-app isolated namespaces
+    server: "https://kubernetes.default.svc"
 
   # Deny cluster-scoped resources (apps should not create CRDs, ClusterRoles, etc.)
   clusterResourceBlacklist:
-    - group: "*"
-      kind: "*"
+  - group: "*"
+    kind: "*"
 
   # Namespace-scoped resources whitelist (same as prod for consistency)
   namespaceResourceWhitelist:
-    - group: ""
-      kind: "ConfigMap"
-    - group: ""
-      kind: "Secret"
-    - group: ""
-      kind: "Service"
-    - group: ""
-      kind: "ServiceAccount"
-    - group: ""
-      kind: "PersistentVolumeClaim"
-    - group: "apps"
-      kind: "Deployment"
-    - group: "apps"
-      kind: "StatefulSet"
-    - group: "batch"
-      kind: "Job"
-    - group: "batch"
-      kind: "CronJob"
-    - group: "networking.k8s.io"
-      kind: "Ingress"
-    - group: "networking.k8s.io"
-      kind: "NetworkPolicy"
-    - group: "gateway.networking.k8s.io"
-      kind: "HTTPRoute"
-    - group: "autoscaling"
-      kind: "HorizontalPodAutoscaler"
+  - group: ""
+    kind: "ConfigMap"
+  - group: ""
+    kind: "Secret"
+  - group: ""
+    kind: "Service"
+  - group: ""
+    kind: "ServiceAccount"
+  - group: ""
+    kind: "PersistentVolumeClaim"
+  - group: "apps"
+    kind: "Deployment"
+  - group: "apps"
+    kind: "StatefulSet"
+  - group: "batch"
+    kind: "Job"
+  - group: "batch"
+    kind: "CronJob"
+  - group: "networking.k8s.io"
+    kind: "Ingress"
+  - group: "networking.k8s.io"
+    kind: "NetworkPolicy"
+  - group: "gateway.networking.k8s.io"
+    kind: "HTTPRoute"
+  - group: "autoscaling"
+    kind: "HorizontalPodAutoscaler"
 
   # Orphaned resources handling
   orphanedResources:

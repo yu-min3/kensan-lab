@@ -4,9 +4,9 @@ metadata:
   name: cert-manager
   namespace: argocd
   annotations:
-    argocd.argoproj.io/sync-wave: "0"  # Deploy after istio (wave -1)
+    argocd.argoproj.io/sync-wave: "0" # Deploy after istio (wave -1)
   finalizers:
-    - resources-finalizer.argocd.argoproj.io
+  - resources-finalizer.argocd.argoproj.io
 spec:
   project: platform-project
 
@@ -21,8 +21,8 @@ spec:
 
   syncPolicy:
     automated:
-      prune: true      # Remove resources when removed from Git
-      selfHeal: true   # Revert manual changes
+      prune: true # Remove resources when removed from Git
+      selfHeal: true # Revert manual changes
     syncOptions:
-      - CreateNamespace=true  # Create cert-manager namespace
-      - ServerSideApply=true  # Use server-side apply for large manifests
+    - CreateNamespace=true # Create cert-manager namespace
+    - ServerSideApply=true # Use server-side apply for large manifests

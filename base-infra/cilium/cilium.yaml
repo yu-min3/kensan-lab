@@ -1,4 +1,3 @@
----
 # Source: cilium/templates/cilium-secrets-namespace.yaml
 apiVersion: v1
 kind: Namespace
@@ -62,7 +61,7 @@ metadata:
   namespace: kube-system
 type: kubernetes.io/tls
 data:
-  ca.crt:  LS0tLS1CRUdJTiBDRVJUSUZJQ0FURS0tLS0tCk1JSURFekNDQWZ1Z0F3SUJBZ0lRUWcyclZaSWpLTXRQR0RVdFo0ZVFDVEFOQmdrcWhraUc5dzBCQVFzRkFEQVUKTVJJd0VBWURWUVFERXdsRGFXeHBkVzBnUTBFd0hoY05NalV4TVRBM01EVTBPRE15V2hjTk1qZ3hNVEEyTURVMApPRE15V2pBVU1SSXdFQVlEVlFRREV3bERhV3hwZFcwZ1EwRXdnZ0VpTUEwR0NTcUdTSWIzRFFFQkFRVUFBNElCCkR3QXdnZ0VLQW9JQkFRRGNpZW4xK21qV016ZHVpb2lZTGZkVTZCRWFsSHBHL3VwYVBpK0M2SW5TaFBWOFNWQ3MKSCsyYS8ydjJpWGo4OERkWUpUb2ZPMER1RUttTGFUb1VGcTB3MW9tUFVRU2xtN2dIaWMzc1lEd013dWswT0d1SAozelNZRzZycFB2QzUra011Q1ZsdkoyeEZOVGJOSElHa1A1cWtENHBPeUx1emVVd0Fidk9UMXZra3N4ZjhSZ1JoCkFiVnJlaHZEY2lrS3U5bzRnNDEzNW5zUEUvaUIzNTVma3VxNXR0NDdINnZUaTJXVzEwNDdoQm9jY0I0Z0hXRVkKNDBVN0R6V3JiM0FjM0pOUHRpZzBVQlJjQkFvRm5RQmhPNWlhQnZrWDI2aDN0MGYrcE9BQmVsRjZNbkt3Z1pRcwpXcWtsRE5yRnVMYWh3VWVWS09KQmduMDllYmpsQXF5QWtXeEZBZ01CQUFHallUQmZNQTRHQTFVZER3RUIvd1FFCkF3SUNwREFkQmdOVkhTVUVGakFVQmdnckJnRUZCUWNEQVFZSUt3WUJCUVVIQXdJd0R3WURWUjBUQVFIL0JBVXcKQXdFQi96QWRCZ05WSFE0RUZnUVUxOWVrQlAveGZzY0Znb0tCYUovdXp3SXVOYjR3RFFZSktvWklodmNOQVFFTApCUUFEZ2dFQkFNVndIYUg5ZTBCOXArVmxUeGo1U3FlcHljWmIrYWJIc044RllhSm0zTmpMeWRoNDBnMjRFTFR6Cjc4Tmk0dFBGaVBWNnBiYjdYM0FOY0ZnVmkxeVpGYmhJMlZNMUFqZkZPZ0dad1N6Q05nVWlQZ1ZqY0JKdisvRXMKb1dIM0swR0xJWklJbDBQU3JSVlNnYTcveHlCUy9icGZTSk9WZnUwWXZTS2pYZnRMdEJDK2FubTdzVnlQN1BaUQpUQjRYMkxTRjF1NnJPeEQ1UUpPaTFjaHE2aW9UR1lkYnE1NnQycmYwVnJodkxIVmJUeGYzbWxDVDh0bVZUWEhnCm5ZYjBnTUNURHJudTlsM2VKdlJIcEVNMEpCTmFRQnc0cUk2MG1CQVdnaWQ3czJGOEtIS3lKWFBXbFJlTGtWQ2cKWW9UYVVpcTdnWTlkMFZWZmZJcG1zN3dzL0krbXN6dz0KLS0tLS1FTkQgQ0VSVElGSUNBVEUtLS0tLQo=
+  ca.crt: LS0tLS1CRUdJTiBDRVJUSUZJQ0FURS0tLS0tCk1JSURFekNDQWZ1Z0F3SUJBZ0lRUWcyclZaSWpLTXRQR0RVdFo0ZVFDVEFOQmdrcWhraUc5dzBCQVFzRkFEQVUKTVJJd0VBWURWUVFERXdsRGFXeHBkVzBnUTBFd0hoY05NalV4TVRBM01EVTBPRE15V2hjTk1qZ3hNVEEyTURVMApPRE15V2pBVU1SSXdFQVlEVlFRREV3bERhV3hwZFcwZ1EwRXdnZ0VpTUEwR0NTcUdTSWIzRFFFQkFRVUFBNElCCkR3QXdnZ0VLQW9JQkFRRGNpZW4xK21qV016ZHVpb2lZTGZkVTZCRWFsSHBHL3VwYVBpK0M2SW5TaFBWOFNWQ3MKSCsyYS8ydjJpWGo4OERkWUpUb2ZPMER1RUttTGFUb1VGcTB3MW9tUFVRU2xtN2dIaWMzc1lEd013dWswT0d1SAozelNZRzZycFB2QzUra011Q1ZsdkoyeEZOVGJOSElHa1A1cWtENHBPeUx1emVVd0Fidk9UMXZra3N4ZjhSZ1JoCkFiVnJlaHZEY2lrS3U5bzRnNDEzNW5zUEUvaUIzNTVma3VxNXR0NDdINnZUaTJXVzEwNDdoQm9jY0I0Z0hXRVkKNDBVN0R6V3JiM0FjM0pOUHRpZzBVQlJjQkFvRm5RQmhPNWlhQnZrWDI2aDN0MGYrcE9BQmVsRjZNbkt3Z1pRcwpXcWtsRE5yRnVMYWh3VWVWS09KQmduMDllYmpsQXF5QWtXeEZBZ01CQUFHallUQmZNQTRHQTFVZER3RUIvd1FFCkF3SUNwREFkQmdOVkhTVUVGakFVQmdnckJnRUZCUWNEQVFZSUt3WUJCUVVIQXdJd0R3WURWUjBUQVFIL0JBVXcKQXdFQi96QWRCZ05WSFE0RUZnUVUxOWVrQlAveGZzY0Znb0tCYUovdXp3SXVOYjR3RFFZSktvWklodmNOQVFFTApCUUFEZ2dFQkFNVndIYUg5ZTBCOXArVmxUeGo1U3FlcHljWmIrYWJIc044RllhSm0zTmpMeWRoNDBnMjRFTFR6Cjc4Tmk0dFBGaVBWNnBiYjdYM0FOY0ZnVmkxeVpGYmhJMlZNMUFqZkZPZ0dad1N6Q05nVWlQZ1ZqY0JKdisvRXMKb1dIM0swR0xJWklJbDBQU3JSVlNnYTcveHlCUy9icGZTSk9WZnUwWXZTS2pYZnRMdEJDK2FubTdzVnlQN1BaUQpUQjRYMkxTRjF1NnJPeEQ1UUpPaTFjaHE2aW9UR1lkYnE1NnQycmYwVnJodkxIVmJUeGYzbWxDVDh0bVZUWEhnCm5ZYjBnTUNURHJudTlsM2VKdlJIcEVNMEpCTmFRQnc0cUk2MG1CQVdnaWQ3czJGOEtIS3lKWFBXbFJlTGtWQ2cKWW9UYVVpcTdnWTlkMFZWZmZJcG1zN3dzL0krbXN6dz0KLS0tLS1FTkQgQ0VSVElGSUNBVEUtLS0tLQo=
   tls.crt: LS0tLS1CRUdJTiBDRVJUSUZJQ0FURS0tLS0tCk1JSURTRENDQWpDZ0F3SUJBZ0lRTDBJMnNZU04wRDl6clREQUgvVVYrREFOQmdrcWhraUc5dzBCQVFzRkFEQVUKTVJJd0VBWURWUVFERXdsRGFXeHBkVzBnUTBFd0hoY05NalV4TVRBM01EVTBPRE15V2hjTk1qWXhNVEEzTURVMApPRE15V2pBak1TRXdId1lEVlFRRERCZ3FMbWgxWW1Kc1pTMXlaV3hoZVM1amFXeHBkVzB1YVc4d2dnRWlNQTBHCkNTcUdTSWIzRFFFQkFRVUFBNElCRHdBd2dnRUtBb0lCQVFEVUdNbmRjRmk1anR6Y2prSm1JVHNxeGVHUnRPazYKandJcEErTFFYRkhLYWx1b3lDWmVmOC9nUGgyczBBQ1ZuOGNoblZybURlUVk0Ym1lZGlEVWlLWUFhQzNMditoMwplbEVva1JlVDg0STRPWjNMc1U0NjIvOW5EZEhVQVBSOWxCdGM1TFU5MHlXWHdNbzdzVTBBbCtFSWpFTFppYWVwCjlyQlg0NUZQbCt2UmhFRllCMTR3bnpuejcxV0ZBa3VjZ2dYOFpnS0hwTGdrSk9XVFAxK3RJbnRLQnNldWRLMTAKZ0tGcUdZZUFtRTZHbzhMQlhudWRydHFVV1ZSY1pKRmNtdVM1cHJCZlllU1ExS1d3dWd6ZndTWXdHeGt0UytiTwo1SldxUzZLMXhyc3FzRUVmeFlveXdJS0dLamNzOXZvUHErS1ZSeURXemZlZ3Y1WXlZK1ExcmpXckFnTUJBQUdqCmdZWXdnWU13RGdZRFZSMFBBUUgvQkFRREFnV2dNQjBHQTFVZEpRUVdNQlFHQ0NzR0FRVUZCd01CQmdnckJnRUYKQlFjREFqQU1CZ05WSFJNQkFmOEVBakFBTUI4R0ExVWRJd1FZTUJhQUZOZlhwQVQvOFg3SEJZS0NnV2lmN3M4QwpMalcrTUNNR0ExVWRFUVFjTUJxQ0dDb3VhSFZpWW14bExYSmxiR0Y1TG1OcGJHbDFiUzVwYnpBTkJna3Foa2lHCjl3MEJBUXNGQUFPQ0FRRUFJY01WUEY5dHcyQ1UzcEgwaXZxcDFSbHRjL3NhV2grVUIwWGp5VWhZVlJieHpyMVcKdGdXaDJoeUZubUNYcDM5MlI3eUJsUFpCMmllYmF5RXVlUS9wTUoySVNHSy80cVhINWorQWlxWTB6UEtjeHA5dwpiNE15UU96QTJoMlVJQjd5WUpEc0NjeHdxRm5rVHFwOHlkeTY4SWVjbExXbDZqdmRFTGZTMmZGdTBMS21mWW5XClQzczNqQVkzcndhcWlnUmJEYkh3VVRFV0JHeDJvM3JpQ0lLYWpuZmlmbnBWbkdTdEl3ZWtiM0plekIxL25zaHoKV1ZWOEdocmp2dnVoQnZFT0ZOMDI5N25zQU9tY1ZOQi9TV0ZvVzNGMEJ5aWMwSVhMQ2d2N3BPcFg2SWRDanNyYQpDWUZzQkNHZkJTVGlHYjhFY2ZRODRvY1R0eTJCSWxPbEdHdVpwUT09Ci0tLS0tRU5EIENFUlRJRklDQVRFLS0tLS0K
   tls.key: LS0tLS1CRUdJTiBSU0EgUFJJVkFURSBLRVktLS0tLQpNSUlFb3dJQkFBS0NBUUVBMUJqSjNYQll1WTdjM0k1Q1ppRTdLc1hoa2JUcE9vOENLUVBpMEZ4UnltcGJxTWdtClhuL1A0RDRkck5BQWxaL0hJWjFhNWcza0dPRzVubllnMUlpbUFHZ3R5Ny9vZDNwUktKRVhrL09DT0RtZHk3Rk8KT3R2L1p3M1IxQUQwZlpRYlhPUzFQZE1sbDhES083Rk5BSmZoQ0l4QzJZbW5xZmF3VitPUlQ1ZnIwWVJCV0FkZQpNSjg1OCs5VmhRSkxuSUlGL0dZQ2g2UzRKQ1Rsa3o5ZnJTSjdTZ2JIcm5TdGRJQ2hhaG1IZ0poT2hxUEN3VjU3Cm5hN2FsRmxVWEdTUlhKcmt1YWF3WDJIa2tOU2xzTG9NMzhFbU1Cc1pMVXZtenVTVnFrdWl0Y2E3S3JCQkg4V0sKTXNDQ2hpbzNMUGI2RDZ2aWxVY2cxczMzb0wrV01tUGtOYTQxcXdJREFRQUJBb0lCQUFnUkpxRzgyTmhsN2Z5WQpPZXBNaFVXV2lvSjg1bDlnZW0wNDcvTGcyck9LTnJ1YXNVQTlqWmlIMlovREREZjZBSEdhTWVUaUk3VFdrUXJOCk9oUEdCc1QraHJvTjJJMEN6VklhVi8wNzhTTldVd0YyV0VxMkoyYXlDSWhrYU9nd2creVZQbGVBVDhPNmhNdjAKYmNDc3NOWEp1cGt2ajlMNmNRYWNGSXQ1eWNjSmk2bVV4RE5LRzE2WE0vc3B4ZDVTZndya1ZneFFXd21PUFlRUwpYazhBVUM3eUFRUG1td0ZQTXRWc3RxMFVLcEx0dXdHVkp5cjZTdlhKWmNXR2ZBOVI5NVpWZzNzTG5uZmJuaDFqCkRTcFdLNWwyUUhNUW5lS210UC9CSFJ1aVRPZHlaaTlaMnA5ZVJ4Yk5YQlVxTnUyek1YNGpVMEVPNFd3ZkcvRkwKZG8rY0orRUNnWUVBNGlTNmZkdHpSVXRNenJJdjYybUVpKzFNSEJ5SlN6aXRnb0M0OTRudXRkODZxZURYdTVGVAoybzUrWFNQQmNTMkVhKzJBSnFEYVFOQTVpRW1OTXRPMFZmUmVlZVNPK3R4VHQwb2VmMG5SeEpwTG9XdlcwQjh1CjVXa0FidEI0YUV1OWlKY2ZCMjFFWEg2bndDNDJ6ODJKNUtrbXUzSE5GMzExRUlsNDhjUHp0UU1DZ1lFQThCbE8KbkVVdjdYZHFtVFFqclgwOWJCWURBUHhKQmVLangrU1lYK3J0TWtuRzJUVmhXb08xMVlPci80WDRZWVBRbTdVLwpSZnJVOHdvaE5qMko2QnNrK2ErYURPNWFRVEViRGUzOExDYWJUMFlQb1lYSCtVQ0dyKzhOZmsvRDVVZkdaRWFrCnpVYUZyK0ZsUm5kY0g5d3NFakJmaEY3MjVmM2FieWszNjFtdytEa0NnWUJTUVlYTURheUtBZSs0Snp3aTVzaWQKbFB6Z0pNa1RvVlFMYWdMZGwwQkt5eDJ0ZU9rL2dvYjdzbVRvUC84MnlaV25KRVkreHJkY1orRGxYOHVLTjFNYgpDTDNzbkdRZGYxSzhFcXV4SlFxMTltR1lIMytOU0Nwb3E1N0tyKzE4RWtDb2xEOW5GaW1OYzB4VkxQb203OTQrClhBQ0lvY1kxeXg1dm0zRndqeFB3UFFLQmdRRGNYdDRBSUtDMDNINUN6OUJQVkR3a0VMQUJINDRHa05heWllWXgKWTNjQ1NTVHlDRVNxeDJrRjZDemVBeURPb0NYQVJNTW1mK3NraDQra01TZDZtaTk5M09jUUoxVS9zTXFjSm1ybQpPeWtod2JSbkZGdFBNeUpzS0lYQ0FZUlQxV1VLZEt5ZW5MUG5rb0ZhQkFQU1drczVCcDBrNmVURGhCUVJJMHZvCkFCS21RUUtCZ0U1MEZLaTcrR1F3ckc0aTZZZ0JXV3BXNTJ6TEIxYkVSb1J5M0ptMVdTZ010NysvRHhtbWR3WFIKT3NyTk8rUXJGMGxPWDNpeldMUmN2bUQ3SENLd0tJWm1xcmlJY2JiaWRicU5nb1hlRTlpRi9tZ241bXFSbS81ZQo4N2tud2VzV25jd05udXhINnlTZmJxdmZ4N0puUWFJZHFmOUhzSkhjZzFFS3RwSFRTWGQzCi0tLS0tRU5EIFJTQSBQUklWQVRFIEtFWS0tLS0tCg==
 ---
@@ -74,7 +73,7 @@ metadata:
   namespace: kube-system
 type: kubernetes.io/tls
 data:
-  ca.crt:  LS0tLS1CRUdJTiBDRVJUSUZJQ0FURS0tLS0tCk1JSURFekNDQWZ1Z0F3SUJBZ0lRUWcyclZaSWpLTXRQR0RVdFo0ZVFDVEFOQmdrcWhraUc5dzBCQVFzRkFEQVUKTVJJd0VBWURWUVFERXdsRGFXeHBkVzBnUTBFd0hoY05NalV4TVRBM01EVTBPRE15V2hjTk1qZ3hNVEEyTURVMApPRE15V2pBVU1SSXdFQVlEVlFRREV3bERhV3hwZFcwZ1EwRXdnZ0VpTUEwR0NTcUdTSWIzRFFFQkFRVUFBNElCCkR3QXdnZ0VLQW9JQkFRRGNpZW4xK21qV016ZHVpb2lZTGZkVTZCRWFsSHBHL3VwYVBpK0M2SW5TaFBWOFNWQ3MKSCsyYS8ydjJpWGo4OERkWUpUb2ZPMER1RUttTGFUb1VGcTB3MW9tUFVRU2xtN2dIaWMzc1lEd013dWswT0d1SAozelNZRzZycFB2QzUra011Q1ZsdkoyeEZOVGJOSElHa1A1cWtENHBPeUx1emVVd0Fidk9UMXZra3N4ZjhSZ1JoCkFiVnJlaHZEY2lrS3U5bzRnNDEzNW5zUEUvaUIzNTVma3VxNXR0NDdINnZUaTJXVzEwNDdoQm9jY0I0Z0hXRVkKNDBVN0R6V3JiM0FjM0pOUHRpZzBVQlJjQkFvRm5RQmhPNWlhQnZrWDI2aDN0MGYrcE9BQmVsRjZNbkt3Z1pRcwpXcWtsRE5yRnVMYWh3VWVWS09KQmduMDllYmpsQXF5QWtXeEZBZ01CQUFHallUQmZNQTRHQTFVZER3RUIvd1FFCkF3SUNwREFkQmdOVkhTVUVGakFVQmdnckJnRUZCUWNEQVFZSUt3WUJCUVVIQXdJd0R3WURWUjBUQVFIL0JBVXcKQXdFQi96QWRCZ05WSFE0RUZnUVUxOWVrQlAveGZzY0Znb0tCYUovdXp3SXVOYjR3RFFZSktvWklodmNOQVFFTApCUUFEZ2dFQkFNVndIYUg5ZTBCOXArVmxUeGo1U3FlcHljWmIrYWJIc044RllhSm0zTmpMeWRoNDBnMjRFTFR6Cjc4Tmk0dFBGaVBWNnBiYjdYM0FOY0ZnVmkxeVpGYmhJMlZNMUFqZkZPZ0dad1N6Q05nVWlQZ1ZqY0JKdisvRXMKb1dIM0swR0xJWklJbDBQU3JSVlNnYTcveHlCUy9icGZTSk9WZnUwWXZTS2pYZnRMdEJDK2FubTdzVnlQN1BaUQpUQjRYMkxTRjF1NnJPeEQ1UUpPaTFjaHE2aW9UR1lkYnE1NnQycmYwVnJodkxIVmJUeGYzbWxDVDh0bVZUWEhnCm5ZYjBnTUNURHJudTlsM2VKdlJIcEVNMEpCTmFRQnc0cUk2MG1CQVdnaWQ3czJGOEtIS3lKWFBXbFJlTGtWQ2cKWW9UYVVpcTdnWTlkMFZWZmZJcG1zN3dzL0krbXN6dz0KLS0tLS1FTkQgQ0VSVElGSUNBVEUtLS0tLQo=
+  ca.crt: LS0tLS1CRUdJTiBDRVJUSUZJQ0FURS0tLS0tCk1JSURFekNDQWZ1Z0F3SUJBZ0lRUWcyclZaSWpLTXRQR0RVdFo0ZVFDVEFOQmdrcWhraUc5dzBCQVFzRkFEQVUKTVJJd0VBWURWUVFERXdsRGFXeHBkVzBnUTBFd0hoY05NalV4TVRBM01EVTBPRE15V2hjTk1qZ3hNVEEyTURVMApPRE15V2pBVU1SSXdFQVlEVlFRREV3bERhV3hwZFcwZ1EwRXdnZ0VpTUEwR0NTcUdTSWIzRFFFQkFRVUFBNElCCkR3QXdnZ0VLQW9JQkFRRGNpZW4xK21qV016ZHVpb2lZTGZkVTZCRWFsSHBHL3VwYVBpK0M2SW5TaFBWOFNWQ3MKSCsyYS8ydjJpWGo4OERkWUpUb2ZPMER1RUttTGFUb1VGcTB3MW9tUFVRU2xtN2dIaWMzc1lEd013dWswT0d1SAozelNZRzZycFB2QzUra011Q1ZsdkoyeEZOVGJOSElHa1A1cWtENHBPeUx1emVVd0Fidk9UMXZra3N4ZjhSZ1JoCkFiVnJlaHZEY2lrS3U5bzRnNDEzNW5zUEUvaUIzNTVma3VxNXR0NDdINnZUaTJXVzEwNDdoQm9jY0I0Z0hXRVkKNDBVN0R6V3JiM0FjM0pOUHRpZzBVQlJjQkFvRm5RQmhPNWlhQnZrWDI2aDN0MGYrcE9BQmVsRjZNbkt3Z1pRcwpXcWtsRE5yRnVMYWh3VWVWS09KQmduMDllYmpsQXF5QWtXeEZBZ01CQUFHallUQmZNQTRHQTFVZER3RUIvd1FFCkF3SUNwREFkQmdOVkhTVUVGakFVQmdnckJnRUZCUWNEQVFZSUt3WUJCUVVIQXdJd0R3WURWUjBUQVFIL0JBVXcKQXdFQi96QWRCZ05WSFE0RUZnUVUxOWVrQlAveGZzY0Znb0tCYUovdXp3SXVOYjR3RFFZSktvWklodmNOQVFFTApCUUFEZ2dFQkFNVndIYUg5ZTBCOXArVmxUeGo1U3FlcHljWmIrYWJIc044RllhSm0zTmpMeWRoNDBnMjRFTFR6Cjc4Tmk0dFBGaVBWNnBiYjdYM0FOY0ZnVmkxeVpGYmhJMlZNMUFqZkZPZ0dad1N6Q05nVWlQZ1ZqY0JKdisvRXMKb1dIM0swR0xJWklJbDBQU3JSVlNnYTcveHlCUy9icGZTSk9WZnUwWXZTS2pYZnRMdEJDK2FubTdzVnlQN1BaUQpUQjRYMkxTRjF1NnJPeEQ1UUpPaTFjaHE2aW9UR1lkYnE1NnQycmYwVnJodkxIVmJUeGYzbWxDVDh0bVZUWEhnCm5ZYjBnTUNURHJudTlsM2VKdlJIcEVNMEpCTmFRQnc0cUk2MG1CQVdnaWQ3czJGOEtIS3lKWFBXbFJlTGtWQ2cKWW9UYVVpcTdnWTlkMFZWZmZJcG1zN3dzL0krbXN6dz0KLS0tLS1FTkQgQ0VSVElGSUNBVEUtLS0tLQo=
   tls.crt: LS0tLS1CRUdJTiBDRVJUSUZJQ0FURS0tLS0tCk1JSURWakNDQWo2Z0F3SUJBZ0lRY0c4amxBOW1RZ3dhTnNKbzRHY2U0akFOQmdrcWhraUc5dzBCQVFzRkFEQVUKTVJJd0VBWURWUVFERXdsRGFXeHBkVzBnUTBFd0hoY05NalV4TVRBM01EVTBPRE15V2hjTk1qWXhNVEEzTURVMApPRE15V2pBcU1TZ3dKZ1lEVlFRRERCOHFMbVJsWm1GMWJIUXVhSFZpWW14bExXZHljR011WTJsc2FYVnRMbWx2Ck1JSUJJakFOQmdrcWhraUc5dzBCQVFFRkFBT0NBUThBTUlJQkNnS0NBUUVBdzEyZUxwT1NFQlBRK2N2OGQ0OVQKMFlZV1lvS2lwMEtKeUYvdnNRWHZTYk5LSjVQOWZXN3JvTTNFZjBCcld6UUFBS1NXNmR3cTRodWRBcjFOYnRrZAo4Tkt6bmVYQUc1blBVUFc1ZlpESGZicm10d0c5SEFYb1RGS1JPZlhDU1BuaTVBY1NGYnFZRTZpYzhNT1NsbUhuCnpDb09TUUhqalFra2FIT3dkSkpFYzV1Njl1eHgvVzBia1FqMHA4Y1FaSUZPakw3aWZYTUw0em9VYnY4R2dpTFkKZUpSRWh2dUlyM3Axei80YWVBRE9lMFVWSDFxWWpZdXA5N1lwVjFZTTU4Ykk3MjVDQ0FISXlwT0FVTjFRa0V4MgpnUHVvNExqM2VYVlI4STc0NWIwR3B6Q1QzVXhHbUwzc1VQcG5LZnY1VmFYV0lmRytlSlEwT1J5SG5ZZVEyTzZKCnN3SURBUUFCbzRHTk1JR0tNQTRHQTFVZER3RUIvd1FFQXdJRm9EQWRCZ05WSFNVRUZqQVVCZ2dyQmdFRkJRY0QKQVFZSUt3WUJCUVVIQXdJd0RBWURWUjBUQVFIL0JBSXdBREFmQmdOVkhTTUVHREFXZ0JUWDE2UUUvL0YreHdXQwpnb0Zvbis3UEFpNDF2akFxQmdOVkhSRUVJekFoZ2g4cUxtUmxabUYxYkhRdWFIVmlZbXhsTFdkeWNHTXVZMmxzCmFYVnRMbWx2TUEwR0NTcUdTSWIzRFFFQkN3VUFBNElCQVFDVGozb0U1YlhVR3BCakZyd0owcmdlQ0VyemVqWkEKcUpHcnpHUW5TT0VzamNHUTJqNWtoT0hLb3RLYUNDSnpKRVk4TUU3eU1CdFhnZFJvcDJXYjJPOWpWM2orQVVQKwpjSjFMZkZtZlVQdmV6TnFjbmFNNElPN3NzTCsrUVFERkIyVlpldzdPTkxDYlpkUEVJTm1XdnhSVGNJNzdQNndFCjBiK3d3T2hSUFkxZG5iWGhVVnR0NXpFMXFrUmxhenB0TE11WUJFOUxiTVdhT3lNSSt4bG9EUTgyVDBVSm95T1AKR3czRzRGSnZ3YnlLblF1eWtPTmd0ZTJHSTNXcXlVUElpLzZiTDdjQ21ZdlZtRmUrbXlJWEh6UWZlcnN4dUNaegp0TVpqTzZUZlozb2QycWxEWUhvQkJrZDZtZVgrUldJeWN4Ni84bXFlOWl1WEVWTEYvZEEzZGNvbQotLS0tLUVORCBDRVJUSUZJQ0FURS0tLS0tCg==
   tls.key: LS0tLS1CRUdJTiBSU0EgUFJJVkFURSBLRVktLS0tLQpNSUlFb0FJQkFBS0NBUUVBdzEyZUxwT1NFQlBRK2N2OGQ0OVQwWVlXWW9LaXAwS0p5Ri92c1FYdlNiTktKNVA5CmZXN3JvTTNFZjBCcld6UUFBS1NXNmR3cTRodWRBcjFOYnRrZDhOS3puZVhBRzVuUFVQVzVmWkRIZmJybXR3RzkKSEFYb1RGS1JPZlhDU1BuaTVBY1NGYnFZRTZpYzhNT1NsbUhuekNvT1NRSGpqUWtrYUhPd2RKSkVjNXU2OXV4eAovVzBia1FqMHA4Y1FaSUZPakw3aWZYTUw0em9VYnY4R2dpTFllSlJFaHZ1SXIzcDF6LzRhZUFET2UwVVZIMXFZCmpZdXA5N1lwVjFZTTU4Ykk3MjVDQ0FISXlwT0FVTjFRa0V4MmdQdW80TGozZVhWUjhJNzQ1YjBHcHpDVDNVeEcKbUwzc1VQcG5LZnY1VmFYV0lmRytlSlEwT1J5SG5ZZVEyTzZKc3dJREFRQUJBb0gvU3hwN1lNUXVaaVJyUkJGVwpvWmgwTm13STVjNmJ1TTVNNEZnZWFqU3VUL3I0SE5pSlZRTTFpcWJScFNFTVh0c1hYNnVPaEYvM0Jtby9XK2ZYCjRGUEtTR2RuTUcwWFUzWmNRQzFwMUxOaVJvbE51cDhLRjdET21QMm9kNXYzbThYVHNhSklEQXNTT0VIMUdvcmgKWlZ3WlhWaFloSnN4b09WaTFESnlGS2RaV001WktyVExCRXoxa1NSK2RrcjFKelVmdE5pQUU3WjB0UXBVMUtqUwo0NW9WVnRmTnBxQlBhb0FrSXNScG1pZHhKdForNE9NemF0K0VWOExBVVpwQ1VkbFRtOXZIRHpPRnVKOUJYNTJTCklqT083REZ5aGVtYzlHNTJlWm44aTI4c3RFeDlTTTVhd3p6cFFqSDdteGR1aTFWUUd0RjRpdm02NGx6bTE2YkEKb2lVZEFvR0JBTlhuZUcxdXRFanFJOERpSXFFME5QcUNoQm8vSG9RUjBveHpxRnF0aVlKTk1kVUNtWDBFNnNYTgpTKzVyeXAzRWxxOUIwcnZSaWwvVStqSk82SGxkSU9XdHZTNnJMeTltbnAyL29iN25vcU9Rb0E4K1JvRFJoTlQzCkxvVUdod2hJUW9kNm0ybVlSREhuNlV4RjBUNUZSeDhac3ZvSVM5bCt2eTFTWmtnMTUzWC9Bb0dCQU9uUUxPS2IKYVFiZmFYd0FGK0RrYnEvNTlVWXlRWnJCWEZ0ajBqTkVNemRucWpzWmJwaDRRVDNDSUVQVitEMXgxbklNZUs0ZgpONjEyUVZBZmpQWGlsaWprNXk0STIzMnZQWEpRKzdrYmMxNFVrVENKL1BxTXhUbDVNT0FtU0UwRGxXL0NnTUFaCkR1d1E4VEFSOFBXY1FtWC9VZVRvSGVBOVZsMnBUa0wwSi9STkFvR0FmcDJDU255U0dPc0hlT0Fpa1h0K3RKNVgKSmRZZzhSby9vRVhCN05MMkozd2NPRE5PdVpNVWlUdHBhOXJBVjcwTFdQaEVqa3FOZHdaeGh4L3dPZzZuTDIwMQpJNC9PNFdjRUV1cGhDc2pBRzhPN0N1clkvdDJHbkMwb2l6Tis4S2NkUW1hUDRlUncwWDJ1T2lqRm4rK1FGdGUyCmVvdzRvYWlGNzRUcjZHaUg5dThDZ1lBREpuWGtXN212aVFVUDBhU0F1RE14bGNtVE40d2d2S2cwNXdSbkFtMDYKT3VCVlNZTnU5SGZVa0RBRkdmWHRSZ0pncVFCYlFEcHMwT0lTWlVwdDZhNmlRR3RJK0grVWt1N2VBbTlSMENmZQp4YUlyS0VETFUyZzQzUVFta1AxNlpDajRSNE9ha3Z2YmZHTHpoZHBjUk0yME9CdHZYUjFCN3pHaHMyMUZnNnFpCkpRS0JnSGQ2WkZMOS9EVE5Rcm1PV081ZUJ5QkpDb2FKZmZqR1JmQk5tMlVyU3NZYy9iT1FtK3FTTWtKRC9HZUIKNGFPZ2k2dTJiRS9DeEM3WUc2ZDJMQjU1aTlGMEROUEJleTZDM09TM2lWY1VhcnZCcnh5QXRaaUt3U1JVTDlQKwpRY1A3UVdlR0RWQ01veU9qellHVFlYU0o2aCtsR25ZZ0hyWFl0RFZ1MkxOOHdJUUQKLS0tLS1FTkQgUlNBIFBSSVZBVEUgS0VZLS0tLS0K
 ---
@@ -363,13 +362,13 @@ data:
     listen-address: :4245
     gops: true
     gops-port: "9893"
-    retry-timeout: 
-    sort-buffer-len-max: 
-    sort-buffer-drain-timeout: 
+    retry-timeout:
+    sort-buffer-len-max:
+    sort-buffer-drain-timeout:
     tls-hubble-client-cert-file: /var/lib/hubble-relay/tls/client.crt
     tls-hubble-client-key-file: /var/lib/hubble-relay/tls/client.key
     tls-hubble-server-ca-files: /var/lib/hubble-relay/tls/hubble-server-ca.crt
-    
+
     disable-server-tls: true
 ---
 # Source: cilium/templates/hubble-ui/configmap.yaml
@@ -379,7 +378,13 @@ metadata:
   name: hubble-ui-nginx
   namespace: kube-system
 data:
-  nginx.conf: "server {\n    listen       8081;\n    listen       [::]:8081;\n    server_name  localhost;\n    root /app;\n    index index.html;\n    client_max_body_size 1G;\n\n    location / {\n        proxy_set_header Host $host;\n        proxy_set_header X-Real-IP $remote_addr;\n\n        location /api {\n            proxy_http_version 1.1;\n            proxy_pass_request_headers on;\n            proxy_pass http://127.0.0.1:8090;\n        }\n        location / {\n            if ($http_user_agent ~* \"kube-probe\") { access_log off; }\n            # double `/index.html` is required here\n            try_files $uri $uri/ /index.html /index.html;\n        }\n\n        # Liveness probe\n        location /healthz {\n            access_log off;\n            add_header Content-Type text/plain;\n            return 200 'ok';\n        }\n    }\n}"
+  nginx.conf: "server {\n    listen       8081;\n    listen       [::]:8081;\n    server_name  localhost;\n    root /app;\n
+    \   index index.html;\n    client_max_body_size 1G;\n\n    location / {\n        proxy_set_header Host $host;\n        proxy_set_header
+    X-Real-IP $remote_addr;\n\n        location /api {\n            proxy_http_version 1.1;\n            proxy_pass_request_headers
+    on;\n            proxy_pass http://127.0.0.1:8090;\n        }\n        location / {\n            if ($http_user_agent
+    ~* \"kube-probe\") { access_log off; }\n            # double `/index.html` is required here\n            try_files $uri
+    $uri/ /index.html /index.html;\n        }\n\n        # Liveness probe\n        location /healthz {\n            access_log
+    off;\n            add_header Content-Type text/plain;\n            return 200 'ok';\n        }\n    }\n}"
 ---
 # Source: cilium/templates/cilium-agent/clusterrole.yaml
 apiVersion: rbac.authorization.k8s.io/v1
@@ -907,9 +912,9 @@ roleRef:
   kind: Role
   name: cilium-config-agent
 subjects:
-  - kind: ServiceAccount
-    name: "cilium"
-    namespace: kube-system
+- kind: ServiceAccount
+  name: "cilium"
+  namespace: kube-system
 ---
 # Source: cilium/templates/cilium-agent/rolebinding.yaml
 apiVersion: rbac.authorization.k8s.io/v1
@@ -1007,9 +1012,9 @@ spec:
   selector:
     k8s-app: hubble-ui
   ports:
-    - name: http
-      port: 80
-      targetPort: 8081
+  - name: http
+    port: 80
+    targetPort: 8081
 ---
 # Source: cilium/templates/hubble/peer-service.yaml
 apiVersion: v1
@@ -1142,26 +1147,26 @@ spec:
               - "bash"
               - "-c"
               - |
-                    set -o errexit
-                    set -o pipefail
-                    set -o nounset
-                    
-                    # When running in AWS ENI mode, it's likely that 'aws-node' has
-                    # had a chance to install SNAT iptables rules. These can result
-                    # in dropped traffic, so we should attempt to remove them.
-                    # We do it using a 'postStart' hook since this may need to run
-                    # for nodes which might have already been init'ed but may still
-                    # have dangling rules. This is safe because there are no
-                    # dependencies on anything that is part of the startup script
-                    # itself, and can be safely run multiple times per node (e.g. in
-                    # case of a restart).
-                    if [[ "$(iptables-save | grep -E -c 'AWS-SNAT-CHAIN|AWS-CONNMARK-CHAIN')" != "0" ]];
-                    then
-                        echo 'Deleting iptables rules created by the AWS CNI VPC plugin'
-                        iptables-save | grep -E -v 'AWS-SNAT-CHAIN|AWS-CONNMARK-CHAIN' | iptables-restore
-                    fi
-                    echo 'Done!'
-                    
+                set -o errexit
+                set -o pipefail
+                set -o nounset
+
+                # When running in AWS ENI mode, it's likely that 'aws-node' has
+                # had a chance to install SNAT iptables rules. These can result
+                # in dropped traffic, so we should attempt to remove them.
+                # We do it using a 'postStart' hook since this may need to run
+                # for nodes which might have already been init'ed but may still
+                # have dangling rules. This is safe because there are no
+                # dependencies on anything that is part of the startup script
+                # itself, and can be safely run multiple times per node (e.g. in
+                # case of a restart).
+                if [[ "$(iptables-save | grep -E -c 'AWS-SNAT-CHAIN|AWS-CONNMARK-CHAIN')" != "0" ]];
+                then
+                    echo 'Deleting iptables rules created by the AWS CNI VPC plugin'
+                    iptables-save | grep -E -v 'AWS-SNAT-CHAIN|AWS-CONNMARK-CHAIN' | iptables-restore
+                fi
+                echo 'Done!'
+
           preStop:
             exec:
               command:
@@ -1172,20 +1177,20 @@ spec:
             type: spc_t
           capabilities:
             add:
-              - CHOWN
-              - KILL
-              - NET_ADMIN
-              - NET_RAW
-              - IPC_LOCK
-              - SYS_MODULE
-              - SYS_ADMIN
-              - SYS_RESOURCE
-              - DAC_OVERRIDE
-              - FOWNER
-              - SETGID
-              - SETUID
+            - CHOWN
+            - KILL
+            - NET_ADMIN
+            - NET_RAW
+            - IPC_LOCK
+            - SYS_MODULE
+            - SYS_ADMIN
+            - SYS_RESOURCE
+            - DAC_OVERRIDE
+            - FOWNER
+            - SETGID
+            - SETUID
             drop:
-              - ALL
+            - ALL
         terminationMessagePolicy: FallbackToLogsOnError
         volumeMounts:
         - name: envoy-sockets
@@ -1227,7 +1232,7 @@ spec:
           readOnly: true
         - name: tmp
           mountPath: /tmp
-        
+
       initContainers:
       - name: config
         image: "quay.io/cilium/cilium:v1.18.3@sha256:5649db451c88d928ea585514746d50d91e6210801b300c897283ea319d68de15"
@@ -1284,11 +1289,11 @@ spec:
             type: spc_t
           capabilities:
             add:
-              - SYS_ADMIN
-              - SYS_CHROOT
-              - SYS_PTRACE
+            - SYS_ADMIN
+            - SYS_CHROOT
+            - SYS_PTRACE
             drop:
-              - ALL
+            - ALL
       - name: apply-sysctl-overwrites
         image: "quay.io/cilium/cilium:v1.18.3@sha256:5649db451c88d928ea585514746d50d91e6210801b300c897283ea319d68de15"
         imagePullPolicy: IfNotPresent
@@ -1319,11 +1324,11 @@ spec:
             type: spc_t
           capabilities:
             add:
-              - SYS_ADMIN
-              - SYS_CHROOT
-              - SYS_PTRACE
+            - SYS_ADMIN
+            - SYS_CHROOT
+            - SYS_PTRACE
             drop:
-              - ALL
+            - ALL
       # Mount the bpf fs if it is not mounted. We will perform this task
       # from a privileged container because the mount propagation bidirectional
       # only works from privileged containers.
@@ -1374,12 +1379,12 @@ spec:
             type: spc_t
           capabilities:
             add:
-              - NET_ADMIN
-              - SYS_MODULE
-              - SYS_ADMIN
-              - SYS_RESOURCE
+            - NET_ADMIN
+            - SYS_MODULE
+            - SYS_ADMIN
+            - SYS_RESOURCE
             drop:
-              - ALL
+            - ALL
         volumeMounts:
         - name: bpf-maps
           mountPath: /sys/fs/bpf
@@ -1394,7 +1399,7 @@ spec:
         image: "quay.io/cilium/cilium:v1.18.3@sha256:5649db451c88d928ea585514746d50d91e6210801b300c897283ea319d68de15"
         imagePullPolicy: IfNotPresent
         command:
-          - "/install-plugin.sh"
+        - "/install-plugin.sh"
         resources:
           requests:
             cpu: 100m
@@ -1405,18 +1410,18 @@ spec:
             type: spc_t
           capabilities:
             drop:
-              - ALL
+            - ALL
         terminationMessagePolicy: FallbackToLogsOnError
         volumeMounts:
-          - name: cni-path
-            mountPath: /host/opt/cni/bin # .Values.cni.install
+        - name: cni-path
+          mountPath: /host/opt/cni/bin # .Values.cni.install
       restartPolicy: Always
       priorityClassName: system-node-critical
       serviceAccountName: "cilium"
       automountServiceAccountToken: true
       terminationGracePeriodSeconds: 1
       hostNetwork: true
-      
+
       affinity:
         podAntiAffinity:
           requiredDuringSchedulingIgnoredDuringExecution:
@@ -1427,9 +1432,9 @@ spec:
       nodeSelector:
         kubernetes.io/os: linux
       tolerations:
-        - operator: Exists
+      - operator: Exists
       volumes:
-        # For sharing configuration between the "config" initContainer and the agent
+      # For sharing configuration between the "config" initContainer and the agent
       - name: tmp
         emptyDir: {}
         # To keep state between restarts / upgrades
@@ -1437,12 +1442,12 @@ spec:
         hostPath:
           path: /var/run/cilium
           type: DirectoryOrCreate
-        # To exec into pod network namespaces
+          # To exec into pod network namespaces
       - name: cilium-netns
         hostPath:
           path: /var/run/netns
           type: DirectoryOrCreate
-        # To keep state between restarts / upgrades for bpf maps
+          # To keep state between restarts / upgrades for bpf maps
       - name: bpf-maps
         hostPath:
           path: /sys/fs/bpf
@@ -1460,18 +1465,18 @@ spec:
       # To install cilium cni plugin in the host
       - name: cni-path
         hostPath:
-          path:  /opt/cni/bin
+          path: /opt/cni/bin
           type: DirectoryOrCreate
-        # To install cilium cni configuration in the host
+          # To install cilium cni configuration in the host
       - name: etc-cni-netd
         hostPath:
           path: /etc/cni/net.d
           type: DirectoryOrCreate
-        # To be able to load kernel modules
+          # To be able to load kernel modules
       - name: lib-modules
         hostPath:
           path: /lib/modules
-        # To access iptables concurrently with other processes (e.g. kube-proxy)
+          # To access iptables concurrently with other processes (e.g. kube-proxy)
       - name: xtables-lock
         hostPath:
           path: /run/xtables.lock
@@ -1481,7 +1486,7 @@ spec:
         hostPath:
           path: "/var/run/cilium/envoy/sockets"
           type: DirectoryOrCreate
-        # To read the clustermesh configuration
+          # To read the clustermesh configuration
       - name: clustermesh-secrets
         projected:
           # note: the leading zero means this number is in octal representation: do not remove it
@@ -1636,10 +1641,10 @@ spec:
             type: spc_t
           capabilities:
             add:
-              - NET_ADMIN
-              - SYS_ADMIN
+            - NET_ADMIN
+            - SYS_ADMIN
             drop:
-              - ALL
+            - ALL
         terminationMessagePolicy: FallbackToLogsOnError
         volumeMounts:
         - name: envoy-sockets
@@ -1684,7 +1689,7 @@ spec:
       nodeSelector:
         kubernetes.io/os: linux
       tolerations:
-        - operator: Exists
+      - operator: Exists
       volumes:
       - name: envoy-sockets
         hostPath:
@@ -1700,10 +1705,10 @@ spec:
           # note: the leading zero means this number is in octal representation: do not remove it
           defaultMode: 0400
           items:
-            - key: bootstrap-config.json
-              path: bootstrap-config.json
-        # To keep state between restarts / upgrades
-        # To keep state between restarts / upgrades for bpf maps
+          - key: bootstrap-config.json
+            path: bootstrap-config.json
+            # To keep state between restarts / upgrades
+            # To keep state between restarts / upgrades for bpf maps
       - name: bpf-maps
         hostPath:
           path: /sys/fs/bpf
@@ -1828,19 +1833,19 @@ spec:
       nodeSelector:
         kubernetes.io/os: linux
       tolerations:
-        - key: node-role.kubernetes.io/control-plane
-          operator: Exists
-        - key: node-role.kubernetes.io/master
-          operator: Exists
-        - key: node.kubernetes.io/not-ready
-          operator: Exists
-        - key: node.cloudprovider.kubernetes.io/uninitialized
-          operator: Exists
-        - key: node.cilium.io/agent-not-ready
-          operator: Exists
-      
+      - key: node-role.kubernetes.io/control-plane
+        operator: Exists
+      - key: node-role.kubernetes.io/master
+        operator: Exists
+      - key: node.kubernetes.io/not-ready
+        operator: Exists
+      - key: node.cloudprovider.kubernetes.io/uninitialized
+        operator: Exists
+      - key: node.cilium.io/agent-not-ready
+        operator: Exists
+
       volumes:
-        # To read the configuration from the config map
+      # To read the configuration from the config map
       - name: cilium-config-path
         configMap:
           name: cilium-config
@@ -1878,69 +1883,69 @@ spec:
         seccompProfile:
           type: RuntimeDefault
       containers:
-        - name: hubble-relay
-          securityContext:
-            allowPrivilegeEscalation: false
-            capabilities:
-              drop:
-              - ALL
-            runAsGroup: 65532
-            runAsNonRoot: true
-            runAsUser: 65532
-            seccompProfile:
-              type: RuntimeDefault
-          image: "quay.io/cilium/hubble-relay:v1.18.3@sha256:e53e00c47fe4ffb9c086bad0c1c77f23cb968be4385881160683d9e15aa34dc3"
-          imagePullPolicy: IfNotPresent
-          command:
-            - hubble-relay
-          args:
-            - serve
-          ports:
-            - name: grpc
-              containerPort: 4245
-          readinessProbe:
-            grpc:
-              port: 4222
-            timeoutSeconds: 3
-          # livenessProbe will kill the pod, we should be very conservative
-          # here on failures since killing the pod should be a last resort, and
-          # we should provide enough time for relay to retry before killing it.
-          livenessProbe:
-            grpc:
-              port: 4222
-            timeoutSeconds: 10
-            # Give relay time to establish connections and make a few retries
-            # before starting livenessProbes.
-            initialDelaySeconds: 10
-            # 10 second * 12 failures = 2 minutes of failure.
-            # If relay cannot become healthy after 2 minutes, then killing it
-            # might resolve whatever issue is occurring.
-            #
-            # 10 seconds is a reasonable retry period so we can see if it's
-            # failing regularly or only sporadically.
-            periodSeconds: 10
-            failureThreshold: 12
-          startupProbe:
-            grpc:
-              port: 4222
-            # Give relay time to get it's certs and establish connections and
-            # make a few retries before starting startupProbes.
-            initialDelaySeconds: 10
-            # 20 * 3 seconds = 1 minute of failure before we consider startup as failed.
-            failureThreshold: 20
-            # Retry more frequently at startup so that it can be considered started more quickly.
-            periodSeconds: 3
-          volumeMounts:
-          - name: config
-            mountPath: /etc/hubble-relay
-            readOnly: true
-          - name: tls
-            mountPath: /var/lib/hubble-relay/tls
-            readOnly: true
-          terminationMessagePolicy: FallbackToLogsOnError
-        
+      - name: hubble-relay
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+            - ALL
+          runAsGroup: 65532
+          runAsNonRoot: true
+          runAsUser: 65532
+          seccompProfile:
+            type: RuntimeDefault
+        image: "quay.io/cilium/hubble-relay:v1.18.3@sha256:e53e00c47fe4ffb9c086bad0c1c77f23cb968be4385881160683d9e15aa34dc3"
+        imagePullPolicy: IfNotPresent
+        command:
+        - hubble-relay
+        args:
+        - serve
+        ports:
+        - name: grpc
+          containerPort: 4245
+        readinessProbe:
+          grpc:
+            port: 4222
+          timeoutSeconds: 3
+        # livenessProbe will kill the pod, we should be very conservative
+        # here on failures since killing the pod should be a last resort, and
+        # we should provide enough time for relay to retry before killing it.
+        livenessProbe:
+          grpc:
+            port: 4222
+          timeoutSeconds: 10
+          # Give relay time to establish connections and make a few retries
+          # before starting livenessProbes.
+          initialDelaySeconds: 10
+          # 10 second * 12 failures = 2 minutes of failure.
+          # If relay cannot become healthy after 2 minutes, then killing it
+          # might resolve whatever issue is occurring.
+          #
+          # 10 seconds is a reasonable retry period so we can see if it's
+          # failing regularly or only sporadically.
+          periodSeconds: 10
+          failureThreshold: 12
+        startupProbe:
+          grpc:
+            port: 4222
+          # Give relay time to get it's certs and establish connections and
+          # make a few retries before starting startupProbes.
+          initialDelaySeconds: 10
+          # 20 * 3 seconds = 1 minute of failure before we consider startup as failed.
+          failureThreshold: 20
+          # Retry more frequently at startup so that it can be considered started more quickly.
+          periodSeconds: 3
+        volumeMounts:
+        - name: config
+          mountPath: /etc/hubble-relay
+          readOnly: true
+        - name: tls
+          mountPath: /var/lib/hubble-relay/tls
+          readOnly: true
+        terminationMessagePolicy: FallbackToLogsOnError
+
       restartPolicy: Always
-      priorityClassName: 
+      priorityClassName:
       serviceAccountName: "hubble-relay"
       automountServiceAccountToken: false
       terminationGracePeriodSeconds: 1
@@ -1968,12 +1973,12 @@ spec:
           - secret:
               name: hubble-relay-client-certs
               items:
-                - key: tls.crt
-                  path: client.crt
-                - key: tls.key
-                  path: client.key
-                - key: ca.crt
-                  path: hubble-server-ca.crt
+              - key: tls.crt
+                path: client.crt
+              - key: tls.key
+                path: client.key
+              - key: ca.crt
+                path: hubble-server-ca.crt
 ---
 # Source: cilium/templates/hubble-ui/deployment.yaml
 kind: Deployment
@@ -2006,7 +2011,7 @@ spec:
         fsGroup: 1001
         runAsGroup: 1001
         runAsUser: 1001
-      priorityClassName: 
+      priorityClassName:
       serviceAccountName: "hubble-ui"
       automountServiceAccountToken: true
       containers:

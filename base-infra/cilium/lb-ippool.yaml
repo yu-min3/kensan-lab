@@ -4,8 +4,8 @@ metadata:
   name: platform-pool
 spec:
   blocks:
-    - start: "192.168.0.240"
-      stop: "192.168.0.249"
+  - start: "192.168.0.240"
+    stop: "192.168.0.249"
 ---
 apiVersion: cilium.io/v2alpha1
 kind: CiliumL2AnnouncementPolicy
@@ -14,7 +14,7 @@ metadata:
 spec:
   # Which network interfaces to announce on
   interfaces:
-    - wlan0
+  - wlan0
 
   # Only announce for LoadBalancer services using our IP pool
   loadBalancerIPs: true
@@ -23,8 +23,8 @@ spec:
   # This prevents lease transitions between master and worker nodes
   nodeSelector:
     matchExpressions:
-      - key: node.kubernetes.io/exclude-from-external-load-balancers
-        operator: DoesNotExist
+    - key: node.kubernetes.io/exclude-from-external-load-balancers
+      operator: DoesNotExist
 
   # Which services to announce (empty means all LoadBalancer services with IPs from our pool)
   serviceSelector:
