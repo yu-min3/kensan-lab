@@ -57,6 +57,10 @@ RUN curl https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | b
 # Create vscode user and home directory
 RUN useradd -m -s /bin/bash vscode
 
+# Enable passwordless sudo for vscode user
+RUN echo "vscode ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers.d/vscode && \
+    chmod 0440 /etc/sudoers.d/vscode
+
 # Create bash setup script
 RUN echo '#!/bin/bash' > /tmp/setup-bash.sh && \
     echo '# Kubernetes alias' >> /tmp/setup-bash.sh && \
