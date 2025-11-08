@@ -4,9 +4,9 @@ metadata:
   name: istio
   namespace: argocd
   annotations:
-    argocd.argoproj.io/sync-wave: "-1"  # Deploy before cert-manager (creates istio-system namespace)
+    argocd.argoproj.io/sync-wave: "-1" # Deploy before cert-manager (creates istio-system namespace)
   finalizers:
-    - resources-finalizer.argocd.argoproj.io
+  - resources-finalizer.argocd.argoproj.io
 spec:
   project: platform-project
 
@@ -24,5 +24,5 @@ spec:
       prune: true
       selfHeal: true
     syncOptions:
-      - CreateNamespace=true
-      - ServerSideApply=true
+    - CreateNamespace=true
+    - ServerSideApply=true

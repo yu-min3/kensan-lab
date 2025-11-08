@@ -1,4 +1,3 @@
----
 # Let's Encrypt ClusterIssuer for Production
 # Uses DNS-01 challenge with AWS Route53
 apiVersion: cert-manager.io/v1
@@ -19,16 +18,16 @@ spec:
 
     # DNS-01 challenge solver using Route53
     solvers:
-      - dns01:
-          route53:
-            region: ap-northeast-1 # Tokyo region (必要に応じて変更)
-            # AWS credentials from Secret
-            accessKeyIDSecretRef:
-              name: route53-credentials
-              key: access-key-id
-            secretAccessKeySecretRef:
-              name: route53-credentials
-              key: secret-access-key
+    - dns01:
+        route53:
+          region: ap-northeast-1 # Tokyo region (必要に応じて変更)
+          # AWS credentials from Secret
+          accessKeyIDSecretRef:
+            name: route53-credentials
+            key: access-key-id
+          secretAccessKeySecretRef:
+            name: route53-credentials
+            key: secret-access-key
 ---
 # Let's Encrypt ClusterIssuer for Staging (testing)
 # Use this for testing before using production issuer
@@ -47,12 +46,12 @@ spec:
       name: letsencrypt-staging
 
     solvers:
-      - dns01:
-          route53:
-            region: ap-northeast-1
-            accessKeyIDSecretRef:
-              name: route53-credentials
-              key: access-key-id
-            secretAccessKeySecretRef:
-              name: route53-credentials
-              key: secret-access-key
+    - dns01:
+        route53:
+          region: ap-northeast-1
+          accessKeyIDSecretRef:
+            name: route53-credentials
+            key: access-key-id
+          secretAccessKeySecretRef:
+            name: route53-credentials
+            key: secret-access-key

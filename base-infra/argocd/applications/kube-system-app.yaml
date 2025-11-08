@@ -4,7 +4,7 @@ metadata:
   name: kube-system
   namespace: argocd
   finalizers:
-    - resources-finalizer.argocd.argoproj.io
+  - resources-finalizer.argocd.argoproj.io
 spec:
   project: platform-project
 
@@ -19,7 +19,7 @@ spec:
 
   syncPolicy:
     automated:
-      prune: true      # Remove resources when removed from Git
-      selfHeal: true   # Revert manual changes
+      prune: true # Remove resources when removed from Git
+      selfHeal: true # Revert manual changes
     syncOptions:
-      - CreateNamespace=false  # kube-system already exists
+    - CreateNamespace=false # kube-system already exists

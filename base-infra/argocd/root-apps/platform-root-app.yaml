@@ -4,7 +4,7 @@ metadata:
   name: platform-root
   namespace: argocd
   finalizers:
-    - resources-finalizer.argocd.argoproj.io
+  - resources-finalizer.argocd.argoproj.io
 spec:
   project: platform-project
 
@@ -19,10 +19,10 @@ spec:
 
   syncPolicy:
     automated:
-      prune: true      # Remove applications when removed from Git
-      selfHeal: true   # Revert manual changes to Applications
+      prune: true # Remove applications when removed from Git
+      selfHeal: true # Revert manual changes to Applications
     syncOptions:
-      - CreateNamespace=false
+    - CreateNamespace=false
     retry:
       limit: 5
       backoff:

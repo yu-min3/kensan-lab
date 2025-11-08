@@ -5,4 +5,4 @@ metadata:
   labels:
     name: platform-auth-dev
     environment: development
-    platform: infrastructure  # Allow access from gateway-platform
+    platform: infrastructure # Allow access from gateway-platform

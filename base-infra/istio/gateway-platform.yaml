@@ -1,4 +1,3 @@
----
 # Istio Gateway for Platform Infrastructure
 # Provides external access to monitoring, CI/CD, and developer portal services
 apiVersion: gateway.networking.k8s.io/v1
@@ -11,33 +10,33 @@ metadata:
 spec:
   gatewayClassName: istio
   listeners:
-    - name: http
-      protocol: HTTP
-      port: 80
-      hostname: "*.platform.yu-min3.com"
-      allowedRoutes:
-        namespaces:
-          from: Selector
-          selector:
-            matchLabels:
-              platform: infrastructure
+  - name: http
+    protocol: HTTP
+    port: 80
+    hostname: "*.platform.yu-min3.com"
+    allowedRoutes:
+      namespaces:
+        from: Selector
+        selector:
+          matchLabels:
+            platform: infrastructure
 
-    - name: https
-      protocol: HTTPS
-      port: 443
-      hostname: "*.platform.yu-min3.com"
-      allowedRoutes:
-        namespaces:
-          from: Selector
-          selector:
-            matchLabels:
-              platform: infrastructure
-      tls:
-        mode: Terminate
-        certificateRefs:
-          - group: ""
-            kind: Secret
-            name: wildcard-platform-tls
+  - name: https
+    protocol: HTTPS
+    port: 443
+    hostname: "*.platform.yu-min3.com"
+    allowedRoutes:
+      namespaces:
+        from: Selector
+        selector:
+          matchLabels:
+            platform: infrastructure
+    tls:
+      mode: Terminate
+      certificateRefs:
+      - group: ""
+        kind: Secret
+        name: wildcard-platform-tls
 ---
 # LoadBalancer Service for Platform Gateway
 apiVersion: v1
@@ -52,11 +51,11 @@ spec:
   selector:
     gateway.networking.k8s.io/gateway-name: gateway-platform
   ports:
-    - name: http
-      port: 80
-      targetPort: 80
-      protocol: TCP
-    - name: https
-      port: 443
-      targetPort: 443
-      protocol: TCP
+  - name: http
+    port: 80
+    targetPort: 80
+    protocol: TCP
+  - name: https
+    port: 443
+    targetPort: 443
+    protocol: TCP
