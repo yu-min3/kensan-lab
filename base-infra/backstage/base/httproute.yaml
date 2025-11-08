@@ -5,10 +5,10 @@ metadata:
   namespace: backstage
 spec:
   parentRefs:
-  - name: gateway-prod
+  - name: gateway-platform
     namespace: istio-system
   hostnames:
-  - "backstage.yu-min3.com"
+  - "backstage.platform.yu-min3.com"
   rules:
   - matches:
     - path:

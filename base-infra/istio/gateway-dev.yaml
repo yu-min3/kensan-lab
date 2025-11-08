@@ -1,4 +1,3 @@
----
 # Istio Gateway for Development Environment
 apiVersion: gateway.networking.k8s.io/v1
 kind: Gateway
@@ -10,30 +9,30 @@ metadata:
 spec:
   gatewayClassName: istio
   listeners:
-    - name: http
-      protocol: HTTP
-      port: 80
-      hostname: "*.app.yu-min3.com"
-      allowedRoutes:
-        namespaces:
-          from: Selector
-          selector:
-            matchLabels:
-              environment: development
+  - name: http
+    protocol: HTTP
+    port: 80
+    hostname: "*.app.yu-min3.com"
+    allowedRoutes:
+      namespaces:
+        from: Selector
+        selector:
+          matchLabels:
+            environment: development
 
-    - name: https
-      protocol: HTTPS
-      port: 443
-      hostname: "*.app.yu-min3.com"
-      allowedRoutes:
-        namespaces:
-          from: Selector
-          selector:
-            matchLabels:
-              environment: development
-      tls:
-        mode: Terminate
-        certificateRefs:
-          - group: ""
-            kind: Secret
-            name: wildcard-tls
+  - name: https
+    protocol: HTTPS
+    port: 443
+    hostname: "*.app.yu-min3.com"
+    allowedRoutes:
+      namespaces:
+        from: Selector
+        selector:
+          matchLabels:
+            environment: development
+    tls:
+      mode: Terminate
+      certificateRefs:
+      - group: ""
+        kind: Secret
+        name: wildcard-tls

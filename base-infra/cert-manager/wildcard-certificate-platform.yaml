@@ -1,4 +1,3 @@
----
 # Wildcard certificate for *.platform.yu-min3.com
 # This certificate will be used by Platform Gateway (infrastructure services)
 apiVersion: cert-manager.io/v1
@@ -17,7 +16,7 @@ spec:
 
   # DNS names covered by this certificate
   dnsNames:
-    - "*.platform.yu-min3.com"  # Wildcard for platform subdomain
+  - "*.platform.yu-min3.com" # Wildcard for platform subdomain
 
   # Private key settings
   privateKey:
@@ -26,4 +25,4 @@ spec:
     size: 4096
 
   # Certificate renewal settings
-  renewBefore: 720h  # Renew 30 days before expiration (Let's Encrypt certs are valid for 90 days)
+  renewBefore: 720h # Renew 30 days before expiration (Let's Encrypt certs are valid for 90 days)

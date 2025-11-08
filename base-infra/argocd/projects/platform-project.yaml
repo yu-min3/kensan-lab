@@ -4,30 +4,30 @@ metadata:
   name: platform-project
   namespace: argocd
   finalizers:
-    - resources-finalizer.argocd.argoproj.io
+  - resources-finalizer.argocd.argoproj.io
 spec:
   description: Platform Engineering project for infrastructure components
 
   # Source repositories that applications can pull from
   sourceRepos:
-    - "https://github.com/yu-min3/k8s-platform-config"
-    - "*" # Allow Helm charts and other external sources
+  - "https://github.com/yu-min3/k8s-platform-config"
+  - "*" # Allow Helm charts and other external sources
 
   # Destinations where applications can be deployed
   # Using wildcard for all namespaces as this cluster is dedicated to infrastructure
   destinations:
-    - namespace: "*"
-      server: "https://kubernetes.default.svc"
+  - namespace: "*"
+    server: "https://kubernetes.default.svc"
 
   # Allow all cluster-scoped resources (required for CNI, CRDs, etc.)
   clusterResourceWhitelist:
-    - group: "*"
-      kind: "*"
+  - group: "*"
+    kind: "*"
 
   # Namespace-scoped resources whitelist (allow all for platform components)
   namespaceResourceWhitelist:
-    - group: "*"
-      kind: "*"
+  - group: "*"
+    kind: "*"
 
   # Orphaned resources handling
   orphanedResources:
