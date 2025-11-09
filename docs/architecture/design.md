@@ -14,10 +14,11 @@
 | ロードバランサ | Cilium LoadBalancer | L2アナウンスベースの外部トラフィックルーティング（MetalLBを置き換え） |
 | サービスメッシュ | Istio | 外部トラフィック認証、アプリ間制御、セキュリティ |
 | 認証/認可 | Keycloak | ユーザーアカウント管理とJWT発行 |
+| 証明書管理 | cert-manager | Let's Encrypt + Route53 DNSチャレンジによるワイルドカード証明書自動発行・更新 |
 | GitOps | Argo CD | すべてのアプリケーションとインフラの自動デプロイと追跡 |
 | シークレット管理 | Sealed Secrets | Gitリポジトリでのシークレット安全管理（GHCR認証情報） |
-| モニタリング | Prometheus | クラスターおよびアプリケーションメトリクスの収集 |
-| 開発者ポータル | Backstage | アプリケーションテンプレート展開、ドキュメント、カタログ |
+| モニタリング | Prometheus | クラスターおよびアプリケーションメトリクスの収集（未実装） |
+| 開発者ポータル | Backstage | アプリケーションテンプレート展開、ドキュメント、カタログ（デプロイ済み） |
 
 
 ## 2. 環境と権限の分離設計
@@ -70,10 +71,17 @@
 
 ### Istioサービスメッシュ統合
 
-- Istio Gatewayリソースは環境ごと（Prod/Dev）に`base-infra/istio/`で定義
-- アプリケーションはHTTPRouteリソースを使用して適切なGatewayにアタッチ
-- Keycloak JWT検証による外部トラフィック認証
-- アプリケーションごとの認可ポリシーによる細かいアクセス制御
+- **Istio Gateway**: 環境ごと（Prod/Dev）に`base-infra/istio/`で定義
+  - `gateway-prod`: 本番環境用Gateway (HTTPS/TLS termination with cert-manager)
+  - `gateway-dev`: 開発環境用Gateway (HTTPS/TLS termination with cert-manager)
+- **HTTPRoute**: Kubernetes Gateway APIを使用したルーティング設定
+  - アプリケーションはHTTPRouteリソースで適切なGatewayにアタッチ
+  - パスベースルーティングとホストベースルーティングをサポート
+- **TLS証明書**: cert-managerがLet's Encryptから自動取得
+  - ワイルドカード証明書 (`*.yu-min3.com`) をRoute53 DNSチャレンジで管理
+  - 証明書は `wildcard-tls` Secretとして各環境Namespaceに配置
+- **認証/認可**: Keycloak JWT検証による外部トラフィック認証（実装予定）
+- **Authorization Policy**: アプリケーションごとの細かいアクセス制御（実装予定）
 
 ## 5. シークレット管理戦略
 
@@ -86,10 +94,19 @@
 
 ### Backstage統合
 
-- **テンプレートスキャフォールディング**: ADがBackstageを使用してPE管理のテンプレートから新規アプリを作成
-- **自動GitOps**: BackstageがArgo CD Application CRを`platform-config`に自動コミット
-- **TechDocs**: アプリケーションドキュメントがBackstage上で直接レンダリング
-- **カタログ**: すべてのアプリケーションがBackstageカタログに登録され、発見可能に
+Backstageは`backstage` Namespace内にデプロイされ、以下のコンポーネントで構成されています：
+
+- **PostgreSQL StatefulSet**: Backstageのメタデータ永続化用データベース
+- **Backstage Deployment**: カスタムイメージ (`ghcr.io/yu-min3/backstage`) を使用
+- **HTTPRoute**: Istio Gateway経由での外部アクセス設定
+- **Sealed Secrets**: PostgreSQL認証情報とGitHub Personal Access Tokenを安全に管理
+
+#### 主要機能
+
+- **テンプレートスキャフォールディング**: ADがBackstageを使用してPE管理のテンプレートから新規アプリを作成（実装予定）
+- **自動GitOps**: BackstageがArgo CD Application CRを`platform-config`に自動コミット（実装予定）
+- **TechDocs**: アプリケーションドキュメントがBackstage上で直接レンダリング（実装予定）
+- **カタログ**: すべてのアプリケーションがBackstageカタログに登録され、発見可能に（実装予定）
 
 ### 関心の分離
 
@@ -112,4 +129,44 @@
 5. **デフォルトでセキュア**: すべての外部エンドポイントでIstio + Keycloak認証
 6. **宣言的設定**: すべてのリソースをYAMLマニフェストで宣言的に定義
 7. **イミュータブルインフラ**: クラスターへの直接変更は一切行わない
+
+## 9. 現在の実装状況
+
+### ✅ 実装完了
+- **Phase 1: クラスター初期化**
+  - Kubeadmによるクラスター構築
+  - Cilium CNI with LoadBalancer (L2アナウンス)
+  - Sealed Secrets controller
+  - GHCR pull secrets (Prod/Dev環境)
+
+- **Phase 2: GitOps基盤**
+  - Argo CD デプロイ (LoadBalancer: 192.168.0.240)
+  - Argo CD Projects (platform-project, app-project-prod, app-project-dev)
+  - App-of-Apps パターン実装
+  - Namespace分離 (app-prod, app-dev)
+
+- **Phase 3: サービスメッシュ・認証基盤**
+  - Istio Control Plane (`istio-system`)
+  - Istio Gateway (Prod/Dev) with HTTPS/TLS termination
+  - cert-manager + Let's Encrypt (Route53 DNSチャレンジ)
+  - ワイルドカード証明書 (`*.yu-min3.com`) 自動管理
+  - Keycloak (Prod/Dev環境) デプロイ
+  - Backstage デプロイ (PostgreSQL + Backstage Deployment + HTTPRoute)
+
+### 🚧 実装予定
+- **Phase 4: モニタリング**
+  - Prometheus デプロイ
+  - ServiceMonitor設定
+  - Grafana ダッシュボード
+
+- **Phase 5: 開発者エクスペリエンス**
+  - Backstage テンプレート作成 (app-templates リポジトリ)
+  - Argo CD Application CR 自動生成機能
+  - TechDocs 統合
+  - Backstage Catalog 登録
+
+- **Phase 6: アプリケーション検証**
+  - 新規アプリケーション作成フロー検証 (Dev/Prod)
+  - Istio + Keycloak JWT認証検証
+  - GitOps自動デプロイフロー検証
 
