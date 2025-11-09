@@ -7,8 +7,8 @@
         "--userns=keep-id",
         "--privileged"
     ],
-    "containerUser": "root", // イメージ内に存在する非ルートユーザー
-    "remoteUser": "root",
+    "containerUser": "vscode", // イメージ内に存在する非ルートユーザー
+    "remoteUser": "vscode",
     "customizations": {
         "vscode": {
             "extensions": [
