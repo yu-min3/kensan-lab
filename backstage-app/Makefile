@@ -15,18 +15,19 @@ CONTAINER_RUNTIME ?= podman
 .PHONY: help
 help:
 	@echo "Backstage Build and Push Commands:"
-	@echo "  make install      - Install dependencies"
-	@echo "  make build        - Build backend and create Docker image"
-	@echo "  make push         - Login to GHCR and push image"
-	@echo "  make all          - Install, build, and push image"
-	@echo "  make deploy       - Build, push, and deploy to Kubernetes via Kustomize"
-	@echo "  make commit-deploy - Commit Kustomize overlay change for GitOps"
-	@echo "  make preview      - Preview Kustomize manifests without deploying"
-	@echo "  make clean        - Remove Docker image locally"
+	@echo "  make install       - Install dependencies"
+	@echo "  make build         - Build backend and create Docker image"
+	@echo "  make push          - Login to GHCR and push image"
+	@echo "  make all           - Install, build, and push image"
+	@echo "  make update-image  - Build, push, and update kustomization.yaml (no git commit)"
+	@echo "  make deploy        - GitOps deployment: build, push, update, commit, push, sync"
+	@echo "  make commit-deploy - Commit kustomization.yaml changes only (after update-image)"
+	@echo "  make preview       - Preview Kustomize manifests without deploying"
+	@echo "  make clean         - Remove Docker image locally"
 	@echo ""
 	@echo "Development Commands:"
-	@echo "  make dev          - Run Backstage locally (production mode, port 7007)"
-	@echo "  make dev-watch    - Run with hot reload (frontend:3000, backend:7007)"
+	@echo "  make dev           - Run Backstage locally (production mode, port 7007)"
+	@echo "  make dev-watch     - Run with hot reload (frontend:3000, backend:7007)"
 	@echo ""
 	@echo "Environment Variables (set in ../.env):"
 	@echo "  GITHUB_USER          - GitHub username"
@@ -96,24 +97,38 @@ tsc:
 	@echo "Running TypeScript compiler..."
 	node .yarn/releases/yarn-4.4.1.cjs tsc
 
+.PHONY: update-image
+update-image: build push
+	@echo "Updating Kustomize overlay with tag: $(TAG)..."
+	cd ../base-infra/backstage/overlays/prod && \
+		kustomize edit set image ghcr.io/$(GITHUB_USER)/backstage:$(TAG)
+	@echo ""
+	@echo "✅ Image built, pushed, and kustomization.yaml updated"
+	@echo "   Image: $(FULL_IMAGE)"
+	@echo ""
+	@echo "Next steps:"
+	@echo "  - Review changes: git diff ../base-infra/backstage/overlays/prod/kustomization.yaml"
+	@echo "  - Deploy via GitOps: make deploy TAG=$(TAG)"
+	@echo "  - Or commit manually: make commit-deploy TAG=$(TAG)"
+
 .PHONY: deploy
 deploy: build push
 	@echo "Updating Kustomize overlay with tag: $(TAG)..."
 	cd ../base-infra/backstage/overlays/prod && \
 		kustomize edit set image ghcr.io/$(GITHUB_USER)/backstage:$(TAG)
-	@echo "Deploying via Kustomize..."
-	kubectl apply -k ../base-infra/backstage/overlays/prod
-	@echo "Waiting for rollout to complete..."
-	kubectl rollout status deployment/backstage -n backstage --timeout=5m
+	@echo "Committing change to Git..."
+	cd .. && git add base-infra/backstage/overlays/prod/kustomization.yaml
+	cd .. && git commit -m "Deploy Backstage $(TAG)"
+	cd .. && git push
+	@echo "Triggering Argo CD sync..."
+	argocd app sync backstage --async || echo "Warning: argocd CLI not available, please sync manually"
 	@echo ""
-	@echo "✅ Deployed $(FULL_IMAGE)"
+	@echo "✅ GitOps deployment triggered for $(FULL_IMAGE)"
 	@echo ""
-	@echo "Check status:"
-	@echo "  kubectl get pods -n backstage"
+	@echo "Monitor deployment:"
+	@echo "  argocd app get backstage"
+	@echo "  kubectl get pods -n backstage -w"
 	@echo "  kubectl logs -n backstage deployment/backstage -f"
-	@echo ""
-	@echo "To commit this change (GitOps):"
-	@echo "  make commit-deploy"
 
 .PHONY: commit-deploy
 commit-deploy:
