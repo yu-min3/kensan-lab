@@ -24,34 +24,34 @@ backend:
 
 integrations:
   github:
-    - host: github.com
-      token: ${GITHUB_TOKEN}
+  - host: github.com
+    token: ${GITHUB_TOKEN}
 
 catalog:
   rules:
-    - allow: [Component, System, API, Resource, Location, Template]
+  - allow: [Component, System, API, Resource, Location, Template]
   locations:
-    # App templates repository (production)
-    - type: url
-      target: https://github.com/yu-min3/app-templates/blob/main/catalog-info.yaml
-      rules:
-        - allow: [Template]
+  # FastAPIテンプレート
+  - type: url
+    target: https://github.com/yu-min3/app-templates/blob/main/fastapi-template/catalog-info.yaml
+    rules:
+    - allow: [Template, Location]
 
-    # Local examples (for testing in Kubernetes)
-    # In Docker image, working directory is /app/packages/backend
-    # examples/ is copied to /app/examples (see Dockerfile line 64)
-    - type: file
-      target: ../../examples/entities.yaml
+  # Local examples (for testing in Kubernetes)
+  # In Docker image, working directory is /app/packages/backend
+  # examples/ is copied to /app/examples (see Dockerfile line 64)
+  - type: file
+    target: ../../examples/entities.yaml
 
-    - type: file
-      target: ../../examples/template/template.yaml
-      rules:
-        - allow: [Template]
+  - type: file
+    target: ../../examples/template/template.yaml
+    rules:
+    - allow: [Template]
 
-    - type: file
-      target: ../../examples/org.yaml
-      rules:
-        - allow: [User, Group]
+  - type: file
+    target: ../../examples/org.yaml
+    rules:
+    - allow: [User, Group]
 
 auth:
   providers:
