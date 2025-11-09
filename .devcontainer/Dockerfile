@@ -44,7 +44,8 @@ RUN curl -sSL -o argocd-linux-arm64 https://github.com/argoproj/argo-cd/releases
     rm argocd-linux-arm64
 
 # kustomizeのインストール
-RUN curl -s "https://raw.githubusercontent.com/kubernetes-sigs/kustomize/master/hack/install_kustomize.sh" | bash
+RUN curl -s "https://raw.githubusercontent.com/kubernetes-sigs/kustomize/master/hack/install_kustomize.sh" | bash && \
+    mv kustomize /usr/local/bin/
 
 # kubeseal
 RUN wget https://github.com/bitnami-labs/sealed-secrets/releases/download/v0.26.0/kubeseal-0.26.0-linux-arm64.tar.gz && \
@@ -56,7 +57,10 @@ RUN wget https://github.com/bitnami-labs/sealed-secrets/releases/download/v0.26.
 RUN curl https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
 
 # Create vscode user and home directory
-RUN useradd -m -s /bin/bash vscode
+RUN useradd -m -s /bin/bash vscode && \
+    usermod -aG sudo vscode && \
+    echo 'vscode ALL=(ALL) NOPASSWD:ALL' > /etc/sudoers.d/vscode && \
+    chmod 0440 /etc/sudoers.d/vscode
 
 # Create bash setup script
 RUN echo '#!/bin/bash' > /tmp/setup-bash.sh && \
