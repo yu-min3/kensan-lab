@@ -94,35 +94,15 @@ spec:
           - `app-dev-${{ parameters.name }}`
           - `app-prod-${{ parameters.name }}`
 
-          ## ⚠️ Action Required (Platform Engineer)
+          **Location**: `base-infra/argocd/applications/apps/${{ parameters.name }}/argocd-apps.yaml`
 
-          Before merging this PR, you must register the private repository to Argo CD:
+          ## Platform Engineer Actions
 
-          **Repository URL**: `https://github.com/${{ (parameters.repoUrl | parseRepoUrl).owner }}/${{ parameters.name }}.git`
+          ✅ **Repository Access**: Pre-configured (GitHub organization-wide credentials)
 
-          ### Method 1: Argo CD UI (Recommended)
-          1. Navigate to Argo CD UI: http://192.168.0.240
-          2. Go to **Settings** → **Repositories**
-          3. Click **Connect Repo**
-          4. Select **VIA HTTPS**
-          5. Fill in:
-             - **Type**: `git`
-             - **Repository URL**: `https://github.com/${{ (parameters.repoUrl | parseRepoUrl).owner }}/${{ parameters.name }}.git`
-             - **Username**: Your GitHub username
-             - **Password**: GitHub Personal Access Token (with `repo` scope)
-          6. Click **Connect**
-
-          ### Method 2: Argo CD CLI
-          ```bash
-          argocd repo add https://github.com/${{ (parameters.repoUrl | parseRepoUrl).owner }}/${{ parameters.name }}.git \
-            --username <github-username> \
-            --password <github-pat>
-          ```
-
-          ### Method 3: Kubernetes Secret (GitOps)
-          Create a repository secret in `base-infra/argocd/repo-secrets/${{ parameters.name }}-repo.yaml`
+          **Review & Merge**: Please review the Application manifests and merge when ready. Argo CD will automatically sync the applications.
         sourcePath: .backstage
-        targetPath: base-infra/argocd/applications
+        targetPath: base-infra/argocd/applications/apps/${{ parameters.name }}
 
     # Step 4: Register component in Backstage catalog
     - id: register
