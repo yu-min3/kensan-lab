@@ -1,0 +1,36 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: app-dev-test-app-4
+  namespace: argocd
+  labels:
+    environment: dev
+    app: test-app-4
+    managed-by: backstage
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: app-project-dev
+  source:
+    repoURL: https://github.com/yu-min3/test-app-4.git
+    targetRevision: main
+    path: overlays/dev
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: app-dev
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+      allowEmpty: false
+    syncOptions:
+      - CreateNamespace=false
+      - PrunePropagationPolicy=foreground
+      - PruneLast=true
+    retry:
+      limit: 5
+      backoff:
+        duration: 5s
+        factor: 2
+        maxDuration: 3m
+  revisionHistoryLimit: 10
