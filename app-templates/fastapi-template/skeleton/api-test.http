@@ -1,0 +1,22 @@
+### FastAPI ${{ values.name }} - API Testing
+### Use the REST Client extension in VS Code to send these requests
+
+@baseUrl = http://localhost:8000
+
+### Root Endpoint
+GET {{baseUrl}}/
+
+### Health Check
+GET {{baseUrl}}/health
+
+### Metrics (Prometheus)
+GET {{baseUrl}}/metrics
+
+### Example API Endpoint
+GET {{baseUrl}}/api/v1/example
+
+### OpenAPI Documentation (Swagger UI)
+# Open in browser: {{baseUrl}}/docs
+
+### OpenAPI Schema (JSON)
+GET {{baseUrl}}/openapi.json

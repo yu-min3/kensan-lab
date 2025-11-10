@@ -1,0 +1,16 @@
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: ${{ values.name }}
+  labels:
+    app: ${{ values.name }}
+    prometheus: kube-prometheus
+spec:
+  selector:
+    matchLabels:
+      app: ${{ values.name }}
+  endpoints:
+    - port: http
+      path: /metrics
+      interval: 30s
+      scrapeTimeout: 10s

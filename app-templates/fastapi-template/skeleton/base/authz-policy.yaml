@@ -1,0 +1,35 @@
+apiVersion: security.istio.io/v1beta1
+kind: AuthorizationPolicy
+metadata:
+  name: ${{ values.name }}
+  labels:
+    app: ${{ values.name }}
+spec:
+  selector:
+    matchLabels:
+      app: ${{ values.name }}
+  action: ALLOW
+  rules:
+    # Allow health check from within the mesh
+    - from:
+        - source:
+            principals: ["cluster.local/ns/istio-system/sa/istio-ingressgateway"]
+      to:
+        - operation:
+            paths: ["/health", "/metrics"]
+            methods: ["GET"]
+    # Allow all authenticated requests from the gateway
+    - from:
+        - source:
+            principals: ["cluster.local/ns/istio-system/sa/istio-ingressgateway"]
+      to:
+        - operation:
+            methods: ["GET", "POST", "PUT", "DELETE", "PATCH"]
+    # Allow Prometheus scraping
+    - from:
+        - source:
+            namespaces: ["monitoring"]
+      to:
+        - operation:
+            paths: ["/metrics"]
+            methods: ["GET"]
