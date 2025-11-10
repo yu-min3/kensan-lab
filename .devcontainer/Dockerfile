@@ -20,8 +20,8 @@ RUN apt-get update && apt-get install -y \
     yamllint \
     && rm -rf /var/lib/apt/lists/*
 
-# Install Node.js and npm
-RUN curl -fsSL https://deb.nodesource.com/setup_lts.x | bash - \
+# Install Node.js and npm (v22 for Backstage compatibility)
+RUN curl -fsSL https://deb.nodesource.com/setup_22.x | bash - \
     && apt-get install -y nodejs
 
 # Install Claude Code globally
