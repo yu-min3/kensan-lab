@@ -31,11 +31,13 @@ catalog:
   rules:
   - allow: [Component, System, API, Resource, Location, Template]
   locations:
-  # FastAPIテンプレート
-  - type: url
-    target: https://github.com/yu-min3/app-templates/blob/main/fastapi-template/catalog-info.yaml
+  # FastAPIテンプレート（ローカルパス）
+  # In Docker image, working directory is /app/packages/backend
+  # app-templates/ is copied to /app/app-templates (see Dockerfile)
+  - type: file
+    target: ../../app-templates/fastapi-template/template.yaml
     rules:
-    - allow: [Template, Location]
+    - allow: [Template]
 
   # Local examples (for testing in Kubernetes)
   # In Docker image, working directory is /app/packages/backend

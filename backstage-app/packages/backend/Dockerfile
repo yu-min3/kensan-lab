@@ -37,9 +37,10 @@ USER node
 WORKDIR /app
 
 # Copy files needed by Yarn
-COPY --chown=node:node .yarn ./.yarn
-COPY --chown=node:node .yarnrc.yml ./
-COPY --chown=node:node backstage.json ./
+# Note: Build context is now k8s-platform-config/ (parent dir)
+COPY --chown=node:node backstage-app/.yarn ./.yarn
+COPY --chown=node:node backstage-app/.yarnrc.yml ./
+COPY --chown=node:node backstage-app/backstage.json ./
 
 # This switches many Node.js dependencies to production mode.
 ENV NODE_ENV=production
@@ -50,16 +51,19 @@ ENV NODE_OPTIONS="--no-node-snapshot"
 # Copy repo skeleton first, to avoid unnecessary docker cache invalidation.
 # The skeleton contains the package.json of each package in the monorepo,
 # and along with yarn.lock and the root package.json, that's enough to run yarn install.
-COPY --chown=node:node yarn.lock package.json packages/backend/dist/skeleton.tar.gz ./
+COPY --chown=node:node backstage-app/yarn.lock backstage-app/package.json backstage-app/packages/backend/dist/skeleton.tar.gz ./
 RUN tar xzf skeleton.tar.gz && rm skeleton.tar.gz
 
 RUN yarn workspaces focus --all --production && rm -rf "$(yarn cache clean)"
 
 # This will include the examples, if you don't need these simply remove this line
-COPY --chown=node:node examples ./examples
+COPY --chown=node:node backstage-app/examples ./examples
+
+# Copy app-templates directory (Backstage templates)
+COPY --chown=node:node app-templates ./app-templates
 
 # Then copy the rest of the backend bundle, along with any other files we might want.
-COPY --chown=node:node packages/backend/dist/bundle.tar.gz app-config*.yaml ./
+COPY --chown=node:node backstage-app/packages/backend/dist/bundle.tar.gz backstage-app/app-config*.yaml ./
 RUN tar xzf bundle.tar.gz && rm bundle.tar.gz
 
 CMD ["node", "packages/backend", "--config", "app-config.yaml", "--config", "app-config.kubernetes.yaml"]

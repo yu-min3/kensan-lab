@@ -3,6 +3,7 @@ archive/*
 *.env
 mcp-server-kubernetes/*
 CLAUDE.md
+GEMINI.md
 temp.txt
 temp/*
 kubeconfig
