@@ -49,7 +49,8 @@ build-backend:
 build: build-backend
 	@echo "Building container image: $(FULL_IMAGE)"
 	@echo "Using container runtime: $(CONTAINER_RUNTIME)"
-	$(CONTAINER_RUNTIME) build --format=docker -f packages/backend/Dockerfile -t $(FULL_IMAGE) .
+	@echo "Build context: parent directory (to include app-templates)"
+	cd .. && $(CONTAINER_RUNTIME) build --format=docker -f backstage-app/packages/backend/Dockerfile -t $(FULL_IMAGE) .
 
 .PHONY: login
 login:

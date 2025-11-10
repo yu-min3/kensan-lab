@@ -1,0 +1,70 @@
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: ${{ values.name }}
+  description: ${{ values.description }}
+  annotations:
+    github.com/project-slug: yu-min3/${{ values.name }}
+    backstage.io/techdocs-ref: dir:.
+    argocd/app-name: app-dev-${{ values.name }},app-prod-${{ values.name }}
+  tags:
+    - fastapi
+    - python
+    - gitops
+  links:
+    - url: https://${{ values.name }}.yu-min3.com
+      title: Live Application (Dev)
+      icon: web
+    - url: https://argocd.yu-min3.com/applications/app-dev-${{ values.name }}
+      title: Argo CD (Dev)
+      icon: dashboard
+    - url: https://argocd.yu-min3.com/applications/app-prod-${{ values.name }}
+      title: Argo CD (Prod)
+      icon: dashboard
+spec:
+  type: service
+  lifecycle: experimental
+  owner: ${{ values.owner }}
+  system: platform
+  providesApis:
+    - ${{ values.name }}-api
+
+---
+apiVersion: backstage.io/v1alpha1
+kind: API
+metadata:
+  name: ${{ values.name }}-api
+  description: API for ${{ values.name }}
+  tags:
+    - fastapi
+    - rest
+spec:
+  type: openapi
+  lifecycle: experimental
+  owner: ${{ values.owner }}
+  system: platform
+  definition: |
+    openapi: 3.0.0
+    info:
+      title: ${{ values.name }}
+      version: 1.0.0
+      description: ${{ values.description }}
+    paths:
+      /:
+        get:
+          summary: Root endpoint
+          responses:
+            '200':
+              description: Success
+      /health:
+        get:
+          summary: Health check
+          responses:
+            '200':
+              description: Healthy
+      /api/v1/example:
+        get:
+          summary: Example endpoint
+          responses:
+            '200':
+              description: Example response

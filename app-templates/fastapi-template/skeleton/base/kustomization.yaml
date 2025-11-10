@@ -1,0 +1,24 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: app-dev  # Default namespace, will be overridden by overlays
+
+resources:
+  - deployment.yaml
+  - service.yaml
+  - httproute.yaml
+  - authz-policy.yaml
+  - servicemonitor.yaml
+
+commonLabels:
+  app: ${{ values.name }}
+  app.kubernetes.io/name: ${{ values.name }}
+  app.kubernetes.io/instance: ${{ values.name }}
+  app.kubernetes.io/component: application
+  app.kubernetes.io/part-of: ${{ values.name }}
+  app.kubernetes.io/managed-by: kustomize
+
+images:
+  - name: app-image
+    newName: ghcr.io/yu-min3/${{ values.name }}
+    newTag: latest
