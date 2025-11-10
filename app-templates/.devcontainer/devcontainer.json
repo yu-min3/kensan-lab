@@ -1,0 +1,21 @@
+{
+    "name": "app-template",
+    "build": {
+        "dockerfile": "Dockerfile"
+    },
+    "runArgs": [
+        "--userns=keep-id",
+        "--privileged"
+    ],
+    "containerUser": "vscode", // イメージ内に存在する非ルートユーザー
+    "remoteUser": "vscode",
+    "customizations": {
+        "vscode": {
+            "extensions": [
+                "redhat.vscode-yaml",
+                "ms-azuretools.vscode-docker",
+                "bluebrown.yamlfmt"
+            ]
+        }
+    }
+}

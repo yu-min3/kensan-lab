@@ -90,6 +90,12 @@ catalog:
       rules:
         - allow: [Template]
 
+    # FastAPI template (from app-templates directory)
+    - type: file
+      target: ../../../../../../app-templates/fastapi-template/template.yaml
+      rules:
+        - allow: [Template]
+
     # Local example organizational data
     - type: file
       target: ../../../../../examples/org.yaml
