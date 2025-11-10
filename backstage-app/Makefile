@@ -3,6 +3,10 @@
 -include ../.env
 export
 
+# For Backstage compatibility: use GITHUB_GHCR_PAT as GITHUB_TOKEN if not set
+GITHUB_TOKEN ?= $(GITHUB_GHCR_PAT)
+export GITHUB_TOKEN
+
 # Default values
 REGISTRY ?= ghcr.io
 IMAGE_NAME ?= $(GITHUB_USER)/backstage
@@ -81,7 +85,7 @@ dev: build-backend
 	@echo "Press Ctrl+C to stop"
 	@echo ""
 	cd packages/backend/dist/packages/backend && \
-		node dist/index.cjs.js \
+		NODE_OPTIONS=--no-node-snapshot node dist/index.cjs.js \
 		--config $(CURDIR)/app-config.yaml \
 		--config $(CURDIR)/app-config.local.yaml
 
@@ -91,7 +95,7 @@ dev-watch:
 	@echo "Frontend: http://localhost:3000 (Webpack Dev Server)"
 	@echo "Backend:  http://localhost:7007 (API)"
 	@echo ""
-	node .yarn/releases/yarn-4.4.1.cjs start
+	NODE_OPTIONS=--no-node-snapshot node .yarn/releases/yarn-4.4.1.cjs start
 
 .PHONY: tsc
 tsc:
