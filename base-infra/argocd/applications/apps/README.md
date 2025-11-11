@@ -2,25 +2,40 @@
 
 このディレクトリには、Backstageテンプレートから作成された全アプリケーションのArgo CD Application CRが格納されます。
 
+## ⚠️ 重要: リポジトリ命名規則
+
+**全てのアプリケーションリポジトリは `goldship-apps-` プレフィックスを持つ必要があります。**
+
+- **正しい例**: `goldship-apps-my-app`, `goldship-apps-api-server`
+- **誤った例**: `my-app`, `api-server`, `app-my-app`
+
+このプレフィックスは：
+- Backstageテンプレートで自動的に付与されます
+- **変更しないでください** - Argo CDの追跡に使用されます
+- 将来的にApplicationSetでの自動検出に対応予定
+
 ## ディレクトリ構造
 
 各アプリケーションは専用のサブディレクトリを持ち、Dev/Prod両環境のApplication CRを含みます：
 
 ```
 apps/
-├── test-app/
-│   └── argocd-apps.yaml    # app-dev-test-app と app-prod-test-app を含む
-├── another-app/
-│   └── argocd-apps.yaml    # app-dev-another-app と app-prod-another-app を含む
+├── my-app/
+│   └── argocd-apps.yaml    # app-dev-my-app と app-prod-my-app を含む
+│                           # リポジトリ: goldship-apps-my-app
+├── api-server/
+│   └── argocd-apps.yaml    # app-dev-api-server と app-prod-api-server を含む
+│                           # リポジトリ: goldship-apps-api-server
 └── README.md
 ```
 
 ## アプリケーション追加フロー
 
 1. **開発者**がBackstageのSoftware Templatesから新規アプリケーションを作成
+   - アプリケーション名入力: `my-app`
 2. **Backstage**が自動的に以下を生成：
-   - アプリケーションリポジトリ（例: `github.com/yu-min3/test-app`）
-   - このリポジトリへのPull Request（Application CRを含む）
+   - アプリケーションリポジトリ: `github.com/yu-min3/goldship-apps-my-app`
+   - このリポジトリ（platform-config）へのPull Request（Application CRを含む）
 3. **Platform Engineer**がPRをレビューしてマージ
 4. **Argo CD**が自動的に新しいApplicationを検出してsync
 
@@ -38,7 +53,7 @@ metadata:
 spec:
   project: app-project-dev
   source:
-    repoURL: https://github.com/yu-min3/<app-name>.git
+    repoURL: https://github.com/yu-min3/goldship-apps-<app-name>.git
     targetRevision: main
     path: overlays/dev
   destination:
@@ -56,7 +71,7 @@ metadata:
 spec:
   project: app-project-prod
   source:
-    repoURL: https://github.com/yu-min3/<app-name>.git
+    repoURL: https://github.com/yu-min3/goldship-apps-<app-name>.git
     targetRevision: main
     path: overlays/prod
   destination:
