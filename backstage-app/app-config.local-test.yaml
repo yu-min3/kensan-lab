@@ -1,0 +1,4 @@
+backend:
+  database:
+    client: better-sqlite3
+    connection: ':memory:'
