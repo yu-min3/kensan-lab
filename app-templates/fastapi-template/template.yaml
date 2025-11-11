@@ -19,11 +19,21 @@ spec:
         - name
         - description
         - owner
+        - repoUrl
       properties:
         name:
           title: Application Name
           type: string
-          description: Unique name for your application (lowercase, alphanumeric, hyphens only)
+          description: |
+            アプリケーション名（小文字、英数字、ハイフンのみ）
+
+            📌 **この名前が影響するもの:**
+            - Argo CD Applicationリソース名: `app-dev-{name}`, `app-prod-{name}`
+            - Kubernetesデプロイ先namespace: `app-dev`, `app-prod` (共有) または `app-dev-{name}`, `app-prod-{name}` (分離型)
+            - Backstageカタログのコンポーネント名
+            - Argo CD UIでの表示名
+
+            💡 リポジトリ名とは独立して設定可能です
           pattern: '^[a-z0-9-]+$'
           ui:autofocus: true
         description:
@@ -38,20 +48,25 @@ spec:
           ui:options:
             catalogFilter:
               kind: [Group, User]
-
-    - title: Repository Configuration
-      required:
-        - repoUrl
-      properties:
         repoUrl:
           title: Repository Location
           type: string
+          description: |
+            GitHubリポジトリの場所
+
+            📌 **この設定が影響するもの:**
+            - GitHubリポジトリURL: `https://github.com/{owner}/{repo}`
+            - Argo CDのgit sync元
+            - GitHub Actionsビルドパイプライン
+            - コンテナイメージ名: `ghcr.io/{owner}/{repo}:{tag}`
+
+            💡 推奨命名: `goldship-apps-{アプリ名}` (追跡しやすいため)
           ui:field: RepoUrlPicker
           ui:options:
             allowedHosts:
               - github.com
             allowedOwners:
-              - yu-min3  # Your GitHub organization
+              - yu-min3
 
   steps:
     # Step 1: Fetch template skeleton
@@ -64,7 +79,8 @@ spec:
           name: ${{ parameters.name }}
           description: ${{ parameters.description }}
           owner: ${{ parameters.owner }}
-          destination: ${{ parameters.repoUrl | parseRepoUrl }}
+          repoName: ${{ (parameters.repoUrl | parseRepoUrl).repo }}
+          repoOwner: ${{ (parameters.repoUrl | parseRepoUrl).owner }}
 
     # Step 2: Create application repository
     - id: publish
@@ -91,38 +107,31 @@ spec:
 
           This PR adds the Argo CD Application CRs for **${{ parameters.name }}** in both Dev and Prod environments.
 
-          - `app-dev-${{ parameters.name }}`
-          - `app-prod-${{ parameters.name }}`
+          ## Application Details
 
-          ## ⚠️ Action Required (Platform Engineer)
+          - **Application Name**: `${{ parameters.name }}`
+          - **Repository**: `${{ (parameters.repoUrl | parseRepoUrl).owner }}/${{ (parameters.repoUrl | parseRepoUrl).repo }}`
+          - **Dev Application**: `app-dev-${{ parameters.name }}`
+          - **Prod Application**: `app-prod-${{ parameters.name }}`
 
-          Before merging this PR, you must register the private repository to Argo CD:
+          **Location**: `base-infra/argocd/applications/apps/${{ parameters.name }}/argocd-apps.yaml`
 
-          **Repository URL**: `https://github.com/${{ (parameters.repoUrl | parseRepoUrl).owner }}/${{ parameters.name }}.git`
+          ## 🔐 Repository Authentication
 
-          ### Method 1: Argo CD UI (Recommended)
-          1. Navigate to Argo CD UI: http://192.168.0.240
-          2. Go to **Settings** → **Repositories**
-          3. Click **Connect Repo**
-          4. Select **VIA HTTPS**
-          5. Fill in:
-             - **Type**: `git`
-             - **Repository URL**: `https://github.com/${{ (parameters.repoUrl | parseRepoUrl).owner }}/${{ parameters.name }}.git`
-             - **Username**: Your GitHub username
-             - **Password**: GitHub Personal Access Token (with `repo` scope)
-          6. Click **Connect**
+          ✅ **No manual action required!**
 
-          ### Method 2: Argo CD CLI
-          ```bash
-          argocd repo add https://github.com/${{ (parameters.repoUrl | parseRepoUrl).owner }}/${{ parameters.name }}.git \
-            --username <github-username> \
-            --password <github-pat>
-          ```
+          Argo CD is configured with Credential Templates that automatically authenticate all repositories under `https://github.com/${{ (parameters.repoUrl | parseRepoUrl).owner }}/` prefix.
 
-          ### Method 3: Kubernetes Secret (GitOps)
-          Create a repository secret in `base-infra/argocd/repo-secrets/${{ parameters.name }}-repo.yaml`
+          ## ⚠️ Platform Engineer Actions Required
+
+          ### Review & Merge
+
+          Review this PR and merge. Argo CD will automatically:
+          1. Detect the new Application CRs
+          2. Authenticate to the repository using Credential Templates
+          3. Sync the application to both Dev and Prod environments
         sourcePath: .backstage
-        targetPath: base-infra/argocd/applications
+        targetPath: base-infra/argocd/applications/apps/${{ parameters.name }}
 
     # Step 4: Register component in Backstage catalog
     - id: register
@@ -133,15 +142,41 @@ spec:
         catalogInfoPath: '/catalog-info.yaml'
 
   output:
+    text:
+      - title: 🎉 アプリケーション作成完了！
+        content: |
+          ## 次のステップ
+
+          ### 1. Platform Configへのプルリクエスト
+          Platform Engineerが以下のPRをレビュー・マージします：
+          - **PR**: [Platform Config PR](${{ steps['create-argocd-apps'].output.remoteUrl }})
+          - **内容**: Argo CD Application CRsの追加
+
+          ### 2. 最初のイメージリリース
+          PRがマージされたら、アプリケーションリポジトリで最初のバージョンをリリースしてください：
+          ```bash
+          cd ${{ (parameters.repoUrl | parseRepoUrl).repo }}
+          git tag v0.1.0
+          git push origin v0.1.0
+          ```
+          GitHub Actionsが自動的にイメージをビルドしてGHCRにプッシュします。
+
+          ### 3. アプリケーションがデプロイされます
+          Argo CDが自動的に以下の環境にデプロイします：
+          - **Dev環境**: `app-dev` namespace
+          - **Prod環境**: `app-prod` namespace
+
+          デプロイ状況は Argo CD UI で確認できます。
+
     links:
-      - title: Repository
+      - title: 📦 アプリケーションリポジトリ
         url: ${{ steps.publish.output.remoteUrl }}
-      - title: Open in Backstage
+      - title: 📋 Backstageカタログで開く
         icon: catalog
         entityRef: ${{ steps.register.output.entityRef }}
-      - title: Platform Config PR
+      - title: 🔀 Platform Config PR
         url: ${{ steps['create-argocd-apps'].output.remoteUrl }}
-      - title: Argo CD App (Dev)
+      - title: 🚀 Argo CD App (Dev)
         url: http://192.168.0.240/applications/app-dev-${{ parameters.name }}
-      - title: Argo CD App (Prod)
+      - title: 🚀 Argo CD App (Prod)
         url: http://192.168.0.240/applications/app-prod-${{ parameters.name }}

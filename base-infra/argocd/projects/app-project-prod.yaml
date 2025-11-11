@@ -53,6 +53,10 @@ spec:
     kind: "HTTPRoute"
   - group: "autoscaling"
     kind: "HorizontalPodAutoscaler"
+  - group: "monitoring.coreos.com"
+    kind: "ServiceMonitor"
+  - group: "security.istio.io"
+    kind: "AuthorizationPolicy"
 
   # Orphaned resources handling
   orphanedResources:
