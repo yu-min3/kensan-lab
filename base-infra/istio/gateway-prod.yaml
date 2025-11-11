@@ -35,4 +35,4 @@ spec:
       certificateRefs:
       - group: ""
         kind: Secret
-        name: wildcard-tls
+        name: wildcard-apps-tls
