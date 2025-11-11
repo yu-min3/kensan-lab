@@ -27,6 +27,10 @@ RUN curl -fsSL https://deb.nodesource.com/setup_22.x | bash - \
 # Install Claude Code globally
 RUN npm install -g @anthropic-ai/claude-code
 
+# Install Gemini CLI globally
+RUN npm install -g @google/gemini-cli
+
+
 # uvのインストール
 RUN curl -LsSf https://astral.sh/uv/install.sh | sh
 
