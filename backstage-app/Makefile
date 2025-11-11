@@ -27,6 +27,7 @@ help:
 	@echo "  make deploy        - GitOps deployment: build, push, update, commit, push, sync"
 	@echo "  make commit-deploy - Commit kustomization.yaml changes only (after update-image)"
 	@echo "  make preview       - Preview Kustomize manifests without deploying"
+	@echo "  make run           - Run the built Docker image locally"
 	@echo "  make clean         - Remove Docker image locally"
 	@echo ""
 	@echo "Development Commands:"
@@ -55,6 +56,17 @@ build: build-backend
 	@echo "Using container runtime: $(CONTAINER_RUNTIME)"
 	@echo "Build context: parent directory (to include app-templates)"
 	cd .. && $(CONTAINER_RUNTIME) build --format=docker -f backstage-app/packages/backend/Dockerfile -t $(FULL_IMAGE) .
+
+.PHONY: run
+run: build
+	@echo "Running container image for local testing (with SQLite)..."
+	@echo "Access at: http://localhost:7007"
+	@echo ""
+	$(CONTAINER_RUNTIME) run --rm -it -p 7007:7007 \
+		-v $(CURDIR)/app-config.local-test.yaml:/app/app-config.local-test.yaml \
+		-e GITHUB_TOKEN="$(GITHUB_TOKEN)" \
+		$(FULL_IMAGE) \
+		node packages/backend --config app-config.yaml --config app-config.kubernetes.yaml --config app-config.local-test.yaml
 
 .PHONY: login
 login:

@@ -32,26 +32,26 @@ catalog:
   - allow: [Component, System, API, Resource, Location, Template]
   locations:
   # FastAPIテンプレート（ローカルパス）
-  # In Docker image, working directory is /app/packages/backend
+  # In Docker image, working directory is /app
   # app-templates/ is copied to /app/app-templates (see Dockerfile)
   - type: file
-    target: ../../app-templates/fastapi-template/template.yaml
+    target: ./app-templates/fastapi-template/template.yaml
     rules:
     - allow: [Template]
 
   # Local examples (for testing in Kubernetes)
-  # In Docker image, working directory is /app/packages/backend
+  # In Docker image, working directory is /app
   # examples/ is copied to /app/examples (see Dockerfile line 64)
   - type: file
-    target: ../../examples/entities.yaml
+    target: ./examples/entities.yaml
 
   - type: file
-    target: ../../examples/template/template.yaml
+    target: ./examples/template/template.yaml
     rules:
     - allow: [Template]
 
   - type: file
-    target: ../../examples/org.yaml
+    target: ./examples/org.yaml
     rules:
     - allow: [User, Group]
 
