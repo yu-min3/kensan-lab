@@ -10,7 +10,7 @@ spec:
       namespace: istio-system
       kind: Gateway
   hostnames:
-    - "${{ values.name }}.yu-min3.com"
+    - "${{ values.name }}.app.yu-min3.com"
   rules:
     - matches:
         - path:
