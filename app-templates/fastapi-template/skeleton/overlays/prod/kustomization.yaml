@@ -12,8 +12,7 @@ patches:
   - path: resources-patch.yaml
 
 images:
-  - name: app-image
-    newName: ghcr.io/yu-min3/${{ values.name }}
+  - name: ghcr.io/yu-min3/${{ values.name }}
     newTag: v1.0.0
 
 commonLabels:

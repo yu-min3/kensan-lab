@@ -11,8 +11,7 @@ patches:
   - path: httproute-patch.yaml
 
 images:
-  - name: app-image
-    newName: ghcr.io/yu-min3/${{ values.name }}
+  - name: ghcr.io/yu-min3/${{ values.name }}
     newTag: dev-latest
 
 commonLabels:
