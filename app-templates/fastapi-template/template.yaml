@@ -148,12 +148,12 @@ spec:
           ## 次のステップ
 
           ### 1. Platform Configへのプルリクエスト
-          Platform Engineerが以下のPRをレビュー・マージします：
+          Platform Engineerが作成済みの以下のPRをレビュー・マージします：
           - **PR**: [Platform Config PR](${{ steps['create-argocd-apps'].output.remoteUrl }})
           - **内容**: Argo CD Application CRsの追加
 
           ### 2. 最初のイメージリリース
-          PRがマージされたら、アプリケーションリポジトリで最初のバージョンをリリースしてください：
+          PRがマージされたら、上記リンクのアプリケーションリポジトリで最初のバージョンをリリースしてください：
           ```bash
           cd ${{ (parameters.repoUrl | parseRepoUrl).repo }}
           git tag v0.1.0
