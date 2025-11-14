@@ -17,17 +17,12 @@ FROM node:22-bookworm-slim
 # Set Python interpreter for `node-gyp` to use
 ENV PYTHON=/usr/bin/python3
 
-# Install isolate-vm dependencies, these are needed by the @backstage/plugin-scaffolder-backend.
-# Also install mkdocs-techdocs-core for TechDocs local generation
+# Install isolate-vm dependencies, sqlite3, and mkdocs-techdocs-core
+# Consolidated into single RUN to optimize build time (avoid redundant apt-get update)
 RUN apt-get update && \
-    apt-get install -y --no-install-recommends python3 python3-pip g++ build-essential && \
+    apt-get install -y --no-install-recommends \
+        python3 python3-pip g++ build-essential libsqlite3-dev && \
     pip3 install --no-cache-dir --break-system-packages mkdocs-techdocs-core==1.4.0 && \
-    rm -rf /var/lib/apt/lists/*
-
-# Install sqlite3 dependencies. You can skip this if you don't use sqlite3 in the image,
-# in which case you should also move better-sqlite3 to "devDependencies" in package.json.
-RUN apt-get update && \
-    apt-get install -y --no-install-recommends libsqlite3-dev && \
     rm -rf /var/lib/apt/lists/*
 
 # From here on we use the least-privileged `node` user to run the backend.
@@ -61,9 +56,8 @@ RUN yarn workspaces focus --all --production && rm -rf "$(yarn cache clean)"
 # NOTE: Examples are NOT included in the Docker image
 # They are only available in local development environment (make dev)
 
-# TODO: Re-enable catalog copy after testing with more memory
 # Copy production catalog (domains and organizations)
-# COPY --chown=node:node backstage-app/catalog ./catalog
+COPY --chown=node:node backstage-app/catalog ./catalog
 
 # Copy app-templates directory (Backstage templates)
 COPY --chown=node:node app-templates ./app-templates
