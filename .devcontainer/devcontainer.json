@@ -9,6 +9,7 @@
     ],
     "containerUser": "vscode", // イメージ内に存在する非ルートユーザー
     "remoteUser": "vscode",
+    "postCreateCommand": "bash -c 'pip3 install --break-system-packages mkdocs-techdocs-core==1.4.0 && sudo ln -sf /home/vscode/.local/bin/mkdocs /usr/local/bin/mkdocs'",
     "customizations": {
         "vscode": {
             "extensions": [

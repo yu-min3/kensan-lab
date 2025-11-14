@@ -1,0 +1,98 @@
+# Production Organization Structure
+# This defines the actual teams and users in the platform
+
+# --- Groups: Teams and Roles ---
+apiVersion: backstage.io/v1alpha1
+kind: Group
+metadata:
+  name: platform-engineering
+  description: Platform Engineering team responsible for infrastructure and tooling
+spec:
+  type: team
+  children: []
+
+---
+apiVersion: backstage.io/v1alpha1
+kind: Group
+metadata:
+  name: application-developers
+  description: Application development teams
+spec:
+  type: team
+  children: []
+
+# --- Users: Platform members ---
+# Note: These are demo users. In production, use external auth provider (OIDC/SAML)
+
+# Platform Engineering Team Members
+---
+apiVersion: backstage.io/v1alpha1
+kind: User
+metadata:
+  name: demo-platform-admin
+spec:
+  profile:
+    displayName: Demo Platform Admin
+    email: demo-admin@example.com
+  memberOf: [platform-engineering]
+
+---
+apiVersion: backstage.io/v1alpha1
+kind: User
+metadata:
+  name: demo-platform-engineer-1
+spec:
+  profile:
+    displayName: Demo Platform Engineer 1
+    email: demo-pe1@example.com
+    picture: https://i.pravatar.cc/150?u=demo-pe1
+  memberOf: [platform-engineering]
+
+---
+apiVersion: backstage.io/v1alpha1
+kind: User
+metadata:
+  name: demo-platform-engineer-2
+spec:
+  profile:
+    displayName: Demo Platform Engineer 2
+    email: demo-pe2@example.com
+    picture: https://i.pravatar.cc/150?u=demo-pe2
+  memberOf: [platform-engineering]
+
+# Application Developers
+---
+apiVersion: backstage.io/v1alpha1
+kind: User
+metadata:
+  name: demo-developer-1
+spec:
+  profile:
+    displayName: Demo Developer 1
+    email: demo-dev1@example.com
+    picture: https://i.pravatar.cc/150?u=demo-dev1
+  memberOf: [application-developers]
+
+---
+apiVersion: backstage.io/v1alpha1
+kind: User
+metadata:
+  name: demo-developer-2
+spec:
+  profile:
+    displayName: Demo Developer 2
+    email: demo-dev2@example.com
+    picture: https://i.pravatar.cc/150?u=demo-dev2
+  memberOf: [application-developers]
+
+---
+apiVersion: backstage.io/v1alpha1
+kind: User
+metadata:
+  name: demo-developer-3
+spec:
+  profile:
+    displayName: Demo Developer 3
+    email: demo-dev3@example.com
+    picture: https://i.pravatar.cc/150?u=demo-dev3
+  memberOf: [application-developers]

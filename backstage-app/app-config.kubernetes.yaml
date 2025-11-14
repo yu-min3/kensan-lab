@@ -1,17 +1,17 @@
 app:
   title: Platform Engineering Portal
-  baseUrl: https://backstage.yu-min3.com
+  baseUrl: https://backstage.platform.yu-min3.com
 
 organization:
   name: Platform Team
 
 backend:
-  baseUrl: https://backstage.yu-min3.com
+  baseUrl: https://backstage.platform.yu-min3.com
   listen:
     port: 7007
     host: 0.0.0.0
   cors:
-    origin: https://backstage.yu-min3.com
+    origin: https://backstage.platform.yu-min3.com
     methods: [GET, HEAD, PATCH, POST, PUT, DELETE]
     credentials: true
   database:
@@ -29,7 +29,7 @@ integrations:
 
 catalog:
   rules:
-  - allow: [Component, System, API, Resource, Location, Template]
+  - allow: [Component, System, API, Resource, Location, Template, Domain, Group, User]
   locations:
   # FastAPIテンプレート（ローカルパス）
   # In Docker image, working directory is /app
@@ -39,21 +39,21 @@ catalog:
     rules:
     - allow: [Template]
 
-  # Local examples (for testing in Kubernetes)
-  # In Docker image, working directory is /app
-  # examples/ is copied to /app/examples (see Dockerfile line 64)
-  - type: file
-    target: ./examples/entities.yaml
+  # TODO: Re-enable after catalog is properly configured with more memory
+  # Production catalog: Domains and Systems
+  # - type: file
+  #   target: ./catalog/domains/*.yaml
+  #   rules:
+  #   - allow: [Domain, System, Resource]
 
-  - type: file
-    target: ./examples/template/template.yaml
-    rules:
-    - allow: [Template]
+  # Production catalog: Teams and Users
+  # - type: file
+  #   target: ./catalog/organizations/*.yaml
+  #   rules:
+  #   - allow: [Group, User]
 
-  - type: file
-    target: ./examples/org.yaml
-    rules:
-    - allow: [User, Group]
+  # NOTE: Example data (components, etc) is NOT loaded in production
+  # Examples are only available in local development (see app-config.yaml)
 
 auth:
   providers:

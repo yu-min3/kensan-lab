@@ -1,0 +1,14 @@
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: auth-service
+  description: The service for user authentication and authorization
+  annotations:
+    backstage.io/techdocs-ref: dir:.
+    github.com/project-slug: example/auth-service
+spec:
+  type: service
+  lifecycle: production
+  owner: squad-identity
+  system: user-authentication-system
+  providesApis: [auth-service]
