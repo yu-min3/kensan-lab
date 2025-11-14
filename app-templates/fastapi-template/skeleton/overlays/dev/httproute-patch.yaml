@@ -7,3 +7,5 @@ spec:
     - name: gateway-dev
       namespace: istio-system
       kind: Gateway
+  hostnames:
+    - "${{ values.name }}-dev.app.yu-min3.com"
