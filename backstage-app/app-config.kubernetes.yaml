@@ -63,7 +63,7 @@ auth:
 techdocs:
   builder: 'local'
   generator:
-    runIn: 'docker'
+    runIn: 'local'  # Changed from 'docker' to 'local' to avoid Docker socket dependency
   publisher:
     type: 'local'
 
