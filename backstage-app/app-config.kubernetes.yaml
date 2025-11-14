@@ -41,16 +41,15 @@ catalog:
 
   # TODO: Re-enable after catalog is properly configured with more memory
   # Production catalog: Domains and Systems
-  # - type: file
-  #   target: ./catalog/domains/*.yaml
-  #   rules:
-  #   - allow: [Domain, System, Resource]
-
+  - type: file
+    target: ./catalog/domains/*.yaml
+    rules:
+    - allow: [Domain, System, Resource]
   # Production catalog: Teams and Users
-  # - type: file
-  #   target: ./catalog/organizations/*.yaml
-  #   rules:
-  #   - allow: [Group, User]
+  - type: file
+    target: ./catalog/organizations/*.yaml
+    rules:
+    - allow: [Group, User]
 
   # NOTE: Example data (components, etc) is NOT loaded in production
   # Examples are only available in local development (see app-config.yaml)
