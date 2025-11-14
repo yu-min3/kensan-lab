@@ -24,7 +24,7 @@ spec:
         - name: ghcr-pull-secret
       containers:
         - name: app
-          image: app-image  # Placeholder, will be replaced by Kustomize
+          image: ghcr.io/yu-min3/${{ values.name }}:latest  # Placeholder, will be replaced by Kustomize
           imagePullPolicy: Always
           ports:
             - name: http

@@ -1,4 +1,10 @@
 # Makefile for building and deploying ${{ values.name }}
+# Load environment variables from .env file if it exists
+-include .env
+
+# For GHCR push credential
+GITHUB_TOKEN ?= $(GITHUB_GHCR_PAT)
+export GITHUB_TOKEN
 
 # Variables
 APP_NAME := ${{ values.name }}
@@ -8,18 +14,11 @@ IMAGE := $(REGISTRY)/$(APP_NAME)
 # TAG is required - must be provided via command line
 TAG ?=
 
-# Container runtime (podman or docker) - auto-detect or override via RUNTIME env var
-RUNTIME ?= $(shell which podman >/dev/null 2>&1 && echo podman || echo docker)
+# Full image name
+FULL_IMAGE := $(IMAGE):$(TAG)
 
-# Build command - use buildx for docker, standard build for podman
-ifeq ($(RUNTIME),docker)
-    BUILD_CMD := $(RUNTIME) buildx build
-else
-    BUILD_CMD := $(RUNTIME) build
-endif
-
-PUSH_CMD := $(RUNTIME) push
-TAG_CMD := $(RUNTIME) tag
+# Container runtime (podman or docker) - auto-detect or override via CONTAINER_RUNTIME env var
+CONTAINER_RUNTIME ?= $(shell which podman >/dev/null 2>&1 && echo podman || echo docker)
 
 # Colors for output
 RED := \033[0;31m
@@ -35,8 +34,8 @@ help: ## Show this help message
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "  $(YELLOW)%-20s$(NC) %s\n", $$1, $$2}'
 	@echo ""
 	@echo "$(GREEN)Container Runtime:$(NC)"
-	@echo "  Current: $(YELLOW)$(RUNTIME)$(NC)"
-	@echo "  Override: RUNTIME=docker make build TAG=v1.0"
+	@echo "  Current: $(YELLOW)$(CONTAINER_RUNTIME)$(NC)"
+	@echo "  Override: CONTAINER_RUNTIME=docker make build TAG=v1.0"
 	@echo ""
 	@echo "$(GREEN)TAG Format Requirements:$(NC)"
 	@echo "  $(YELLOW)Dev:$(NC)  Any tag format (e.g., dev-latest, dev-v1.0, feature-branch)"
@@ -46,7 +45,7 @@ help: ## Show this help message
 	@echo "  make build TAG=v1.0             # Build image with tag v1.0"
 	@echo "  make deploy-dev TAG=dev-latest  # Build, push, and deploy to Dev"
 	@echo "  make deploy-prod TAG=v1.2       # Build, push, and deploy to Prod (vX.Y format required)"
-	@echo "  RUNTIME=docker make build TAG=v1.0  # Override runtime to use docker"
+	@echo "  CONTAINER_RUNTIME=docker make build TAG=v1.0  # Override runtime to use docker"
 
 check-tag:
 	@if [ -z "$(TAG)" ]; then \
@@ -70,22 +69,28 @@ check-tag-format-prod:
 	@echo "$(GREEN)✓ TAG format is valid: $(TAG)$(NC)"
 
 build: check-tag ## Build container image (requires TAG=<version>)
-	@echo "$(GREEN)Building container image with $(RUNTIME): $(IMAGE):$(TAG)$(NC)"
-	$(BUILD_CMD) --platform linux/amd64,linux/arm64 \
-		-t $(IMAGE):$(TAG) \
-		--load \
-		.
-	@echo "$(GREEN)✓ Build complete: $(IMAGE):$(TAG)$(NC)"
+	@echo "$(GREEN)Building container image with $(CONTAINER_RUNTIME): $(FULL_IMAGE)$(NC)"
+	$(CONTAINER_RUNTIME) build --format=docker -t $(FULL_IMAGE) .
+	@echo "$(GREEN)✓ Build complete: $(FULL_IMAGE)$(NC)"
 
-push: check-tag ## Push container image to registry (requires TAG=<version>)
-	@echo "$(GREEN)Pushing container image with $(RUNTIME): $(IMAGE):$(TAG)$(NC)"
-	$(PUSH_CMD) $(IMAGE):$(TAG)
-	@echo "$(GREEN)✓ Push complete: $(IMAGE):$(TAG)$(NC)"
+login: ## Login to GHCR
+	@echo "$(GREEN)Logging in to GHCR...$(NC)"
+	@echo "$(YELLOW)Note: Set GITHUB_TOKEN or GITHUB_GHCR_PAT environment variable$(NC)"
+	@if [ -z "$$GITHUB_TOKEN" ] && [ -z "$$GITHUB_GHCR_PAT" ]; then \
+		echo "$(RED)ERROR: GITHUB_TOKEN or GITHUB_GHCR_PAT not set$(NC)"; \
+		exit 1; \
+	fi
+	@echo "$${GITHUB_TOKEN:-$$GITHUB_GHCR_PAT}" | $(CONTAINER_RUNTIME) login ghcr.io -u $${GITHUB_USER:-yu-min3} --password-stdin
+
+push: check-tag login ## Push container image to registry (requires TAG=<version>)
+	@echo "$(GREEN)Pushing image: $(FULL_IMAGE)$(NC)"
+	$(CONTAINER_RUNTIME) push $(FULL_IMAGE)
+	@echo "$(GREEN)✓ Push complete: $(FULL_IMAGE)$(NC)"
 
 update-dev: check-tag ## Update Dev environment image tag in overlays/dev/kustomization.yaml
 	@echo "$(GREEN)Updating Dev environment to tag: $(TAG)$(NC)"
-	@sed -i.bak 's|newTag: .*|newTag: $(TAG)|' overlays/dev/kustomization.yaml && rm overlays/dev/kustomization.yaml.bak || \
-		sed -i 's|newTag: .*|newTag: $(TAG)|' overlays/dev/kustomization.yaml
+	cd overlays/dev && \
+		kustomize edit set image $(FULL_IMAGE)
 	@echo "$(YELLOW)Updated overlays/dev/kustomization.yaml$(NC)"
 	@echo "$(RED)Don't forget to commit and push the changes!$(NC)"
 	@echo "  git add overlays/dev/kustomization.yaml"
@@ -94,8 +99,8 @@ update-dev: check-tag ## Update Dev environment image tag in overlays/dev/kustom
 
 update-prod: check-tag check-tag-format-prod ## Update Prod environment image tag in overlays/prod/kustomization.yaml
 	@echo "$(GREEN)Updating Prod environment to tag: $(TAG)$(NC)"
-	@sed -i.bak 's|newTag: .*|newTag: $(TAG)|' overlays/prod/kustomization.yaml && rm overlays/prod/kustomization.yaml.bak || \
-		sed -i 's|newTag: .*|newTag: $(TAG)|' overlays/prod/kustomization.yaml
+	cd overlays/prod && \
+		kustomize edit set image $(FULL_IMAGE)
 	@echo "$(YELLOW)Updated overlays/prod/kustomization.yaml$(NC)"
 	@echo "$(RED)Don't forget to commit and push the changes!$(NC)"
 	@echo "  git add overlays/prod/kustomization.yaml"
@@ -123,11 +128,11 @@ validate: ## Validate Kustomize manifests
 
 clean: ## Clean up local container images
 	@echo "$(YELLOW)Cleaning up container images for $(APP_NAME)...$(NC)"
-	@$(RUNTIME) images $(IMAGE) -q | xargs -r $(RUNTIME) rmi -f || true
+	@$(CONTAINER_RUNTIME) images $(IMAGE) -q | xargs -r $(CONTAINER_RUNTIME) rmi -f || true
 	@echo "$(GREEN)✓ Cleanup complete$(NC)"
 
 # Development helpers
-.PHONY: run-local install sync test lint format format-check
+.PHONY: run run-local install sync test lint format format-check
 
 install: ## Install uv (if not already installed)
 	@which uv > /dev/null || (echo "$(RED)uv is not installed$(NC)" && echo "Install with: curl -LsSf https://astral.sh/uv/install.sh | sh" && exit 1)
@@ -138,8 +143,16 @@ sync: install ## Sync dependencies with uv
 	uv sync
 	@echo "$(GREEN)✓ Dependencies synced$(NC)"
 
-run-local: sync ## Run application locally (without Docker)
-	@echo "$(GREEN)Running application locally...$(NC)"
+run: build ## Run the built container image locally for testing
+	@echo "$(GREEN)Running container image for local testing...$(NC)"
+	@echo "Access at: http://localhost:8000"
+	@echo ""
+	$(CONTAINER_RUNTIME) run --rm -it -p 8000:8000 $(FULL_IMAGE)
+
+run-local: sync ## Run application locally (without container)
+	@echo "$(GREEN)Running application locally with uv...$(NC)"
+	@echo "Access at: http://localhost:8000"
+	@echo ""
 	uv run python app/main.py
 
 test: sync ## Run tests with pytest
