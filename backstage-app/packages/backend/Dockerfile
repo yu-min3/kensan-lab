@@ -18,8 +18,10 @@ FROM node:22-bookworm-slim
 ENV PYTHON=/usr/bin/python3
 
 # Install isolate-vm dependencies, these are needed by the @backstage/plugin-scaffolder-backend.
+# Also install mkdocs-techdocs-core for TechDocs local generation
 RUN apt-get update && \
-    apt-get install -y --no-install-recommends python3 g++ build-essential && \
+    apt-get install -y --no-install-recommends python3 python3-pip g++ build-essential && \
+    pip3 install --no-cache-dir --break-system-packages mkdocs-techdocs-core==1.4.0 && \
     rm -rf /var/lib/apt/lists/*
 
 # Install sqlite3 dependencies. You can skip this if you don't use sqlite3 in the image,
