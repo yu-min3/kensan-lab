@@ -1,0 +1,29 @@
+apiVersion: backstage.io/v1alpha1
+kind: API
+metadata:
+  name: product-catalog-api
+  description: Product catalog and search API
+spec:
+  type: openapi
+  lifecycle: production
+  owner: squad-catalog
+  system: product-catalog-system
+  definition: |
+    openapi: 3.0.0
+    info:
+      title: Product Catalog API
+      version: 1.0.0
+      description: Provides product information and search capabilities
+    paths:
+      /api/v1/products:
+        get:
+          summary: List products
+          description: Get all products with pagination
+      /api/v1/products/{productId}:
+        get:
+          summary: Get product details
+          description: Retrieve specific product information
+      /api/v1/search:
+        get:
+          summary: Search products
+          description: Search products by keywords

@@ -1,0 +1,5 @@
+site_name: Auth Service
+nav:
+  - Home: index.md
+plugins:
+  - techdocs-core

@@ -25,7 +25,7 @@ spec:
   type: service
   lifecycle: experimental
   owner: ${{ values.owner }}
-  system: platform
+  system: ${{ values.system }}
   providesApis:
     - ${{ values.name }}-api
 
@@ -42,7 +42,7 @@ spec:
   type: openapi
   lifecycle: experimental
   owner: ${{ values.owner }}
-  system: platform
+  system: ${{ values.system }}
   definition: |
     openapi: 3.0.0
     info:
