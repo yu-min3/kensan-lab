@@ -18,6 +18,8 @@ RUN apt-get update && apt-get install -y \
     sudo \
     podman \
     yamllint \
+    python3 \
+    python3-pip \
     && rm -rf /var/lib/apt/lists/*
 
 # Install Node.js and npm (v22 for Backstage compatibility)

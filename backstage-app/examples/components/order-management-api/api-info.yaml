@@ -1,0 +1,28 @@
+apiVersion: backstage.io/v1alpha1
+kind: API
+metadata:
+  name: order-management-api
+  description: Order management and processing API
+spec:
+  type: openapi
+  lifecycle: production
+  owner: squad-orders
+  system: order-management-system
+  definition: |
+    openapi: 3.0.0
+    info:
+      title: Order Management API
+      version: 1.0.0
+      description: Manages orders, order history, and status tracking
+    paths:
+      /api/v1/orders:
+        get:
+          summary: List orders
+          description: Get all orders for a user
+        post:
+          summary: Create order
+          description: Create a new order
+      /api/v1/orders/{orderId}:
+        get:
+          summary: Get order details
+          description: Retrieve specific order information

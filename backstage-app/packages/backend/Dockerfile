@@ -58,8 +58,8 @@ RUN tar xzf skeleton.tar.gz && rm skeleton.tar.gz
 
 RUN yarn workspaces focus --all --production && rm -rf "$(yarn cache clean)"
 
-# This will include the examples, if you don't need these simply remove this line
-COPY --chown=node:node backstage-app/examples ./examples
+# NOTE: Examples are NOT included in the Docker image
+# They are only available in local development environment (make dev)
 
 # Copy app-templates directory (Backstage templates)
 COPY --chown=node:node app-templates ./app-templates

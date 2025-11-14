@@ -58,7 +58,7 @@ proxy:
 techdocs:
   builder: 'local' # Alternatives - 'external'
   generator:
-    runIn: 'docker' # Alternatives - 'local'
+    runIn: 'local' # Alternatives - 'docker'. Using 'local' for Podman environment
   publisher:
     type: 'local' # Alternatives - 'googleGcs' or 'awsS3'. Read documentation for using alternatives.
 
@@ -78,29 +78,55 @@ catalog:
   rules:
     - allow: [Component, System, API, Resource, Location]
   locations:
-    # Local example data, file locations are relative to the backend execution directory
-    # When running 'make dev', the working directory is packages/backend/dist/packages/backend
-    # So we need to go up 5 levels: packages/backend/dist/packages/backend -> backstage-app/
-    - type: file
-      target: ../../../../../examples/entities.yaml
-
-    # Local example template
-    - type: file
-      target: ../../../../../examples/template/template.yaml
-      rules:
-        - allow: [Template]
-
     # FastAPI template (from app-templates directory)
     - type: file
       target: ../../../../../../app-templates/fastapi-template/template.yaml
       rules:
         - allow: [Template]
 
-    # Local example organizational data
+    # --- LOCAL DEVELOPMENT ONLY: Example Data ---
+    # File locations are relative to the backend execution directory
+    # When running 'make dev', the working directory is packages/backend/dist/packages/backend
+    # So we need to go up 5 levels: packages/backend/dist/packages/backend -> backstage-app/
+
+    # Example entities and organizational data
+    - type: file
+      target: ../../../../../examples/entities.yaml
+
     - type: file
       target: ../../../../../examples/org.yaml
       rules:
         - allow: [User, Group]
+
+    # Example templates
+    - type: file
+      target: ../../../../../examples/templates/template.yaml
+      rules:
+        - allow: [Template]
+
+    # Example domains (e-commerce domain and its systems)
+    - type: file
+      target: ../../../../../examples/domains/*.yaml
+      rules:
+        - allow: [Domain, System, Resource]
+
+    # Example organizations (teams, squads, users)
+    - type: file
+      target: ../../../../../examples/organizations/*.yaml
+      rules:
+        - allow: [Group, User]
+
+    # Example components (microservices for e-commerce domain)
+    - type: file
+      target: ../../../../../examples/components/*/catalog-info.yaml
+      rules:
+        - allow: [Component]
+
+    # Example component APIs
+    - type: file
+      target: ../../../../../examples/components/*/api-info.yaml
+      rules:
+        - allow: [API]
 
     ## Uncomment these lines to add more example data
     # - type: url

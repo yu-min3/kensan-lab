@@ -1,0 +1,148 @@
+# Microservices Teams Organization (Spotify Model)
+# This file defines the organizational structure with autonomous teams (Squads),
+# tribes, and cross-functional groups (Chapters).
+
+# --- Groups: Business Units, Tribes, Squads, and Chapters ---
+apiVersion: backstage.io/v1alpha1
+kind: Group
+metadata:
+  name: product-management
+  description: Product Management Group
+spec:
+  type: business-unit
+  children: []
+
+---
+apiVersion: backstage.io/v1alpha1
+kind: Group
+metadata:
+  name: tribe-checkout
+  description: 'Tribe focused on the customer checkout experience'
+spec:
+  type: tribe
+  children: [squad-catalog, squad-orders, squad-identity, squad-recommendations]
+
+---
+apiVersion: backstage.io/v1alpha1
+kind: Group
+metadata:
+  name: squad-catalog
+  description: 'Squad responsible for the Product Catalog System'
+spec:
+  type: squad
+  parent: tribe-checkout
+  children: []
+
+---
+apiVersion: backstage.io/v1alpha1
+kind: Group
+metadata:
+  name: squad-orders
+  description: 'Squad responsible for the Order Management System'
+spec:
+  type: squad
+  parent: tribe-checkout
+  children: []
+
+---
+apiVersion: backstage.io/v1alpha1
+kind: Group
+metadata:
+  name: squad-identity
+  description: 'Squad responsible for the User Authentication System'
+spec:
+  type: squad
+  parent: tribe-checkout
+  children: []
+
+---
+apiVersion: backstage.io/v1alpha1
+kind: Group
+metadata:
+  name: squad-recommendations
+  description: 'Squad responsible for the Recommendation Engine System'
+spec:
+  type: squad
+  parent: tribe-checkout
+  children: []
+
+---
+apiVersion: backstage.io/v1alpha1
+kind: Group
+metadata:
+  name: chapter-frontend
+  description: 'Chapter for all frontend engineers'
+spec:
+  type: chapter
+  children: []
+
+---
+apiVersion: backstage.io/v1alpha1
+kind: Group
+metadata:
+  name: chapter-backend
+  description: 'Chapter for all backend engineers'
+spec:
+  type: chapter
+  children: []
+
+# --- Users: The individual people belonging to squads and chapters ---
+---
+apiVersion: backstage.io/v1alpha1
+kind: User
+metadata:
+  name: akira.sato
+spec:
+  profile:
+    displayName: Akira Sato
+    email: akira.sato@example.com
+    picture: https://i.pravatar.cc/150?u=akira.sato
+  memberOf: [squad-catalog, chapter-frontend]
+
+---
+apiVersion: backstage.io/v1alpha1
+kind: User
+metadata:
+  name: mai.ito
+spec:
+  profile:
+    displayName: Mai Ito
+    email: mai.ito@example.com
+    picture: https://i.pravatar.cc/150?u=mai.ito
+  memberOf: [squad-orders, chapter-backend]
+
+---
+apiVersion: backstage.io/v1alpha1
+kind: User
+metadata:
+  name: kenta.kobayashi
+spec:
+  profile:
+    displayName: Kenta Kobayashi
+    email: kenta.kobayashi@example.com
+    picture: https://i.pravatar.cc/150?u=kenta.kobayashi
+  memberOf: [squad-identity, chapter-backend]
+
+---
+apiVersion: backstage.io/v1alpha1
+kind: User
+metadata:
+  name: yuki.takahashi
+spec:
+  profile:
+    displayName: Yuki Takahashi
+    email: yuki.takahashi@example.com
+    picture: https://i.pravatar.cc/150?u=yuki.takahashi
+  memberOf: [squad-recommendations, chapter-backend]
+
+---
+apiVersion: backstage.io/v1alpha1
+kind: User
+metadata:
+  name: ryo.nakamura
+spec:
+  profile:
+    displayName: Ryo Nakamura
+    email: ryo.nakamura@example.com
+    picture: https://i.pravatar.cc/150?u=ryo.nakamura
+  memberOf: [squad-recommendations, chapter-frontend]

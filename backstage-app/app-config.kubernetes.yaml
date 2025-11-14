@@ -39,21 +39,8 @@ catalog:
     rules:
     - allow: [Template]
 
-  # Local examples (for testing in Kubernetes)
-  # In Docker image, working directory is /app
-  # examples/ is copied to /app/examples (see Dockerfile line 64)
-  - type: file
-    target: ./examples/entities.yaml
-
-  - type: file
-    target: ./examples/template/template.yaml
-    rules:
-    - allow: [Template]
-
-  - type: file
-    target: ./examples/org.yaml
-    rules:
-    - allow: [User, Group]
+  # NOTE: Example data is NOT loaded in production (Kubernetes) environment
+  # Examples are only available in local development (see app-config.yaml)
 
 auth:
   providers:

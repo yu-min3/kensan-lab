@@ -1,0 +1,29 @@
+apiVersion: backstage.io/v1alpha1
+kind: API
+metadata:
+  name: auth-service
+  description: Authentication and authorization API
+spec:
+  type: openapi
+  lifecycle: production
+  owner: squad-identity
+  system: user-authentication-system
+  definition: |
+    openapi: 3.0.0
+    info:
+      title: Auth Service API
+      version: 1.0.0
+      description: Provides authentication and authorization endpoints
+    paths:
+      /api/v1/login:
+        post:
+          summary: User login
+          description: Authenticate user credentials
+      /api/v1/logout:
+        post:
+          summary: User logout
+          description: Invalidate user session
+      /api/v1/verify:
+        get:
+          summary: Verify token
+          description: Verify JWT token validity
