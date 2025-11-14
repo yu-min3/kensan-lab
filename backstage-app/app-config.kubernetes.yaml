@@ -1,17 +1,17 @@
 app:
   title: Platform Engineering Portal
-  baseUrl: https://backstage.yu-min3.com
+  baseUrl: https://backstage.platform.yu-min3.com
 
 organization:
   name: Platform Team
 
 backend:
-  baseUrl: https://backstage.yu-min3.com
+  baseUrl: https://backstage.platform.yu-min3.com
   listen:
     port: 7007
     host: 0.0.0.0
   cors:
-    origin: https://backstage.yu-min3.com
+    origin: https://backstage.platform.yu-min3.com
     methods: [GET, HEAD, PATCH, POST, PUT, DELETE]
     credentials: true
   database:
