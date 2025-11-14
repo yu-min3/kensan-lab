@@ -10,10 +10,12 @@ metadata:
   tags:
     - fastapi
     - python
-    - gitops
   links:
-    - url: https://${{ values.name }}.yu-min3.com
-      title: Live Application (Dev)
+    - url: https://${{ values.name }}-dev.yu-min3.com/docs
+      title: API Docs (Dev)
+      icon: web
+    - url: https://${{ values.name }}.yu-min3.com/docs
+      title: API Docs (Prod)
       icon: web
     - url: https://argocd.yu-min3.com/applications/app-dev-${{ values.name }}
       title: Argo CD (Dev)

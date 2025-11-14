@@ -70,64 +70,43 @@ spec:
 
     - title: Domain & System
       required:
-        - domainOption
+        - domain
+        - system
       properties:
-        domainOption:
+        domain:
           title: Domain
           type: string
-          description: Select an existing domain or create a new one
+          description: |
+            Select the domain this application belongs to.
+
+            📌 **What is a Domain?**
+            A domain represents a bounded business context or area of the platform.
+
+            💡 If your domain is not listed, select "To be Assigned" and contact Platform Engineering team.
           default: platform
           enum:
             - platform
-            - new
+            - to-be-assigned
           enumNames:
             - 'Platform (infrastructure and internal tools)'
-            - '➕ Create New Domain'
-        newDomainName:
-          title: New Domain Name
-          type: string
-          description: Name for the new domain (lowercase, alphanumeric, hyphens only)
-          pattern: '^[a-z0-9-]+$'
-        newDomainDescription:
-          title: New Domain Description
-          type: string
-          description: Description of the new domain
-        newDomainOwner:
-          title: New Domain Owner
-          type: string
-          description: Team that owns this domain
-          ui:field: OwnerPicker
-          ui:options:
-            catalogFilter:
-              kind: [Group]
-        systemOption:
+            - '📋 To be Assigned (contact Platform Engineering)'
+        system:
           title: System
           type: string
-          description: Select an existing system or create a new one
+          description: |
+            Select the system this application belongs to.
+
+            📌 **What is a System?**
+            A system is a collection of related components that work together.
+
+            💡 If your system is not listed, select "To be Assigned" and contact Platform Engineering team.
           default: developer-portal
           enum:
             - developer-portal
-            - new
+            - to-be-assigned
           enumNames:
-            - 'Developer Portal (Backstage)'
-            - '➕ Create New System'
-        newSystemName:
-          title: New System Name
-          type: string
-          description: Name for the new system (lowercase, alphanumeric, hyphens only)
-          pattern: '^[a-z0-9-]+$'
-        newSystemDescription:
-          title: New System Description
-          type: string
-          description: Description of the new system
-        newSystemOwner:
-          title: New System Owner
-          type: string
-          description: Team that owns this system
-          ui:field: OwnerPicker
-          ui:options:
-            catalogFilter:
-              kind: [Group]
+            - 'Developer Portal (Backstage self-service platform)'
+            - '📋 To be Assigned (contact Platform Engineering)'
 
   steps:
     # Step 1: Fetch template skeleton
@@ -143,18 +122,8 @@ spec:
           repoName: ${{ (parameters.repoUrl | parseRepoUrl).repo }}
           repoOwner: ${{ (parameters.repoUrl | parseRepoUrl).owner }}
           # Domain & System values
-          domain: ${{ parameters.domainOption if parameters.domainOption != 'new' else parameters.newDomainName }}
-          system: ${{ parameters.systemOption if parameters.systemOption != 'new' else parameters.newSystemName }}
-          # Flags for conditional rendering
-          createNewDomain: ${{ parameters.domainOption == 'new' }}
-          createNewSystem: ${{ parameters.systemOption == 'new' }}
-          # New domain/system details
-          newDomainName: ${{ parameters.newDomainName }}
-          newDomainDescription: ${{ parameters.newDomainDescription }}
-          newDomainOwner: ${{ parameters.newDomainOwner }}
-          newSystemName: ${{ parameters.newSystemName }}
-          newSystemDescription: ${{ parameters.newSystemDescription }}
-          newSystemOwner: ${{ parameters.newSystemOwner }}
+          domain: ${{ parameters.domain }}
+          system: ${{ parameters.system }}
 
     # Step 2: Create application repository
     - id: publish
@@ -187,26 +156,10 @@ spec:
           - **Repository**: `${{ (parameters.repoUrl | parseRepoUrl).owner }}/${{ (parameters.repoUrl | parseRepoUrl).repo }}`
           - **Dev Application**: `app-dev-${{ parameters.name }}`
           - **Prod Application**: `app-prod-${{ parameters.name }}`
-          - **Domain**: `${{ parameters.domainOption if parameters.domainOption != 'new' else parameters.newDomainName }}`
-          - **System**: `${{ parameters.systemOption if parameters.systemOption != 'new' else parameters.newSystemName }}`
+          - **Domain**: `${{ parameters.domain }}`
+          - **System**: `${{ parameters.system }}`
 
           **Location**: `base-infra/argocd/applications/apps/${{ parameters.name }}/argocd-apps.yaml`
-
-          {% if parameters.domainOption == 'new' or parameters.systemOption == 'new' %}
-          ## 📋 Catalog Updates
-
-          This PR also includes:
-          {% if parameters.domainOption == 'new' %}
-          - ✨ **New Domain**: `${{ parameters.newDomainName }}` in `backstage-app/catalog/domains/${{ parameters.newDomainName }}.yaml`
-          {% endif %}
-          {% if parameters.systemOption == 'new' %}
-          - ✨ **New System**: `${{ parameters.newSystemName }}` in the domain file
-          {% endif %}
-
-          **Location**: `.backstage/catalog/domains/new-domain.yaml`
-
-          ⚠️ **Platform Engineer**: Please manually move this file to `backstage-app/catalog/domains/${{ parameters.newDomainName if parameters.domainOption == 'new' else parameters.domain }}.yaml` before merging.
-          {% endif %}
 
           ## 🔐 Repository Authentication
 
@@ -218,13 +171,8 @@ spec:
 
           ### Review & Merge
 
-          {% if parameters.domainOption == 'new' or parameters.systemOption == 'new' %}
-          1. **Move catalog file**: Rename and move `.backstage/catalog/domains/new-domain.yaml` to `backstage-app/catalog/domains/${{ parameters.newDomainName if parameters.domainOption == 'new' else parameters.domain }}.yaml`
-          2. **Delete source**: Delete `.backstage/catalog/` directory
-          3. **Merge PR**: After moving files, merge this PR
-          {% else %}
-          Review this PR and merge.
-          {% endif %}
+          1. **Review Application CRs**: Verify the Argo CD Application definitions are correct
+          2. **Merge PR**: After review, merge this PR
 
           Argo CD will automatically:
           1. Detect the new Application CRs
