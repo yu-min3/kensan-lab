@@ -1,0 +1,14 @@
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: recommendation-service
+  description: The service for generating product recommendations
+  annotations:
+    backstage.io/techdocs-ref: dir:.
+    github.com/project-slug: example/recommendation-service
+spec:
+  type: service
+  lifecycle: experimental
+  owner: squad-recommendations
+  system: recommendation-engine-system
+  consumesApis: [product-catalog-api]

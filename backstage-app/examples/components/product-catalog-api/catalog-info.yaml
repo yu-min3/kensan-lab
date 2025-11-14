@@ -1,0 +1,14 @@
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: product-catalog-api
+  description: The API for managing the product catalog
+  annotations:
+    backstage.io/techdocs-ref: dir:.
+    github.com/project-slug: example/product-catalog-api
+spec:
+  type: service
+  lifecycle: production
+  owner: squad-catalog
+  system: product-catalog-system
+  providesApis: [product-catalog-api]

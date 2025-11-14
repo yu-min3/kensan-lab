@@ -1,0 +1,15 @@
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: order-management-api
+  description: The API for managing customer orders
+  annotations:
+    backstage.io/techdocs-ref: dir:.
+    github.com/project-slug: example/order-management-api
+spec:
+  type: service
+  lifecycle: production
+  owner: squad-orders
+  system: order-management-system
+  providesApis: [order-management-api]
+  consumesApis: [product-catalog-api, auth-service]

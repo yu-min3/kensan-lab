@@ -1,0 +1,52 @@
+# E-Commerce Platform Domain
+# This file defines the e-commerce domain and its systems
+
+# --- Domain: A single, large business area decomposed into systems ---
+apiVersion: backstage.io/v1alpha1
+kind: Domain
+metadata:
+  name: e-commerce
+  description: The e-commerce platform
+spec:
+  owner: product-management
+
+# --- Systems: Decomposed parts of the e-commerce domain ---
+---
+apiVersion: backstage.io/v1alpha1
+kind: System
+metadata:
+  name: product-catalog-system
+  description: Manages all product information and search
+spec:
+  owner: squad-catalog
+  domain: e-commerce
+
+---
+apiVersion: backstage.io/v1alpha1
+kind: System
+metadata:
+  name: order-management-system
+  description: Handles order processing, history, and status
+spec:
+  owner: squad-orders
+  domain: e-commerce
+
+---
+apiVersion: backstage.io/v1alpha1
+kind: System
+metadata:
+  name: user-authentication-system
+  description: Manages user identity, login, and sessions
+spec:
+  owner: squad-identity
+  domain: e-commerce
+
+---
+apiVersion: backstage.io/v1alpha1
+kind: System
+metadata:
+  name: recommendation-engine-system
+  description: Provides product recommendations to users
+spec:
+  owner: squad-recommendations
+  domain: e-commerce
