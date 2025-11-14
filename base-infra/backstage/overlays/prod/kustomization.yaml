@@ -6,4 +6,4 @@ resources:
 
 images:
 - name: ghcr.io/yu-min3/backstage
-  newTag: v0.0.2
+  newTag: v0.0.3
