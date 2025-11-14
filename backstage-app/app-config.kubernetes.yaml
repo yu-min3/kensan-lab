@@ -29,7 +29,7 @@ integrations:
 
 catalog:
   rules:
-  - allow: [Component, System, API, Resource, Location, Template]
+  - allow: [Component, System, API, Resource, Location, Template, Domain, Group, User]
   locations:
   # FastAPIテンプレート（ローカルパス）
   # In Docker image, working directory is /app
@@ -39,7 +39,20 @@ catalog:
     rules:
     - allow: [Template]
 
-  # NOTE: Example data is NOT loaded in production (Kubernetes) environment
+  # TODO: Re-enable after catalog is properly configured with more memory
+  # Production catalog: Domains and Systems
+  # - type: file
+  #   target: ./catalog/domains/*.yaml
+  #   rules:
+  #   - allow: [Domain, System, Resource]
+
+  # Production catalog: Teams and Users
+  # - type: file
+  #   target: ./catalog/organizations/*.yaml
+  #   rules:
+  #   - allow: [Group, User]
+
+  # NOTE: Example data (components, etc) is NOT loaded in production
   # Examples are only available in local development (see app-config.yaml)
 
 auth:

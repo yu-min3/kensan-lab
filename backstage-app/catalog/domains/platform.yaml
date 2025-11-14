@@ -1,0 +1,20 @@
+# Platform Domain
+# This defines the platform infrastructure domain for production
+
+apiVersion: backstage.io/v1alpha1
+kind: Domain
+metadata:
+  name: platform
+  description: Platform infrastructure and internal tools
+spec:
+  owner: platform-engineering
+
+---
+apiVersion: backstage.io/v1alpha1
+kind: System
+metadata:
+  name: developer-portal
+  description: Backstage developer portal for self-service
+spec:
+  owner: platform-engineering
+  domain: platform

@@ -61,6 +61,10 @@ RUN yarn workspaces focus --all --production && rm -rf "$(yarn cache clean)"
 # NOTE: Examples are NOT included in the Docker image
 # They are only available in local development environment (make dev)
 
+# TODO: Re-enable catalog copy after testing with more memory
+# Copy production catalog (domains and organizations)
+# COPY --chown=node:node backstage-app/catalog ./catalog
+
 # Copy app-templates directory (Backstage templates)
 COPY --chown=node:node app-templates ./app-templates
 
