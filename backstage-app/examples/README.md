@@ -1,6 +1,6 @@
 # Backstage Examples
 
-This directory contains example data for local development of the Backstage application.
+This directory contains example data for **local development only**.
 
 ## Important Notes
 
@@ -10,6 +10,12 @@ This directory contains example data for local development of the Backstage appl
   - Docker images (`make run`, `make build`)
   - Kubernetes deployments (production environment)
   - `app-config.kubernetes.yaml` does NOT reference these examples
+
+## Production vs Development
+
+For production catalog data (domains, organizations), see [`catalog/`](../catalog/README.md):
+- **`examples/`** (this directory): Local development, testing, demos
+- **`catalog/`**: Production organizational data, included in Docker images
 
 ## Directory Structure
 
