@@ -18,7 +18,3 @@ commonLabels:
   app.kubernetes.io/part-of: ${{ values.name }}
   app.kubernetes.io/managed-by: kustomize
 
-images:
-  - name: app-image
-    newName: ghcr.io/yu-min3/${{ values.name }}
-    newTag: latest

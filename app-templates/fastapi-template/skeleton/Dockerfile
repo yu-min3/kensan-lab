@@ -1,7 +1,7 @@
 # syntax=docker/dockerfile:1
 # Multi-stage build for optimized FastAPI application with uv
 
-FROM python:3.11-slim AS builder
+FROM docker.io/library/python:3.11-slim AS builder
 
 # Install uv
 COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
@@ -12,11 +12,10 @@ WORKDIR /build
 COPY pyproject.toml uv.lock ./
 
 # Install dependencies into .venv
-RUN --mount=type=cache,target=/root/.cache/uv \
-    uv sync --frozen --no-install-project --no-dev
+RUN uv sync --frozen --no-install-project --no-dev
 
 # Final stage
-FROM python:3.11-slim
+FROM docker.io/library/python:3.11-slim
 
 WORKDIR /app
 
@@ -42,9 +41,5 @@ ENV VIRTUAL_ENV="/app/.venv"
 # Expose port
 EXPOSE 8000
 
-# Health check
-HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
-    CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"
-
-# Run the application
-CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
+# ✅ Run the application via python -m
+CMD ["python", "-m", "uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
