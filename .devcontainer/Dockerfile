@@ -1,30 +1,41 @@
 FROM debian:bookworm
 
-# Install basic packages (bash-completion moved to correct position)
-RUN apt-get update && apt-get install -y \
+# Version pinning for cache stability
+ARG KUBECTL_VERSION=v1.31.3
+ARG ARGOCD_VERSION=v2.13.2
+ARG KUSTOMIZE_VERSION=v5.5.0
+ARG KUBESEAL_VERSION=v0.27.2
+ARG HELM_VERSION=v3.16.3
+ARG K9S_VERSION=v0.32.7
+ARG NODE_MAJOR=22
+
+# Install base packages first
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends \
     curl \
     wget \
-    vim \
-    git \
-    make \
     ca-certificates \
-    iproute2 \
-    iputils-ping \
-    net-tools \
-    lsof \
+    gnupg2 \
+    git \
+    vim \
+    make \
     unzip \
-    bash-completion \
-    dnsutils \
     sudo \
-    podman \
-    yamllint \
+    bash-completion \
     python3 \
     python3-pip \
+    yamllint \
+    dnsutils \
+    podman \
     && rm -rf /var/lib/apt/lists/*
 
-# Install Node.js and npm (v22 for Backstage compatibility)
-RUN curl -fsSL https://deb.nodesource.com/setup_22.x | bash - \
-    && apt-get install -y nodejs
+# Install Node.js (separate layer for better caching)
+RUN curl -fsSL https://deb.nodesource.com/setup_${NODE_MAJOR}.x | bash - \
+    && apt-get install -y --no-install-recommends nodejs \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install uv (Python package manager) - using fixed installer
+RUN curl -LsSf https://astral.sh/uv/0.5.11/install.sh | sh
 
 # Install Claude Code globally
 RUN npm install -g @anthropic-ai/claude-code
@@ -32,35 +43,34 @@ RUN npm install -g @anthropic-ai/claude-code
 # Install Gemini CLI globally
 RUN npm install -g @google/gemini-cli
 
+# Install kubectl with fixed version
+RUN curl -LO "https://dl.k8s.io/release/${KUBECTL_VERSION}/bin/linux/arm64/kubectl" && \
+    install -o root -g root -m 0755 kubectl /usr/local/bin/kubectl && \
+    rm kubectl
 
-# uvのインストール
-RUN curl -LsSf https://astral.sh/uv/install.sh | sh
-
-# kubectlのインストール
-RUN curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/arm64/kubectl" && \
-    install -o root -g root -m 0755 kubectl /usr/local/bin/kubectl
-
-# k9sのインストール
-RUN curl -sS https://webinstall.dev/k9s | bash && \
-    bash -c "source ~/.config/envman/PATH.env"
-
-# argocd cliのインストール
-RUN curl -sSL -o argocd-linux-arm64 https://github.com/argoproj/argo-cd/releases/latest/download/argocd-linux-arm64 && \
+# Install ArgoCD CLI with fixed version
+RUN curl -sSL -o argocd-linux-arm64 "https://github.com/argoproj/argo-cd/releases/download/${ARGOCD_VERSION}/argocd-linux-arm64" && \
     install -m 555 argocd-linux-arm64 /usr/local/bin/argocd && \
     rm argocd-linux-arm64
 
-# kustomizeのインストール
-RUN curl -s "https://raw.githubusercontent.com/kubernetes-sigs/kustomize/master/hack/install_kustomize.sh" | bash && \
-    mv kustomize /usr/local/bin/
+# Install Kustomize with fixed version
+RUN curl -sSL "https://github.com/kubernetes-sigs/kustomize/releases/download/kustomize%2F${KUSTOMIZE_VERSION}/kustomize_${KUSTOMIZE_VERSION}_linux_arm64.tar.gz" | \
+    tar xz -C /usr/local/bin/
 
-# kubeseal
-RUN wget https://github.com/bitnami-labs/sealed-secrets/releases/download/v0.26.0/kubeseal-0.26.0-linux-arm64.tar.gz && \
-    tar xfz kubeseal-0.26.0-linux-arm64.tar.gz && \
-    sudo install -m 755 kubeseal /usr/local/bin/kubeseal && \
-    rm kubeseal-0.26.0-linux-arm64.tar.gz kubeseal
+# Install kubeseal with fixed version (note: file name uses version without 'v' prefix)
+RUN KUBESEAL_VERSION_NUM=$(echo ${KUBESEAL_VERSION} | sed 's/^v//') && \
+    curl -sSL "https://github.com/bitnami-labs/sealed-secrets/releases/download/${KUBESEAL_VERSION}/kubeseal-${KUBESEAL_VERSION_NUM}-linux-arm64.tar.gz" | \
+    tar xz kubeseal && \
+    install -m 755 kubeseal /usr/local/bin/kubeseal && \
+    rm kubeseal
 
-# helmのインストール
-RUN curl https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
+# Install Helm with fixed version
+RUN curl -sSL "https://get.helm.sh/helm-${HELM_VERSION}-linux-arm64.tar.gz" | \
+    tar xz --strip-components=1 -C /usr/local/bin/ linux-arm64/helm
+
+# Install k9s with fixed version
+RUN curl -sSL "https://github.com/derailed/k9s/releases/download/${K9S_VERSION}/k9s_Linux_arm64.tar.gz" | \
+    tar xz -C /usr/local/bin/ k9s
 
 # Create vscode user and home directory
 RUN useradd -m -s /bin/bash vscode && \
