@@ -34,7 +34,7 @@ USER node
 WORKDIR /app
 
 # Copy files needed by Yarn
-# Note: Build context is now k8s-platform-config/ (parent dir)
+# Note: Build context is now goldship-platform/ (parent dir)
 COPY --chown=node:node backstage-app/.yarn ./.yarn
 COPY --chown=node:node backstage-app/.yarnrc.yml ./
 COPY --chown=node:node backstage-app/backstage.json ./
