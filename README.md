@@ -32,11 +32,13 @@
 
 ## アーキテクチャ
 
-プラットフォームは3リポジトリGitOps戦略を使用します：
+プラットフォームはマルチリポジトリGitOps戦略を使用します：
 
-1. **platform-config**（このリポジトリ）: インフラ、セキュリティ、Argo CD制御構造（PEが管理）
-2. **app-templates**: Backstageスキャフォールディングテンプレート（PEが管理）
-3. **app-<name>**: アプリケーションコードとデプロイ設定（ADが管理、アプリごとに1つ）
+1. **goldship-platform**（このリポジトリ）: インフラ、セキュリティ、Argo CD制御構造、Backstageテンプレート（PEが管理）
+   - `base-infra/`: Kubernetesインフラマニフェスト
+   - `backstage-app/`: Backstageアプリケーション
+   - `backstage-app/templates/`: アプリケーションスキャフォールディングテンプレート
+2. **app-<name>**: アプリケーションコードとデプロイ設定（ADが管理、アプリごとに1つ）
 
 ### 環境分離
 
@@ -107,7 +109,7 @@ make clean    # ローカルイメージ削除
 ## リポジトリ構造
 
 ```
-platform-config/
+goldship-platform/
 ├── base-infra/
 │   ├── argocd/              # Argo CD Projects、Root Apps、Application CRs
 │   ├── cilium/              # Cilium CNI + LoadBalancer設定
@@ -116,7 +118,11 @@ platform-config/
 │   ├── prometheus/          # Prometheus + Grafana監視スタック
 │   ├── sealed-secret/       # Sealed Secretsコントローラーと暗号化シークレット
 │   ├── rbac/                # ServiceAccount設定
-│   └── namespaces/          # Namespace定義
+│   └── backstage/           # Backstage Kubernetesマニフェスト
+├── backstage-app/
+│   ├── packages/            # Backstage packages（app, backend）
+│   ├── templates/           # アプリケーションスキャフォールディングテンプレート
+│   └── plugins/             # カスタムBackstageプラグイン
 ├── docs/
 │   ├── architecture/        # アーキテクチャとデザインドキュメント
 │   └── guides/              # ユーザーおよび運用ガイド
@@ -127,7 +133,7 @@ platform-config/
 
 ### プラットフォームエンジニア（PE）
 
-1. `platform-config`でインフラ設定を変更
+1. `goldship-platform`でインフラ設定を変更
 2. Gitに変更をコミット
 3. Argo CDが自動的にクラスターに同期
 4. Argo CD UIでデプロイを確認
@@ -135,7 +141,7 @@ platform-config/
 ### アプリケーション開発者（AD）
 
 1. Backstageテンプレートから新規アプリを作成
-2. BackstageがApplication CRを`platform-config`に自動コミット
+2. BackstageがApplication CRを`goldship-platform`に自動コミット
 3. 生成された`app-<name>`リポジトリでコードを開発
 4. `overlays/dev/image-patch.yaml`でイメージタグを更新
 5. Argo CDが変更を検出してアプリケーションを再デプロイ
