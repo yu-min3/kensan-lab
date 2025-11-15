@@ -80,7 +80,7 @@ Argo CD ApplicationのソースURLを変更する必要があります。
 ```yaml
 spec:
   source:
-    repoURL: 'https://github.com/yu-min3/k8s-platform-config'  # ← 自分のリポジトリURLに変更
+    repoURL: 'https://github.com/yu-min3/goldship-platform'  # ← 自分のリポジトリURLに変更
 ```
 
 ### 6. TLS証明書
