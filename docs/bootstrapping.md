@@ -416,7 +416,7 @@ integrations:
 catalog:
   locations:
     - type: url
-      target: https://github.com/yu-min3/app-templates/blob/main/catalog-info.yaml
+      target: ./templates/fastapi-template/template.yaml
       rules:
         - allow: [Template]
 ```
