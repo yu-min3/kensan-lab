@@ -1,4 +1,4 @@
-# Backstage Image Build and Push Makefile
+# Backstage Build and Deployment Makefile
 # Load environment variables from .env file if it exists
 -include ../.env
 export
@@ -16,76 +16,52 @@ FULL_IMAGE := $(REGISTRY)/$(IMAGE_NAME):$(TAG)
 # Container runtime (podman or docker)
 CONTAINER_RUNTIME ?= podman
 
+# Yarn wrapper
+YARN := node .yarn/releases/yarn-4.4.1.cjs
+
+#==============================================================================
+# Help
+#==============================================================================
+
 .PHONY: help
 help:
-	@echo "Backstage Build and Push Commands:"
+	@echo "Backstage Development Commands:"
 	@echo "  make install       - Install dependencies"
-	@echo "  make build         - Build backend and create Docker image"
-	@echo "  make push          - Login to GHCR and push image"
-	@echo "  make all           - Install, build, and push image"
-	@echo "  make update-image  - Build, push, and update kustomization.yaml (no git commit)"
-	@echo "  make deploy        - GitOps deployment: build, push, update, commit, push, sync"
-	@echo "  make commit-deploy - Commit kustomization.yaml changes only (after update-image)"
-	@echo "  make preview       - Preview Kustomize manifests without deploying"
-	@echo "  make run           - Run the built Docker image locally"
-	@echo "  make clean         - Remove Docker image locally"
-	@echo ""
-	@echo "Development Commands:"
-	@echo "  make dev           - Run Backstage locally (production mode, port 7007)"
+	@echo "  make dev           - Run Backstage locally (port 7007)"
 	@echo "  make dev-watch     - Run with hot reload (frontend:3000, backend:7007)"
 	@echo ""
+	@echo "Testing & Code Quality:"
+	@echo "  make tsc           - TypeScript type checking"
+	@echo "  make lint          - Run ESLint"
+	@echo "  make test          - Run unit tests"
+	@echo "  make test:e2e      - Run Playwright E2E tests"
+	@echo ""
+	@echo "Build & Deploy:"
+	@echo "  make build         - Build Docker image"
+	@echo "  make push          - Push image to GHCR"
+	@echo "  make all           - Build and push in one command"
+	@echo "  make run           - Run built image locally"
+	@echo "  make clean         - Remove local Docker image"
+	@echo ""
+	@echo "GitOps Deployment (for goldship-platform):"
+	@echo "  make update-image  - Build, push, and update kustomization.yaml"
+	@echo "  make deploy        - Full GitOps deployment (build, push, commit, sync)"
+	@echo "  make commit-deploy - Commit kustomization.yaml changes only"
+	@echo "  make preview       - Preview Kustomize manifests"
+	@echo ""
 	@echo "Environment Variables (set in ../.env):"
-	@echo "  GITHUB_USER          - GitHub username"
-	@echo "  GITHUB_GHCR_PAT      - GitHub Personal Access Token for GHCR"
-	@echo "  TAG                  - Image tag (default: latest)"
-	@echo "  CONTAINER_RUNTIME    - Container runtime (default: podman, can use: docker)"
+	@echo "  GITHUB_USER        - GitHub username"
+	@echo "  GITHUB_GHCR_PAT    - GitHub Personal Access Token for GHCR"
+	@echo "  TAG                - Image tag (default: latest)"
+
+#==============================================================================
+# Development
+#==============================================================================
 
 .PHONY: install
 install:
 	@echo "Installing dependencies..."
-	node .yarn/releases/yarn-4.4.1.cjs install
-
-.PHONY: build-backend
-build-backend:
-	@echo "Building backend package..."
-	node .yarn/releases/yarn-4.4.1.cjs workspace backend build
-
-.PHONY: build
-build: build-backend
-	@echo "Building container image: $(FULL_IMAGE)"
-	@echo "Using container runtime: $(CONTAINER_RUNTIME)"
-	@echo "Build context: parent directory (to include backstage-app)"
-	cd .. && $(CONTAINER_RUNTIME) build --format=docker -f backstage-app/packages/backend/Dockerfile -t $(FULL_IMAGE) .
-
-.PHONY: run
-run: build
-	@echo "Running container image for local testing (with SQLite)..."
-	@echo "Access at: http://localhost:7007"
-	@echo ""
-	$(CONTAINER_RUNTIME) run --rm -it -p 7007:7007 \
-		-v $(CURDIR)/app-config.local.yaml:/app/app-config.local.yaml \
-		-e GITHUB_TOKEN="$(GITHUB_TOKEN)" \
-		$(FULL_IMAGE) \
-		node packages/backend --config app-config.yaml --config app-config.kubernetes.yaml --config app-config.local.yaml
-
-.PHONY: login
-login:
-	@echo "Logging in to GHCR..."
-	@echo "$(GITHUB_GHCR_PAT)" | $(CONTAINER_RUNTIME) login ghcr.io -u $(GITHUB_USER) --password-stdin
-
-.PHONY: push
-push: login
-	@echo "Pushing image: $(FULL_IMAGE)"
-	$(CONTAINER_RUNTIME) push $(FULL_IMAGE)
-
-.PHONY: all
-all: install build push
-	@echo "Successfully built and pushed $(FULL_IMAGE)"
-
-.PHONY: clean
-clean:
-	@echo "Removing local image: $(FULL_IMAGE)"
-	$(CONTAINER_RUNTIME) rmi $(FULL_IMAGE) || true
+	$(YARN) install
 
 .PHONY: dev
 dev: build-backend
@@ -107,12 +83,81 @@ dev-watch:
 	@echo "Frontend: http://localhost:3000 (Webpack Dev Server)"
 	@echo "Backend:  http://localhost:7007 (API)"
 	@echo ""
-	NODE_OPTIONS=--no-node-snapshot node .yarn/releases/yarn-4.4.1.cjs start
+	NODE_OPTIONS=--no-node-snapshot $(YARN) start
+
+#==============================================================================
+# Testing & Code Quality
+#==============================================================================
 
 .PHONY: tsc
 tsc:
-	@echo "Running TypeScript compiler..."
-	node .yarn/releases/yarn-4.4.1.cjs tsc
+	@echo "Running TypeScript type checking..."
+	$(YARN) tsc
+
+.PHONY: lint
+lint:
+	@echo "Running ESLint..."
+	$(YARN) lint:all
+
+.PHONY: test
+test:
+	@echo "Running unit tests..."
+	$(YARN) test:all
+
+.PHONY: test:e2e
+test:e2e:
+	@echo "Running E2E tests with Playwright..."
+	$(YARN) test:e2e
+
+#==============================================================================
+# Build & Deploy
+#==============================================================================
+
+.PHONY: build-backend
+build-backend:
+	@echo "Building backend package..."
+	$(YARN) workspace backend build
+
+.PHONY: build
+build: build-backend
+	@echo "Building container image: $(FULL_IMAGE)"
+	@echo "Using container runtime: $(CONTAINER_RUNTIME)"
+	@echo "Build context: parent directory (to include templates/)"
+	cd .. && $(CONTAINER_RUNTIME) build --format=docker -f backstage-app/packages/backend/Dockerfile -t $(FULL_IMAGE) .
+
+.PHONY: login
+login:
+	@echo "Logging in to GHCR..."
+	@echo "$(GITHUB_GHCR_PAT)" | $(CONTAINER_RUNTIME) login ghcr.io -u $(GITHUB_USER) --password-stdin
+
+.PHONY: push
+push: login
+	@echo "Pushing image: $(FULL_IMAGE)"
+	$(CONTAINER_RUNTIME) push $(FULL_IMAGE)
+
+.PHONY: all
+all: build push
+	@echo "Successfully built and pushed $(FULL_IMAGE)"
+
+.PHONY: run
+run:
+	@echo "Running container image for local testing..."
+	@echo "Access at: http://localhost:7007"
+	@echo ""
+	$(CONTAINER_RUNTIME) run --rm -it -p 7007:7007 \
+		-v $(CURDIR)/app-config.local.yaml:/app/app-config.local.yaml \
+		-e GITHUB_TOKEN="$(GITHUB_TOKEN)" \
+		$(FULL_IMAGE) \
+		node packages/backend --config app-config.yaml --config app-config.kubernetes.yaml --config app-config.local.yaml
+
+.PHONY: clean
+clean:
+	@echo "Removing local image: $(FULL_IMAGE)"
+	$(CONTAINER_RUNTIME) rmi $(FULL_IMAGE) || true
+
+#==============================================================================
+# GitOps Deployment (goldship-platform specific)
+#==============================================================================
 
 .PHONY: update-image
 update-image: build push
