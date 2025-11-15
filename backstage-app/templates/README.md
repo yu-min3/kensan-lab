@@ -1,12 +1,12 @@
 # Application Templates
 
-This repository contains Backstage templates for creating new applications with GitOps deployment patterns.
+This directory contains Backstage templates for creating new applications with GitOps deployment patterns.
 
 ## Architecture
 
-Part of a 3-repository GitOps architecture:
-- **platform-config**: Platform infrastructure (managed by Platform Engineers)
-- **app-templates**: Application templates (this repository)
+Part of the goldship-platform GitOps architecture:
+- **goldship-platform**: Platform infrastructure and Backstage application (managed by Platform Engineers)
+  - `backstage-app/templates/`: Application templates (this directory)
 - **app-\<name\>**: Generated application repositories (managed by Application Developers)
 
 ## Available Templates
@@ -30,14 +30,24 @@ A production-ready FastAPI application template with:
 
 ### 1. Register Template in Backstage
 
-Add the template location to Backstage:
+Templates are automatically loaded from this directory:
 
 ```yaml
-# In platform-config backstage configuration
+# In app-config.yaml (local development)
 catalog:
   locations:
-    - type: url
-      target: https://github.com/yu-min3/app-templates/blob/main/fastapi-template/catalog-info.yaml
+    - type: file
+      target: ../../templates/fastapi-template/template.yaml
+      rules:
+        - allow: [Template]
+
+# In app-config.kubernetes.yaml (Docker image)
+catalog:
+  locations:
+    - type: file
+      target: ./templates/fastapi-template/template.yaml
+      rules:
+        - allow: [Template]
 ```
 
 ### 2. Create New Application
@@ -58,7 +68,7 @@ Backstage will automatically:
 - Create a new GitHub repository (`app-<name>`)
 - Generate Kustomize manifests (base + dev/prod overlays)
 - Create Argo CD Application CRs for both environments
-- Commit Application CRs to `platform-config` repository
+- Commit Application CRs to `goldship-platform` repository
 - Register the app in Backstage catalog
 
 ### 4. Deploy Your Application
@@ -91,9 +101,9 @@ fastapi-template/
 
 ### For Platform Engineers
 
-1. Create new templates in this repository
+1. Create new templates in this directory
 2. Test templates locally using Backstage
-3. Register templates in Backstage catalog
+3. Templates are automatically registered via app-config
 4. Document template usage
 
 ### For Application Developers
@@ -116,10 +126,9 @@ fastapi-template/
 
 ## Links
 
-- [Architecture Documentation](./mydocs/architecture/)
-- [Design Documentation](./mydocs/design.md)
-- [Tasks](./mydocs/tasks.md)
-- [Platform Config Repository](https://github.com/yu-min3/platform-config)
+- [Platform Repository](https://github.com/yu-min3/goldship-platform)
+- [Architecture Documentation](../../docs/architecture/)
+- [Backstage Documentation](../README.platform.md)
 
 ## Contributing
 

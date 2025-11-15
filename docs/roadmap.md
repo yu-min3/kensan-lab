@@ -105,7 +105,7 @@ Argo CDをGitOpsエンジンとして確立し、インフラ管理を整備。
 
 | タスクID | タスク | 責務 | ステータス | 詳細 |
 |---------|------|---------------|--------|---------|
-| I-13 | Backstageテンプレート作成 | PE | ⏳ 保留中 | app-templatesリポジトリにKustomizeベーステンプレートを作成、Argo CD Application CRs自動生成機能を含む |
+| I-13 | Backstageテンプレート作成 | PE | ✅ 完了 | backstage-app/templates/にKustomizeベーステンプレートを作成、Argo CD Application CRs自動生成機能を含む |
 | I-14 | Backstageカタログ登録 | PE | ⏳ 保留中 | テンプレートが発見可能で、アプリケーション開発者が使用可能であることを確認 |
 
 ### 目標

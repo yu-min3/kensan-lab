@@ -54,7 +54,7 @@ build-backend:
 build: build-backend
 	@echo "Building container image: $(FULL_IMAGE)"
 	@echo "Using container runtime: $(CONTAINER_RUNTIME)"
-	@echo "Build context: parent directory (to include app-templates)"
+	@echo "Build context: parent directory (to include backstage-app)"
 	cd .. && $(CONTAINER_RUNTIME) build --format=docker -f backstage-app/packages/backend/Dockerfile -t $(FULL_IMAGE) .
 
 .PHONY: run
@@ -63,10 +63,10 @@ run: build
 	@echo "Access at: http://localhost:7007"
 	@echo ""
 	$(CONTAINER_RUNTIME) run --rm -it -p 7007:7007 \
-		-v $(CURDIR)/app-config.local-test.yaml:/app/app-config.local-test.yaml \
+		-v $(CURDIR)/app-config.local.yaml:/app/app-config.local.yaml \
 		-e GITHUB_TOKEN="$(GITHUB_TOKEN)" \
 		$(FULL_IMAGE) \
-		node packages/backend --config app-config.yaml --config app-config.kubernetes.yaml --config app-config.local-test.yaml
+		node packages/backend --config app-config.yaml --config app-config.kubernetes.yaml --config app-config.local.yaml
 
 .PHONY: login
 login:

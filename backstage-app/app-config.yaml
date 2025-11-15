@@ -78,9 +78,9 @@ catalog:
   rules:
     - allow: [Component, System, API, Resource, Location]
   locations:
-    # FastAPI template (from app-templates directory)
+    # FastAPI template (from templates directory)
     - type: file
-      target: ../../../../../../app-templates/fastapi-template/template.yaml
+      target: ../../templates/fastapi-template/template.yaml
       rules:
         - allow: [Template]
 

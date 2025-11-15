@@ -33,9 +33,9 @@ catalog:
   locations:
   # FastAPIテンプレート（ローカルパス）
   # In Docker image, working directory is /app
-  # app-templates/ is copied to /app/app-templates (see Dockerfile)
+  # templates/ is copied to /app/templates (see Dockerfile)
   - type: file
-    target: ./app-templates/fastapi-template/template.yaml
+    target: ./templates/fastapi-template/template.yaml
     rules:
     - allow: [Template]
 
