@@ -3,5 +3,7 @@ kind: Namespace
 metadata:
   name: argocd
   labels:
-    name: argocd
-    platform: infrastructure # Allow access from gateway-platform
+    app.kubernetes.io/managed-by: argocd
+    goldship.platform/environment: infrastructure
+    goldship.platform/tier: platform
+    goldship.platform/component: gitops

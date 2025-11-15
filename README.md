@@ -99,11 +99,20 @@ make clean    # ローカルイメージ削除
 
 ## ドキュメント
 
+### セットアップ・運用ガイド
 - **[ブートストラッピング手順](./docs/bootstrapping.md)**: ゼロからクラスターを構築する際の参考手順
 - **[環境固有の設定変更ガイド](./docs/configuration.md)**: 別環境で使用する際に変更が必要な設定項目
+
+### アーキテクチャ・設計
 - **[プラットフォームアーキテクチャ](./docs/architecture/design.md)**: 設計原則、技術スタック、セキュリティモデル
 - **[リポジトリ構成](./docs/architecture/repository-structure.md)**: マルチリポジトリGitOps戦略とワークフロー
 - **[実装ロードマップ](./docs/roadmap.md)**: プロジェクトフェーズと現在の進捗
+
+### 開発ガイドライン
+- **[Kustomize使用ガイドライン](./docs/kustomize-guidelines.md)**: base-infra/でKustomizeを使用するタイミングと構造化パターン
+- **[Namespaceラベル設計](./docs/namespace-label-design.md)**: 統一されたNamespaceラベリング戦略とセキュリティポリシー活用
+
+### その他
 - **[CLAUDE.md](./CLAUDE.md)**: Claude Code用指示書（git-ignored）
 
 ## リポジトリ構造

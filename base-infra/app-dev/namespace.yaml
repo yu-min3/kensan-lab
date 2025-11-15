@@ -3,4 +3,7 @@ kind: Namespace
 metadata:
   name: app-dev
   labels:
-    environment: development
+    app.kubernetes.io/managed-by: argocd
+    goldship.platform/environment: development
+    goldship.platform/tier: application
+    istio-injection: enabled
