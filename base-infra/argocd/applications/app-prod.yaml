@@ -6,7 +6,7 @@ metadata:
 spec:
   project: platform-project
   source:
-    repoURL: https://github.com/yu-min3/k8s-platform-config
+    repoURL: https://github.com/yu-min3/goldship-platform
     targetRevision: HEAD
     path: base-infra/app-prod
   destination:
