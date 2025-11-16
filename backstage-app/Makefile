@@ -9,6 +9,7 @@ export GITHUB_TOKEN
 
 # Default values
 REGISTRY ?= ghcr.io
+GITHUB_USER ?= your-org
 IMAGE_NAME ?= $(GITHUB_USER)/backstage
 TAG ?= latest
 FULL_IMAGE := $(REGISTRY)/$(IMAGE_NAME):$(TAG)
@@ -28,24 +29,22 @@ help:
 	@echo "Backstage Development Commands:"
 	@echo "  make install       - Install dependencies"
 	@echo "  make dev           - Run Backstage locally (port 7007)"
-	@echo "  make dev-watch     - Run with hot reload (frontend:3000, backend:7007)"
 	@echo ""
 	@echo "Testing & Code Quality:"
 	@echo "  make tsc           - TypeScript type checking"
 	@echo "  make lint          - Run ESLint"
 	@echo "  make test          - Run unit tests"
-	@echo "  make test:e2e      - Run Playwright E2E tests"
+	@echo "  make test-e2e      - Run Playwright E2E tests"
 	@echo ""
 	@echo "Build & Deploy:"
 	@echo "  make build         - Build Docker image"
-	@echo "  make push          - Push image to GHCR"
-	@echo "  make all           - Build and push in one command"
+	@echo "  make push          - Build and Push image to GHCR"
 	@echo "  make run           - Run built image locally"
 	@echo "  make clean         - Remove local Docker image"
 	@echo ""
 	@echo "GitOps Deployment (for goldship-platform):"
 	@echo "  make update-image  - Build, push, and update kustomization.yaml"
-	@echo "  make deploy        - Full GitOps deployment (build, push, commit, sync)"
+	@echo "  make deploy        - Create PR for deployment (build, push, branch, commit)"
 	@echo "  make commit-deploy - Commit kustomization.yaml changes only"
 	@echo "  make preview       - Preview Kustomize manifests"
 	@echo ""
@@ -77,14 +76,6 @@ dev: build-backend
 		--config $(CURDIR)/app-config.yaml \
 		--config $(CURDIR)/app-config.local.yaml
 
-.PHONY: dev-watch
-dev-watch:
-	@echo "Starting Backstage in development mode with hot reload..."
-	@echo "Frontend: http://localhost:3000 (Webpack Dev Server)"
-	@echo "Backend:  http://localhost:7007 (API)"
-	@echo ""
-	NODE_OPTIONS=--no-node-snapshot $(YARN) start
-
 #==============================================================================
 # Testing & Code Quality
 #==============================================================================
@@ -104,10 +95,10 @@ test:
 	@echo "Running unit tests..."
 	$(YARN) test:all
 
-.PHONY: test:e2e
-test:e2e:
+.PHONY: test-e2e
+test-e2e:
 	@echo "Running E2E tests with Playwright..."
-	$(YARN) test:e2e
+	$(YARN) test-e2e
 
 #==============================================================================
 # Build & Deploy
@@ -123,7 +114,12 @@ build: build-backend
 	@echo "Building container image: $(FULL_IMAGE)"
 	@echo "Using container runtime: $(CONTAINER_RUNTIME)"
 	@echo "Build context: parent directory (to include templates/)"
-	cd .. && $(CONTAINER_RUNTIME) build --format=docker -f backstage-app/packages/backend/Dockerfile -t $(FULL_IMAGE) .
+	@echo "Note: This may take several minutes and use significant memory"
+	cd .. && $(CONTAINER_RUNTIME) build \
+		--format=docker \
+		-f backstage-app/packages/backend/Dockerfile \
+		-t $(FULL_IMAGE) \
+		.
 
 .PHONY: login
 login:
@@ -131,16 +127,12 @@ login:
 	@echo "$(GITHUB_GHCR_PAT)" | $(CONTAINER_RUNTIME) login ghcr.io -u $(GITHUB_USER) --password-stdin
 
 .PHONY: push
-push: login
+push: login build
 	@echo "Pushing image: $(FULL_IMAGE)"
 	$(CONTAINER_RUNTIME) push $(FULL_IMAGE)
 
-.PHONY: all
-all: build push
-	@echo "Successfully built and pushed $(FULL_IMAGE)"
-
 .PHONY: run
-run:
+run: build
 	@echo "Running container image for local testing..."
 	@echo "Access at: http://localhost:7007"
 	@echo ""
@@ -174,23 +166,28 @@ update-image: build push
 	@echo "  - Or commit manually: make commit-deploy TAG=$(TAG)"
 
 .PHONY: deploy
-deploy: build push
-	@echo "Updating Kustomize overlay with tag: $(TAG)..."
-	cd ../base-infra/backstage/overlays/prod && \
-		kustomize edit set image ghcr.io/$(GITHUB_USER)/backstage:$(TAG)
+deploy: update-image
+	@echo "Creating deployment branch..."
+	cd .. && git checkout -b deploy-backstage-$(TAG)
 	@echo "Committing change to Git..."
 	cd .. && git add base-infra/backstage/overlays/prod/kustomization.yaml
 	cd .. && git commit -m "Deploy Backstage $(TAG)"
-	cd .. && git push
-	@echo "Triggering Argo CD sync..."
-	argocd app sync backstage --async || echo "Warning: argocd CLI not available, please sync manually"
+	@echo "Pushing to remote..."
+	cd .. && git push origin deploy-backstage-$(TAG)
 	@echo ""
-	@echo "✅ GitOps deployment triggered for $(FULL_IMAGE)"
+	@echo "✅ Deployment branch created and pushed: deploy-backstage-$(TAG)"
 	@echo ""
-	@echo "Monitor deployment:"
-	@echo "  argocd app get backstage"
-	@echo "  kubectl get pods -n backstage -w"
-	@echo "  kubectl logs -n backstage deployment/backstage -f"
+	@echo "Next steps:"
+	@echo "  1. Create a Pull Request:"
+	@echo "     gh pr create --base main --head deploy-backstage-$(TAG) --title 'Deploy Backstage $(TAG)' --body 'Update Backstage image to $(TAG)'"
+	@echo ""
+	@echo "  2. Merge the PR:"
+	@echo "     - Review and approve the PR on GitHub"
+	@echo "     - Merge to main"
+	@echo "     - Argo CD will automatically sync the changes"
+	@echo ""
+	@echo "  3. Monitor deployment after merge:"
+	@echo "     kubectl get pods -n backstage -w"
 
 .PHONY: commit-deploy
 commit-deploy:
@@ -208,7 +205,7 @@ preview:
 		kustomize edit set image ghcr.io/$(GITHUB_USER)/backstage:$(TAG)
 	@echo ""
 	@echo "Generated Deployment (image section):"
-	@kubectl kustomize ../base-infra/backstage/overlays/prod | grep -A10 "kind: Deployment" | grep -A5 "containers:"
+	@kubectl kustomize ../base-infra/backstage/overlays/prod | grep -A10 "kind: Deployment" | grep -A5 "containers:" || echo "  (Could not extract container section)"
 	@echo ""
 	@echo "Full manifests:"
 	@echo "  kubectl kustomize ../base-infra/backstage/overlays/prod"
