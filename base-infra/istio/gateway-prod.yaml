@@ -18,7 +18,7 @@ spec:
         from: Selector
         selector:
           matchLabels:
-            environment: production
+            goldship.platform/environment: production
 
   - name: https
     protocol: HTTPS
@@ -29,7 +29,7 @@ spec:
         from: Selector
         selector:
           matchLabels:
-            environment: production
+            goldship.platform/environment: production
     tls:
       mode: Terminate
       certificateRefs:
