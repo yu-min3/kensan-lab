@@ -2,7 +2,7 @@
 
 このドキュメントは、プラットフォームエンジニア（PE）とアプリケーション開発者（AD）の完全な分離を可能にする3リポジトリアーキテクチャについて説明します。
 
-## 1. プラットフォーム設定リポジトリ（platform-config）
+## 1. プラットフォーム設定リポジトリ（goldship-platform）
 
 **責務**: クラスター基盤コンポーネント、セキュリティ設定、GitOps制御構造
 **管理者**: プラットフォームエンジニア（PE）
@@ -11,7 +11,7 @@
 ### ディレクトリ構造
 
 ```
-platform-config/
+goldship-platform/
 ├── base-infra/
 │   ├── argocd/
 │   │   ├── projects/
@@ -38,7 +38,7 @@ platform-config/
 │   │   ├── cert-manager.yaml              # cert-managerコントローラー
 │   │   ├── cluster-issuer.yaml            # Let's Encrypt ClusterIssuer（Route53 DNS）
 │   │   ├── route53-secret.yaml            # AWS Route53認証情報（SealedSecret）
-│   │   └── wildcard-certificate.yaml      # ワイルドカード証明書（*.yu-min3.com）
+│   │   └── wildcard-certificate.yaml      # ワイルドカード証明書（*.your-org.com）
 │   ├── keycloak/
 │   │   ├── base/
 │   │   │   ├── kustomization.yaml
@@ -160,7 +160,7 @@ backstage-app/templates/
 2. **Backstage登録**: テンプレートをBackstageカタログに登録
 3. **AD選択**: ADがBackstage UIからテンプレートを選択
 4. **リポジトリ生成**: Backstageが新しい`app-<name>`リポジトリをスキャフォールド
-5. **GitOps登録**: BackstageがApplication CRを`platform-config`に自動コミット
+5. **GitOps登録**: BackstageがApplication CRを`goldship-platform`に自動コミット
 6. **自動デプロイ**: Argo CDが変更を検出し両環境にデプロイ
 
 ---
