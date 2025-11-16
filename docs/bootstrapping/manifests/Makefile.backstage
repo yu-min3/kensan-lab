@@ -1,0 +1,19 @@
+# This is an example Makefile. The actual Makefile is located at
+# backstage-app/Makefile
+
+-include ../.env
+export
+
+REGISTRY ?= ghcr.io
+IMAGE_NAME ?= $(GITHUB_USER)/backstage
+TAG ?= latest
+
+.PHONY: build
+build:
+	node .yarn/releases/yarn-4.4.1.cjs workspace backend build
+	DOCKER_BUILDKIT=1 docker build -f packages/backend/Dockerfile -t $(REGISTRY)/$(IMAGE_NAME):$(TAG) .
+
+.PHONY: push
+push:
+	echo "$(GITHUB_GHCR_PAT)" | docker login ghcr.io -u $(GITHUB_USER) --password-stdin
+	docker push $(REGISTRY)/$(IMAGE_NAME):$(TAG)
