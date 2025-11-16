@@ -1,9 +1,0 @@
-apiVersion: backstage.io/v1alpha1
-kind: Location
-metadata:
-  name: fastapi-template
-  description: FastAPI application template for GitOps deployment
-spec:
-  type: url
-  targets:
-    - ./template.yaml

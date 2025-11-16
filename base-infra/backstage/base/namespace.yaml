@@ -3,5 +3,8 @@ kind: Namespace
 metadata:
   name: backstage
   labels:
+    app.kubernetes.io/managed-by: argocd
+    goldship.platform/environment: production
+    goldship.platform/tier: platform
+    goldship.platform/component: developer-portal
     istio-injection: enabled
-    platform: infrastructure
