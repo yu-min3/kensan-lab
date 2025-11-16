@@ -56,7 +56,7 @@ kubectl get ciliumloadbalancerippools
 - IP Pool: 192.168.0.240-249（`base-infra/cilium/lb-ippool.yaml` で定義）
 
 **Hubble UI へのアクセス:**
-- HTTPRoute 経由: `https://hubble.platform.yu-min3.com`（Platform Gateway を使用）
+- HTTPRoute 経由: `https://hubble.platform.your-org.com`（Platform Gateway を使用）
 - ポートフォワード: `kubectl port-forward -n kube-system svc/hubble-ui 8081:80`
 
 **Hubble の機能:**
@@ -107,7 +107,7 @@ spec:
   - name: gateway-platform
     namespace: istio-system
   hostnames:
-  - "argocd.platform.yu-min3.com"
+  - "argocd.platform.your-org.com"
   rules:
   - matches:
     - path:
@@ -119,7 +119,7 @@ spec:
 ```
 
 **アクセス:**
-- URL: https://argocd.platform.yu-min3.com（Platform Gateway 経由）
+- URL: https://argocd.platform.your-org.com（Platform Gateway 経由）
 - ユーザー名: admin
 - パスワード: 上記コマンドで取得
 
@@ -303,15 +303,15 @@ helm template prometheus prometheus-community/kube-prometheus-stack \
 
 ```bash
 # Platform Gateway の作成（base-infra/istio/gateway-platform.yaml）
-# - ホスト名: *.platform.yu-min3.com
+# - ホスト名: *.platform.your-org.com
 # - HTTP/HTTPS リスナー
 # - Cilium LoadBalancer で外部 IP 割り当て
 
 # HTTPRoute の作成
 # - base-infra/prometheus/httproute-grafana.yaml
-#   → https://grafana.platform.yu-min3.com
+#   → https://grafana.platform.your-org.com
 # - base-infra/prometheus/httproute-prometheus.yaml
-#   → https://prometheus.platform.yu-min3.com
+#   → https://prometheus.platform.your-org.com
 ```
 
 ### 6.4. デプロイとアクセス
@@ -341,8 +341,8 @@ kubectl port-forward -n monitoring svc/prometheus-grafana 3000:80
 ```
 
 HTTPRoute 経由（本番用）:
-- Grafana: `https://grafana.platform.yu-min3.com`
-- Prometheus UI: `https://prometheus.platform.yu-min3.com`
+- Grafana: `https://grafana.platform.your-org.com`
+- Prometheus UI: `https://prometheus.platform.your-org.com`
 
 **利用可能なデフォルトダッシュボード:**
 - Kubernetes / Compute Resources / Cluster
@@ -399,7 +399,7 @@ npx @backstage/create-app@latest --path backstage-app
 ```yaml
 # Kubernetes 環境用設定（主要な変更点のみ）
 backend:
-  baseUrl: https://backstage.yu-min3.com
+  baseUrl: https://backstage.your-org.com
   listen:
     host: 0.0.0.0  # K8s 用に全インターフェースでリッスン
   database:
@@ -507,7 +507,7 @@ kubectl apply -f ../base-infra/backstage/
 - HTTPRoute（Platform Gateway 経由でアクセス）
 
 **アクセス:**
-- URL: https://backstage.yu-min3.com
+- URL: https://backstage.your-org.com
 - 認証: Guest プロバイダー（開発用）
 
 ---

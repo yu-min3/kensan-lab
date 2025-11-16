@@ -91,7 +91,7 @@ resources:
 - ../../base
 
 images:
-- name: ghcr.io/yu-min3/backstage
+- name: ghcr.io/your-org/backstage
   newTag: v0.0.5               # ← CI/CDで自動更新
 ```
 
@@ -99,7 +99,7 @@ images:
 ```bash
 # CI/CDパイプラインやMakefileで実行
 cd base-infra/backstage/overlays/prod
-kustomize edit set image ghcr.io/yu-min3/backstage:v0.0.6
+kustomize edit set image ghcr.io/your-org/backstage:v0.0.6
 
 # または
 sed -i 's/newTag: v.*/newTag: v0.0.6/' kustomization.yaml
@@ -176,7 +176,7 @@ metadata:
   name: keycloak-prod
 spec:
   source:
-    repoURL: https://github.com/yu-min3/goldship-platform.git
+    repoURL: https://github.com/your-org/goldship-platform.git
     targetRevision: main
     path: base-infra/keycloak/overlays/prod  # ← overlaysを指定
 ```
@@ -189,7 +189,7 @@ metadata:
   name: cilium
 spec:
   source:
-    repoURL: https://github.com/yu-min3/goldship-platform.git
+    repoURL: https://github.com/your-org/goldship-platform.git
     targetRevision: main
     path: base-infra/cilium                 # ← ディレクトリを直接指定
     directory:

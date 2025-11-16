@@ -84,7 +84,7 @@
 
 1. **Gateway側**:
    - Istio Gatewayで Let's Encrypt証明書を使用（cert-manager自動管理）
-   - `*.platform.yu-min3.com` ワイルドカード証明書
+   - `*.platform.your-org.com` ワイルドカード証明書
    - TLS終端（`tls.mode: Terminate`）
 
 2. **Backend側**:
@@ -165,8 +165,8 @@
 
 3. **証明書の範囲**
 
-   - `*.platform.yu-min3.com`: プラットフォームインフラ用
-   - `*.app.yu-min3.com`: アプリケーション用（将来）
+   - `*.platform.your-org.com`: プラットフォームインフラ用
+   - `*.app.your-org.com`: アプリケーション用（将来）
 
    Let's Encryptのワイルドカード証明書は1レベルのサブドメインのみカバーするため、
    階層的なサブドメイン構造に応じて証明書を分ける。
