@@ -1,0 +1,5 @@
+# This is an example Dockerfile. The actual Dockerfile is located at
+# backstage-app/packages/backend/Dockerfile
+
+# To adapt it for Kubernetes, modify the last line:
+CMD ["node", "packages/backend", "--config", "app-config.yaml", "--config", "app-config.kubernetes.yaml"]

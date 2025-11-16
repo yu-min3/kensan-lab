@@ -24,13 +24,13 @@
 
 | サービス | URL | サービス特性 | 認可の必要性 |
 |---------|-----|------------|------------|
-| Keycloak (Prod) | keycloak.platform.yu-min3.com | 認証サーバー | なし（自己認証） |
-| Keycloak (Dev) | keycloak-dev.platform.yu-min3.com | 認証サーバー | なし（自己認証） |
-| Backstage | backstage.platform.yu-min3.com | SPA + API | 高（Permission Framework） |
-| Argo CD | argocd.platform.yu-min3.com | UI + API | 高（RBAC） |
-| Grafana | grafana.platform.yu-min3.com | UI + API | 中（Role Mapping） |
-| Prometheus | prometheus.platform.yu-min3.com | UI + API | 低（全員同じ権限でOK） |
-| Hubble | hubble.platform.yu-min3.com | UI | 低（全員同じ権限でOK） |
+| Keycloak (Prod) | keycloak.platform.your-org.com | 認証サーバー | なし（自己認証） |
+| Keycloak (Dev) | keycloak-dev.platform.your-org.com | 認証サーバー | なし（自己認証） |
+| Backstage | backstage.platform.your-org.com | SPA + API | 高（Permission Framework） |
+| Argo CD | argocd.platform.your-org.com | UI + API | 高（RBAC） |
+| Grafana | grafana.platform.your-org.com | UI + API | 中（Role Mapping） |
+| Prometheus | prometheus.platform.your-org.com | UI + API | 低（全員同じ権限でOK） |
+| Hubble | hubble.platform.your-org.com | UI | 低（全員同じ権限でOK） |
 
 ### 検討した認証パターン
 
@@ -321,7 +321,7 @@ Realm: platform
 Clients:
   - oauth2-proxy-client (Confidential, Standard Flow)
     # OAuth2 Proxy用
-    # Redirect URI: https://auth.platform.yu-min3.com/oauth2/callback
+    # Redirect URI: https://auth.platform.your-org.com/oauth2/callback
 
   - backstage-client (Confidential, Standard Flow) # Phase 3で使用
   - argocd-client (Confidential, Standard Flow)    # Phase 3で使用
@@ -362,14 +362,14 @@ spec:
     args:
     # OIDC Provider
     - --provider=oidc
-    - --oidc-issuer-url=https://keycloak.platform.yu-min3.com/realms/platform
+    - --oidc-issuer-url=https://keycloak.platform.your-org.com/realms/platform
     - --client-id=oauth2-proxy-client
     - --client-secret=$(CLIENT_SECRET)
 
     # Cookie設定（全サブドメインで共有）
     - --cookie-name=_oauth2_proxy
     - --cookie-secure=true
-    - --cookie-domain=.platform.yu-min3.com
+    - --cookie-domain=.platform.your-org.com
 
     # JWT転送（Phase 3で使用）
     - --pass-access-token=true
@@ -427,15 +427,15 @@ spec:
   # OAuth2 Proxyコールバック
   - to:
     - operation:
-        hosts: ["auth.platform.yu-min3.com"]
+        hosts: ["auth.platform.your-org.com"]
         paths: ["/oauth2/*"]
 
   # Keycloak（認証サーバー自体）
   - to:
     - operation:
         hosts:
-        - "keycloak.platform.yu-min3.com"
-        - "keycloak-dev.platform.yu-min3.com"
+        - "keycloak.platform.your-org.com"
+        - "keycloak-dev.platform.your-org.com"
 ```
 
 ### Backstage設定（Phase 3）
@@ -487,7 +487,7 @@ export class PlatformPermissionPolicy implements PermissionPolicy {
 ### 認証フロー（Phase 2）
 
 ```
-1. ユーザー → https://backstage.platform.yu-min3.com
+1. ユーザー → https://backstage.platform.your-org.com
 
 2. Istio Gateway → OAuth2 Proxyに認証確認
    GET /oauth2/auth
@@ -506,7 +506,7 @@ export class PlatformPermissionPolicy implements PermissionPolicy {
 
 3-B. Cookie無効（未認証）:
    OAuth2 Proxy → 302 Redirect
-   Location: https://keycloak.platform.yu-min3.com/realms/platform/...
+   Location: https://keycloak.platform.your-org.com/realms/platform/...
 
    → Keycloakでログイン
    → OAuth2 Proxyがトークン取得
@@ -518,7 +518,7 @@ export class PlatformPermissionPolicy implements PermissionPolicy {
 ### 認証フロー（Phase 3 - Backstage例）
 
 ```
-1. ユーザー → https://backstage.platform.yu-min3.com
+1. ユーザー → https://backstage.platform.your-org.com
 
 2. OAuth2 Proxy（Layer 1）:
    - Cookie検証
@@ -558,7 +558,7 @@ export class PlatformPermissionPolicy implements PermissionPolicy {
 
 5. **ユーザー体験**
    - 1回のログインで全サービスアクセス
-   - Cookie共有（.platform.yu-min3.com）
+   - Cookie共有（.platform.your-org.com）
 
 ### デメリットと対策
 
@@ -615,7 +615,7 @@ export class PlatformPermissionPolicy implements PermissionPolicy {
 **Week 2:**
 1. OAuth2 Proxy Deployment/Service作成
 2. Sealed Secretsで秘密情報管理
-3. HTTPRoute（auth.platform.yu-min3.com）作成
+3. HTTPRoute（auth.platform.your-org.com）作成
 4. Istio ExtAuthz設定
 5. 動作確認
 

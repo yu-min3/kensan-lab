@@ -59,8 +59,8 @@ RUN yarn workspaces focus --all --production && rm -rf "$(yarn cache clean)"
 # Copy production catalog (domains and organizations)
 COPY --chown=node:node backstage-app/catalog ./catalog
 
-# Copy app-templates directory (Backstage templates)
-COPY --chown=node:node app-templates ./app-templates
+# Copy templates directory (Backstage templates)
+COPY --chown=node:node backstage-app/templates ./templates
 
 # Then copy the rest of the backend bundle, along with any other files we might want.
 COPY --chown=node:node backstage-app/packages/backend/dist/bundle.tar.gz backstage-app/app-config*.yaml ./

@@ -2,6 +2,10 @@ apiVersion: v1
 kind: Namespace
 metadata:
   name: istio-system
+  labels:
+    app.kubernetes.io/managed-by: argocd
+    goldship.platform/environment: infrastructure
+    goldship.platform/tier: platform
+    goldship.platform/component: service-mesh
   annotations:
     argocd.argoproj.io/sync-wave: "-3" # Create namespace first (before CRDs)
-spec: {}

@@ -1,0 +1,72 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ${{ values.name }}
+  labels:
+    app: ${{ values.name }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: ${{ values.name }}
+  template:
+    metadata:
+      labels:
+        app: ${{ values.name }}
+        version: v1
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8000"
+        prometheus.io/path: "/metrics"
+    spec:
+      serviceAccountName: default
+      imagePullSecrets:
+        - name: ghcr-pull-secret
+      containers:
+        - name: app
+          image: ghcr.io/yu-min3/${{ values.name }}:latest  # Placeholder, will be replaced by Kustomize
+          imagePullPolicy: Always
+          ports:
+            - name: http
+              containerPort: 8000
+              protocol: TCP
+          env:
+            - name: APP_NAME
+              value: "${{ values.name }}"
+            - name: APP_VERSION
+              value: "1.0.0"
+            - name: ENVIRONMENT
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.namespace
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            timeoutSeconds: 3
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 5
+            timeoutSeconds: 3
+            failureThreshold: 3
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 1000
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: false
+            capabilities:
+              drop:
+                - ALL

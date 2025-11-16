@@ -2,7 +2,7 @@
 
 このドキュメントは、プラットフォームエンジニア（PE）とアプリケーション開発者（AD）の完全な分離を可能にする3リポジトリアーキテクチャについて説明します。
 
-## 1. プラットフォーム設定リポジトリ（platform-config）
+## 1. プラットフォーム設定リポジトリ（goldship-platform）
 
 **責務**: クラスター基盤コンポーネント、セキュリティ設定、GitOps制御構造
 **管理者**: プラットフォームエンジニア（PE）
@@ -11,7 +11,7 @@
 ### ディレクトリ構造
 
 ```
-platform-config/
+goldship-platform/
 ├── base-infra/
 │   ├── argocd/
 │   │   ├── projects/
@@ -38,7 +38,7 @@ platform-config/
 │   │   ├── cert-manager.yaml              # cert-managerコントローラー
 │   │   ├── cluster-issuer.yaml            # Let's Encrypt ClusterIssuer（Route53 DNS）
 │   │   ├── route53-secret.yaml            # AWS Route53認証情報（SealedSecret）
-│   │   └── wildcard-certificate.yaml      # ワイルドカード証明書（*.yu-min3.com）
+│   │   └── wildcard-certificate.yaml      # ワイルドカード証明書（*.your-org.com）
 │   ├── keycloak/
 │   │   ├── base/
 │   │   │   ├── kustomization.yaml
@@ -114,17 +114,17 @@ platform-config/
 
 ---
 
-## 2. アプリケーションテンプレートリポジトリ（app-templates）
+## 2. アプリケーションテンプレート（backstage-app/templates/）
 
 **責務**: 新規アプリケーション用のBackstageスキャフォールディングテンプレート（Kustomizeベース）
 **管理者**: プラットフォームエンジニア（PE）
-**リポジトリ**: PEが管理する別リポジトリ
-**ステータス**: 🚧 実装予定（Phase 5）
+**場所**: goldship-platform リポジトリ内の `backstage-app/templates/`
+**ステータス**: ✅ 実装済み
 
 ### ディレクトリ構造
 
 ```
-app-templates/
+backstage-app/templates/
 ├── fastapi-template/
 │   ├── template.yaml                      # Backstageテンプレート実行定義
 │   ├── skeleton/
@@ -160,7 +160,7 @@ app-templates/
 2. **Backstage登録**: テンプレートをBackstageカタログに登録
 3. **AD選択**: ADがBackstage UIからテンプレートを選択
 4. **リポジトリ生成**: Backstageが新しい`app-<name>`リポジトリをスキャフォールド
-5. **GitOps登録**: BackstageがApplication CRを`platform-config`に自動コミット
+5. **GitOps登録**: BackstageがApplication CRを`goldship-platform`に自動コミット
 6. **自動デプロイ**: Argo CDが変更を検出し両環境にデプロイ
 
 ---
@@ -222,16 +222,18 @@ app-fastapi-user/
 ## リポジトリ統合フロー
 
 ```
+┌──────────────────────────────────────┐
+│   goldship-platform                  │  （PE管理）
+│   ├── backstage-app/templates/      │
+│   │   └── fastapi-template/         │  テンプレート定義
+│   └── base-infra/argocd/            │  Application CRs
+└──────────────┬───────────────────────┘
+               │
+               │ Backstageがスキャフォールド＆Application CRを自動コミット
+               ▼
 ┌─────────────────────┐
-│   app-templates     │  （PE管理）
-│   テンプレート定義   │
-└──────────┬──────────┘
-           │
-           │ Backstageがスキャフォールド
-           ▼
-┌─────────────────────┐      Application CRを      ┌─────────────────────┐
-│  app-<name>         │      自動コミット           │ platform-config     │
-│  （AD管理）         │─────────────────────────────▶│ （PE管理）          │
+│  app-<name>         │  （AD管理）
+│  （AD管理）         │  生成されたアプリケーションリポジトリ
 │                     │      argocd/applications/へ  │                     │
 │  - コード           │                              │ - Argo CD Projects  │
 │  - Dockerfile       │                              │ - Root Apps         │
@@ -265,14 +267,14 @@ app-fastapi-user/
 ## 現在の実装状況
 
 ### ✅ 実装完了
-- **platform-config リポジトリ**: 基盤インフラのGitOps管理が完全に機能
+- **goldship-platform リポジトリ**: 基盤インフラのGitOps管理が完全に機能
   - Argo CD Projects/Root Apps構造
   - Istio + cert-manager + Keycloak デプロイ済み
   - Backstage デプロイ済み（PostgreSQL + Deployment + HTTPRoute）
   - Sealed Secrets による安全なシークレット管理
+  - **Backstageテンプレート**: `backstage-app/templates/` に統合済み
 
 ### 🚧 実装予定
-- **app-templates リポジトリ**: Backstageテンプレートの作成（Phase 5）
 - **app-<name> リポジトリ**: Backstageによる自動生成フロー（Phase 5-6）
 - **自動GitOps統合**: Application CR自動コミット機能（Phase 5）
 
