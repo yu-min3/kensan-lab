@@ -1,0 +1,29 @@
+# This .dockerignore is for building Backstage Docker image
+# Build context is the parent directory (goldship-platform/)
+# We need to exclude everything except backstage-app/
+
+# Exclude base-infra (Kubernetes manifests not needed in image)
+base-infra
+
+# Exclude docs (not needed in image)
+docs
+my_docs
+
+# Exclude temp files
+temp
+
+# Exclude node_modules (CRITICAL for reducing context size)
+backstage-app/node_modules
+backstage-app/packages/*/node_modules
+
+# Git and version control
+.git
+.gitignore
+
+# IDE files
+.vscode
+.idea
+
+# OS files
+.DS_Store
+Thumbs.db

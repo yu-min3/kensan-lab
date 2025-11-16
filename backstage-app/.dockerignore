@@ -1,8 +1,54 @@
+# Git and version control
 .git
+.gitignore
+
+# Yarn cache
 .yarn/cache
 .yarn/install-state.gz
+
+# Node modules (most important for size reduction)
 node_modules
-packages/*/src
 packages/*/node_modules
+**/node_modules
+
+# Source files (not needed in production image)
+packages/*/src
+
+# Plugins (development only)
 plugins
+
+# Local config
 *.local.yaml
+app-config.local.yaml
+
+# Examples and docs (not needed in image)
+examples
+docs
+
+# Build artifacts
+dist
+coverage
+.turbo
+
+# IDE and editor files
+.vscode
+.idea
+*.swp
+*.swo
+*~
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Temporary files
+tmp
+temp
+*.tmp
+
+# Test files
+*.test.ts
+*.test.tsx
+*.spec.ts
+*.spec.tsx
+**/__tests__
