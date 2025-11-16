@@ -6,22 +6,24 @@ A modern GitOps-based Kubernetes platform running on bare-metal hardware, design
 
 - [Key Features](#key-features)
 - [Tech Stack](#tech-stack)
+- [Who Should Use This](#who-should-use-this)
 - [Quick Start](#quick-start)
 - [Architecture](#architecture)
 - [Development Workflow](#development-workflow)
 - [Documentation](#documentation)
 - [Security](#security)
+- [Internet Exposure](#internet-exposure)
 - [License](#license)
 
 ## Key Features
 
-- **GitOps First**: All resources are managed with Git and Argo CD.
-- **Self-Service**: Application developers can deploy apps without the intervention of platform engineers.
-- **Secure by Default**: Istio service mesh + Keycloak JWT authentication.
-- **Environment Isolation**: Strict separation between production and development environments.
-- **Declarative Configuration**: Kubernetes manifest management through Infrastructure as Code.
-- **Automated Deployment**: Changes in Git are automatically synced to the cluster.
-- **Developer Portal**: Backstage with templates, documentation, and a catalog feature.
+- **GitOps + Service Mesh Ready**: Deploy a production-ready GitOps cluster with Istio service mesh integration out of the box.
+- **Self-Service Application Deployment**: Application developers can deploy apps via Backstage templates, including automatic HTTPRoute distribution for traffic management.
+- **Secure by Default**: Istio service mesh + Keycloak JWT authentication for all external traffic.
+- **Environment Isolation**: Strict separation between production and development environments with dedicated Argo CD Projects.
+- **Declarative Configuration**: All Kubernetes resources managed through Infrastructure as Code in Git.
+- **Automated Deployment**: Changes in Git are automatically synced to the cluster via Argo CD.
+- **Developer Portal**: Backstage with scaffolding templates, TechDocs, and service catalog for streamlined development workflows.
 
 ## Tech Stack
 
@@ -37,6 +39,32 @@ A modern GitOps-based Kubernetes platform running on bare-metal hardware, design
 | **Secret Management** | Sealed Secrets | Encrypted secrets in Git |
 | **Monitoring** | Prometheus + Grafana | Metrics collection and visualization |
 | **Developer Portal** | Backstage | Self-service templates and documentation |
+
+## Who Should Use This
+
+This platform is ideal for:
+
+### Learning the Golden Kubernetes Stack
+If you're studying **Golden Kubernetes** (a curated set of CNCF tools for production-ready clusters), this repository provides hands-on experience with:
+- ✅ **Argo CD** for GitOps continuous deployment
+- ✅ **Istio** for service mesh and traffic management
+- ✅ **Cilium** for CNI and network policies
+- ✅ **Prometheus + Grafana** for observability
+- ✅ **Backstage** for developer experience
+
+**Note**: The following Golden Kubernetes components are not yet implemented:
+- ❌ OpenTelemetry (distributed tracing)
+- ❌ Keyverno (policy management)
+- ❌ Other Argo products (Argo Workflows, Argo Rollouts, Argo Events)
+
+### Organizations Requiring Secure GitOps Clusters
+This platform is designed for organizations that need:
+- **Security-first architecture**: mTLS service mesh, JWT authentication, encrypted secrets in Git
+- **Compliance and auditability**: Complete Git history of all infrastructure changes
+- **Multi-tenancy**: Strict namespace isolation between teams and environments
+- **Self-service developer workflows**: Reduce bottlenecks by empowering developers with Backstage templates
+
+If your organization values **infrastructure as code, zero-trust networking, and developer productivity**, this platform provides a solid foundation.
 
 ## Quick Start
 
@@ -81,8 +109,7 @@ For a detailed breakdown of the repository structure and design decisions, pleas
 
 | Tier | Namespaces | Labels | Administrator | Argo CD Project |
 |---|---|---|---|---|
-| **Infrastructure** | `kube-system`, `istio-system`, `argocd`, `monitoring` | `goldship.platform/tier: platform`<br>`goldship.platform/environment: infrastructure` | PE | `platform-project` |
-| **Authentication** | `platform-auth-prod`, `platform-auth-dev`, `backstage` | `goldship.platform/tier: platform`<br>`goldship.platform/environment: production\|development` | PE | `platform-project` |
+| **Infrastructure** | `kube-system`, `istio-system`, `argocd`, `monitoring`, `backstage`, `platform-auth-prod`, `platform-auth-dev` | `goldship.platform/tier: platform`<br>`goldship.platform/environment: infrastructure` | PE | `platform-project` |
 | **Application** | `app-prod`, `app-dev` | `goldship.platform/tier: application`<br>`goldship.platform/environment: production\|development` | AD | `app-project-prod`, `app-project-dev` |
 
 ## Development Workflow
@@ -132,6 +159,56 @@ This project includes detailed documentation in the `docs/` directory, primarily
 - **GitOps Audit**: A complete Git history of all infrastructure changes.
 
 > **Important**: Never commit unencrypted secrets.
+
+## Internet Exposure
+
+### Current Limitations
+
+This platform currently uses **Cilium LoadBalancer with L2 announcements** for local network access. Services are exposed on the local network (e.g., `192.168.0.240-249`) but are **not accessible from the internet**.
+
+### Exposing Services to the Internet
+
+If you need to expose cluster endpoints to the internet, you'll need to set up one of the following:
+
+#### Option 1: Port Forwarding (Simple Home Lab Setup)
+For home labs or testing environments:
+
+1. **Configure your router** to forward ports (80, 443) to the Istio Gateway LoadBalancer IP
+2. **Set up Dynamic DNS** (e.g., DuckDNS, No-IP) if you don't have a static public IP
+3. **Update DNS records** to point your domain to your public IP
+4. **Configure TLS certificates** using Let's Encrypt with DNS-01 or HTTP-01 challenges
+
+**Example using cert-manager**:
+```bash
+# Install cert-manager
+kubectl apply -f https://github.com/cert-manager/cert-manager/releases/download/v1.13.0/cert-manager.yaml
+
+# Create ClusterIssuer for Let's Encrypt
+# See docs/internet-exposure.md for detailed configuration
+```
+
+#### Option 2: Cloudflare Tunnel (Zero Trust Access)
+For secure internet access without exposing your home IP:
+
+1. Set up **Cloudflare Tunnel** (cloudflared)
+2. Configure tunnel routes to your Istio Gateway
+3. Manage access via Cloudflare's Zero Trust dashboard
+
+This approach provides DDoS protection, automatic TLS, and doesn't require port forwarding.
+
+#### Option 3: VPS Reverse Proxy (Production Setup)
+For production deployments:
+
+1. Deploy a **VPS with a public IP** (e.g., DigitalOcean, AWS EC2)
+2. Set up **WireGuard VPN** or **Tailscale** between your cluster and the VPS
+3. Configure **Nginx/Traefik** on the VPS to proxy traffic to your cluster
+4. Manage TLS certificates on the VPS
+
+### Documentation
+
+Detailed guides for each approach will be added to `docs/internet-exposure.md`. The setup is relatively straightforward and typically takes 1-2 hours depending on the chosen method.
+
+**Recommended for beginners**: Start with Cloudflare Tunnel for the easiest setup with built-in security.
 
 ## License
 
