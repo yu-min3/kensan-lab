@@ -1,0 +1,22 @@
+# Kubernetes 環境用設定（主要な変更点のみ）
+backend:
+  baseUrl: https://backstage.your-org.com
+  listen:
+    host: 0.0.0.0  # K8s 用に全インターフェースでリッスン
+  database:
+    client: pg     # SQLite から PostgreSQL へ
+    connection:
+      host: ${POSTGRES_HOST}
+      user: ${POSTGRES_USER}
+      password: ${POSTGRES_PASSWORD}
+
+integrations:
+  github:
+    - token: ${GITHUB_TOKEN}
+
+catalog:
+  locations:
+    - type: url
+      target: ./templates/fastapi-template/template.yaml
+      rules:
+        - allow: [Template]
