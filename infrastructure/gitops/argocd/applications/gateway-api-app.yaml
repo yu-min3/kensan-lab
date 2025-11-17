@@ -8,7 +8,7 @@ spec:
   source:
     repoURL: https://github.com/yu-min3/goldship-yumin3
     targetRevision: HEAD
-    path: base-infra/gateway-api
+    path: infrastructure/network/gateway-api
   destination:
     server: https://kubernetes.default.svc
     namespace: kube-system # CRDs are cluster-scoped, but ArgoCD requires a namespace context
