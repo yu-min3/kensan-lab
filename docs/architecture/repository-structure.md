@@ -1,8 +1,8 @@
 # GitOps リポジトリ構成
 
-このドキュメントは、プラットフォームエンジニア（PE）とアプリケーション開発者（AD）の完全な分離を可能にするアーキテクチャについて説明します。中心となるのはこの`goldship-platform`リポジトリです。
+このドキュメントは、プラットフォームエンジニア（PE）とアプリケーション開発者（AD）の完全な分離を可能にするアーキテクチャについて説明します。中心となるのはこの`goldship`リポジトリです。
 
-## 1. プラットフォーム設定リポジトリ（goldship-platform）
+## 1. プラットフォーム設定リポジトリ（goldship）
 
 **責務**: クラスター基盤コンポーネント、セキュリティ設定、GitOps制御構造、Backstageアプリケーションのソースとテンプレート
 **管理者**: プラットフォームエンジニア（PE）
@@ -10,7 +10,7 @@
 ### ディレクトリ構造
 
 ```
-goldship-platform/
+goldship/
 ├── base-infra/                # Kubernetes infrastructure manifests
 │   ├── argocd/                # Argo CD (with CRDs split)
 │   │   ├── 00-crds.yaml       # Argo CD CRDs

@@ -21,7 +21,7 @@ ENV PYTHON=/usr/bin/python3
 # Consolidated into single RUN to optimize build time (avoid redundant apt-get update)
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
-        python3 python3-pip g++ build-essential libsqlite3-dev && \
+    python3 python3-pip g++ build-essential libsqlite3-dev && \
     pip3 install --no-cache-dir --break-system-packages mkdocs-techdocs-core==1.4.0 && \
     rm -rf /var/lib/apt/lists/*
 
@@ -34,7 +34,7 @@ USER node
 WORKDIR /app
 
 # Copy files needed by Yarn
-# Note: Build context is now goldship-platform/ (parent dir)
+# Note: Build context is now goldship/ (parent dir)
 COPY --chown=node:node backstage-app/.yarn ./.yarn
 COPY --chown=node:node backstage-app/.yarnrc.yml ./
 COPY --chown=node:node backstage-app/backstage.json ./

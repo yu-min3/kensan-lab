@@ -42,7 +42,7 @@ help:
 	@echo "  make run           - Run built image locally"
 	@echo "  make clean         - Remove local Docker image"
 	@echo ""
-	@echo "GitOps Deployment (for goldship-platform):"
+	@echo "GitOps Deployment (for goldship):"
 	@echo "  make update-image  - Build, push, and update kustomization.yaml"
 	@echo "  make deploy        - Create PR for deployment (build, push, branch, commit)"
 	@echo "  make commit-deploy - Commit kustomization.yaml changes only"
@@ -148,7 +148,7 @@ clean:
 	$(CONTAINER_RUNTIME) rmi $(FULL_IMAGE) || true
 
 #==============================================================================
-# GitOps Deployment (goldship-platform specific)
+# GitOps Deployment (goldship specific)
 #==============================================================================
 
 .PHONY: update-image
