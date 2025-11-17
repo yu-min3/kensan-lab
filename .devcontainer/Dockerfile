@@ -43,6 +43,10 @@ RUN npm install -g @anthropic-ai/claude-code
 # Install Gemini CLI globally
 RUN npm install -g @google/gemini-cli
 
+# Install Codex CLI globally
+RUN npm i -g @openai/codex
+
+
 # Install kubectl with fixed version
 RUN curl -LO "https://dl.k8s.io/release/${KUBECTL_VERSION}/bin/linux/arm64/kubectl" && \
     install -o root -g root -m 0755 kubectl /usr/local/bin/kubectl && \
