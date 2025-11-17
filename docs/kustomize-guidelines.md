@@ -176,7 +176,7 @@ metadata:
   name: keycloak-prod
 spec:
   source:
-    repoURL: https://github.com/your-org/goldship-platform.git
+    repoURL: https://github.com/your-org/goldship.git
     targetRevision: main
     path: base-infra/keycloak/overlays/prod  # ← overlaysを指定
 ```
@@ -189,7 +189,7 @@ metadata:
   name: cilium
 spec:
   source:
-    repoURL: https://github.com/your-org/goldship-platform.git
+    repoURL: https://github.com/your-org/goldship.git
     targetRevision: main
     path: base-infra/cilium                 # ← ディレクトリを直接指定
     directory:

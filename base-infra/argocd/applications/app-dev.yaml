@@ -6,7 +6,7 @@ metadata:
 spec:
   project: platform-project
   source:
-    repoURL: https://github.com/yu-min3/goldship-platform-yumin3
+    repoURL: https://github.com/yu-min3/goldship-yumin3
     targetRevision: HEAD
     path: base-infra/app-dev
   destination:
