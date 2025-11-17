@@ -1,10 +1,10 @@
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
-  name: keycloak-dev
+  name: istio
   namespace: argocd
   annotations:
-    argocd.argoproj.io/sync-wave: "2" # Deploy after Istio (depends on HTTPRoute)
+    argocd.argoproj.io/sync-wave: "-1" # Deploy before cert-manager (creates istio-system namespace)
   finalizers:
   - resources-finalizer.argocd.argoproj.io
 spec:
@@ -13,11 +13,11 @@ spec:
   source:
     repoURL: 'https://github.com/yu-min3/goldship-yumin3'
     targetRevision: HEAD
-    path: base-infra/keycloak/overlays/dev
+    path: infrastructure/network/istio
 
   destination:
     server: 'https://kubernetes.default.svc'
-    namespace: platform-auth-dev
+    namespace: istio-system
 
   syncPolicy:
     automated:
@@ -25,3 +25,4 @@ spec:
       selfHeal: true
     syncOptions:
     - CreateNamespace=true
+    - ServerSideApply=true

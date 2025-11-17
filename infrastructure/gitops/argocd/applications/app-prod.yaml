@@ -8,7 +8,7 @@ spec:
   source:
     repoURL: https://github.com/yu-min3/goldship-yumin3
     targetRevision: HEAD
-    path: base-infra/app-prod
+    path: infrastructure/environments/app-prod
   destination:
     server: https://kubernetes.default.svc
     namespace: app-prod
