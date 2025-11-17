@@ -4,7 +4,7 @@ metadata:
   name: platform-auth-dev
   labels:
     app.kubernetes.io/managed-by: argocd
-    goldship.platform/environment: development
+    goldship.platform/environment: infrastructure
     goldship.platform/tier: platform
     goldship.platform/component: keycloak
     istio-injection: enabled
