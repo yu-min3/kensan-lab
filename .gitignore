@@ -4,6 +4,7 @@ archive/*
 mcp-server-kubernetes/*
 CLAUDE.md
 GEMINI.md
+AGENTS.md
 temp.txt
 temp/*
 kubeconfig
