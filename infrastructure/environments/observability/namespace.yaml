@@ -1,0 +1,9 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: monitoring
+  labels:
+    app.kubernetes.io/managed-by: argocd
+    goldship.platform/environment: infrastructure
+    goldship.platform/tier: platform
+    goldship.platform/component: observability
