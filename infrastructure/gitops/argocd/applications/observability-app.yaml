@@ -1,0 +1,22 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: observability
+  namespace: argocd
+spec:
+  project: platform-project
+  source:
+    repoURL: 'https://github.com/yu-min3/goldship-yumin3'
+    targetRevision: HEAD
+    path: infrastructure/envirornments/observability
+    directory:
+      recurse: false
+  destination:
+    server: 'https://kubernetes.default.svc'
+    namespace: monitoring
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+    - CreateNamespace=true
