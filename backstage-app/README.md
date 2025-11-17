@@ -1,6 +1,6 @@
 # Backstage Developer Portal
 
-A production-ready Backstage application for the goldship-platform GitOps Kubernetes platform, with integrated application scaffolding templates and optimized for bare-metal deployment.
+A production-ready Backstage application for the goldship GitOps Kubernetes platform, with integrated application scaffolding templates and optimized for bare-metal deployment.
 
 ## ✨ Features
 
@@ -29,8 +29,8 @@ A production-ready Backstage application for the goldship-platform GitOps Kubern
 ### 1. Clone the Repository
 
 ```bash
-git clone https://github.com/yu-min3/goldship-platform.git
-cd goldship-platform/backstage-app
+git clone https://github.com/yu-min3/goldship.git
+cd goldship/backstage-app
 ```
 
 ### 2. Configure Environment Variables
@@ -207,7 +207,7 @@ make run
 
 #### 4. Production Deployment
 
-Deploy to goldship-platform cluster:
+Deploy to goldship cluster:
 
 ```bash
 # Full GitOps deployment
@@ -335,7 +335,7 @@ This section describes the architecture of the application templates used by Bac
 
 **Responsibility**: Backstage scaffolding templates for new applications (Kustomize-based)
 **Administrator**: Platform Engineer (PE)
-**Location**: `backstage-app/templates/` within the `goldship-platform` repository
+**Location**: `backstage-app/templates/` within the `goldship` repository
 **Status**: ✅ Implemented
 
 #### Directory Structure
@@ -377,7 +377,7 @@ backstage-app/templates/
 2.  **Backstage Registration**: The template is registered in the Backstage catalog.
 3.  **AD Selection**: AD selects the template from the Backstage UI.
 4.  **Repository Generation**: Backstage scaffolds a new `app-<name>` repository.
-5.  **GitOps Registration**: Backstage automatically commits the Application CR to the `goldship-platform` repository.
+5.  **GitOps Registration**: Backstage automatically commits the Application CR to the `goldship` repository.
 6.  **Automatic Deployment**: Argo CD detects the change and deploys to both environments.
 
 ---
@@ -540,7 +540,7 @@ npx playwright show-report e2e-test-report
 
 - **Backstage Documentation**: https://backstage.io/docs
 - **Yarn 4 Documentation**: https://yarnpkg.com
-- **Platform Repository**: https://github.com/yu-min3/goldship-platform
+- **Platform Repository**: https://github.com/yu-min3/goldship
 - **CLAUDE.md**: See repository root for AI assistant instructions
 
 ---
@@ -569,4 +569,4 @@ This project follows the Backstage license (Apache 2.0) for framework code.
 
 ---
 
-**Built with ❤️ for the goldship-platform GitOps ecosystem**
+**Built with ❤️ for the goldship GitOps ecosystem**

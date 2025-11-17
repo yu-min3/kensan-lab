@@ -142,7 +142,7 @@ spec:
       name: Create Argo CD Applications (Dev & Prod)
       action: publish:github:pull-request
       input:
-        repoUrl: github.com?repo=goldship-platform&owner=yu-min3
+        repoUrl: github.com?repo=goldship&owner=yu-min3
         branchName: add-app-${{ parameters.name }}
         title: 'Add Application: ${{ parameters.name }}'
         description: |
