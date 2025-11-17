@@ -7,7 +7,7 @@ DOTENV_FILE := .env
 # ===============================================
 # 環境変数設定 (必ず置き換えてください)
 # ===============================================
-APP_REPO_NAME := goldship-platform
+APP_REPO_NAME := goldship
 IMAGE_TAG := latest
 GHCR_IMAGE := ghcr.io/$(GITHUB_USER)/$(APP_REPO_NAME)/$(APP_REPO_NAME):$(IMAGE_TAG)
 IMAGE_SOURCE_DIR := test-app

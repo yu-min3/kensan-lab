@@ -100,7 +100,7 @@ kubectl get all -n istio-system
 
 The platform consists of multiple Git repositories to separate responsibilities:
 
-1.  **`goldship-platform`** (This repository): Infrastructure, security, Argo CD control structure, Backstage templates (managed by PE).
+1.  **`goldship`** (This repository): Infrastructure, security, Argo CD control structure, Backstage templates (managed by PE).
 2.  **`app-<name>`**: Application code and deployment settings (managed by AD, one repository per app).
 
 For a detailed breakdown of the repository structure and design decisions, please see the [architecture documentation](./docs/architecture/).
@@ -116,7 +116,7 @@ For a detailed breakdown of the repository structure and design decisions, pleas
 
 ### Platform Engineer (PE)
 
-1.  Modify infrastructure settings in this repository (`goldship-platform`).
+1.  Modify infrastructure settings in this repository (`goldship`).
 2.  Commit and push the changes to Git.
 3.  Argo CD automatically syncs the changes to the cluster.
 4.  Check the deployment status in the Argo CD UI.
@@ -124,7 +124,7 @@ For a detailed breakdown of the repository structure and design decisions, pleas
 ### Application Developer (AD)
 
 1.  Create a new app from a template in the Backstage UI.
-2.  Backstage automatically creates a new `app-<name>` repository and commits the Argo CD Application CR to the `goldship-platform` repository.
+2.  Backstage automatically creates a new `app-<name>` repository and commits the Argo CD Application CR to the `goldship` repository.
 3.  Develop code in the generated `app-<name>` repository.
 4.  Update the image tag in `overlays/dev/kustomization.yaml`.
 5.  Argo CD detects the changes and automatically redeploys the application.

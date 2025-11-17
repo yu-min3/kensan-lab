@@ -128,7 +128,7 @@ Get-ChildItem -Path base-infra -Recurse -Filter *.yaml | ForEach-Object {
 # 変更前
 spec:
   source:
-    repoURL: 'https://github.com/your-org/goldship-platform'  # ← ここを変更
+    repoURL: 'https://github.com/your-org/goldship'  # ← ここを変更
     targetRevision: HEAD
     path: base-infra/prometheus
 ```
