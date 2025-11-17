@@ -1,22 +1,17 @@
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
-  name: sealed-secrets
+  name: app-dev
   namespace: argocd
-  finalizers:
-  - resources-finalizer.argocd.argoproj.io
 spec:
   project: platform-project
-
   source:
-    repoURL: 'https://github.com/yu-min3/goldship-yumin3'
+    repoURL: https://github.com/yu-min3/goldship-yumin3
     targetRevision: HEAD
-    path: base-infra/sealed-secret
-
+    path: infrastructure/environments/app-dev
   destination:
-    server: 'https://kubernetes.default.svc'
-    namespace: sealed-secrets
-
+    server: https://kubernetes.default.svc
+    namespace: app-dev
   syncPolicy:
     automated:
       prune: true

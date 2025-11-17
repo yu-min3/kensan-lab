@@ -11,7 +11,7 @@ spec:
   source:
     repoURL: 'https://github.com/yu-min3/goldship-yumin3'
     targetRevision: HEAD
-    path: base-infra/argocd
+    path: infrastructure/gitops/argocd
     directory:
       recurse: false # Don't recursively apply subdirectories
       exclude: '{applications/*,projects/*,root-apps/*}' # Exclude subdirectories

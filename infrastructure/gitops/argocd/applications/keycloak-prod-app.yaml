@@ -13,7 +13,7 @@ spec:
   source:
     repoURL: 'https://github.com/yu-min3/goldship-yumin3'
     targetRevision: HEAD
-    path: base-infra/keycloak/overlays/prod
+    path: infrastructure/security/keycloak/overlays/prod
 
   destination:
     server: 'https://kubernetes.default.svc'
