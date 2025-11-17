@@ -1,8 +1,10 @@
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
-  name: kube-system
+  name: cert-manager
   namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "0" # Deploy after istio (wave -1)
   finalizers:
   - resources-finalizer.argocd.argoproj.io
 spec:
@@ -11,15 +13,16 @@ spec:
   source:
     repoURL: 'https://github.com/yu-min3/goldship-yumin3'
     targetRevision: HEAD
-    path: base-infra/kube-system
+    path: infrastructure/security/cert-manager
 
   destination:
     server: 'https://kubernetes.default.svc'
-    namespace: kube-system
+    namespace: cert-manager
 
   syncPolicy:
     automated:
       prune: true # Remove resources when removed from Git
       selfHeal: true # Revert manual changes
     syncOptions:
-    - CreateNamespace=false # kube-system already exists
+    - CreateNamespace=true # Create cert-manager namespace
+    - ServerSideApply=true # Use server-side apply for large manifests
