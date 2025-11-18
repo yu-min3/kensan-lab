@@ -70,13 +70,18 @@ echo "✓ Grafana manifest generated ($(wc -l < infrastructure/observability/gra
 
 ## 5. OTel Dashboards生成
 
-スクリプトを実行してGrafana.comからダッシュボードをダウンロード：
+Grafana.comから公式ダッシュボードをダウンロード：
 
 ```bash
 docs/bootstrapping/scripts/13-generate-grafana-dashboards.sh
 ```
 
-**生成されるダッシュボード**:
+**処理内容**:
+1. Grafana.com APIからダッシュボードJSON取得
+2. Datasource UID を置換 (`${DS_PROMETHEUS}` → `prometheus` 等)
+3. ConfigMapとして `infrastructure/observability/grafana/dashboards.yaml` に保存
+
+**出力**: 2個のOTelダッシュボード
 - OpenTelemetry APM (ID: 19419)
 - OpenTelemetry for HTTP Services (ID: 21587)
 
@@ -106,6 +111,29 @@ echo "✓ Prometheus manifest regenerated without Grafana"
 grep -c "grafana" prometheus-stack.yaml || echo "✓ No Grafana resources found"
 ```
 
+## 6.5. Prometheusダッシュボード ConfigMaps作成
+
+**背景**: `grafana.enabled: false` の場合、Helm chartはダッシュボード ConfigMapsを生成しません。
+
+**解決策**: スクリプトで自動抽出
+
+```bash
+docs/bootstrapping/scripts/14-extract-prometheus-dashboards.sh
+```
+
+**処理内容**:
+1. 一時的に `grafana.enabled: true` でHelm manifest生成
+2. `grafana_dashboard: "1"` ラベルを持つConfigMapsを抽出
+3. `infrastructure/observability/prometheus/dashboards-configmaps.yaml` に保存
+4. 一時ファイルをクリーンアップ
+
+**出力**: 28個のダッシュボード ConfigMaps (401KB)
+- API Server, Controller Manager, etcd, Kubelet
+- Nodes, Pods, Workloads, Persistent Volumes
+- Networking, Scheduler, Prometheus自体の監視
+- その他Kubernetes監視用ダッシュボード
+
+
 ## 7. デプロイ
 
 ```bash
@@ -115,18 +143,31 @@ kubectl apply -f infrastructure/observability/grafana/grafana-admin-sealed-secre
 # 2. Datasources ConfigMap適用（Issue #90で作成済み）
 kubectl apply -f infrastructure/observability/grafana/datasources.yaml
 
-# 3. Dashboards ConfigMap適用
+# 3. OTel Dashboards ConfigMap適用
 kubectl apply -f infrastructure/observability/grafana/dashboards.yaml
 
-# 4. Grafana manifest適用
+# 4. Prometheus Dashboards ConfigMaps適用（28個）
+kubectl apply -f infrastructure/observability/prometheus/dashboards-configmaps.yaml
+
+# 5. Grafana manifest適用
 kubectl apply -f infrastructure/observability/grafana/grafana-manifests.yaml
 
-# 5. Pod起動確認
+# 6. Pod起動確認
 kubectl get pods -n monitoring -l app.kubernetes.io/name=grafana
 
 # 出力例:
 # NAME                       READY   STATUS    RESTARTS   AGE
 # grafana-845c4575f8-klgw2   3/3     Running   0          2m
+
+# 7. Dashboard ConfigMaps確認
+kubectl get configmap -n monitoring -l grafana_dashboard=1
+
+# 出力例:
+# NAME                                                  DATA   AGE
+# grafana-otel-dashboards                               2      4h
+# prometheus-kube-prometheus-alertmanager-overview      1      10m
+# prometheus-kube-prometheus-apiserver                  1      10m
+# ... (合計30個)
 ```
 
 ## 8. 動作確認
@@ -159,7 +200,15 @@ Grafana UI で:
 2. **OpenTelemetry** フォルダ内に以下が表示されることを確認:
    - ✅ OpenTelemetry APM
    - ✅ OpenTelemetry for HTTP Services
-3. **General** フォルダ内に Prometheus関連ダッシュボード（28個）
+3. **General** フォルダ内に Prometheus関連ダッシュボード（28個）:
+   - ✅ Kubernetes / API Server
+   - ✅ Kubernetes / Compute Resources / Cluster
+   - ✅ Kubernetes / Compute Resources / Namespace (Pods)
+   - ✅ Kubernetes / Kubelet
+   - ✅ Kubernetes / Networking / Namespace
+   - ✅ Node Exporter / Nodes
+   - ✅ Prometheus
+   - その他多数
 
 ### Sidecar ログ確認
 
@@ -178,7 +227,27 @@ kubectl logs -n monitoring deployment/grafana -c grafana-sc-dashboard --tail=20
 # {"time": "...", "msg": "Writing /tmp/dashboards/otel-http-services-dashboard.json (ascii)", "level": "INFO"}
 ```
 
-## 9. 旧Grafanaの削除
+## 9. HTTPRoute更新
+
+**重要**: Grafana HTTPRouteが旧サービスを参照しているため更新が必要です。
+
+```bash
+# HTTPRouteファイルを確認
+kubectl get httproute grafana-route -n monitoring
+
+# サービス名を更新: prometheus-grafana → grafana
+# ファイル: infrastructure/observability/grafana/httproute.yaml
+kubectl apply -f infrastructure/observability/grafana/httproute.yaml
+
+# HTTPRoute正常性確認
+kubectl describe httproute grafana-route -n monitoring | grep -A 5 "Conditions"
+
+# 期待される出力:
+# Status: Accepted = True
+# Status: ResolvedRefs = True
+```
+
+## 10. 旧Grafanaの削除
 
 **注意**: 新Grafanaの動作確認が完了してから実行してください。
 
@@ -186,7 +255,9 @@ kubectl logs -n monitoring deployment/grafana -c grafana-sc-dashboard --tail=20
 # Git commit & push (Argo CD が自動的に旧Grafanaを削除)
 git add infrastructure/observability/prometheus/prometheus-values.yaml
 git add infrastructure/observability/prometheus/prometheus-stack.yaml
-git commit -m "Disable Grafana in Prometheus stack (migrated to independent deployment)"
+git add infrastructure/observability/prometheus/dashboards-configmaps.yaml
+git add infrastructure/observability/grafana/
+git commit -m "Separate Grafana from Prometheus stack with OTel dashboards"
 git push
 
 # Argo CDで sync後、旧Grafana削除を確認
@@ -194,7 +265,7 @@ kubectl get deployment prometheus-grafana -n monitoring
 # 出力: Error: deployments.apps "prometheus-grafana" not found (正常)
 ```
 
-## 10. Argo CD Application CR作成（任意）
+## 11. Argo CD Application CR作成（任意）
 
 独立Grafanaを Argo CD で管理する場合:
 
@@ -281,13 +352,20 @@ kubectl logs -n monitoring deployment/grafana -c grafana-sc-dashboard
 ```
 infrastructure/observability/grafana/
 ├── datasources.yaml                    # Issue #90で作成
-├── dashboards.yaml                     # OTelダッシュボード
+├── dashboards.yaml                     # OTelダッシュボード (2個)
 ├── values.yaml                         # Grafana Helm values
 ├── grafana-manifests.yaml              # Helm生成manifest (494行)
-└── grafana-admin-sealed-secret.yaml    # Admin password
+├── grafana-admin-sealed-secret.yaml    # Admin password
+└── httproute.yaml                      # HTTPRoute (prometheus/から移動)
+
+infrastructure/observability/prometheus/
+├── prometheus-values.yaml              # 更新: grafana.enabled: false
+├── prometheus-stack.yaml               # 再生成: Grafana除外
+└── dashboards-configmaps.yaml          # Prometheusダッシュボード (28個, 401KB)
 
 docs/bootstrapping/scripts/
-└── 13-generate-grafana-dashboards.sh   # ダッシュボード生成スクリプト
+├── 13-generate-grafana-dashboards.sh   # OTelダッシュボード生成スクリプト
+└── 14-extract-prometheus-dashboards.sh # Prometheusダッシュボード抽出スクリプト
 ```
 
 ## 次のステップ
