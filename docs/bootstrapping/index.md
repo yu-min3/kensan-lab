@@ -197,3 +197,33 @@ volumeClaimTemplates:
 ```
 Application → OTel Collector (4317/4318) → Tempo (4317) → Storage (PVC)
 ```
+
+---
+
+## 10. Grafana Loki ログ集約バックエンドのデプロイ
+
+Grafana Loki は、OpenTelemetry Collector から送信されたログデータを保存・クエリするためのログ集約システムです。
+
+マニフェストを生成するには、以下のスクリプトを実行します。
+```bash
+./scripts/11-generate-loki.sh
+```
+
+**デプロイされるリソース:**
+- ServiceAccount
+- ConfigMap（Loki設定）
+- Service（HTTP API: 3100、OTLP受信: 3100/otlp/v1/logs）
+- StatefulSet（Loki Pod - Monolithic Mode）
+- PersistentVolumeClaim（ログデータ保存用: 10Gi）
+- ServiceMonitor（Prometheus Operator統合）
+
+**設定のカスタマイズ:**
+`infrastructure/observability/loki/values.yaml` を編集後、スクリプトを再実行してマニフェストを再生成してください。
+
+**✓ 注意:**
+Loki Helm Chart（v6.46.0）は `volumeClaimTemplates` を正しく生成します。Tempoと異なり、手動修正は不要です。
+
+**データフロー:**
+```
+Application → OTel Collector (OTLP logs) → Loki (HTTP 3100) → Storage (PVC)
+```
