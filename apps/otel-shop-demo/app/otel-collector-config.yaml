@@ -1,0 +1,51 @@
+# OpenTelemetry Collector configuration for local development
+receivers:
+  otlp:
+    protocols:
+      grpc:
+        endpoint: 0.0.0.0:4317
+      http:
+        endpoint: 0.0.0.0:4318
+        cors:
+          allowed_origins:
+            - "http://localhost:3000"
+            - "http://*"
+
+processors:
+  batch:
+    timeout: 1s
+    send_batch_size: 1024
+
+  attributes:
+    actions:
+      - key: environment
+        value: local
+        action: insert
+
+exporters:
+  # Console exporter for debugging
+  debug:
+    verbosity: detailed
+
+service:
+  pipelines:
+    traces:
+      receivers: [otlp]
+      processors: [batch, attributes]
+      exporters: [debug]
+
+    metrics:
+      receivers: [otlp]
+      processors: [batch, attributes]
+      exporters: [debug]
+
+    logs:
+      receivers: [otlp]
+      processors: [batch, attributes]
+      exporters: [debug]
+
+  extensions: []
+
+  telemetry:
+    logs:
+      level: info

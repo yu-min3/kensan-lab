@@ -1,0 +1,8 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: otel-shop-demo
+  labels:
+    app.kubernetes.io/name: otel-shop-demo
+    app.kubernetes.io/component: demo
+    istio-injection: enabled
