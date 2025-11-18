@@ -1,0 +1,145 @@
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: postgres-init-script
+data:
+  init.sql: |
+    -- Database initialization script for otel-shop-demo
+
+    -- Create products table
+    CREATE TABLE IF NOT EXISTS products (
+        id SERIAL PRIMARY KEY,
+        name VARCHAR(255) NOT NULL,
+        description TEXT,
+        price DECIMAL(10, 2) NOT NULL,
+        image_url VARCHAR(512),
+        stock INT DEFAULT 0,
+        created_at TIMESTAMP DEFAULT NOW()
+    );
+
+    -- Create carts table
+    CREATE TABLE IF NOT EXISTS carts (
+        id SERIAL PRIMARY KEY,
+        user_id VARCHAR(100) NOT NULL,
+        product_id INT NOT NULL REFERENCES products(id) ON DELETE CASCADE,
+        quantity INT DEFAULT 1,
+        created_at TIMESTAMP DEFAULT NOW(),
+        UNIQUE(user_id, product_id)
+    );
+
+    -- Create orders table
+    CREATE TABLE IF NOT EXISTS orders (
+        id SERIAL PRIMARY KEY,
+        user_id VARCHAR(100) NOT NULL,
+        total_amount DECIMAL(10, 2) NOT NULL,
+        status VARCHAR(50) DEFAULT 'pending',
+        created_at TIMESTAMP DEFAULT NOW()
+    );
+
+    -- Create indexes for performance
+    CREATE INDEX IF NOT EXISTS idx_carts_user_id ON carts(user_id);
+    CREATE INDEX IF NOT EXISTS idx_orders_user_id ON orders(user_id);
+    CREATE INDEX IF NOT EXISTS idx_products_name ON products(name);
+
+    -- Insert sample products
+    INSERT INTO products (name, description, price, image_url, stock) VALUES
+    ('Laptop Pro 15"', 'High-performance laptop with 16GB RAM and 512GB SSD', 1299.99, 'https://images.unsplash.com/photo-1496181133206-80ce9b88a853?w=400', 10),
+    ('Wireless Mouse', 'Ergonomic wireless mouse with precision tracking', 29.99, 'https://images.unsplash.com/photo-1527814050087-3793815479db?w=400', 50),
+    ('Mechanical Keyboard', 'RGB mechanical keyboard with blue switches', 89.99, 'https://images.unsplash.com/photo-1595225476474-87563907a212?w=400', 30),
+    ('USB-C Hub', '7-in-1 USB-C hub with HDMI, USB 3.0, and SD card reader', 49.99, 'https://images.unsplash.com/photo-1625948515291-69613efd103f?w=400', 25),
+    ('4K Monitor 27"', 'Ultra HD 4K monitor with IPS panel and HDR support', 399.99, 'https://images.unsplash.com/photo-1527443224154-c4a3942d3acf?w=400', 15),
+    ('Wireless Headphones', 'Noise-canceling over-ear headphones with 30h battery', 199.99, 'https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=400', 40),
+    ('Webcam HD', '1080p webcam with built-in microphone and auto-focus', 79.99, 'https://images.unsplash.com/photo-1614624532983-4ce03382d63d?w=400', 35),
+    ('External SSD 1TB', 'Portable SSD with USB 3.2 Gen 2 for fast data transfer', 129.99, 'https://images.unsplash.com/photo-1531492746076-161ca9bcad58?w=400', 20),
+    ('Standing Desk', 'Electric height-adjustable standing desk with memory presets', 599.99, 'https://images.unsplash.com/photo-1595515106969-1ce29566ff1c?w=400', 8),
+    ('Office Chair', 'Ergonomic mesh office chair with lumbar support', 299.99, 'https://images.unsplash.com/photo-1580480055273-228ff5388ef8?w=400', 12),
+    ('Desk Lamp LED', 'Adjustable LED desk lamp with touch control and USB port', 39.99, 'https://images.unsplash.com/photo-1507473885765-e6ed057f782c?w=400', 45),
+    ('Cable Management', 'Cable management kit with clips, sleeves, and ties', 19.99, 'https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=400', 60)
+    ON CONFLICT DO NOTHING;
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgresql
+spec:
+  selector:
+    app: postgresql
+  ports:
+  - port: 5432
+    targetPort: 5432
+  clusterIP: None
+
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: postgresql
+spec:
+  serviceName: postgresql
+  replicas: 1
+  selector:
+    matchLabels:
+      app: postgresql
+  template:
+    metadata:
+      labels:
+        app: postgresql
+    spec:
+      containers:
+      - name: postgresql
+        image: postgres:16-alpine
+        env:
+        - name: POSTGRES_DB
+          value: shopdb
+        - name: POSTGRES_USER
+          value: postgres
+        - name: POSTGRES_PASSWORD
+          value: password
+        - name: PGDATA
+          value: /var/lib/postgresql/data/pgdata
+        ports:
+        - containerPort: 5432
+          name: postgres
+        volumeMounts:
+        - name: data
+          mountPath: /var/lib/postgresql/data
+        - name: init-script
+          mountPath: /docker-entrypoint-initdb.d
+        resources:
+          requests:
+            cpu: 100m
+            memory: 256Mi
+          limits:
+            cpu: 200m
+            memory: 512Mi
+        livenessProbe:
+          exec:
+            command:
+            - pg_isready
+            - -U
+            - postgres
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        readinessProbe:
+          exec:
+            command:
+            - pg_isready
+            - -U
+            - postgres
+          initialDelaySeconds: 5
+          periodSeconds: 5
+      volumes:
+      - name: init-script
+        configMap:
+          name: postgres-init-script
+  volumeClaimTemplates:
+  - metadata:
+      name: data
+    spec:
+      accessModes: ["ReadWriteOnce"]
+      storageClassName: local-path
+      resources:
+        requests:
+          storage: 1Gi
