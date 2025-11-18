@@ -1,0 +1,80 @@
+# Grafana Helm Chart Custom Values
+# Chart: grafana/grafana
+# Repository: https://grafana.github.io/helm-charts
+#
+# This is an independent Grafana deployment separated from kube-prometheus-stack
+# to serve as a unified visualization layer for the entire Observability stack
+# (Prometheus, Tempo, Loki)
+
+# Image configuration
+image:
+  repository: grafana/grafana
+  tag: "10.2.3"
+  pullPolicy: IfNotPresent
+
+# Replicas
+replicas: 1
+
+# Admin credentials (managed by Sealed Secrets)
+admin:
+  existingSecret: grafana-admin-secret
+  userKey: admin-user
+  passwordKey: admin-password
+
+# Service configuration
+service:
+  type: ClusterIP
+  port: 80
+
+# Resources (optimized for Raspberry Pi)
+resources:
+  requests:
+    cpu: 100m
+    memory: 128Mi
+  limits:
+    cpu: 200m
+    memory: 256Mi
+
+# Persistence for dashboards and configuration
+persistence:
+  enabled: true
+  type: pvc
+  storageClassName: local-path
+  size: 2Gi
+
+# Sidecar configuration for auto-discovery
+sidecar:
+  # Datasources auto-discovery
+  datasources:
+    enabled: true
+    label: grafana_datasource
+    labelValue: "1"
+    searchNamespace: monitoring
+    defaultDatasourceEnabled: false  # Disable built-in Prometheus datasource (use our custom ones)
+  # Dashboards auto-discovery
+  dashboards:
+    enabled: true
+    label: grafana_dashboard
+    labelValue: "1"
+    searchNamespace: monitoring
+    folderAnnotation: grafana_folder
+    folder: /tmp/dashboards
+
+# Security context
+securityContext:
+  runAsUser: 472
+  runAsGroup: 472
+  fsGroup: 472
+
+# Grafana configuration
+grafana.ini:
+  server:
+    root_url: "http://grafana.monitoring.svc.cluster.local:3000"
+  auth.anonymous:
+    enabled: false
+
+# Default settings
+defaultDashboardsTimezone: Asia/Tokyo
+
+# Pod annotations
+podAnnotations: {}
