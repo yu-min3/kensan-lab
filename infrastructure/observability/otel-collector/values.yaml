@@ -194,11 +194,6 @@ serviceMonitor:
   extraLabels:
     release: prometheus
 
-# Pod labels
-podLabels:
-  app.kubernetes.io/name: otel-collector
-  app.kubernetes.io/component: observability
-
 # Security context
 securityContext: {}
 
