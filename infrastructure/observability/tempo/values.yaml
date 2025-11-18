@@ -73,11 +73,6 @@ service:
 serviceMonitor:
   enabled: false
 
-# Pod labels
-podLabels:
-  app.kubernetes.io/name: tempo
-  app.kubernetes.io/component: observability
-
 # Pod annotations
 podAnnotations: {}
 

@@ -163,8 +163,6 @@ spec:
       labels:
         app.kubernetes.io/name: tempo
         app.kubernetes.io/instance: tempo
-        app.kubernetes.io/component: observability
-        app.kubernetes.io/name: tempo
       annotations:
         checksum/config: a95e913fd4694092d1762d301391364538957233270d58a00d0dcbd6233d36b5
     spec:
