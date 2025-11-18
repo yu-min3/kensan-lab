@@ -1,5 +1,3 @@
-WARNING: Kubernetes configuration file is group-readable. This is insecure. Location: /home/vscode/.kube/config
-WARNING: Kubernetes configuration file is world-readable. This is insecure. Location: /home/vscode/.kube/config
 ---
 # Source: opentelemetry-collector/templates/serviceaccount.yaml
 apiVersion: v1

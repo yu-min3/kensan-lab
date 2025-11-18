@@ -8,6 +8,6 @@ helm template otel-collector open-telemetry/opentelemetry-collector \
   --version 0.97.1 \
   --namespace monitoring \
   --values ../../infrastructure/observability/otel-collector/values.yaml \
-  > ../../infrastructure/observability/otel-collector/otel-collector-manifests.yaml
+  > ../../infrastructure/observability/otel-collector/otel-collector-manifests.yaml 2>/dev/null
 
 echo "OpenTelemetry Collector manifests generated successfully!"
