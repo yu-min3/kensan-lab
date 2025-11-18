@@ -111,6 +111,10 @@ service:
 
 # Ports configuration
 ports:
+  # Disable default otlp port (conflicts with otlp-grpc)
+  otlp:
+    enabled: false
+
   # OTLP gRPC receiver
   otlp-grpc:
     enabled: true
@@ -138,6 +142,16 @@ ports:
     containerPort: 13133
     servicePort: 13133
     protocol: TCP
+
+  # Disable other default receivers (not needed)
+  jaeger-compact:
+    enabled: false
+  jaeger-grpc:
+    enabled: false
+  jaeger-thrift:
+    enabled: false
+  zipkin:
+    enabled: false
 
 # Resource limits
 resources:
