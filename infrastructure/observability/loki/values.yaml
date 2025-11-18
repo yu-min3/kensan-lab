@@ -1,0 +1,143 @@
+# Grafana Loki Helm Chart Custom Values
+# Chart: loki
+# Repository: https://grafana.github.io/helm-charts
+
+# Deployment mode: monolithic (single instance)
+deploymentMode: SingleBinary
+
+loki:
+  # Image configuration
+  image:
+    repository: grafana/loki
+    tag: "3.5.7"
+    pullPolicy: IfNotPresent
+
+  # Common configuration
+  commonConfig:
+    path_prefix: /var/loki
+    replication_factor: 1
+    ring:
+      kvstore:
+        store: inmemory
+
+  # Storage configuration
+  storage:
+    type: filesystem
+    filesystem:
+      chunks_directory: /var/loki/chunks
+      rules_directory: /var/loki/rules
+
+  # Schema configuration
+  schemaConfig:
+    configs:
+      - from: "2024-01-01"
+        store: tsdb
+        object_store: filesystem
+        schema: v13
+        index:
+          prefix: index_
+          period: 24h
+
+  # Limits configuration
+  limits_config:
+    retention_period: 168h  # 7 days
+    max_query_series: 100000
+    max_query_parallelism: 32
+    split_queries_by_interval: 15m
+    ingestion_rate_mb: 10
+    ingestion_burst_size_mb: 20
+
+  # Compactor configuration
+  compactor:
+    working_directory: /var/loki/compactor
+    compaction_interval: 10m
+    retention_enabled: true
+    retention_delete_delay: 2h
+    retention_delete_worker_count: 150
+    delete_request_store: filesystem
+
+# Single Binary configuration
+singleBinary:
+  replicas: 1
+
+  # Resources
+  resources:
+    requests:
+      cpu: 200m
+      memory: 512Mi
+    limits:
+      cpu: 500m
+      memory: 1Gi
+
+  # Persistence
+  persistence:
+    enabled: true
+    size: 10Gi
+    storageClass: local-path
+    enableStatefulSetAutoDeletePVC: false
+
+  # Liveness and readiness probes
+  livenessProbe:
+    httpGet:
+      path: /ready
+      port: http-metrics
+    initialDelaySeconds: 30
+    periodSeconds: 10
+    timeoutSeconds: 5
+    failureThreshold: 3
+
+  readinessProbe:
+    httpGet:
+      path: /ready
+      port: http-metrics
+    initialDelaySeconds: 30
+    periodSeconds: 10
+    timeoutSeconds: 5
+    successThreshold: 1
+    failureThreshold: 3
+
+# Gateway (disabled - using direct access)
+gateway:
+  enabled: false
+
+# Backend (disabled - using single binary)
+backend:
+  replicas: 0
+
+# Read component (disabled - using single binary)
+read:
+  replicas: 0
+
+# Write component (disabled - using single binary)
+write:
+  replicas: 0
+
+# Service configuration
+service:
+  type: ClusterIP
+  port: 3100
+
+# ServiceMonitor for Prometheus Operator
+monitoring:
+  serviceMonitor:
+    enabled: true
+    labels:
+      release: prometheus
+    interval: 30s
+
+# Test configuration (disabled)
+test:
+  enabled: false
+
+# Memcached caching (disabled for SingleBinary mode)
+chunksCache:
+  enabled: false
+
+resultsCache:
+  enabled: false
+
+# Pod annotations
+podAnnotations: {}
+
+# Security context
+securityContext: {}
