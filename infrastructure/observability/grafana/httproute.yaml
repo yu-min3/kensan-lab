@@ -19,6 +19,6 @@ spec:
     backendRefs:
     - group: ''
       kind: Service
-      name: prometheus-grafana
+      name: grafana
       port: 80
       weight: 1
