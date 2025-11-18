@@ -195,8 +195,7 @@ spec:
         app.kubernetes.io/name: opentelemetry-collector
         app.kubernetes.io/instance: otel-collector
         component: standalone-collector
-        app.kubernetes.io/component: observability
-        app.kubernetes.io/name: otel-collector
+        
     spec:
       
       serviceAccountName: otel-collector-opentelemetry-collector
