@@ -244,10 +244,10 @@ spec:
     type:
       RollingUpdate
   volumeClaimTemplates:
-    - metadata:
+    - apiVersion: v1
+      kind: PersistentVolumeClaim
+      metadata:
         name: storage
-        annotations:
-          null
       spec:
         accessModes:
           - ReadWriteOnce
@@ -255,3 +255,4 @@ spec:
           requests:
             storage: "10Gi"
         storageClassName: local-path
+        volumeMode: Filesystem
