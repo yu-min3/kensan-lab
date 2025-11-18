@@ -270,18 +270,6 @@ resources:
   - その他（Compactor等）: ~100MB
   - 合計: ~500MB（余裕を持って512Mi）
 
-### Pod Labels
-
-```yaml
-podLabels:
-  app.kubernetes.io/name: tempo
-  app.kubernetes.io/component: observability
-```
-
-**設計意図:**
-- **標準ラベル**: Kubernetes の推奨ラベルスキーマに準拠
-- **component: observability**: 可観測性スタックの一部として識別
-
 ## アーキテクチャ設計の原則
 
 ### 1. Single Binary Mode の採用理由
