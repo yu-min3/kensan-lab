@@ -1,0 +1,94 @@
+# Grafana Tempo Helm Chart Custom Values
+# Chart: tempo
+# Repository: https://grafana.github.io/helm-charts
+
+# Number of replicas
+replicas: 1
+
+# Tempo image configuration
+tempo:
+  repository: grafana/tempo
+  tag: "2.3.1"
+  pullPolicy: IfNotPresent
+
+  # Resource limits
+  resources:
+    requests:
+      cpu: 200m
+      memory: 512Mi
+    limits:
+      cpu: 500m
+      memory: 1Gi
+
+  # Tempo configuration
+  structuredConfig:
+    server:
+      http_listen_port: 3100
+
+    distributor:
+      receivers:
+        otlp:
+          protocols:
+            grpc:
+              endpoint: 0.0.0.0:4317
+            http:
+              endpoint: 0.0.0.0:4318
+
+    ingester:
+      trace_idle_period: 10s
+      max_block_bytes: 1_000_000
+      max_block_duration: 5m
+
+    compactor:
+      compaction:
+        block_retention: 168h  # 7 days
+
+    storage:
+      trace:
+        backend: local
+        local:
+          path: /var/tempo/traces
+        wal:
+          path: /var/tempo/wal
+        pool:
+          max_workers: 100
+          queue_depth: 10000
+
+# Persistence configuration
+persistence:
+  enabled: true
+  accessModes:
+    - ReadWriteOnce
+  size: 10Gi
+  storageClassName: local-path
+  # Do not auto-delete PVC when StatefulSet is deleted
+  enableStatefulSetAutoDeletePVC: false
+
+# Service configuration
+service:
+  type: ClusterIP
+  port: 3100
+
+# Service ports configuration
+serviceMonitor:
+  enabled: false
+
+# Pod labels
+podLabels:
+  app.kubernetes.io/name: tempo
+  app.kubernetes.io/component: observability
+
+# Pod annotations
+podAnnotations: {}
+
+# Security context
+securityContext: {}
+
+# Node selector
+nodeSelector: {}
+
+# Tolerations
+tolerations: []
+
+# Affinity
+affinity: {}
