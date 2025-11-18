@@ -150,6 +150,49 @@ Grafana Tempo は、OpenTelemetry Collector から送信されたトレースデ
 **設定のカスタマイズ:**
 `infrastructure/observability/tempo/values.yaml` を編集後、スクリプトを再実行してマニフェストを再生成してください。
 
+**⚠️ 重要な注意事項（手動修正が必要）:**
+
+Tempo Helm Chart（v1.24.0）の既知の制限により、生成されたマニフェストの `volumeClaimTemplates` セクションに不備があります。マニフェスト生成後、以下の手動修正が必要です。
+
+`infrastructure/observability/tempo/tempo-manifests.yaml` を開き、`volumeClaimTemplates:` セクションを以下のように修正してください:
+
+```yaml
+# ❌ Helmが生成する不完全な構造
+volumeClaimTemplates:
+  - metadata:
+      name: storage
+      annotations:
+        null  # 無効なYAML
+    spec:
+      accessModes:
+        - ReadWriteOnce
+      resources:
+        requests:
+          storage: "10Gi"
+      storageClassName: local-path
+
+# ✅ 修正後の正しい構造
+volumeClaimTemplates:
+  - apiVersion: v1
+    kind: PersistentVolumeClaim
+    metadata:
+      name: storage
+    spec:
+      accessModes:
+        - ReadWriteOnce
+      resources:
+        requests:
+          storage: "10Gi"
+      storageClassName: local-path
+      volumeMode: Filesystem
+```
+
+**修正内容:**
+1. `apiVersion: v1` を追加
+2. `kind: PersistentVolumeClaim` を追加
+3. 無効な `annotations: null` を削除
+4. `volumeMode: Filesystem` を追加
+
 **データフロー:**
 ```
 Application → OTel Collector (4317/4318) → Tempo (4317) → Storage (PVC)
