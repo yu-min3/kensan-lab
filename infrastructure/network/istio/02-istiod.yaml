@@ -3038,8 +3038,8 @@ spec:
           value: ""
         resources:
           requests:
-            cpu: 500m
-            memory: 2048Mi
+            cpu: 250m
+            memory: 1024Mi
         securityContext:
           allowPrivilegeEscalation: false
           readOnlyRootFilesystem: true
