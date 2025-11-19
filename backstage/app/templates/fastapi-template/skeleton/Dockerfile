@@ -14,6 +14,9 @@ COPY pyproject.toml uv.lock ./
 # Install dependencies into .venv
 RUN uv sync --frozen --no-install-project --no-dev
 
+# Install OpenTelemetry auto-instrumentation libraries
+RUN /build/.venv/bin/opentelemetry-bootstrap -a install
+
 # Final stage
 FROM docker.io/library/python:3.11-slim
 
@@ -41,5 +44,5 @@ ENV VIRTUAL_ENV="/app/.venv"
 # Expose port
 EXPOSE 8000
 
-# ✅ Run the application via python -m
-CMD ["python", "-m", "uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
+# Run the application with OpenTelemetry auto-instrumentation
+CMD ["opentelemetry-instrument", "python", "-m", "uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
