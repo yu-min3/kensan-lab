@@ -15,3 +15,7 @@ patches:
   target:
     kind: Deployment
     name: keycloak
+- path: postgresql-patch.yaml
+  target:
+    kind: StatefulSet
+    name: postgresql

@@ -10,8 +10,8 @@ spec:
       - name: keycloak
         resources:
           requests:
-            memory: "1Gi"
-            cpu: "1000m"
+            memory: "512Mi"
+            cpu: "250m"
           limits:
             memory: "2Gi"
             cpu: "2000m"
