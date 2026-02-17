@@ -4,7 +4,7 @@ metadata:
   name: istio-resources
   namespace: argocd
   annotations:
-    argocd.argoproj.io/sync-wave: "-3"  # Create namespace first (before CRDs)
+    argocd.argoproj.io/sync-wave: "-3"  # Namespace + Gateways: deploy first
   finalizers:
     - resources-finalizer.argocd.argoproj.io
 spec:

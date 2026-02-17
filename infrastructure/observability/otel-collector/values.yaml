@@ -1,6 +1,4 @@
-# OpenTelemetry Collector Helm Chart Custom Values
-# Chart: opentelemetry-collector
-# Repository: https://open-telemetry.github.io/opentelemetry-helm-charts
+# Chart config: infrastructure/gitops/argocd/applications/observability/otel-collector/app.yaml
 
 # Deployment mode: deployment (single instance)
 mode: deployment

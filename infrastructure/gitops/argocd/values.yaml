@@ -1,6 +1,4 @@
-# Argo CD Helm Chart Values
-# Chart: argo/argo-cd
-# Repository: https://argoproj.github.io/argo-helm
+# Chart config: infrastructure/gitops/argocd/applications/gitops/argocd/app.yaml
 # Version: 9.1.0
 #
 # GitOps controller for Kubernetes
