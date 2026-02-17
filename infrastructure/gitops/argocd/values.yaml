@@ -1,0 +1,18 @@
+# Argo CD Helm Chart Values
+# Chart: argo/argo-cd
+# Repository: https://argoproj.github.io/argo-helm
+# Version: 9.1.0
+#
+# GitOps controller for Kubernetes
+# TLS termination is handled by Istio Gateway (gateway-platform)
+
+# Server configuration
+server:
+  service:
+    type: ClusterIP
+
+# Argo CD parameters
+configs:
+  params:
+    # Run without TLS - Istio Gateway handles TLS termination
+    server.insecure: true

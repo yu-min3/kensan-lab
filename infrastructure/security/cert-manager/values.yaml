@@ -1,0 +1,10 @@
+# cert-manager Helm Chart Values
+# Chart: jetstack/cert-manager
+# Repository: https://charts.jetstack.io
+# Version: v1.19.1
+#
+# TLS certificate management with Let's Encrypt
+
+# Install CRDs with the chart (required for Certificate, ClusterIssuer, etc.)
+crds:
+  enabled: true

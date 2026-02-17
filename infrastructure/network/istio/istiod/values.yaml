@@ -1,0 +1,12 @@
+# Istiod (Control Plane) Helm Chart Values
+# Chart: istio/istiod
+# Repository: https://istio-release.storage.googleapis.com/charts
+# Version: 1.27.3
+#
+# Gateway API support enabled for Kubernetes Gateway API integration
+
+pilot:
+  env:
+    PILOT_ENABLE_GATEWAY_API: "true"
+    PILOT_ENABLE_GATEWAY_API_STATUS: "true"
+    PILOT_ENABLE_GATEWAY_API_DEPLOYMENT_CONTROLLER: "true"
