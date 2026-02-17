@@ -1,0 +1,42 @@
+# Cilium CNI Helm Chart Values
+# Chart: cilium/cilium
+# Repository: https://helm.cilium.io/
+# Version: 1.18.3
+#
+# Bare-metal cluster with kube-proxy replacement and Hubble observability
+
+# Replace kube-proxy entirely with Cilium
+kubeProxyReplacement: true
+
+# API server client rate limiting
+k8sClientRateLimit:
+  qps: 10
+  burst: 20
+
+# Pod CIDR for the cluster
+k8s:
+  cluster:
+    cidr: 10.244.0.0/16
+
+# IP Address Management mode
+ipam:
+  mode: kubernetes
+
+# L2 announcements for LoadBalancer services (bare-metal)
+l2announcements:
+  enabled: true
+
+# Enable external IPs support
+externalIPs:
+  enabled: true
+
+# Network interface for L2 announcements
+devices: wlan0
+
+# Hubble observability
+hubble:
+  enabled: true
+  relay:
+    enabled: true
+  ui:
+    enabled: true

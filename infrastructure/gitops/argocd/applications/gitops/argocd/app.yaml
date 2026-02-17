@@ -4,49 +4,59 @@ metadata:
   name: argocd
   namespace: argocd
   finalizers:
-  - resources-finalizer.argocd.argoproj.io
+    - resources-finalizer.argocd.argoproj.io
 spec:
   project: platform-project
 
-  source:
-    repoURL: 'https://github.com/yu-min3/goldship-yumin3'
-    targetRevision: HEAD
-    path: infrastructure/gitops/argocd
-    directory:
-      recurse: false # Don't recursively apply subdirectories
-      exclude: '{applications/*,projects/*,root-apps/*}' # Exclude subdirectories
+  sources:
+    # Helm chart source
+    - repoURL: https://argoproj.github.io/argo-helm
+      chart: argo-cd
+      targetRevision: 9.1.0
+      helm:
+        releaseName: argocd
+        valueFiles:
+          - $values/infrastructure/gitops/argocd/values.yaml
+    # Values file reference
+    - repoURL: https://github.com/yu-min3/goldship-yumin3
+      targetRevision: HEAD
+      ref: values
+    # Custom resources (namespace, httproute)
+    - repoURL: https://github.com/yu-min3/goldship-yumin3
+      targetRevision: HEAD
+      path: infrastructure/gitops/argocd/resources
 
   destination:
-    server: 'https://kubernetes.default.svc'
+    server: https://kubernetes.default.svc
     namespace: argocd
 
   syncPolicy:
-    automated:
-      prune: true
-      selfHeal: true
+    # automated:           # TEMPORARILY DISABLED for helm migration
+    #   prune: true        # Re-enable after manual sync verification
+    #   selfHeal: true
     syncOptions:
-    - CreateNamespace=false
-    - ServerSideApply=true # Large manifest support
+      - CreateNamespace=false
+      - ServerSideApply=true  # Large manifest support
 
   # Ignore differences in auto-generated secrets and runtime fields
   ignoreDifferences:
-  - group: ''
-    kind: Secret
-    name: argocd-secret
-    jsonPointers:
-    - /data
-  - group: ''
-    kind: ConfigMap
-    name: argocd-cm
-    jsonPointers:
-    - /data/dex.config
-  # Ignore Helm hook resources (redis-secret-init)
-  - group: ''
-    kind: ServiceAccount
-    name: argocd-redis-secret-init
-  - group: rbac.authorization.k8s.io
-    kind: Role
-    name: argocd-redis-secret-init
-  - group: rbac.authorization.k8s.io
-    kind: RoleBinding
-    name: argocd-redis-secret-init
+    - group: ''
+      kind: Secret
+      name: argocd-secret
+      jsonPointers:
+        - /data
+    - group: ''
+      kind: ConfigMap
+      name: argocd-cm
+      jsonPointers:
+        - /data/dex.config
+    # Ignore Helm hook resources (redis-secret-init)
+    - group: ''
+      kind: ServiceAccount
+      name: argocd-redis-secret-init
+    - group: rbac.authorization.k8s.io
+      kind: Role
+      name: argocd-redis-secret-init
+    - group: rbac.authorization.k8s.io
+      kind: RoleBinding
+      name: argocd-redis-secret-init
