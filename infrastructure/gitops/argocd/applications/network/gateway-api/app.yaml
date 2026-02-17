@@ -6,17 +6,10 @@ metadata:
 spec:
   project: platform-project
 
-  sources:
-    - repoURL: https://gateway-api.sigs.k8s.io/charts
-      chart: gateway-api
-      targetRevision: v1.2.0
-      helm:
-        releaseName: gateway-api
-        valueFiles:
-          - $values/infrastructure/network/gateway-api/values.yaml
-    - repoURL: https://github.com/yu-min3/goldship-yumin3
-      targetRevision: HEAD
-      ref: values
+  source:
+    repoURL: https://github.com/yu-min3/goldship-yumin3
+    targetRevision: HEAD
+    path: infrastructure/network/gateway-api
 
   destination:
     server: https://kubernetes.default.svc
