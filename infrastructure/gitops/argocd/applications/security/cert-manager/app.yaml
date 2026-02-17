@@ -33,9 +33,9 @@ spec:
     namespace: cert-manager
 
   syncPolicy:
-    # automated:           # TEMPORARILY DISABLED for helm migration
-    #   prune: true        # Re-enable after manual sync verification
-    #   selfHeal: true
+    automated:
+      prune: true
+      selfHeal: true
     syncOptions:
       - CreateNamespace=true  # Create cert-manager namespace
       - ServerSideApply=true  # Use server-side apply for large manifests
