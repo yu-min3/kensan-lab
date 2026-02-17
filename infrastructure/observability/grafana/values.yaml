@@ -1,6 +1,4 @@
-# Grafana Helm Chart Custom Values
-# Chart: grafana/grafana
-# Repository: https://grafana.github.io/helm-charts
+# Chart config: infrastructure/gitops/argocd/applications/observability/grafana/app.yaml
 #
 # This is an independent Grafana deployment separated from kube-prometheus-stack
 # to serve as a unified visualization layer for the entire Observability stack

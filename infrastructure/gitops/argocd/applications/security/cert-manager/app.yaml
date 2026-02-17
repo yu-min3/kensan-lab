@@ -4,14 +4,13 @@ metadata:
   name: cert-manager
   namespace: argocd
   annotations:
-    argocd.argoproj.io/sync-wave: "0"  # Deploy after istio (wave -1)
+    argocd.argoproj.io/sync-wave: "0"  # Deploy after Istio (wave -1)
   finalizers:
     - resources-finalizer.argocd.argoproj.io
 spec:
   project: platform-project
 
   sources:
-    # Helm chart source
     - repoURL: https://charts.jetstack.io
       chart: cert-manager
       targetRevision: v1.19.1
@@ -19,11 +18,9 @@ spec:
         releaseName: cert-manager
         valueFiles:
           - $values/infrastructure/security/cert-manager/values.yaml
-    # Values file reference
     - repoURL: https://github.com/yu-min3/goldship-yumin3
       targetRevision: HEAD
       ref: values
-    # Custom resources (ClusterIssuer, Certificates, Route53 credentials)
     - repoURL: https://github.com/yu-min3/goldship-yumin3
       targetRevision: HEAD
       path: infrastructure/security/cert-manager/resources
@@ -37,5 +34,5 @@ spec:
       prune: true
       selfHeal: true
     syncOptions:
-      - CreateNamespace=true  # Create cert-manager namespace
-      - ServerSideApply=true  # Use server-side apply for large manifests
+      - CreateNamespace=true
+      - ServerSideApply=true

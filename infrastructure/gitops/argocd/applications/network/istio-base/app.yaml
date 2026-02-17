@@ -4,14 +4,13 @@ metadata:
   name: istio-base
   namespace: argocd
   annotations:
-    argocd.argoproj.io/sync-wave: "-2"  # Deploy CRDs after namespace (wave -3)
+    argocd.argoproj.io/sync-wave: "-2"  # CRDs: after namespace (wave -3), before istiod (wave -1)
   finalizers:
     - resources-finalizer.argocd.argoproj.io
 spec:
   project: platform-project
 
   sources:
-    # Helm chart source
     - repoURL: https://istio-release.storage.googleapis.com/charts
       chart: base
       targetRevision: 1.27.3
@@ -19,7 +18,6 @@ spec:
         releaseName: istio-base
         valueFiles:
           - $values/infrastructure/network/istio/base/values.yaml
-    # Values file reference
     - repoURL: https://github.com/yu-min3/goldship-yumin3
       targetRevision: HEAD
       ref: values
@@ -36,7 +34,7 @@ spec:
       - CreateNamespace=false  # Created by istio-resources (wave -3)
       - ServerSideApply=true
 
-  # Ignore webhook differences (istiod overwrites at runtime)
+  # istiod overwrites this webhook at runtime
   ignoreDifferences:
     - group: admissionregistration.k8s.io
       kind: ValidatingWebhookConfiguration

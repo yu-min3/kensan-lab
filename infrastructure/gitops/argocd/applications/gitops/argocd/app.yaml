@@ -9,7 +9,6 @@ spec:
   project: platform-project
 
   sources:
-    # Helm chart source
     - repoURL: https://argoproj.github.io/argo-helm
       chart: argo-cd
       targetRevision: 9.1.0
@@ -17,11 +16,9 @@ spec:
         releaseName: argocd
         valueFiles:
           - $values/infrastructure/gitops/argocd/values.yaml
-    # Values file reference
     - repoURL: https://github.com/yu-min3/goldship-yumin3
       targetRevision: HEAD
       ref: values
-    # Custom resources (namespace, httproute)
     - repoURL: https://github.com/yu-min3/goldship-yumin3
       targetRevision: HEAD
       path: infrastructure/gitops/argocd/resources
@@ -36,9 +33,9 @@ spec:
       selfHeal: true
     syncOptions:
       - CreateNamespace=false
-      - ServerSideApply=true  # Large manifest support
+      - ServerSideApply=true
 
-  # Ignore differences in auto-generated secrets and runtime fields
+  # Auto-generated secrets and Helm hook resources
   ignoreDifferences:
     - group: ''
       kind: Secret
@@ -50,7 +47,6 @@ spec:
       name: argocd-cm
       jsonPointers:
         - /data/dex.config
-    # Ignore Helm hook resources (redis-secret-init)
     - group: ''
       kind: ServiceAccount
       name: argocd-redis-secret-init

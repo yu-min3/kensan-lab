@@ -1,6 +1,4 @@
-# cert-manager Helm Chart Values
-# Chart: jetstack/cert-manager
-# Repository: https://charts.jetstack.io
+# Chart config: infrastructure/gitops/argocd/applications/security/cert-manager/app.yaml
 # Version: v1.19.1
 #
 # TLS certificate management with Let's Encrypt

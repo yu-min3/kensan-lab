@@ -12,7 +12,6 @@ spec:
   project: platform-project
 
   sources:
-    # Helm chart source
     - repoURL: https://grafana.github.io/helm-charts
       chart: grafana
       targetRevision: 7.3.0
@@ -20,11 +19,9 @@ spec:
         releaseName: grafana
         valueFiles:
           - $values/infrastructure/observability/grafana/values.yaml
-    # Values file reference
     - repoURL: https://github.com/yu-min3/goldship-yumin3
       targetRevision: HEAD
       ref: values
-    # Custom resources (datasources, dashboards, httproute, sealed secret)
     - repoURL: https://github.com/yu-min3/goldship-yumin3
       targetRevision: HEAD
       path: infrastructure/observability/grafana/resources
@@ -38,7 +35,7 @@ spec:
       prune: true
       selfHeal: true
     syncOptions:
-      - CreateNamespace=false  # monitoring namespace already exists
+      - CreateNamespace=false
     retry:
       limit: 5
       backoff:
