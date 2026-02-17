@@ -35,3 +35,11 @@ spec:
     syncOptions:
       - CreateNamespace=false  # Created by istio-resources (wave -3)
       - ServerSideApply=true
+
+  # Ignore webhook differences (istiod overwrites at runtime)
+  ignoreDifferences:
+    - group: admissionregistration.k8s.io
+      kind: ValidatingWebhookConfiguration
+      name: istiod-default-validator
+      jqPathExpressions:
+        - .webhooks
