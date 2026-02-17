@@ -1,6 +1,4 @@
-# Cilium CNI Helm Chart Values
-# Chart: cilium/cilium
-# Repository: https://helm.cilium.io/
+# Chart config: infrastructure/gitops/argocd/applications/network/cilium/app.yaml
 # Version: 1.18.3
 #
 # Bare-metal cluster with kube-proxy replacement and Hubble observability

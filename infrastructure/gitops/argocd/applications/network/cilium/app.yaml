@@ -9,7 +9,6 @@ spec:
   project: platform-project
 
   sources:
-    # Helm chart source
     - repoURL: https://helm.cilium.io/
       chart: cilium
       targetRevision: 1.18.3
@@ -17,11 +16,9 @@ spec:
         releaseName: cilium
         valueFiles:
           - $values/infrastructure/network/cilium/values.yaml
-    # Values file reference
     - repoURL: https://github.com/yu-min3/goldship-yumin3
       targetRevision: HEAD
       ref: values
-    # Custom resources (LB IP Pool, L2 Announcement Policy, Hubble HTTPRoute)
     - repoURL: https://github.com/yu-min3/goldship-yumin3
       targetRevision: HEAD
       path: infrastructure/network/cilium/resources
@@ -35,10 +32,10 @@ spec:
       prune: true
       selfHeal: true
     syncOptions:
-      - CreateNamespace=false  # kube-system already exists
-      - ServerSideApply=true  # Use server-side apply for large manifests
+      - CreateNamespace=false
+      - ServerSideApply=true
 
-  # Ignore Cilium runtime-generated CRs
+  # Cilium runtime-generated CRs
   ignoreDifferences:
     - group: cilium.io
       kind: CiliumNode

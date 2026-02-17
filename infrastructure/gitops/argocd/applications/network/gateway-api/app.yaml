@@ -5,17 +5,27 @@ metadata:
   namespace: argocd
 spec:
   project: platform-project
-  source:
-    repoURL: https://github.com/yu-min3/goldship-yumin3
-    targetRevision: HEAD
-    path: infrastructure/network/gateway-api
+
+  sources:
+    - repoURL: https://gateway-api.sigs.k8s.io/charts
+      chart: gateway-api
+      targetRevision: v1.2.0
+      helm:
+        releaseName: gateway-api
+        valueFiles:
+          - $values/infrastructure/network/gateway-api/values.yaml
+    - repoURL: https://github.com/yu-min3/goldship-yumin3
+      targetRevision: HEAD
+      ref: values
+
   destination:
     server: https://kubernetes.default.svc
-    namespace: kube-system # CRDs are cluster-scoped, but ArgoCD requires a namespace context
+    namespace: kube-system
+
   syncPolicy:
     automated:
-      prune: true # Remove resources when removed from Git
-      selfHeal: true # Revert manual changes
+      prune: true
+      selfHeal: true
     syncOptions:
-    - CreateNamespace=true # kube-system already exists
-    - ServerSideApply=true # Use server-side apply for large manifests
+      - CreateNamespace=false
+      - ServerSideApply=true

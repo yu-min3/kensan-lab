@@ -1,13 +1,4 @@
-# Prometheus configuration for bare-metal Kubernetes cluster
-# Optimized for Raspberry Pi hardware with minimal resource usage
-#
-# Usage: Generate manifest with CRDs included
-#   helm template prometheus prometheus-community/kube-prometheus-stack \
-#     --namespace monitoring \
-#     --include-crds \
-#     --values docs/prometheus-values.yaml \
-#     > base-infra/prometheus/prometheus-stack.yaml
-#
+# Chart config: infrastructure/gitops/argocd/applications/observability/prometheus/app.yaml
 # IMPORTANT: Must use --include-crds flag to include Prometheus Operator CRDs
 
 # Global settings
@@ -76,6 +67,7 @@ prometheus:
 # Observability stack (Prometheus, Tempo, Loki) without being tied to Prometheus
 grafana:
   enabled: false
+  forceDeployDashboards: true
 
 # Alertmanager
 alertmanager:
