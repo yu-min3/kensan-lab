@@ -34,9 +34,9 @@ spec:
     namespace: monitoring
 
   syncPolicy:
-    # automated:           # TEMPORARILY DISABLED for helm migration
-    #   prune: true        # Re-enable after manual sync verification
-    #   selfHeal: true
+    automated:
+      prune: true
+      selfHeal: true
     syncOptions:
       - CreateNamespace=false  # monitoring namespace already exists
     retry:

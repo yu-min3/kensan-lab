@@ -31,9 +31,9 @@ spec:
     namespace: argocd
 
   syncPolicy:
-    # automated:           # TEMPORARILY DISABLED for helm migration
-    #   prune: true        # Re-enable after manual sync verification
-    #   selfHeal: true
+    automated:
+      prune: true
+      selfHeal: true
     syncOptions:
       - CreateNamespace=false
       - ServerSideApply=true  # Large manifest support
