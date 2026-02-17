@@ -1,0 +1,28 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: istio-resources
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "-3"  # Create namespace first (before CRDs)
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: platform-project
+
+  source:
+    repoURL: https://github.com/yu-min3/goldship-yumin3
+    targetRevision: HEAD
+    path: infrastructure/network/istio/resources
+
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: istio-system
+
+  syncPolicy:
+    # automated:           # TEMPORARILY DISABLED for helm migration
+    #   prune: true        # Re-enable after manual sync verification
+    #   selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true

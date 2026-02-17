@@ -8,19 +8,28 @@ metadata:
 spec:
   project: platform-project
 
-  source:
-    repoURL: https://github.com/yu-min3/goldship-yumin3
-    targetRevision: HEAD
-    path: infrastructure/observability/loki
+  sources:
+    # Helm chart source
+    - repoURL: https://grafana.github.io/helm-charts
+      chart: loki
+      targetRevision: 6.46.0
+      helm:
+        releaseName: loki
+        valueFiles:
+          - $values/infrastructure/observability/loki/values.yaml
+    # Values file reference
+    - repoURL: https://github.com/yu-min3/goldship-yumin3
+      targetRevision: HEAD
+      ref: values
 
   destination:
     server: https://kubernetes.default.svc
     namespace: monitoring
 
   syncPolicy:
-    automated:
-      prune: true  # Remove resources when removed from Git
-      selfHeal: true  # Revert manual changes
+    # automated:           # TEMPORARILY DISABLED for helm migration
+    #   prune: true        # Re-enable after manual sync verification
+    #   selfHeal: true
     syncOptions:
       - CreateNamespace=false  # monitoring namespace already exists
       - ServerSideApply=true  # Use server-side apply for StatefulSet

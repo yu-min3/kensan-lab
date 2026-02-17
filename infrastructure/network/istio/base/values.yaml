@@ -1,0 +1,6 @@
+# Istio Base (CRDs) Helm Chart Values
+# Chart: istio/base
+# Repository: https://istio-release.storage.googleapis.com/charts
+# Version: 1.27.3
+#
+# Default configuration - CRDs only, no custom values needed
