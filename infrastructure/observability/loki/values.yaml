@@ -1,6 +1,4 @@
-# Grafana Loki Helm Chart Custom Values
-# Chart: loki
-# Repository: https://grafana.github.io/helm-charts
+# Chart config: infrastructure/gitops/argocd/applications/observability/loki/app.yaml
 
 # Deployment mode: monolithic (single instance)
 deploymentMode: SingleBinary

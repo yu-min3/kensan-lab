@@ -9,7 +9,6 @@ spec:
   project: platform-project
 
   sources:
-    # Helm chart source
     - repoURL: https://grafana.github.io/helm-charts
       chart: tempo
       targetRevision: 1.24.0
@@ -17,7 +16,6 @@ spec:
         releaseName: tempo
         valueFiles:
           - $values/infrastructure/observability/tempo/values.yaml
-    # Values file reference
     - repoURL: https://github.com/yu-min3/goldship-yumin3
       targetRevision: HEAD
       ref: values
@@ -31,8 +29,8 @@ spec:
       prune: true
       selfHeal: true
     syncOptions:
-      - CreateNamespace=false  # monitoring namespace already exists
-      - ServerSideApply=true  # Use server-side apply for StatefulSet
+      - CreateNamespace=false
+      - ServerSideApply=true
     retry:
       limit: 5
       backoff:

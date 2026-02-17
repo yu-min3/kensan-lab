@@ -32,3 +32,15 @@ spec:
   # Orphaned resources handling
   orphanedResources:
     warn: true
+    ignore:
+      # kube-system runtime resources (not managed by Cilium app)
+      - group: ""
+        kind: ConfigMap
+      - group: ""
+        kind: Endpoints
+      - group: ""
+        kind: Pod
+      - group: ""
+        kind: Secret
+      - group: apps
+        kind: ReplicaSet

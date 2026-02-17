@@ -1,6 +1,4 @@
-# Grafana Tempo Helm Chart Custom Values
-# Chart: tempo
-# Repository: https://grafana.github.io/helm-charts
+# Chart config: infrastructure/gitops/argocd/applications/observability/tempo/app.yaml
 
 # Number of replicas
 replicas: 1

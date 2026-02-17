@@ -9,7 +9,6 @@ spec:
   project: platform-project
 
   sources:
-    # Helm chart source
     - repoURL: https://prometheus-community.github.io/helm-charts
       chart: kube-prometheus-stack
       targetRevision: 79.5.0
@@ -17,11 +16,9 @@ spec:
         releaseName: prometheus
         valueFiles:
           - $values/infrastructure/observability/prometheus/values.yaml
-    # Values file reference
     - repoURL: https://github.com/yu-min3/goldship-yumin3
       targetRevision: HEAD
       ref: values
-    # Custom resources (httproute, sealed secret)
     - repoURL: https://github.com/yu-min3/goldship-yumin3
       targetRevision: HEAD
       path: infrastructure/observability/prometheus/resources
@@ -35,8 +32,8 @@ spec:
       prune: true
       selfHeal: true
     syncOptions:
-      - CreateNamespace=true  # Create monitoring namespace if not exists
-      - ServerSideApply=true  # Use server-side apply for CRDs
+      - CreateNamespace=true
+      - ServerSideApply=true
     retry:
       limit: 5
       backoff:

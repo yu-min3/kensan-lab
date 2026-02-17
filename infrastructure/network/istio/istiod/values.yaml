@@ -1,6 +1,4 @@
-# Istiod (Control Plane) Helm Chart Values
-# Chart: istio/istiod
-# Repository: https://istio-release.storage.googleapis.com/charts
+# Chart config: infrastructure/gitops/argocd/applications/network/istiod/app.yaml
 # Version: 1.27.3
 #
 # Gateway API support enabled for Kubernetes Gateway API integration
