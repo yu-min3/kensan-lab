@@ -14,7 +14,8 @@ metadata:
 spec:
   # Which network interfaces to announce on
   interfaces:
-  - wlan0
+  - "^wlan.*"
+  - "^wlp.*"
 
   # Only announce for LoadBalancer services using our IP pool
   loadBalancerIPs: true
