@@ -1,0 +1,8 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: kensan-data
+  labels:
+    app.kubernetes.io/managed-by: argocd
+    goldship.platform/environment: infrastructure
+    goldship.platform/tier: infrastructure
