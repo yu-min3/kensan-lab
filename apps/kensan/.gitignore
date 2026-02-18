@@ -1,0 +1,81 @@
+# Dependencies
+node_modules/
+
+# Build outputs
+dist/
+build/
+
+# TypeScript
+*.tsbuildinfo
+
+# Environment files
+.env
+.env.local
+.env.*.local
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Claude
+.claude/settings.local.json
+backend/.claude/
+**/settings.local.json
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Cache
+.cache/
+.npm/
+.eslintcache
+
+# Test
+coverage/
+test-results/
+e2e/.auth/
+e2e/test-results/
+e2e/playwright-report/
+todo.txt
+
+# Backend binaries (keep Dockerfiles)
+backend/bin/
+backend/*.exe
+backend/*-service
+!backend/cmd/
+
+# Go
+backend/tmp/
+backend/vendor/
+
+# Database backups
+backups/
+
+# Lakehouse state
+lakehouse/.ingestion_state.json
+
+# kensan-ai Python
+kensan-ai/.venv/
+kensan-ai/__pycache__/
+kensan-ai/**/__pycache__/
+kensan-ai/*.pyc
+kensan-ai/.pytest_cache/
+kensan-ai/.ruff_cache/
+kensan-ai/.mypy_cache/
+kensan-ai/*.egg-info/
+
+# docs (必要なものだけ追跡)
+docs/*
+!docs/adr/
+!docs/design/
+!docs/spec/
+!docs/TECHNICAL_HIGHLIGHTS.md

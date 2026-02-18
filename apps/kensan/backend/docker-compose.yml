@@ -1,0 +1,187 @@
+services:
+  # PostgreSQL Database
+  postgres:
+    image: postgres:16-alpine
+    container_name: kensan-postgres
+    environment:
+      POSTGRES_USER: kensan
+      POSTGRES_PASSWORD: kensan
+      POSTGRES_DB: kensan
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./migrations:/docker-entrypoint-initdb.d
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U kensan"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # User Service
+  user-service:
+    build:
+      context: .
+      dockerfile: services/user/Dockerfile
+    container_name: kensan-user-service
+    environment:
+      SERVER_PORT: 8081
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_USER: kensan
+      DB_PASSWORD: kensan
+      DB_NAME: kensan
+      JWT_SECRET: ${JWT_SECRET:-your-secret-key-change-in-production}
+    ports:
+      - "8081:8081"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  # Task Service
+  task-service:
+    build:
+      context: .
+      dockerfile: services/task/Dockerfile
+    container_name: kensan-task-service
+    environment:
+      SERVER_PORT: 8082
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_USER: kensan
+      DB_PASSWORD: kensan
+      DB_NAME: kensan
+      JWT_SECRET: ${JWT_SECRET:-your-secret-key-change-in-production}
+    ports:
+      - "8082:8082"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  # Timeblock Service
+  timeblock-service:
+    build:
+      context: .
+      dockerfile: services/timeblock/Dockerfile
+    container_name: kensan-timeblock-service
+    environment:
+      SERVER_PORT: 8084
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_USER: kensan
+      DB_PASSWORD: kensan
+      DB_NAME: kensan
+      JWT_SECRET: ${JWT_SECRET:-your-secret-key-change-in-production}
+    ports:
+      - "8084:8084"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  # Analytics Service
+  analytics-service:
+    build:
+      context: .
+      dockerfile: services/analytics/Dockerfile
+    container_name: kensan-analytics-service
+    environment:
+      SERVER_PORT: 8088
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_USER: kensan
+      DB_PASSWORD: kensan
+      DB_NAME: kensan
+      JWT_SECRET: ${JWT_SECRET:-your-secret-key-change-in-production}
+    ports:
+      - "8088:8088"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  # Memo Service
+  memo-service:
+    build:
+      context: .
+      dockerfile: services/memo/Dockerfile
+    container_name: kensan-memo-service
+    environment:
+      SERVER_PORT: 8090
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_USER: kensan
+      DB_PASSWORD: kensan
+      DB_NAME: kensan
+      JWT_SECRET: ${JWT_SECRET:-your-secret-key-change-in-production}
+    ports:
+      - "8090:8090"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  # Note Service (unified diary, learning, memo)
+  note-service:
+    build:
+      context: .
+      dockerfile: services/note/Dockerfile
+    container_name: kensan-note-service
+    environment:
+      SERVER_PORT: 8091
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_USER: kensan
+      DB_PASSWORD: kensan
+      DB_NAME: kensan
+      JWT_SECRET: ${JWT_SECRET:-your-secret-key-change-in-production}
+      # MinIO/S3設定
+      STORAGE_ENDPOINT: minio:9000
+      STORAGE_ACCESS_KEY: kensan
+      STORAGE_SECRET_KEY: kensan123
+      STORAGE_BUCKET: kensan-notes
+      STORAGE_USE_SSL: "false"
+      STORAGE_PUBLIC_URL: http://localhost:9000/kensan-notes
+    ports:
+      - "8091:8091"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+
+  # MinIO Object Storage (S3互換)
+  minio:
+    image: minio/minio:latest
+    container_name: kensan-minio
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: kensan
+      MINIO_ROOT_PASSWORD: kensan123
+    ports:
+      - "9000:9000"   # S3 API
+      - "9001:9001"   # Web Console
+    volumes:
+      - minio_data:/data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # MinIO初期化（バケット作成）
+  minio-init:
+    image: minio/mc:latest
+    container_name: kensan-minio-init
+    depends_on:
+      minio:
+        condition: service_healthy
+    entrypoint: >
+      /bin/sh -c "
+      mc alias set myminio http://minio:9000 kensan kensan123;
+      mc mb myminio/kensan-notes --ignore-existing;
+      mc anonymous set download myminio/kensan-notes;
+      echo 'Bucket kensan-notes created successfully';
+      exit 0;
+      "
+
+volumes:
+  postgres_data:
+  minio_data:

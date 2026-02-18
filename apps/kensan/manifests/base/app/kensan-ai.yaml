@@ -1,0 +1,143 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: kensan-ai
+  labels:
+    app: kensan-ai
+spec:
+  selector:
+    app: kensan-ai
+  ports:
+  - port: 8089
+    targetPort: 8089
+    name: http
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: kensan-ai
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: kensan-ai
+  template:
+    metadata:
+      labels:
+        app: kensan-ai
+    spec:
+      containers:
+      - name: kensan-ai
+        image: ghcr.io/yu-min3/kensan-ai:latest
+        imagePullPolicy: Always
+        envFrom:
+        - configMapRef:
+            name: kensan-env-config
+        env:
+        - name: SERVER_PORT
+          value: "8089"
+        - name: DB_HOST
+          value: postgresql.kensan-data.svc.cluster.local
+        - name: DB_PORT
+          value: "5432"
+        - name: DB_USER
+          valueFrom:
+            secretKeyRef:
+              name: kensan-app-credentials
+              key: DB_USER
+        - name: DB_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: kensan-app-credentials
+              key: DB_PASSWORD
+        - name: JWT_SECRET
+          valueFrom:
+            secretKeyRef:
+              name: kensan-app-credentials
+              key: JWT_SECRET
+        # AI provider
+        - name: AI_PROVIDER
+          value: google
+        - name: GOOGLE_API_KEY
+          valueFrom:
+            secretKeyRef:
+              name: kensan-ai-credentials
+              key: GOOGLE_API_KEY
+        - name: GOOGLE_MODEL
+          value: gemini-2.0-flash
+        - name: EMBEDDING_PROVIDER
+          value: gemini
+        - name: GEMINI_EMBEDDING_MODEL
+          value: gemini-embedding-001
+        # MinIO (note storage)
+        - name: MINIO_ENDPOINT
+          value: minio.kensan-data.svc.cluster.local:9000
+        - name: MINIO_ACCESS_KEY
+          valueFrom:
+            secretKeyRef:
+              name: kensan-minio-app-credentials
+              key: MINIO_ACCESS_KEY
+        - name: MINIO_SECRET_KEY
+          valueFrom:
+            secretKeyRef:
+              name: kensan-minio-app-credentials
+              key: MINIO_SECRET_KEY
+        - name: MINIO_BUCKET
+          value: "$(NOTES_BUCKET)"
+        - name: MINIO_USE_SSL
+          value: "false"
+        # Lakehouse
+        - name: LAKEHOUSE_ENABLED
+          value: "true"
+        - name: POLARIS_URI
+          value: "http://polaris.kensan-data.svc.cluster.local:8181/api/catalog"
+        - name: POLARIS_CREDENTIAL
+          valueFrom:
+            secretKeyRef:
+              name: kensan-ai-credentials
+              key: POLARIS_CREDENTIAL
+        - name: POLARIS_WAREHOUSE
+          value: "$(LAKEHOUSE_BUCKET)"
+        - name: LAKEHOUSE_S3_ENDPOINT
+          value: "http://minio.kensan-data.svc.cluster.local:9000"
+        - name: LAKEHOUSE_S3_ACCESS_KEY
+          valueFrom:
+            secretKeyRef:
+              name: kensan-ai-credentials
+              key: LAKEHOUSE_S3_ACCESS_KEY
+        - name: LAKEHOUSE_S3_SECRET_KEY
+          valueFrom:
+            secretKeyRef:
+              name: kensan-ai-credentials
+              key: LAKEHOUSE_S3_SECRET_KEY
+        # Observability
+        - name: OTEL_ENABLED
+          value: "true"
+        - name: OTEL_COLLECTOR_URL
+          value: "otel-collector-opentelemetry-collector.monitoring.svc:4318"
+        - name: OTEL_SEMCONV_STABILITY_OPT_IN
+          value: "http"
+        - name: OTEL_RESOURCE_ATTRIBUTES
+          value: "service.name=kensan-ai,service.namespace=kensan,deployment.environment=$(DEPLOYMENT_ENVIRONMENT)"
+        ports:
+        - containerPort: 8089
+          name: http
+        resources:
+          requests:
+            cpu: 100m
+            memory: 256Mi
+          limits:
+            cpu: 500m
+            memory: 512Mi
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8089
+          initialDelaySeconds: 15
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 8089
+          initialDelaySeconds: 5
+          periodSeconds: 5

@@ -1,0 +1,17 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+  - secrets.yaml
+  - dagster-postgres.yaml
+  - polaris.yaml
+  - dagster-user-code.yaml
+  - dagster-webserver.yaml
+  - dagster-daemon.yaml
+  - dagster-workspace.yaml
+  - lakehouse-env.yaml
+
+labels:
+- pairs:
+    app.kubernetes.io/part-of: kensan
+  includeSelectors: false

@@ -1,0 +1,11 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: kensan-env-config
+data:
+  SERVER_ENV: development
+  DB_NAME: kensan_dev
+  DEPLOYMENT_ENVIRONMENT: dev
+  NOTES_BUCKET: kensan-notes-dev
+  LAKEHOUSE_BUCKET: kensan-lakehouse-dev
+  POLARIS_CATALOG: kensan-dev

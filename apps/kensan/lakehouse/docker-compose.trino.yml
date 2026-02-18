@@ -1,0 +1,86 @@
+services:
+  trino:
+    image: trinodb/trino:latest
+    container_name: kensan-trino
+    ports:
+      - "8085:8080"
+    volumes:
+      - ./trino/catalog/iceberg.properties:/etc/trino/catalog/iceberg.properties:ro
+    depends_on:
+      nessie:
+        condition: service_healthy
+    networks:
+      - kensan-network
+
+  superset-db:
+    image: postgres:16-alpine
+    container_name: kensan-superset-db
+    environment:
+      POSTGRES_USER: superset
+      POSTGRES_PASSWORD: superset
+      POSTGRES_DB: superset
+    volumes:
+      - superset_db_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U superset"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - kensan-network
+
+  redis:
+    image: redis:7-alpine
+    container_name: kensan-superset-redis
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - kensan-network
+
+  superset:
+    image: apache/superset:latest
+    container_name: kensan-superset
+    ports:
+      - "8088:8088"
+    environment:
+      SUPERSET_SECRET_KEY: kensan-superset-secret-key-change-in-prod
+      SQLALCHEMY_DATABASE_URI: postgresql+psycopg2://superset:superset@superset-db:5432/superset
+      REDIS_URL: redis://redis:6379/0
+      ADMIN_USERNAME: admin
+      ADMIN_PASSWORD: admin
+      ADMIN_EMAIL: admin@kensan.dev
+      ADMIN_FIRST_NAME: Admin
+      ADMIN_LAST_NAME: User
+    entrypoint: >
+      /bin/sh -c "
+      pip install trino sqlalchemy-trino &&
+      superset db upgrade &&
+      superset fab create-admin
+        --username $$ADMIN_USERNAME
+        --password $$ADMIN_PASSWORD
+        --firstname $$ADMIN_FIRST_NAME
+        --lastname $$ADMIN_LAST_NAME
+        --email $$ADMIN_EMAIL || true &&
+      superset init &&
+      superset run -h 0.0.0.0 -p 8088
+      "
+    depends_on:
+      superset-db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      trino:
+        condition: service_started
+    networks:
+      - kensan-network
+
+networks:
+  kensan-network:
+    external: true
+    name: kensan-mockup_kensan-network
+
+volumes:
+  superset_db_data:

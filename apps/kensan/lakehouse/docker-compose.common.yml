@@ -1,0 +1,6 @@
+# Base network for lakehouse overlay files (dremio, trino, etc.)
+# Core services (polaris, dagster) are defined in root docker-compose.yml
+networks:
+  kensan-network:
+    external: true
+    name: kensan-mockup_kensan-network
