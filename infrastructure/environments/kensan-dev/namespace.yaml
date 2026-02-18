@@ -1,0 +1,9 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: kensan-dev
+  labels:
+    app.kubernetes.io/managed-by: argocd
+    goldship.platform/environment: development
+    goldship.platform/tier: application
+    istio-injection: enabled

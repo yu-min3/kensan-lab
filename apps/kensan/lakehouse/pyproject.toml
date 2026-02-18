@@ -1,0 +1,24 @@
+[project]
+name = "kensan-lakehouse"
+version = "0.1.0"
+description = "Kensan Lakehouse - Iceberg data platform"
+requires-python = ">=3.12"
+dependencies = [
+    "pyiceberg[s3fs,pyiceberg-core]>=0.9.0,<0.11.0",
+    "duckdb>=1.0.0",
+    "psycopg[binary]>=3.2.0",
+    "pyarrow>=18.0.0",
+    "python-dotenv>=1.0.0",
+    "dagster>=1.9.0",
+    "dagster-webserver>=1.9.0",
+    "dagster-postgres>=0.25.0",
+    "google-genai>=1.0.0",
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["catalog", "pipelines", "queries", "dagster_project"]
+
+[dependency-groups]
+dev = [
+    "pytest>=9.0.2",
+]

@@ -1,0 +1,20 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: env-kensan-data
+  namespace: argocd
+spec:
+  project: platform-project
+  source:
+    repoURL: https://github.com/yu-min3/goldship-yumin3
+    targetRevision: HEAD
+    path: infrastructure/environments/kensan-data
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: kensan-data
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+    - CreateNamespace=true

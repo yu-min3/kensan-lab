@@ -1,0 +1,55 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: dagster-user-code
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: dagster-user-code
+  template:
+    metadata:
+      labels:
+        app: dagster-user-code
+    spec:
+      containers:
+      - name: dagster-user-code
+        image: ghcr.io/yu-min3/kensan-dagster:latest
+        imagePullPolicy: Always
+        env:
+        - name: DAGSTER_HOME
+          value: /app
+        - name: DAGSTER_PG_URL
+          valueFrom:
+            secretKeyRef:
+              name: kensan-lakehouse-credentials
+              key: DAGSTER_PG_URL
+        - name: DAGSTER_CURRENT_IMAGE
+          value: ghcr.io/yu-min3/kensan-dagster:latest
+        envFrom:
+        - configMapRef:
+            name: kensan-lakehouse-env
+        ports:
+        - containerPort: 4000
+          name: grpc
+        resources:
+          requests:
+            cpu: 50m
+            memory: 256Mi
+          limits:
+            cpu: 300m
+            memory: 512Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: dagster-user-code
+  labels:
+    app: dagster-user-code
+spec:
+  selector:
+    app: dagster-user-code
+  ports:
+  - port: 4000
+    targetPort: 4000
+    name: grpc

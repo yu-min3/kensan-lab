@@ -1,0 +1,9 @@
+bin/
+migrations-v2/
+e2e/
+*.test
+*.exe
+*.dll
+*.so
+*.dylib
+.DS_Store

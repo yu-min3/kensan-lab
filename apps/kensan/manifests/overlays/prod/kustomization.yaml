@@ -1,0 +1,29 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: kensan-prod
+
+resources:
+  - ../../base/app
+  - env-config.yaml
+
+patches:
+  - path: httproute-patch.yaml
+
+images:
+- name: ghcr.io/yu-min3/kensan-frontend
+  newTag: v0.0.0
+- name: ghcr.io/yu-min3/kensan-user
+  newTag: v0.0.0
+- name: ghcr.io/yu-min3/kensan-task
+  newTag: v0.0.0
+- name: ghcr.io/yu-min3/kensan-timeblock
+  newTag: v0.0.0
+- name: ghcr.io/yu-min3/kensan-analytics
+  newTag: v0.0.0
+- name: ghcr.io/yu-min3/kensan-memo
+  newTag: v0.0.0
+- name: ghcr.io/yu-min3/kensan-note
+  newTag: v0.0.0
+- name: ghcr.io/yu-min3/kensan-ai
+  newTag: v0.0.0

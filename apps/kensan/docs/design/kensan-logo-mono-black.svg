@@ -1,0 +1,7 @@
+<svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+  <!-- Kensan Logo - Monochrome Black -->
+  <rect x="15" y="61" width="70" height="17" rx="2.5" fill="#000000"/>
+  <path d="M18,58 Q38,50 55,38 Q72,24 82,12 L82,58 Z" fill="#000000"/>
+  <path d="M88,8 L90,3 L92,8 L97,10 L92,12 L90,17 L88,12 L83,10 Z" fill="#000000"/>
+  <path d="M78,2 L79,-1 L80,2 L83,3 L80,4 L79,7 L78,4 L75,3 Z" fill="#000000"/>
+</svg>

@@ -1,0 +1,21 @@
+FROM python:3.12-slim
+
+WORKDIR /app
+
+# uv インストール
+RUN pip install --no-cache-dir uv
+
+# 依存定義コピー & インストール
+COPY pyproject.toml ./
+RUN uv sync --no-dev
+
+# アプリケーションコード
+COPY catalog/ catalog/
+COPY pipelines/ pipelines/
+COPY dagster_project/ dagster_project/
+COPY dagster-docker.yaml dagster.yaml
+COPY workspace.yaml ./
+
+# .env は docker-compose の env_file で注入
+
+CMD ["uv", "run", "dagster", "code-server", "start", "-h", "0.0.0.0", "-p", "4000", "-m", "dagster_project"]

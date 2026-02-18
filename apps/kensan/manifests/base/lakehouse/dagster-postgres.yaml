@@ -1,0 +1,88 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: dagster-postgres-init
+data:
+  init-polaris-db.sql: |
+    CREATE DATABASE polaris;
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: dagster-postgres
+  labels:
+    app: dagster-postgres
+spec:
+  selector:
+    app: dagster-postgres
+  ports:
+  - port: 5432
+    targetPort: 5432
+    name: postgres
+  clusterIP: None
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: dagster-postgres
+spec:
+  serviceName: dagster-postgres
+  replicas: 1
+  selector:
+    matchLabels:
+      app: dagster-postgres
+  template:
+    metadata:
+      labels:
+        app: dagster-postgres
+    spec:
+      containers:
+      - name: dagster-postgres
+        image: postgres:16-alpine
+        env:
+        - name: POSTGRES_USER
+          value: dagster
+        - name: POSTGRES_PASSWORD
+          value: dagster
+        - name: POSTGRES_DB
+          value: dagster
+        - name: PGDATA
+          value: /var/lib/postgresql/data/pgdata
+        ports:
+        - containerPort: 5432
+          name: postgres
+        volumeMounts:
+        - name: data
+          mountPath: /var/lib/postgresql/data
+        - name: init-script
+          mountPath: /docker-entrypoint-initdb.d
+        resources:
+          requests:
+            cpu: 50m
+            memory: 128Mi
+          limits:
+            cpu: 200m
+            memory: 256Mi
+        livenessProbe:
+          exec:
+            command: ["pg_isready", "-U", "dagster"]
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        readinessProbe:
+          exec:
+            command: ["pg_isready", "-U", "dagster"]
+          initialDelaySeconds: 5
+          periodSeconds: 5
+      volumes:
+      - name: init-script
+        configMap:
+          name: dagster-postgres-init
+  volumeClaimTemplates:
+  - metadata:
+      name: data
+    spec:
+      accessModes: ["ReadWriteOnce"]
+      storageClassName: local-path
+      resources:
+        requests:
+          storage: 1Gi
