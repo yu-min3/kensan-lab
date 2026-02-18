@@ -1,0 +1,28 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: kensan-data
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: platform-project
+  source:
+    repoURL: https://github.com/yu-min3/goldship-yumin3
+    targetRevision: HEAD
+    path: apps/kensan/manifests/overlays/data
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: kensan-data
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=false
+    retry:
+      limit: 5
+      backoff:
+        duration: 5s
+        factor: 2
+        maxDuration: 3m
