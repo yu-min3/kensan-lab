@@ -83,5 +83,13 @@ nodeSelector: {}
 # Tolerations
 tolerations: []
 
-# Affinity
-affinity: {}
+# Schedule on high-performance node (NVMe I/O for trace storage)
+affinity:
+  nodeAffinity:
+    requiredDuringSchedulingIgnoredDuringExecution:
+      nodeSelectorTerms:
+        - matchExpressions:
+            - key: hardware-class
+              operator: In
+              values:
+                - high-performance
