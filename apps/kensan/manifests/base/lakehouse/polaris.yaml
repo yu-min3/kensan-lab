@@ -80,8 +80,8 @@ spec:
             cpu: 50m
             memory: 256Mi
           limits:
-            cpu: 300m
-            memory: 512Mi
+            cpu: 500m
+            memory: 768Mi
         livenessProbe:
           httpGet:
             path: /q/health
