@@ -1,0 +1,481 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<mxfile host="app.diagrams.net" modified="2025-01-05T12:00:00.000Z" agent="Kensan Screen Flow" version="21.0.0" etag="kensan-screen-flow-v1">
+  <diagram id="kensan-screen-flow" name="Screen Flow">
+    <mxGraphModel dx="1400" dy="900" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1600" pageHeight="1000" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        
+        <!-- Title -->
+        <mxCell id="title" value="Kensan 画面遷移図" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=28;fontStyle=1;fontColor=#1a365d;" vertex="1" parent="1">
+          <mxGeometry x="600" y="20" width="400" height="50" as="geometry" />
+        </mxCell>
+        
+        <mxCell id="subtitle" value="Screen Transition Diagram - MVP Phase" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=14;fontColor=#718096;" vertex="1" parent="1">
+          <mxGeometry x="600" y="65" width="400" height="25" as="geometry" />
+        </mxCell>
+
+        <!-- ========== ENTRY POINT ========== -->
+        <mxCell id="start" value="" style="ellipse;whiteSpace=wrap;html=1;fillColor=#1a365d;strokeColor=#1a365d;" vertex="1" parent="1">
+          <mxGeometry x="90" y="150" width="40" height="40" as="geometry" />
+        </mxCell>
+        
+        <mxCell id="start-label" value="アプリ起動" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=11;fontColor=#4a5568;" vertex="1" parent="1">
+          <mxGeometry x="70" y="195" width="80" height="20" as="geometry" />
+        </mxCell>
+
+        <!-- ========== S01: 設定画面 ========== -->
+        <mxCell id="s01" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#faf5ff;strokeColor=#9f7aea;strokeWidth=2;" vertex="1" parent="1">
+          <mxGeometry x="200" y="120" width="180" height="100" as="geometry" />
+        </mxCell>
+        
+        <mxCell id="s01-title" value="S01: 設定" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=14;fontStyle=1;fontColor=#553c9a;" vertex="1" parent="1">
+          <mxGeometry x="220" y="130" width="140" height="25" as="geometry" />
+        </mxCell>
+        
+        <mxCell id="s01-desc" value="・Clockify APIキー設定&#xa;・ワークスペース選択&#xa;・テーマ設定" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=top;whiteSpace=wrap;rounded=0;fontSize=11;fontColor=#553c9a;" vertex="1" parent="1">
+          <mxGeometry x="215" y="155" width="150" height="55" as="geometry" />
+        </mxCell>
+
+        <!-- Arrow: Start to S01 -->
+        <mxCell id="arrow-start-s01" value="" style="endArrow=classic;html=1;strokeWidth=2;strokeColor=#4a5568;" edge="1" parent="1">
+          <mxGeometry width="50" height="50" relative="1" as="geometry">
+            <mxPoint x="130" y="170" as="sourcePoint" />
+            <mxPoint x="200" y="170" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        
+        <mxCell id="arrow-start-s01-label" value="初回起動&#xa;or 未設定" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=9;fontColor=#718096;" vertex="1" parent="1">
+          <mxGeometry x="135" y="140" width="60" height="30" as="geometry" />
+        </mxCell>
+
+        <!-- ========== S02: ダッシュボード ========== -->
+        <mxCell id="s02" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ebf8ff;strokeColor=#4299e1;strokeWidth=2;" vertex="1" parent="1">
+          <mxGeometry x="480" y="120" width="200" height="100" as="geometry" />
+        </mxCell>
+        
+        <mxCell id="s02-title" value="S02: ダッシュボード" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=14;fontStyle=1;fontColor=#2b6cb0;" vertex="1" parent="1">
+          <mxGeometry x="490" y="130" width="180" height="25" as="geometry" />
+        </mxCell>
+        
+        <mxCell id="s02-desc" value="・概要表示&#xa;・クイックアクション&#xa;・朝/夜画面への導線" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=top;whiteSpace=wrap;rounded=0;fontSize=11;fontColor=#2b6cb0;" vertex="1" parent="1">
+          <mxGeometry x="495" y="155" width="170" height="55" as="geometry" />
+        </mxCell>
+
+        <!-- Arrow: S01 to S02 -->
+        <mxCell id="arrow-s01-s02" value="" style="endArrow=classic;html=1;strokeWidth=2;strokeColor=#4a5568;" edge="1" parent="1">
+          <mxGeometry width="50" height="50" relative="1" as="geometry">
+            <mxPoint x="380" y="170" as="sourcePoint" />
+            <mxPoint x="480" y="170" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        
+        <mxCell id="arrow-s01-s02-label" value="設定完了" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=9;fontColor=#718096;" vertex="1" parent="1">
+          <mxGeometry x="405" y="150" width="60" height="20" as="geometry" />
+        </mxCell>
+
+        <!-- Arrow: Start to S02 (設定済み) -->
+        <mxCell id="arrow-start-s02" value="" style="endArrow=classic;html=1;strokeWidth=2;strokeColor=#4a5568;curved=1;" edge="1" parent="1">
+          <mxGeometry width="50" height="50" relative="1" as="geometry">
+            <mxPoint x="110" y="150" as="sourcePoint" />
+            <mxPoint x="480" y="140" as="targetPoint" />
+            <Array as="points">
+              <mxPoint x="300" y="90" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        
+        <mxCell id="arrow-start-s02-label" value="設定済み" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=9;fontColor=#718096;" vertex="1" parent="1">
+          <mxGeometry x="270" y="70" width="60" height="20" as="geometry" />
+        </mxCell>
+
+        <!-- ========== M01: 朝の画面 ========== -->
+        <mxCell id="m01" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fffff0;strokeColor=#ecc94b;strokeWidth=3;" vertex="1" parent="1">
+          <mxGeometry x="200" y="320" width="220" height="140" as="geometry" />
+        </mxCell>
+        
+        <mxCell id="m01-icon" value="🌅" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=24;" vertex="1" parent="1">
+          <mxGeometry x="210" y="325" width="40" height="40" as="geometry" />
+        </mxCell>
+        
+        <mxCell id="m01-title" value="M01: 朝の画面" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=16;fontStyle=1;fontColor=#975a16;" vertex="1" parent="1">
+          <mxGeometry x="250" y="330" width="150" height="30" as="geometry" />
+        </mxCell>
+        
+        <mxCell id="m01-desc" value="・今日のタスク一覧&#xa;・定期タスク表示&#xa;・タスク追加・編集&#xa;・タイマー開始&#xa;・週間進捗確認" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=top;whiteSpace=wrap;rounded=0;fontSize=11;fontColor=#975a16;" vertex="1" parent="1">
+          <mxGeometry x="215" y="365" width="190" height="85" as="geometry" />
+        </mxCell>
+
+        <!-- ========== E01: 夜の画面 ========== -->
+        <mxCell id="e01" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#1a202c;strokeColor=#4a5568;strokeWidth=3;" vertex="1" parent="1">
+          <mxGeometry x="200" y="540" width="220" height="160" as="geometry" />
+        </mxCell>
+        
+        <mxCell id="e01-icon" value="🌙" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=24;" vertex="1" parent="1">
+          <mxGeometry x="210" y="545" width="40" height="40" as="geometry" />
+        </mxCell>
+        
+        <mxCell id="e01-title" value="E01: 夜の画面" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=16;fontStyle=1;fontColor=#e2e8f0;" vertex="1" parent="1">
+          <mxGeometry x="250" y="550" width="150" height="30" as="geometry" />
+        </mxCell>
+        
+        <mxCell id="e01-desc" value="・時間記録タイムライン&#xa;・目標別時間配分&#xa;・完了/未完了確認&#xa;・簡易メモ入力&#xa;・明日のタスク選択&#xa;・学習記録作成へ" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=top;whiteSpace=wrap;rounded=0;fontSize=11;fontColor=#a0aec0;" vertex="1" parent="1">
+          <mxGeometry x="215" y="585" width="190" height="105" as="geometry" />
+        </mxCell>
+
+        <!-- Arrow: S02 to M01 -->
+        <mxCell id="arrow-s02-m01" value="" style="endArrow=classic;html=1;strokeWidth=2;strokeColor=#ecc94b;" edge="1" parent="1">
+          <mxGeometry width="50" height="50" relative="1" as="geometry">
+            <mxPoint x="480" y="200" as="sourcePoint" />
+            <mxPoint x="420" y="320" as="targetPoint" />
+            <Array as="points">
+              <mxPoint x="450" y="270" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        
+        <mxCell id="arrow-s02-m01-label" value="朝の画面へ" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=9;fontColor=#975a16;" vertex="1" parent="1">
+          <mxGeometry x="430" y="250" width="70" height="20" as="geometry" />
+        </mxCell>
+
+        <!-- Arrow: S02 to E01 -->
+        <mxCell id="arrow-s02-e01" value="" style="endArrow=classic;html=1;strokeWidth=2;strokeColor=#4a5568;" edge="1" parent="1">
+          <mxGeometry width="50" height="50" relative="1" as="geometry">
+            <mxPoint x="500" y="220" as="sourcePoint" />
+            <mxPoint x="420" y="540" as="targetPoint" />
+            <Array as="points">
+              <mxPoint x="470" y="400" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        
+        <mxCell id="arrow-s02-e01-label" value="夜の画面へ" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=9;fontColor=#4a5568;" vertex="1" parent="1">
+          <mxGeometry x="440" y="440" width="70" height="20" as="geometry" />
+        </mxCell>
+
+        <!-- Arrow: M01 to E01 (双方向) -->
+        <mxCell id="arrow-m01-e01" value="" style="endArrow=classic;startArrow=classic;html=1;strokeWidth=3;strokeColor=#805ad5;" edge="1" parent="1">
+          <mxGeometry width="50" height="50" relative="1" as="geometry">
+            <mxPoint x="310" y="460" as="sourcePoint" />
+            <mxPoint x="310" y="540" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        
+        <mxCell id="arrow-m01-e01-label" value="朝 ↔ 夜&#xa;切り替え" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=10;fontStyle=1;fontColor=#805ad5;" vertex="1" parent="1">
+          <mxGeometry x="320" y="480" width="60" height="30" as="geometry" />
+        </mxCell>
+
+        <!-- ========== L01: 学習記録一覧 ========== -->
+        <mxCell id="l01" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f0fff4;strokeColor=#48bb78;strokeWidth=2;" vertex="1" parent="1">
+          <mxGeometry x="520" y="340" width="180" height="100" as="geometry" />
+        </mxCell>
+        
+        <mxCell id="l01-title" value="📚 L01: 学習記録一覧" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=14;fontStyle=1;fontColor=#276749;" vertex="1" parent="1">
+          <mxGeometry x="530" y="350" width="160" height="25" as="geometry" />
+        </mxCell>
+        
+        <mxCell id="l01-desc" value="・記録の検索&#xa;・フィルタ・一覧表示&#xa;・プレビュー" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=top;whiteSpace=wrap;rounded=0;fontSize=11;fontColor=#276749;" vertex="1" parent="1">
+          <mxGeometry x="535" y="375" width="150" height="55" as="geometry" />
+        </mxCell>
+
+        <!-- ========== L02: 学習記録編集 ========== -->
+        <mxCell id="l02" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f0fff4;strokeColor=#48bb78;strokeWidth=2;" vertex="1" parent="1">
+          <mxGeometry x="520" y="500" width="180" height="100" as="geometry" />
+        </mxCell>
+        
+        <mxCell id="l02-title" value="📝 L02: 学習記録編集" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=14;fontStyle=1;fontColor=#276749;" vertex="1" parent="1">
+          <mxGeometry x="530" y="510" width="160" height="25" as="geometry" />
+        </mxCell>
+        
+        <mxCell id="l02-desc" value="・Markdownエディタ&#xa;・drawioエディタ&#xa;・プロジェクト紐づけ" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=top;whiteSpace=wrap;rounded=0;fontSize=11;fontColor=#276749;" vertex="1" parent="1">
+          <mxGeometry x="535" y="535" width="150" height="55" as="geometry" />
+        </mxCell>
+
+        <!-- Arrow: E01 to L01 -->
+        <mxCell id="arrow-e01-l01" value="" style="endArrow=classic;html=1;strokeWidth=2;strokeColor=#48bb78;" edge="1" parent="1">
+          <mxGeometry width="50" height="50" relative="1" as="geometry">
+            <mxPoint x="420" y="580" as="sourcePoint" />
+            <mxPoint x="520" y="420" as="targetPoint" />
+            <Array as="points">
+              <mxPoint x="480" y="580" />
+              <mxPoint x="480" y="420" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        
+        <mxCell id="arrow-e01-l01-label" value="学習記録へ" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=9;fontColor=#276749;" vertex="1" parent="1">
+          <mxGeometry x="480" y="490" width="60" height="20" as="geometry" />
+        </mxCell>
+
+        <!-- Arrow: L01 to L02 -->
+        <mxCell id="arrow-l01-l02" value="" style="endArrow=classic;html=1;strokeWidth=2;strokeColor=#48bb78;" edge="1" parent="1">
+          <mxGeometry width="50" height="50" relative="1" as="geometry">
+            <mxPoint x="610" y="440" as="sourcePoint" />
+            <mxPoint x="610" y="500" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        
+        <mxCell id="arrow-l01-l02-label" value="編集/新規" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=9;fontColor=#276749;" vertex="1" parent="1">
+          <mxGeometry x="620" y="460" width="50" height="20" as="geometry" />
+        </mxCell>
+
+        <!-- Arrow: E01 to L02 (直接作成) -->
+        <mxCell id="arrow-e01-l02" value="" style="endArrow=classic;html=1;strokeWidth=2;strokeColor=#48bb78;dashed=1;" edge="1" parent="1">
+          <mxGeometry width="50" height="50" relative="1" as="geometry">
+            <mxPoint x="420" y="620" as="sourcePoint" />
+            <mxPoint x="520" y="570" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        
+        <mxCell id="arrow-e01-l02-label" value="直接作成" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=9;fontColor=#276749;" vertex="1" parent="1">
+          <mxGeometry x="450" y="600" width="50" height="20" as="geometry" />
+        </mxCell>
+
+        <!-- ========== D01: 日記一覧 (Phase 2) ========== -->
+        <mxCell id="d01" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fefcbf;strokeColor=#d69e2e;strokeWidth=2;dashed=1;" vertex="1" parent="1">
+          <mxGeometry x="520" y="660" width="180" height="80" as="geometry" />
+        </mxCell>
+        
+        <mxCell id="d01-title" value="📓 D01: 日記一覧" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=14;fontStyle=1;fontColor=#975a16;" vertex="1" parent="1">
+          <mxGeometry x="530" y="670" width="160" height="25" as="geometry" />
+        </mxCell>
+        
+        <mxCell id="d01-desc" value="・日付順一覧&#xa;・タグフィルタ (Phase 2)" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=top;whiteSpace=wrap;rounded=0;fontSize=11;fontColor=#975a16;" vertex="1" parent="1">
+          <mxGeometry x="535" y="695" width="150" height="40" as="geometry" />
+        </mxCell>
+
+        <!-- ========== D02: 日記編集 (Phase 2) ========== -->
+        <mxCell id="d02" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fefcbf;strokeColor=#d69e2e;strokeWidth=2;dashed=1;" vertex="1" parent="1">
+          <mxGeometry x="520" y="780" width="180" height="80" as="geometry" />
+        </mxCell>
+        
+        <mxCell id="d02-title" value="📓 D02: 日記編集" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=14;fontStyle=1;fontColor=#975a16;" vertex="1" parent="1">
+          <mxGeometry x="530" y="790" width="160" height="25" as="geometry" />
+        </mxCell>
+        
+        <mxCell id="d02-desc" value="・Markdownエディタ&#xa;・日常の記録 (Phase 2)" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=top;whiteSpace=wrap;rounded=0;fontSize=11;fontColor=#975a16;" vertex="1" parent="1">
+          <mxGeometry x="535" y="815" width="150" height="40" as="geometry" />
+        </mxCell>
+
+        <!-- Arrow: E01 to D01 -->
+        <mxCell id="arrow-e01-d01" value="" style="endArrow=classic;html=1;strokeWidth=2;strokeColor=#d69e2e;dashed=1;" edge="1" parent="1">
+          <mxGeometry width="50" height="50" relative="1" as="geometry">
+            <mxPoint x="420" y="680" as="sourcePoint" />
+            <mxPoint x="520" y="700" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        
+        <mxCell id="arrow-e01-d01-label" value="日記へ" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=9;fontColor=#975a16;" vertex="1" parent="1">
+          <mxGeometry x="450" y="670" width="50" height="20" as="geometry" />
+        </mxCell>
+
+        <!-- Arrow: D01 to D02 -->
+        <mxCell id="arrow-d01-d02" value="" style="endArrow=classic;html=1;strokeWidth=2;strokeColor=#d69e2e;dashed=1;" edge="1" parent="1">
+          <mxGeometry width="50" height="50" relative="1" as="geometry">
+            <mxPoint x="610" y="740" as="sourcePoint" />
+            <mxPoint x="610" y="780" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        
+        <mxCell id="arrow-d01-d02-label" value="編集/新規" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=9;fontColor=#975a16;" vertex="1" parent="1">
+          <mxGeometry x="620" y="750" width="50" height="20" as="geometry" />
+        </mxCell>
+
+        <!-- ========== T01: タスク管理 ========== -->
+        <mxCell id="t01" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff5f5;strokeColor=#fc8181;strokeWidth=2;" vertex="1" parent="1">
+          <mxGeometry x="780" y="280" width="180" height="100" as="geometry" />
+        </mxCell>
+        
+        <mxCell id="t01-title" value="📁 T01: タスク管理" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=14;fontStyle=1;fontColor=#c53030;" vertex="1" parent="1">
+          <mxGeometry x="790" y="290" width="160" height="25" as="geometry" />
+        </mxCell>
+        
+        <mxCell id="t01-desc" value="・プロジェクト一覧&#xa;・タスクCRUD&#xa;・目標タグ設定" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=top;whiteSpace=wrap;rounded=0;fontSize=11;fontColor=#c53030;" vertex="1" parent="1">
+          <mxGeometry x="795" y="315" width="150" height="55" as="geometry" />
+        </mxCell>
+
+        <!-- ========== R01: 定期タスク管理 ========== -->
+        <mxCell id="r01" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#faf5ff;strokeColor=#b794f4;strokeWidth=2;" vertex="1" parent="1">
+          <mxGeometry x="780" y="420" width="180" height="100" as="geometry" />
+        </mxCell>
+        
+        <mxCell id="r01-title" value="🔄 R01: 定期タスク" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=14;fontStyle=1;fontColor=#6b46c1;" vertex="1" parent="1">
+          <mxGeometry x="790" y="430" width="160" height="25" as="geometry" />
+        </mxCell>
+        
+        <mxCell id="r01-desc" value="・習慣タスク設定&#xa;・頻度・時間設定&#xa;・有効/無効切替" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=top;whiteSpace=wrap;rounded=0;fontSize=11;fontColor=#6b46c1;" vertex="1" parent="1">
+          <mxGeometry x="795" y="455" width="150" height="55" as="geometry" />
+        </mxCell>
+
+        <!-- ========== A01: 分析・レポート ========== -->
+        <mxCell id="a01" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ebf8ff;strokeColor=#4299e1;strokeWidth=2;" vertex="1" parent="1">
+          <mxGeometry x="780" y="560" width="180" height="100" as="geometry" />
+        </mxCell>
+        
+        <mxCell id="a01-title" value="📊 A01: 分析・レポート" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=14;fontStyle=1;fontColor=#2b6cb0;" vertex="1" parent="1">
+          <mxGeometry x="790" y="570" width="160" height="25" as="geometry" />
+        </mxCell>
+        
+        <mxCell id="a01-desc" value="・時間分析グラフ&#xa;・目標達成度&#xa;・日/週/月レポート" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=top;whiteSpace=wrap;rounded=0;fontSize=11;fontColor=#2b6cb0;" vertex="1" parent="1">
+          <mxGeometry x="795" y="595" width="150" height="55" as="geometry" />
+        </mxCell>
+
+        <!-- ========== A02: AI振り返り (Phase 2) ========== -->
+        <mxCell id="a02" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e2e8f0;strokeColor=#a0aec0;strokeWidth=2;dashed=1;" vertex="1" parent="1">
+          <mxGeometry x="780" y="700" width="180" height="100" as="geometry" />
+        </mxCell>
+        
+        <mxCell id="a02-title" value="🤖 A02: AI振り返り" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=14;fontStyle=1;fontColor=#718096;" vertex="1" parent="1">
+          <mxGeometry x="790" y="710" width="160" height="25" as="geometry" />
+        </mxCell>
+        
+        <mxCell id="a02-desc" value="・週次レポート生成&#xa;・AIアドバイス&#xa;(Phase 2)" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=top;whiteSpace=wrap;rounded=0;fontSize=11;fontColor=#718096;" vertex="1" parent="1">
+          <mxGeometry x="795" y="735" width="150" height="55" as="geometry" />
+        </mxCell>
+
+        <!-- Arrows from M01 to management screens -->
+        <mxCell id="arrow-m01-t01" value="" style="endArrow=classic;html=1;strokeWidth=2;strokeColor=#fc8181;" edge="1" parent="1">
+          <mxGeometry width="50" height="50" relative="1" as="geometry">
+            <mxPoint x="420" y="360" as="sourcePoint" />
+            <mxPoint x="780" y="320" as="targetPoint" />
+            <Array as="points">
+              <mxPoint x="600" y="280" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        
+        <mxCell id="arrow-m01-r01" value="" style="endArrow=classic;html=1;strokeWidth=2;strokeColor=#b794f4;" edge="1" parent="1">
+          <mxGeometry width="50" height="50" relative="1" as="geometry">
+            <mxPoint x="420" y="400" as="sourcePoint" />
+            <mxPoint x="780" y="460" as="targetPoint" />
+            <Array as="points">
+              <mxPoint x="740" y="400" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+
+        <!-- Arrow from S02 to A01 -->
+        <mxCell id="arrow-s02-a01" value="" style="endArrow=classic;html=1;strokeWidth=2;strokeColor=#4299e1;" edge="1" parent="1">
+          <mxGeometry width="50" height="50" relative="1" as="geometry">
+            <mxPoint x="680" y="170" as="sourcePoint" />
+            <mxPoint x="870" y="560" as="targetPoint" />
+            <Array as="points">
+              <mxPoint x="870" y="170" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        
+        <mxCell id="arrow-s02-a01-label" value="分析へ" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=9;fontColor=#2b6cb0;" vertex="1" parent="1">
+          <mxGeometry x="880" y="350" width="50" height="20" as="geometry" />
+        </mxCell>
+
+        <!-- Arrow from A01 to A02 -->
+        <mxCell id="arrow-a01-a02" value="" style="endArrow=classic;html=1;strokeWidth=2;strokeColor=#a0aec0;dashed=1;" edge="1" parent="1">
+          <mxGeometry width="50" height="50" relative="1" as="geometry">
+            <mxPoint x="870" y="660" as="sourcePoint" />
+            <mxPoint x="870" y="700" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+
+        <!-- ========== GLOBAL NAVIGATION ========== -->
+        <mxCell id="nav-box" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#edf2f7;strokeColor=#a0aec0;strokeWidth=1;" vertex="1" parent="1">
+          <mxGeometry x="1040" y="120" width="200" height="180" as="geometry" />
+        </mxCell>
+        
+        <mxCell id="nav-title" value="グローバルナビゲーション" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=12;fontStyle=1;fontColor=#4a5568;" vertex="1" parent="1">
+          <mxGeometry x="1060" y="130" width="160" height="25" as="geometry" />
+        </mxCell>
+        
+        <mxCell id="nav-desc" value="サイドバーから常時アクセス可能:&#xa;&#xa;• ダッシュボード&#xa;• 朝の画面&#xa;• 夜の画面&#xa;• 学習記録&#xa;• タスク管理&#xa;• 定期タスク&#xa;• 分析・レポート&#xa;• 設定" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=top;whiteSpace=wrap;rounded=0;fontSize=10;fontColor=#4a5568;" vertex="1" parent="1">
+          <mxGeometry x="1055" y="160" width="175" height="130" as="geometry" />
+        </mxCell>
+
+        <!-- ========== LEGEND ========== -->
+        <mxCell id="legend-box" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f7fafc;strokeColor=#e2e8f0;strokeWidth=1;" vertex="1" parent="1">
+          <mxGeometry x="1040" y="340" width="200" height="320" as="geometry" />
+        </mxCell>
+        
+        <mxCell id="legend-title" value="凡例" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=12;fontStyle=1;fontColor=#2d3748;" vertex="1" parent="1">
+          <mxGeometry x="1110" y="350" width="60" height="25" as="geometry" />
+        </mxCell>
+        
+        <!-- Legend items -->
+        <mxCell id="leg-core" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fffff0;strokeColor=#ecc94b;strokeWidth=2;" vertex="1" parent="1">
+          <mxGeometry x="1060" y="385" width="25" height="18" as="geometry" />
+        </mxCell>
+        <mxCell id="leg-core-label" value="コア画面（朝/夜）" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=10;fontColor=#4a5568;" vertex="1" parent="1">
+          <mxGeometry x="1095" y="380" width="130" height="25" as="geometry" />
+        </mxCell>
+        
+        <mxCell id="leg-record" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f0fff4;strokeColor=#48bb78;strokeWidth=2;" vertex="1" parent="1">
+          <mxGeometry x="1060" y="415" width="25" height="18" as="geometry" />
+        </mxCell>
+        <mxCell id="leg-record-label" value="学習記録" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=10;fontColor=#4a5568;" vertex="1" parent="1">
+          <mxGeometry x="1095" y="410" width="130" height="25" as="geometry" />
+        </mxCell>
+        
+        <mxCell id="leg-task" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff5f5;strokeColor=#fc8181;strokeWidth=2;" vertex="1" parent="1">
+          <mxGeometry x="1060" y="445" width="25" height="18" as="geometry" />
+        </mxCell>
+        <mxCell id="leg-task-label" value="タスク管理" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=10;fontColor=#4a5568;" vertex="1" parent="1">
+          <mxGeometry x="1095" y="440" width="130" height="25" as="geometry" />
+        </mxCell>
+        
+        <mxCell id="leg-routine" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#faf5ff;strokeColor=#b794f4;strokeWidth=2;" vertex="1" parent="1">
+          <mxGeometry x="1060" y="475" width="25" height="18" as="geometry" />
+        </mxCell>
+        <mxCell id="leg-routine-label" value="定期タスク" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=10;fontColor=#4a5568;" vertex="1" parent="1">
+          <mxGeometry x="1095" y="470" width="130" height="25" as="geometry" />
+        </mxCell>
+        
+        <mxCell id="leg-analysis" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ebf8ff;strokeColor=#4299e1;strokeWidth=2;" vertex="1" parent="1">
+          <mxGeometry x="1060" y="505" width="25" height="18" as="geometry" />
+        </mxCell>
+        <mxCell id="leg-analysis-label" value="分析・ダッシュボード" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=10;fontColor=#4a5568;" vertex="1" parent="1">
+          <mxGeometry x="1095" y="500" width="130" height="25" as="geometry" />
+        </mxCell>
+        
+        <mxCell id="leg-settings" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#faf5ff;strokeColor=#9f7aea;strokeWidth=2;" vertex="1" parent="1">
+          <mxGeometry x="1060" y="535" width="25" height="18" as="geometry" />
+        </mxCell>
+        <mxCell id="leg-settings-label" value="設定" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=10;fontColor=#4a5568;" vertex="1" parent="1">
+          <mxGeometry x="1095" y="530" width="130" height="25" as="geometry" />
+        </mxCell>
+        
+        <mxCell id="leg-future" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e2e8f0;strokeColor=#a0aec0;strokeWidth=2;dashed=1;" vertex="1" parent="1">
+          <mxGeometry x="1060" y="565" width="25" height="18" as="geometry" />
+        </mxCell>
+        <mxCell id="leg-future-label" value="Phase 2以降" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=10;fontColor=#4a5568;" vertex="1" parent="1">
+          <mxGeometry x="1095" y="560" width="130" height="25" as="geometry" />
+        </mxCell>
+        
+        <mxCell id="leg-diary" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fefcbf;strokeColor=#d69e2e;strokeWidth=2;dashed=1;" vertex="1" parent="1">
+          <mxGeometry x="1060" y="595" width="25" height="18" as="geometry" />
+        </mxCell>
+        <mxCell id="leg-diary-label" value="日記 (Phase 2)" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=10;fontColor=#4a5568;" vertex="1" parent="1">
+          <mxGeometry x="1095" y="590" width="130" height="25" as="geometry" />
+        </mxCell>
+        
+        <mxCell id="leg-arrow" value="" style="endArrow=classic;html=1;strokeWidth=2;strokeColor=#4a5568;" edge="1" parent="1">
+          <mxGeometry width="50" height="50" relative="1" as="geometry">
+            <mxPoint x="1060" y="630" as="sourcePoint" />
+            <mxPoint x="1085" y="630" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="leg-arrow-label" value="画面遷移" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=10;fontColor=#4a5568;" vertex="1" parent="1">
+          <mxGeometry x="1095" y="620" width="130" height="25" as="geometry" />
+        </mxCell>
+
+        <!-- ========== MVP SCOPE ========== -->
+        <mxCell id="mvp-box" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=none;strokeColor=#38a169;strokeWidth=3;dashed=1;dashPattern=12 12;" vertex="1" parent="1">
+          <mxGeometry x="180" y="100" width="740" height="620" as="geometry" />
+        </mxCell>
+        
+        <mxCell id="mvp-label" value="MVP Scope (Phase 1)" style="text;html=1;strokeColor=none;fillColor=#c6f6d5;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=1;fontSize=12;fontStyle=1;fontColor=#276749;" vertex="1" parent="1">
+          <mxGeometry x="460" y="80" width="140" height="25" as="geometry" />
+        </mxCell>
+
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

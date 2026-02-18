@@ -1,0 +1,28 @@
+services:
+  dremio:
+    image: dremio/dremio-oss:25.2.0
+    container_name: kensan-dremio
+    ports:
+      - "9047:9047"    # Web UI
+      - "31010:31010"  # ODBC
+      - "32010:32010"  # Arrow Flight SQL
+    environment:
+      DREMIO_JAVA_SERVER_EXTRA_OPTS: >-
+        -Dpaths.dist=file:///opt/dremio/data/dist
+        -Xmx4g
+        -Xms2g
+    volumes:
+      - dremio_data:/opt/dremio/data
+    depends_on:
+      nessie:
+        condition: service_healthy
+    networks:
+      - kensan-network
+
+networks:
+  kensan-network:
+    external: true
+    name: kensan-mockup_kensan-network
+
+volumes:
+  dremio_data:

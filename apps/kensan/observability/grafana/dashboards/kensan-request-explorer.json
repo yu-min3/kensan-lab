@@ -1,0 +1,211 @@
+{
+  "uid": "kensan-request-explorer",
+  "title": "Kensan - Request Explorer",
+  "description": "Drill down into specific endpoints, slow queries, and traces",
+  "tags": ["kensan", "requests", "traces"],
+  "timezone": "browser",
+  "refresh": "30s",
+  "time": {
+    "from": "now-1h",
+    "to": "now"
+  },
+  "templating": {
+    "list": [
+      {
+        "name": "service",
+        "type": "query",
+        "datasource": { "uid": "prometheus" },
+        "query": "label_values(http_server_request_duration_seconds_count, job)",
+        "refresh": 2,
+        "includeAll": true,
+        "multi": false,
+        "current": { "text": "All", "value": "$__all" }
+      },
+      {
+        "name": "method",
+        "type": "query",
+        "datasource": { "uid": "prometheus" },
+        "query": "label_values(http_server_request_duration_seconds_count{job=~\"$service\"}, http_request_method)",
+        "refresh": 2,
+        "includeAll": true,
+        "multi": true,
+        "current": { "text": "All", "value": "$__all" }
+      }
+    ]
+  },
+  "panels": [
+    {
+      "id": 1,
+      "title": "Endpoint Latency Heatmap",
+      "type": "heatmap",
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 0 },
+      "datasource": { "uid": "prometheus" },
+      "options": {
+        "calculate": false,
+        "yAxis": { "unit": "s" },
+        "color": {
+          "scheme": "Oranges",
+          "fill": "dark-orange",
+          "mode": "scheme"
+        },
+        "cellGap": 1,
+        "tooltip": { "show": true, "yHistogram": true }
+      },
+      "targets": [
+        {
+          "expr": "sum by (le) (increase(http_server_request_duration_seconds_bucket{job=~\"$service\", http_request_method=~\"$method\"}[1m]))",
+          "legendFormat": "{{le}}",
+          "format": "heatmap"
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "title": "Top Endpoints by Request Count",
+      "type": "table",
+      "gridPos": { "h": 9, "w": 12, "x": 0, "y": 8 },
+      "datasource": { "uid": "prometheus" },
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": [
+          {
+            "matcher": { "id": "byName", "options": "Value #rate" },
+            "properties": [
+              { "id": "displayName", "value": "Rate (req/s)" },
+              { "id": "unit", "value": "reqps" },
+              { "id": "decimals", "value": 2 }
+            ]
+          },
+          {
+            "matcher": { "id": "byName", "options": "Value #p95" },
+            "properties": [
+              { "id": "displayName", "value": "p95 Latency" },
+              { "id": "unit", "value": "s" },
+              { "id": "decimals", "value": 3 }
+            ]
+          },
+          {
+            "matcher": { "id": "byName", "options": "Value #errors" },
+            "properties": [
+              { "id": "displayName", "value": "Error Rate" },
+              { "id": "unit", "value": "percentunit" },
+              { "id": "decimals", "value": 2 },
+              { "id": "thresholds", "value": { "mode": "absolute", "steps": [{ "color": "green", "value": null }, { "color": "red", "value": 0.01 }] } },
+              { "id": "custom.cellOptions", "value": { "type": "color-background", "mode": "basic" } }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "sortBy": [{ "displayName": "Rate (req/s)", "desc": true }]
+      },
+      "transformations": [
+        { "id": "merge", "options": {} }
+      ],
+      "targets": [
+        {
+          "expr": "topk(15, sum by (http_route, http_request_method) (rate(http_server_request_duration_seconds_count{job=~\"$service\", http_request_method=~\"$method\"}[5m])))",
+          "legendFormat": "",
+          "format": "table",
+          "instant": true,
+          "refId": "rate"
+        },
+        {
+          "expr": "topk(15, histogram_quantile(0.95, sum by (http_route, http_request_method, le) (rate(http_server_request_duration_seconds_bucket{job=~\"$service\", http_request_method=~\"$method\"}[5m]))))",
+          "legendFormat": "",
+          "format": "table",
+          "instant": true,
+          "refId": "p95"
+        },
+        {
+          "expr": "topk(15, sum by (http_route, http_request_method) (rate(http_server_request_duration_seconds_count{job=~\"$service\", http_request_method=~\"$method\", http_response_status_code=~\"[45]..\"}[5m])) / sum by (http_route, http_request_method) (rate(http_server_request_duration_seconds_count{job=~\"$service\", http_request_method=~\"$method\"}[5m])))",
+          "legendFormat": "",
+          "format": "table",
+          "instant": true,
+          "refId": "errors"
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "title": "Slow DB Queries (p95 > 100ms)",
+      "type": "table",
+      "gridPos": { "h": 9, "w": 12, "x": 12, "y": 8 },
+      "datasource": { "uid": "tempo" },
+      "options": {
+        "sortBy": [{ "displayName": "Duration", "desc": true }]
+      },
+      "targets": [
+        {
+          "queryType": "traceql",
+          "query": "{resource.service.name =~ \"$service\" && name =~ \"SELECT|INSERT|UPDATE|DELETE\" && duration > 100ms}",
+          "limit": 20
+        }
+      ]
+    },
+    {
+      "id": 6,
+      "title": "Errors by Endpoint",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 17 },
+      "datasource": { "uid": "prometheus" },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": {
+            "drawStyle": "bars",
+            "fillOpacity": 60,
+            "lineWidth": 1,
+            "stacking": { "mode": "normal" }
+          },
+          "color": { "mode": "palette-classic" }
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "expr": "sum by (http_route, http_response_status_code) (increase(http_server_request_duration_seconds_count{job=~\"$service\", http_request_method=~\"$method\", http_response_status_code=~\"[45]..\"}[5m])) > 0",
+          "legendFormat": "{{http_route}} [{{http_response_status_code}}]"
+        }
+      ]
+    },
+    {
+      "id": 4,
+      "title": "Trace Search",
+      "type": "table",
+      "gridPos": { "h": 10, "w": 24, "x": 0, "y": 25 },
+      "datasource": { "uid": "tempo" },
+      "targets": [
+        {
+          "queryType": "traceql",
+          "query": "{resource.service.name =~ \"$service\"}",
+          "limit": 30
+        }
+      ]
+    },
+    {
+      "id": 5,
+      "title": "Request Logs (with trace correlation)",
+      "type": "logs",
+      "gridPos": { "h": 10, "w": 24, "x": 0, "y": 35 },
+      "datasource": { "uid": "loki" },
+      "options": {
+        "showTime": true,
+        "showLabels": true,
+        "showCommonLabels": false,
+        "wrapLogMessage": true,
+        "prettifyLogMessage": false,
+        "enableLogDetails": true,
+        "sortOrder": "Descending",
+        "dedupStrategy": "none"
+      },
+      "targets": [
+        {
+          "expr": "{job=~\"$service\"} | json",
+          "refId": "A"
+        }
+      ]
+    }
+  ],
+  "schemaVersion": 39
+}
