@@ -1,0 +1,7 @@
+<svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+  <!-- Kensan Logo - Favicon Light -->
+  <rect x="12" y="60" width="76" height="20" rx="3" fill="#64748B"/>
+  <line x1="15" y1="63" x2="85" y2="63" stroke="#94A3B8" stroke-width="2" stroke-linecap="round"/>
+  <path d="M15,57 Q40,45 58,30 Q75,15 88,2 L88,57 Z" fill="#0EA5E9"/>
+  <path d="M90,6 L93,-2 L96,6 L103,9 L96,12 L93,20 L90,12 L83,9 Z" fill="#38BDF8"/>
+</svg>

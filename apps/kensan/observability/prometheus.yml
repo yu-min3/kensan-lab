@@ -1,0 +1,11 @@
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+# Enable remote write receiver for OTel Collector
+# Prometheus needs --web.enable-remote-write-receiver flag
+
+scrape_configs:
+  - job_name: "otel-collector"
+    static_configs:
+      - targets: ["otel-collector:8888"]

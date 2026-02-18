@@ -1,0 +1,242 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<title>Kensan Lakehouse Architecture</title>
+<script src="https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js"></script>
+<style>
+  body { background: #1a1a2e; color: #e0e0e0; font-family: system-ui, sans-serif; margin: 0; padding: 20px; }
+  h1 { text-align: center; color: #63b3ed; margin-bottom: 8px; }
+  p.sub { text-align: center; color: #888; margin-top: 0; }
+  .mermaid { display: flex; justify-content: center; margin: 20px 0; }
+  .mermaid svg { max-width: 100%; height: auto; }
+  table { border-collapse: collapse; margin: 16px auto; }
+  th, td { border: 1px solid #444; padding: 6px 14px; text-align: left; }
+  th { background: #2c5282; color: #fff; }
+  td { background: #16213e; }
+  h2 { color: #68d391; margin-top: 40px; border-bottom: 1px solid #444; padding-bottom: 4px; }
+  h3 { color: #b794f4; }
+  code { background: #2d2d44; padding: 2px 6px; border-radius: 3px; font-size: 0.9em; }
+  .container { max-width: 1200px; margin: 0 auto; }
+</style>
+</head>
+<body>
+<div class="container">
+
+<h1>Kensan Lakehouse Architecture</h1>
+<p class="sub">2026-02-04</p>
+
+<h2>Full Data Flow</h2>
+
+<pre class="mermaid">
+%%{init: {'theme': 'dark', 'themeVariables': {'fontSize': '14px'}}}%%
+graph TB
+    subgraph Sources["Data Sources"]
+        PG["PostgreSQL\n(Kensan DB)\n:5432"]
+        AI["kensan-ai\n(LakehouseWriter)"]
+    end
+
+    subgraph Infra["Common Infra\n(docker-compose.common.yml)"]
+        MinIO["MinIO\nS3 Storage\n:9000 / :9001"]
+        Nessie["Nessie\nIceberg Catalog\n:19120"]
+    end
+
+    subgraph Pipeline["Pipeline (host: uv run)"]
+        Ingest["ingest_postgres.py\ndelta detection"]
+        Transform["transform.py\ncleanse + calc"]
+        Aggregate["aggregate.py\nweekly rollup"]
+    end
+
+    subgraph Storage["Iceberg Tables (Parquet on MinIO)"]
+        Bronze["Bronze\ntime_entries_raw\ntasks_raw, notes_raw\nai_interactions_raw\nai_facts/reviews_raw\nexternal_tool_results_raw"]
+        Silver["Silver\ntime_entries (+duration)\ntasks (+is_subtask)\nnotes (+content_length)\nai_interactions (+tokens)\nai_token_usage"]
+        Gold["Gold\nweekly_summary\ngoal_progress\nai_usage_weekly\nai_quality_weekly"]
+    end
+
+    subgraph QueryA["Option A\n(docker-compose.dremio.yml)"]
+        Dremio["Dremio OSS\n:9047 Web UI\n:31010 ODBC\n:32010 Flight SQL"]
+    end
+
+    subgraph QueryB["Option B\n(docker-compose.trino.yml)"]
+        Trino["Trino\n:8085"]
+        Superset["Apache Superset\n:8088"]
+    end
+
+    subgraph Local["Local Analysis"]
+        DuckDB["DuckDB\nmake query"]
+    end
+
+    PG -->|psycopg batch| Ingest
+    AI -->|direct parquet| Bronze
+    Ingest -->|PyIceberg| Bronze
+    Bronze --> Transform
+    Transform -->|PyArrow| Silver
+    Silver --> Aggregate
+    Aggregate --> Gold
+
+    Ingest -.->|REST| Nessie
+    Transform -.->|REST| Nessie
+    Aggregate -.->|REST| Nessie
+    Nessie -.->|metadata| MinIO
+
+    Dremio -->|Nessie REST| Nessie
+    Dremio -->|S3 read| MinIO
+    Trino -->|iceberg.properties| Nessie
+    Trino -->|S3 read| MinIO
+    Superset -->|trino://| Trino
+    DuckDB -->|PyIceberg scan| Nessie
+
+    classDef source fill:#4a5568,stroke:#a0aec0,color:#fff
+    classDef infra fill:#2c5282,stroke:#63b3ed,color:#fff
+    classDef pipe fill:#553c9a,stroke:#b794f4,color:#fff
+    classDef bronze fill:#744210,stroke:#ecc94b,color:#fff
+    classDef silver fill:#2d3748,stroke:#a0aec0,color:#fff
+    classDef gold fill:#7b341e,stroke:#fc8181,color:#fff
+    classDef engine fill:#276749,stroke:#68d391,color:#fff
+
+    class PG,AI source
+    class MinIO,Nessie infra
+    class Ingest,Transform,Aggregate pipe
+    class Bronze bronze
+    class Silver silver
+    class Gold gold
+    class Dremio,Trino,Superset,DuckDB engine
+</pre>
+
+<h2>Query Engine Comparison</h2>
+
+<pre class="mermaid">
+%%{init: {'theme': 'dark'}}%%
+graph LR
+    subgraph OptionA["Option A: make dremio-up"]
+        D_UI["Dremio Web UI\nlocalhost:9047"] --> D_Engine["Dremio Engine"]
+        D_Engine --> D_Nessie["Nessie :19120"]
+        D_Engine --> D_MinIO["MinIO :9000"]
+    end
+
+    subgraph OptionB["Option B: make trino-up"]
+        SS_UI["Superset UI\nlocalhost:8088"] --> SS_Trino["Trino :8085"]
+        T_UI["Trino Web UI\nlocalhost:8085"] --> SS_Trino
+        SS_Trino --> T_Nessie["Nessie :19120"]
+        SS_Trino --> T_MinIO["MinIO :9000"]
+        SS_UI --> SS_PG["Superset PG\n(metadata)"]
+        SS_UI --> SS_Redis["Redis\n(cache)"]
+    end
+
+    subgraph OptionC["Local: make query"]
+        REPL["DuckDB REPL"] --> PyIce["PyIceberg"]
+        PyIce --> L_Nessie["Nessie :19120"]
+        PyIce --> L_MinIO["MinIO :9000"]
+    end
+
+    classDef ui fill:#276749,stroke:#68d391,color:#fff
+    classDef engine fill:#2c5282,stroke:#63b3ed,color:#fff
+    classDef infra fill:#4a5568,stroke:#a0aec0,color:#fff
+
+    class D_UI,SS_UI,T_UI,REPL ui
+    class D_Engine,SS_Trino,PyIce engine
+    class D_Nessie,D_MinIO,T_Nessie,T_MinIO,L_Nessie,L_MinIO,SS_PG,SS_Redis infra
+</pre>
+
+<h2>Medallion Architecture Detail</h2>
+
+<pre class="mermaid">
+%%{init: {'theme': 'dark'}}%%
+graph LR
+    subgraph B["Bronze (Raw)"]
+        B1["time_entries_raw\n(month partition)"]
+        B2["tasks_raw"]
+        B3["notes_raw"]
+        B4["ai_interactions_raw\n(month partition)"]
+        B5["ai_facts_raw"]
+        B6["ai_reviews_raw"]
+        B7["ai_contexts_raw"]
+        B8["external_tool_results_raw\n(month partition)"]
+    end
+
+    subgraph S["Silver (Cleaned)"]
+        S1["time_entries\n+date +duration_minutes\n(month partition)"]
+        S2["tasks\n+is_subtask"]
+        S3["notes\n+content_length"]
+        S4["ai_interactions\n+tool_count +tokens_total\n(month partition)"]
+        S5["ai_token_usage\n(daily x situation agg)"]
+    end
+
+    subgraph G["Gold (Weekly)"]
+        G1["weekly_summary"]
+        G2["goal_progress"]
+        G3["ai_usage_weekly"]
+        G4["ai_quality_weekly"]
+    end
+
+    B1 --> S1
+    B2 --> S2
+    B3 --> S3
+    B4 --> S4
+    B4 --> S5
+
+    S1 --> G1
+    S1 --> G2
+    S2 --> G1
+    S3 --> G1
+    S4 --> G3
+    S4 --> G4
+    B5 --> G4
+    B6 --> G4
+
+    classDef bronze fill:#744210,stroke:#ecc94b,color:#fff
+    classDef silver fill:#2d3748,stroke:#a0aec0,color:#fff
+    classDef gold fill:#7b341e,stroke:#fc8181,color:#fff
+
+    class B1,B2,B3,B4,B5,B6,B7,B8 bronze
+    class S1,S2,S3,S4,S5 silver
+    class G1,G2,G3,G4 gold
+</pre>
+
+<h2>Connection Reference</h2>
+
+<h3>Data Ingestion (2 Paths)</h3>
+<table>
+<tr><th>Path</th><th>Source</th><th>Method</th><th>Destination</th></tr>
+<tr><td>Batch</td><td>PostgreSQL</td><td><code>ingest_postgres.py</code> (delta via <code>.ingestion_state.json</code>)</td><td>Bronze 7 tables</td></tr>
+<tr><td>Direct</td><td>kensan-ai</td><td>LakehouseWriter (Parquet append)</td><td><code>bronze.external_tool_results_raw</code></td></tr>
+</table>
+
+<h3>Query Connection Setup</h3>
+<table>
+<tr><th>Engine</th><th>How to Connect</th><th>UI</th><th>Best For</th></tr>
+<tr>
+  <td>Dremio</td>
+  <td>UI: Add Source > Nessie<br>Endpoint: <code>http://nessie:19120/api/v2</code><br>S3: <code>http://minio:9000</code>, key=<code>kensan</code></td>
+  <td>localhost:9047</td>
+  <td>Visual catalog, ad-hoc SQL</td>
+</tr>
+<tr>
+  <td>Trino + Superset</td>
+  <td>Auto-configured via <code>iceberg.properties</code><br>Superset: Add DB > <code>trino://trino@trino:8080/iceberg</code></td>
+  <td>Trino: localhost:8085<br>Superset: localhost:8088</td>
+  <td>Dashboards, scheduled queries</td>
+</tr>
+<tr>
+  <td>DuckDB</td>
+  <td><code>make query</code> (PyIceberg auto-registers all tables)</td>
+  <td>Terminal REPL</td>
+  <td>Local instant analysis</td>
+</tr>
+</table>
+
+<h3>Make Commands</h3>
+<table>
+<tr><th>Command</th><th>What It Does</th></tr>
+<tr><td><code>make common-up</code></td><td>MinIO + Nessie (shared infra)</td></tr>
+<tr><td><code>make dremio-up</code></td><td>Common + Dremio</td></tr>
+<tr><td><code>make trino-up</code></td><td>Common + Trino + Superset + Redis + PG</td></tr>
+<tr><td><code>make dremio-down</code> / <code>make trino-down</code></td><td>Stop option A / B</td></tr>
+<tr><td><code>make init</code></td><td>Create Iceberg tables in Nessie</td></tr>
+<tr><td><code>make pipeline</code></td><td>ingest + transform + aggregate</td></tr>
+<tr><td><code>make query</code></td><td>DuckDB REPL (all tables registered)</td></tr>
+</table>
+
+</div>
+</body>
+</html>

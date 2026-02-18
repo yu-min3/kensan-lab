@@ -1,0 +1,324 @@
+@import "tailwindcss";
+
+@source "../index.html";
+@source "./**/*.{js,ts,jsx,tsx}";
+
+@theme {
+  --color-background: hsl(var(--background));
+  --color-foreground: hsl(var(--foreground));
+  --color-card: hsl(var(--card));
+  --color-card-foreground: hsl(var(--card-foreground));
+  --color-popover: hsl(var(--popover));
+  --color-popover-foreground: hsl(var(--popover-foreground));
+  --color-primary: hsl(var(--primary));
+  --color-primary-foreground: hsl(var(--primary-foreground));
+  --color-secondary: hsl(var(--secondary));
+  --color-secondary-foreground: hsl(var(--secondary-foreground));
+  --color-muted: hsl(var(--muted));
+  --color-muted-foreground: hsl(var(--muted-foreground));
+  --color-accent: hsl(var(--accent));
+  --color-accent-foreground: hsl(var(--accent-foreground));
+  --color-destructive: hsl(var(--destructive));
+  --color-destructive-foreground: hsl(var(--destructive-foreground));
+  --color-border: hsl(var(--border));
+  --color-input: hsl(var(--input));
+  --color-ring: hsl(var(--ring));
+  --color-chart-1: hsl(var(--chart-1));
+  --color-chart-2: hsl(var(--chart-2));
+  --color-chart-3: hsl(var(--chart-3));
+  --color-chart-4: hsl(var(--chart-4));
+  --color-chart-5: hsl(var(--chart-5));
+  --radius-lg: var(--radius);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-sm: calc(var(--radius) - 4px);
+
+  /* Kensan Brand Colors */
+  --color-brand: hsl(var(--brand));
+  --color-brand-foreground: hsl(var(--brand-foreground));
+}
+
+:root {
+  --background: 0 0% 100%;
+  --foreground: 222.2 84% 4.9%;
+
+  /* Kensan Brand - Sky Blue from logo */
+  --brand: 199 89% 48%;
+  --brand-foreground: 0 0% 100%;
+
+  /* TimeBlock colors - Grayscale with contrast differentiation */
+  /* Plan: Light/subtle (未確定) */
+  --timeblock-plan-bg: #f8fafc;
+  --timeblock-plan-border: #e2e8f0;
+  /* Actual: Darker/solid (確定済み) */
+  --timeblock-actual-bg: #e2e8f0;
+  --timeblock-actual-border: #64748b;
+  --card: 0 0% 100%;
+  --card-foreground: 222.2 84% 4.9%;
+  --popover: 0 0% 100%;
+  --popover-foreground: 222.2 84% 4.9%;
+  --primary: 222.2 47.4% 11.2%;
+  --primary-foreground: 210 40% 98%;
+  --secondary: 210 40% 96.1%;
+  --secondary-foreground: 222.2 47.4% 11.2%;
+  --muted: 210 40% 96.1%;
+  --muted-foreground: 215.4 16.3% 46.9%;
+  --accent: 199 89% 96%;
+  --accent-foreground: 199 89% 32%;
+  --destructive: 0 84.2% 60.2%;
+  --destructive-foreground: 210 40% 98%;
+  --border: 214.3 31.8% 91.4%;
+  --input: 214.3 31.8% 91.4%;
+  --ring: 199 89% 48%;
+  --radius: 0.5rem;
+  --chart-1: 12 76% 61%;
+  --chart-2: 173 58% 39%;
+  --chart-3: 197 37% 24%;
+  --chart-4: 43 74% 66%;
+  --chart-5: 27 87% 67%;
+}
+
+.dark {
+  /* Base: Slate-900 inspired, but slightly lighter for better readability */
+  --background: 222 47% 11%;
+  --foreground: 210 40% 98%;
+
+  /* Kensan Brand - Lighter blue for dark mode */
+  --brand: 199 89% 60%;
+  --brand-foreground: 222 47% 11%;
+
+  /* TimeBlock colors - Dark mode (grayscale) */
+  --timeblock-plan-bg: #1e293b;
+  --timeblock-plan-border: #475569;
+  --timeblock-actual-bg: #334155;
+  --timeblock-actual-border: #94a3b8;
+
+  /* Card: Slightly lighter than background for elevation */
+  --card: 222 47% 13%;
+  --card-foreground: 210 40% 98%;
+  --popover: 222 47% 15%;
+  --popover-foreground: 210 40% 98%;
+  --primary: 210 40% 98%;
+  --primary-foreground: 222 47% 11%;
+  /* Secondary: For subtle backgrounds */
+  --secondary: 217 33% 20%;
+  --secondary-foreground: 210 40% 98%;
+  /* Muted: Slightly visible backgrounds */
+  --muted: 217 33% 18%;
+  --muted-foreground: 215 20% 65%;
+  /* Accent: Brand-tinted */
+  --accent: 199 50% 22%;
+  --accent-foreground: 199 89% 80%;
+  --destructive: 0 63% 35%;
+  --destructive-foreground: 210 40% 98%;
+  /* Border: More visible for better structure */
+  --border: 217 33% 28%;
+  --input: 217 33% 25%;
+  --ring: 199 89% 60%;
+  --chart-1: 220 70% 55%;
+  --chart-2: 160 60% 50%;
+  --chart-3: 30 80% 60%;
+  --chart-4: 280 65% 65%;
+  --chart-5: 340 75% 60%;
+}
+
+* {
+  border-color: hsl(var(--border));
+}
+
+body {
+  background-color: hsl(var(--background));
+  color: hsl(var(--foreground));
+}
+
+/* TipTap Editor Styles */
+.tiptap-editor {
+  font-family: ui-sans-serif, system-ui, sans-serif;
+}
+
+.tiptap-editor .tiptap {
+  outline: none;
+  min-height: 250px;
+}
+
+.tiptap-editor .tiptap p.is-editor-empty:first-child::before {
+  content: attr(data-placeholder);
+  color: hsl(var(--muted-foreground));
+  pointer-events: none;
+  float: left;
+  height: 0;
+}
+
+.tiptap-editor h1 {
+  font-size: 1.875rem;
+  font-weight: 700;
+  margin-top: 1rem;
+  margin-bottom: 0.5rem;
+  line-height: 1.2;
+}
+
+.tiptap-editor h2 {
+  font-size: 1.5rem;
+  font-weight: 600;
+  margin-top: 1rem;
+  margin-bottom: 0.5rem;
+  line-height: 1.3;
+}
+
+.tiptap-editor h3 {
+  font-size: 1.25rem;
+  font-weight: 600;
+  margin-top: 0.75rem;
+  margin-bottom: 0.5rem;
+}
+
+.tiptap-editor h4,
+.tiptap-editor h5,
+.tiptap-editor h6 {
+  font-size: 1rem;
+  font-weight: 600;
+  margin-top: 0.75rem;
+  margin-bottom: 0.5rem;
+}
+
+.tiptap-editor p {
+  margin-bottom: 0.75rem;
+  line-height: 1.7;
+}
+
+.tiptap-editor strong {
+  font-weight: 700;
+}
+
+.tiptap-editor em {
+  font-style: italic;
+}
+
+.tiptap-editor s {
+  text-decoration: line-through;
+}
+
+.tiptap-editor code {
+  background-color: hsl(var(--muted));
+  padding: 0.125rem 0.25rem;
+  border-radius: 0.25rem;
+  font-family: ui-monospace, monospace;
+  font-size: 0.875em;
+}
+
+.tiptap-editor pre {
+  background-color: hsl(var(--muted));
+  padding: 1rem;
+  border-radius: 0.5rem;
+  overflow-x: auto;
+  margin: 0.75rem 0;
+}
+
+.tiptap-editor pre code {
+  background: none;
+  padding: 0;
+  font-size: 0.875rem;
+}
+
+.tiptap-editor blockquote {
+  border-left: 4px solid hsl(var(--border));
+  padding-left: 1rem;
+  margin: 0.75rem 0;
+  color: hsl(var(--muted-foreground));
+}
+
+.tiptap-editor ul,
+.tiptap-editor ol {
+  padding-left: 1.5rem;
+  margin: 0.5rem 0;
+}
+
+.tiptap-editor ul {
+  list-style-type: disc;
+}
+
+.tiptap-editor ol {
+  list-style-type: decimal;
+}
+
+.tiptap-editor li {
+  margin: 0.25rem 0;
+}
+
+.tiptap-editor li > ul,
+.tiptap-editor li > ol {
+  margin: 0.25rem 0;
+}
+
+.tiptap-editor li p {
+  margin-bottom: 0;
+}
+
+.tiptap-editor hr {
+  border: none;
+  border-top: 1px solid hsl(var(--border));
+  margin: 1rem 0;
+}
+
+.tiptap-editor a {
+  color: hsl(var(--brand));
+  text-decoration: underline;
+}
+
+.tiptap-editor a:hover {
+  opacity: 0.8;
+}
+
+.tiptap-editor table {
+  border-collapse: collapse;
+  width: 100%;
+  margin: 0.75rem 0;
+}
+
+.tiptap-editor th,
+.tiptap-editor td {
+  border: 1px solid hsl(var(--border));
+  padding: 0.5rem;
+  text-align: left;
+}
+
+.tiptap-editor th {
+  background-color: hsl(var(--muted));
+  font-weight: 600;
+}
+
+.tiptap-editor input[type="checkbox"] {
+  margin-right: 0.5rem;
+}
+
+.tiptap-editor img {
+  max-width: 100%;
+  height: auto;
+  border-radius: 0.5rem;
+  margin: 0.75rem 0;
+}
+
+/* Details/Toggle Styles */
+.tiptap-editor details {
+  border: 1px solid hsl(var(--border));
+  border-radius: 0.5rem;
+  padding: 0.75rem 1rem;
+  margin: 0.75rem 0;
+}
+
+.tiptap-editor details summary {
+  font-weight: 600;
+  cursor: pointer;
+  user-select: none;
+  margin-bottom: 0.5rem;
+  list-style: revert;
+}
+
+.tiptap-editor details summary::marker {
+  color: hsl(var(--muted-foreground));
+}
+
+/* Spotlight Tour Highlight Animation */
+@keyframes spotlight-pulse {
+  0%, 100% { box-shadow: 0 0 0 3px hsl(var(--brand)), 0 0 20px 4px hsl(var(--brand) / 0.3); }
+  50% { box-shadow: 0 0 0 3px hsl(var(--brand)), 0 0 30px 8px hsl(var(--brand) / 0.5); }
+}

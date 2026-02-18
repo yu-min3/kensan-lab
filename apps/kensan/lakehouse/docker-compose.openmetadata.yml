@@ -1,0 +1,195 @@
+services:
+  openmetadata-postgres:
+    image: docker.getcollate.io/openmetadata/postgresql:1.11.7
+    container_name: kensan-openmetadata-postgres
+    restart: always
+    command: "--work_mem=10MB"
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: password
+    ports:
+      - "5433:5432"
+    volumes:
+      - openmetadata_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD", "psql", "-U", "postgres", "-tAc", "select 1", "-d", "openmetadata_db"]
+      interval: 15s
+      timeout: 10s
+      retries: 10
+    networks:
+      - kensan-network
+
+  openmetadata-elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.11.4
+    container_name: kensan-openmetadata-elasticsearch
+    environment:
+      - discovery.type=single-node
+      - ES_JAVA_OPTS=-Xms512m -Xmx512m
+      - xpack.security.enabled=false
+    ports:
+      - "9200:9200"
+      - "9300:9300"
+    volumes:
+      - openmetadata_es_data:/usr/share/elasticsearch/data
+    healthcheck:
+      test: "curl -s http://localhost:9200/_cluster/health?pretty | grep status | grep -qE 'green|yellow' || exit 1"
+      interval: 15s
+      timeout: 10s
+      retries: 10
+    networks:
+      - kensan-network
+
+  openmetadata-migrate:
+    image: docker.getcollate.io/openmetadata/server:1.11.7
+    container_name: kensan-openmetadata-migrate
+    command: "./bootstrap/openmetadata-ops.sh migrate"
+    environment:
+      DB_DRIVER_CLASS: org.postgresql.Driver
+      DB_SCHEME: postgresql
+      DB_HOST: openmetadata-postgres
+      DB_PORT: "5432"
+      DB_USER: openmetadata_user
+      DB_USER_PASSWORD: openmetadata_password
+      OM_DATABASE: openmetadata_db
+      ELASTICSEARCH_HOST: openmetadata-elasticsearch
+      ELASTICSEARCH_PORT: "9200"
+      ELASTICSEARCH_SCHEME: http
+      SEARCH_TYPE: elasticsearch
+      MIGRATION_LIMIT_PARAM: "1200"
+      OPENMETADATA_CLUSTER_NAME: openmetadata
+      SERVER_PORT: "8585"
+      SERVER_ADMIN_PORT: "8586"
+      LOG_LEVEL: INFO
+      AUTHENTICATION_PROVIDER: basic
+      AUTHENTICATION_PUBLIC_KEYS: '[http://localhost:8585/api/v1/system/config/jwks]'
+      AUTHORIZER_CLASS_NAME: org.openmetadata.service.security.DefaultAuthorizer
+      AUTHORIZER_REQUEST_FILTER: org.openmetadata.service.security.JwtFilter
+      AUTHORIZER_ADMIN_PRINCIPALS: '[admin]'
+      AUTHORIZER_PRINCIPAL_DOMAIN: "open-metadata.org"
+      AUTHORIZER_ENFORCE_PRINCIPAL_DOMAIN: "false"
+      AUTHORIZER_ENABLE_SECURE_SOCKET: "false"
+      PIPELINE_SERVICE_CLIENT_ENDPOINT: http://openmetadata-ingestion:8080
+      SERVER_HOST_API_URL: http://openmetadata-server:8585/api
+      PIPELINE_SERVICE_CLIENT_VERIFY_SSL: "no-ssl"
+      PIPELINE_SERVICE_CLIENT_CLASS_NAME: org.openmetadata.service.clients.pipeline.airflow.AirflowRESTClient
+      AIRFLOW_USERNAME: admin
+      AIRFLOW_PASSWORD: admin
+      FERNET_KEY: jJ/9sz0g0OHxsfxOoSfdFdmk3ysNmPRnH3TUAbz3IHA=
+      JWT_ISSUER: "open-metadata.org"
+      JWT_KEY_ID: "Gb389a-9f76-gdjs-a92j-0242bk94356"
+      AUTHENTICATION_ENABLE_SELF_SIGNUP: "true"
+      AUTHORIZER_INGESTION_PRINCIPALS: '[ingestion-bot]'
+      AUTHORIZER_ALLOWED_REGISTRATION_DOMAIN: '["all"]'
+      SECRET_MANAGER: db
+      EVENT_MONITOR: prometheus
+      OPENMETADATA_HEAP_OPTS: "-Xmx1G -Xms1G"
+    depends_on:
+      openmetadata-postgres:
+        condition: service_healthy
+      openmetadata-elasticsearch:
+        condition: service_healthy
+    networks:
+      - kensan-network
+
+  openmetadata-server:
+    image: docker.getcollate.io/openmetadata/server:1.11.7
+    container_name: kensan-openmetadata-server
+    restart: always
+    environment:
+      DB_DRIVER_CLASS: org.postgresql.Driver
+      DB_SCHEME: postgresql
+      DB_HOST: openmetadata-postgres
+      DB_PORT: "5432"
+      DB_USER: openmetadata_user
+      DB_USER_PASSWORD: openmetadata_password
+      OM_DATABASE: openmetadata_db
+      ELASTICSEARCH_HOST: openmetadata-elasticsearch
+      ELASTICSEARCH_PORT: "9200"
+      ELASTICSEARCH_SCHEME: http
+      SEARCH_TYPE: elasticsearch
+      OPENMETADATA_CLUSTER_NAME: openmetadata
+      SERVER_PORT: "8585"
+      SERVER_ADMIN_PORT: "8586"
+      LOG_LEVEL: INFO
+      AUTHENTICATION_PROVIDER: basic
+      AUTHENTICATION_PUBLIC_KEYS: '[http://localhost:8585/api/v1/system/config/jwks]'
+      AUTHENTICATION_ENABLE_SELF_SIGNUP: "true"
+      AUTHORIZER_CLASS_NAME: org.openmetadata.service.security.DefaultAuthorizer
+      AUTHORIZER_REQUEST_FILTER: org.openmetadata.service.security.JwtFilter
+      AUTHORIZER_ADMIN_PRINCIPALS: '[admin]'
+      AUTHORIZER_PRINCIPAL_DOMAIN: "open-metadata.org"
+      AUTHORIZER_ENFORCE_PRINCIPAL_DOMAIN: "false"
+      AUTHORIZER_ENABLE_SECURE_SOCKET: "false"
+      AUTHORIZER_INGESTION_PRINCIPALS: '[ingestion-bot]'
+      AUTHORIZER_ALLOWED_REGISTRATION_DOMAIN: '["all"]'
+      PIPELINE_SERVICE_CLIENT_ENDPOINT: http://openmetadata-ingestion:8080
+      PIPELINE_SERVICE_CLIENT_VERIFY_SSL: "no-ssl"
+      PIPELINE_SERVICE_CLIENT_CLASS_NAME: org.openmetadata.service.clients.pipeline.airflow.AirflowRESTClient
+      PIPELINE_SERVICE_CLIENT_ENABLED: "true"
+      SERVER_HOST_API_URL: http://openmetadata-server:8585/api
+      AIRFLOW_USERNAME: admin
+      AIRFLOW_PASSWORD: admin
+      FERNET_KEY: jJ/9sz0g0OHxsfxOoSfdFdmk3ysNmPRnH3TUAbz3IHA=
+      JWT_ISSUER: "open-metadata.org"
+      JWT_KEY_ID: "Gb389a-9f76-gdjs-a92j-0242bk94356"
+      SECRET_MANAGER: db
+      EVENT_MONITOR: prometheus
+      OPENMETADATA_HEAP_OPTS: "-Xmx1G -Xms1G"
+      MASK_PASSWORDS_API: "false"
+    ports:
+      - "8585:8585"
+      - "8586:8586"
+    depends_on:
+      openmetadata-postgres:
+        condition: service_healthy
+      openmetadata-elasticsearch:
+        condition: service_healthy
+      openmetadata-migrate:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:8586/healthcheck"]
+      interval: 15s
+      timeout: 10s
+      retries: 10
+    networks:
+      - kensan-network
+
+  openmetadata-ingestion:
+    image: docker.getcollate.io/openmetadata/ingestion:1.11.7
+    container_name: kensan-openmetadata-ingestion
+    command: airflow standalone
+    environment:
+      AIRFLOW__API__AUTH_BACKENDS: "airflow.api.auth.backend.basic_auth,airflow.api.auth.backend.session"
+      AIRFLOW__CORE__EXECUTOR: LocalExecutor
+      AIRFLOW__OPENMETADATA_AIRFLOW_APIS__DAG_GENERATED_CONFIGS: "/opt/airflow/dag_generated_configs"
+      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow_user:airflow_pass@openmetadata-postgres:5432/airflow_db
+      _AIRFLOW_DB_MIGRATE: "true"
+      _AIRFLOW_WWW_USER_CREATE: "true"
+      _AIRFLOW_WWW_USER_PASSWORD: admin
+    ports:
+      - "8080:8080"
+    volumes:
+      - openmetadata_ingestion_dag:/opt/airflow/dag_generated_configs
+      - openmetadata_ingestion_dags:/opt/airflow/dags
+      - openmetadata_ingestion_tmp:/tmp
+    depends_on:
+      openmetadata-postgres:
+        condition: service_healthy
+      openmetadata-elasticsearch:
+        condition: service_started
+      openmetadata-server:
+        condition: service_started
+    networks:
+      - kensan-network
+
+networks:
+  kensan-network:
+    external: true
+    name: kensan-mockup_kensan-network
+
+volumes:
+  openmetadata_postgres_data:
+  openmetadata_es_data:
+  openmetadata_ingestion_dag:
+  openmetadata_ingestion_dags:
+  openmetadata_ingestion_tmp:
