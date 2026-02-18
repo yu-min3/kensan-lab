@@ -1,0 +1,101 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: note-service
+  labels:
+    app: note-service
+spec:
+  selector:
+    app: note-service
+  ports:
+  - port: 8091
+    targetPort: 8091
+    name: http
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: note-service
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: note-service
+  template:
+    metadata:
+      labels:
+        app: note-service
+    spec:
+      containers:
+      - name: note-service
+        image: ghcr.io/yu-min3/kensan-note:latest
+        imagePullPolicy: Always
+        envFrom:
+        - configMapRef:
+            name: kensan-env-config
+        env:
+        - name: SERVER_PORT
+          value: "8091"
+        - name: DB_HOST
+          value: postgresql.kensan-data.svc.cluster.local
+        - name: DB_PORT
+          value: "5432"
+        - name: DB_USER
+          valueFrom:
+            secretKeyRef:
+              name: kensan-app-credentials
+              key: DB_USER
+        - name: DB_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: kensan-app-credentials
+              key: DB_PASSWORD
+        - name: JWT_SECRET
+          valueFrom:
+            secretKeyRef:
+              name: kensan-app-credentials
+              key: JWT_SECRET
+        - name: STORAGE_ENDPOINT
+          value: minio.kensan-data.svc.cluster.local:9000
+        - name: STORAGE_ACCESS_KEY
+          valueFrom:
+            secretKeyRef:
+              name: kensan-minio-app-credentials
+              key: STORAGE_ACCESS_KEY
+        - name: STORAGE_SECRET_KEY
+          valueFrom:
+            secretKeyRef:
+              name: kensan-minio-app-credentials
+              key: STORAGE_SECRET_KEY
+        - name: STORAGE_BUCKET
+          value: "$(NOTES_BUCKET)"
+        - name: STORAGE_USE_SSL
+          value: "false"
+        - name: OTEL_ENABLED
+          value: "true"
+        - name: OTEL_COLLECTOR_URL
+          value: "otel-collector-opentelemetry-collector.monitoring.svc:4318"
+        - name: OTEL_RESOURCE_ATTRIBUTES
+          value: "service.name=note-service,service.namespace=kensan,deployment.environment=$(DEPLOYMENT_ENVIRONMENT)"
+        ports:
+        - containerPort: 8091
+          name: http
+        resources:
+          requests:
+            cpu: 50m
+            memory: 128Mi
+          limits:
+            cpu: 200m
+            memory: 256Mi
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8091
+          initialDelaySeconds: 10
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 8091
+          initialDelaySeconds: 5
+          periodSeconds: 5
