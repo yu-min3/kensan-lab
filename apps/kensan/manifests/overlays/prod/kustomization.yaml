@@ -12,18 +12,18 @@ patches:
 
 images:
 - name: ghcr.io/yu-min3/kensan-frontend
-  newTag: v0.0.0
+  newTag: v0.0.1
 - name: ghcr.io/yu-min3/kensan-user
-  newTag: v0.0.0
+  newTag: v0.0.1
 - name: ghcr.io/yu-min3/kensan-task
-  newTag: v0.0.0
+  newTag: v0.0.1
 - name: ghcr.io/yu-min3/kensan-timeblock
-  newTag: v0.0.0
+  newTag: v0.0.1
 - name: ghcr.io/yu-min3/kensan-analytics
-  newTag: v0.0.0
+  newTag: v0.0.1
 - name: ghcr.io/yu-min3/kensan-memo
-  newTag: v0.0.0
+  newTag: v0.0.1
 - name: ghcr.io/yu-min3/kensan-note
-  newTag: v0.0.0
+  newTag: v0.0.1
 - name: ghcr.io/yu-min3/kensan-ai
-  newTag: v0.0.0
+  newTag: v0.0.1
