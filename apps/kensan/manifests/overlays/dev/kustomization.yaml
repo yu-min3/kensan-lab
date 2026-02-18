@@ -9,18 +9,18 @@ resources:
 
 images:
 - name: ghcr.io/yu-min3/kensan-frontend
-  newTag: latest
+  newTag: v0.0.1
 - name: ghcr.io/yu-min3/kensan-user
-  newTag: latest
+  newTag: v0.0.1
 - name: ghcr.io/yu-min3/kensan-task
-  newTag: latest
+  newTag: v0.0.1
 - name: ghcr.io/yu-min3/kensan-timeblock
-  newTag: latest
+  newTag: v0.0.1
 - name: ghcr.io/yu-min3/kensan-analytics
-  newTag: latest
+  newTag: v0.0.1
 - name: ghcr.io/yu-min3/kensan-memo
-  newTag: latest
+  newTag: v0.0.1
 - name: ghcr.io/yu-min3/kensan-note
-  newTag: latest
+  newTag: v0.0.1
 - name: ghcr.io/yu-min3/kensan-ai
-  newTag: latest
+  newTag: v0.0.1
