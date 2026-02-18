@@ -204,5 +204,14 @@ nodeSelector: {}
 # Tolerations
 tolerations: []
 
-# Affinity
-affinity: {}
+# Prefer high-performance node (not required - can run on any node)
+affinity:
+  nodeAffinity:
+    preferredDuringSchedulingIgnoredDuringExecution:
+      - weight: 80
+        preference:
+          matchExpressions:
+            - key: hardware-class
+              operator: In
+              values:
+                - high-performance
