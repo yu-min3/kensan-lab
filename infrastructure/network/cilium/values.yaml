@@ -28,8 +28,10 @@ l2announcements:
 externalIPs:
   enabled: true
 
-# Network interface for L2 announcements
-devices: "wlan+ wlp+"
+# Network device auto-detection
+# Let Cilium detect the default-route device on each node automatically.
+# Required for mixed-interface clusters (RPi: wlan0, M4 Neo: wlp3s0).
+# L2 announcement interfaces are controlled separately in lb-ippool.yaml.
 
 # Hubble observability
 hubble:
