@@ -1,0 +1,23 @@
+apiVersion: security.istio.io/v1
+kind: AuthorizationPolicy
+metadata:
+  name: kensan-allow-gateway
+spec:
+  action: ALLOW
+  rules:
+  # Allow traffic from Istio ingress gateway
+  - from:
+    - source:
+        namespaces: ["istio-system"]
+  # Allow Prometheus scraping from monitoring namespace
+  - from:
+    - source:
+        namespaces: ["monitoring"]
+    to:
+    - operation:
+        methods: ["GET"]
+        paths: ["/metrics"]
+  # Allow intra-service communication within kensan namespaces
+  - from:
+    - source:
+        namespaces: ["kensan-dev", "kensan-prod"]
