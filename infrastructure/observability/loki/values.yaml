@@ -58,6 +58,17 @@ loki:
 singleBinary:
   replicas: 1
 
+  # Schedule on high-performance node (NVMe I/O for log storage)
+  affinity:
+    nodeAffinity:
+      requiredDuringSchedulingIgnoredDuringExecution:
+        nodeSelectorTerms:
+          - matchExpressions:
+              - key: hardware-class
+                operator: In
+                values:
+                  - high-performance
+
   # Resources
   resources:
     requests:

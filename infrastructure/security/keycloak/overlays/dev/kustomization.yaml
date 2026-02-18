@@ -19,3 +19,11 @@ patches:
   target:
     kind: StatefulSet
     name: postgresql
+- path: affinity-patch.yaml
+  target:
+    kind: Deployment
+    name: keycloak
+- path: affinity-patch.yaml
+  target:
+    kind: StatefulSet
+    name: postgresql

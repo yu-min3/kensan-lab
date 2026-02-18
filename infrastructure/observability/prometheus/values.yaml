@@ -21,7 +21,18 @@ prometheusOperator:
 prometheus:
   enabled: true
   prometheusSpec:
-    # Resource limits for Raspberry Pi
+    # Schedule on high-performance node (NVMe I/O for TSDB)
+    affinity:
+      nodeAffinity:
+        requiredDuringSchedulingIgnoredDuringExecution:
+          nodeSelectorTerms:
+            - matchExpressions:
+                - key: hardware-class
+                  operator: In
+                  values:
+                    - high-performance
+
+    # Resource limits
     resources:
       requests:
         cpu: 250m
