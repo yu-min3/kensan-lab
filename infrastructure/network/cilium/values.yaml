@@ -29,7 +29,7 @@ externalIPs:
   enabled: true
 
 # Network interface for L2 announcements
-devices: wlan0
+devices: "wlan+ wlp+"
 
 # Hubble observability
 hubble:
