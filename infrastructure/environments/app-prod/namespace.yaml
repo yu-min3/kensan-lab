@@ -1,9 +1,0 @@
-apiVersion: v1
-kind: Namespace
-metadata:
-  name: app-prod
-  labels:
-    app.kubernetes.io/managed-by: argocd
-    goldship.platform/environment: production
-    goldship.platform/tier: application
-    istio-injection: enabled
