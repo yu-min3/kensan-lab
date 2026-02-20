@@ -33,6 +33,23 @@ externalIPs:
 # Required for mixed-interface clusters (RPi: wlan0, M4 Neo: wlp3s0).
 # L2 announcement interfaces are controlled separately in lb-ippool.yaml.
 
+# Cilium Operator settings
+# - replicas: 1 (default 2) — 4ノードクラスタで十分。CrashLoop 時の apiserver 負荷を半減
+# - resources: light workload パターンに準拠
+# - extraArgs: K8s client rate limit を抑制し、再起動時の API burst を制限
+operator:
+  replicas: 1
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      cpu: 200m
+      memory: 256Mi
+  extraArgs:
+    - --operator-k8s-client-qps=15
+    - --operator-k8s-client-burst=30
+
 # Hubble observability
 hubble:
   enabled: true
