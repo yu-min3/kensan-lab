@@ -123,12 +123,26 @@ kube-state-metrics:
       cpu: 50m
       memory: 64Mi
 
+# etcd monitoring — apiserver 障害の根本原因特定のため有効化
+# master ノードで listen-metrics-urls に master IP を追加する手動作業が必要
+# (手順: temp/fix-etcd-metrics.sh)
+kubeEtcd:
+  enabled: true
+  endpoints:
+    - 192.168.0.107
+  service:
+    enabled: true
+    port: 2381
+    targetPort: 2381
+  serviceMonitor:
+    scheme: http
+
 # Default scrape configs
 defaultRules:
   create: true
   rules:
     alertmanager: true
-    etcd: false  # Not needed for kubeadm clusters
+    etcd: true  # etcd アラートルール有効化（microSD I/O ボトルネック検知）
     configReloaders: true
     general: true
     k8s: true
