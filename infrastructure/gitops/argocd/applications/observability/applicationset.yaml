@@ -1,0 +1,69 @@
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: observability
+  namespace: argocd
+spec:
+  goTemplate: true
+  goTemplateOptions: ["missingkey=error"]
+  generators:
+    - git:
+        repoURL: https://github.com/yu-min3/goldship-yumin3
+        revision: HEAD
+        files:
+          - path: infrastructure/observability/*/config.json
+  template:
+    metadata:
+      name: '{{ .name }}'
+      namespace: argocd
+      labels:
+        app.kubernetes.io/component: observability
+      finalizers:
+        - resources-finalizer.argocd.argoproj.io
+    spec:
+      project: platform-project
+      sources:
+        - repoURL: '{{ .chartRepo }}'
+          chart: '{{ .chart }}'
+          targetRevision: '{{ .chartVersion }}'
+          helm:
+            releaseName: '{{ .name }}'
+            valueFiles:
+              - '$values/infrastructure/observability/{{ .name }}/values.yaml'
+        - repoURL: https://github.com/yu-min3/goldship-yumin3
+          targetRevision: HEAD
+          ref: values
+      destination:
+        server: https://kubernetes.default.svc
+        namespace: '{{ .namespace }}'
+      syncPolicy:
+        automated:
+          prune: true
+          selfHeal: true
+        syncOptions:
+          - CreateNamespace={{ default "false" .createNamespace }}
+          - ServerSideApply=true
+        retry:
+          limit: 5
+          backoff:
+            duration: 5s
+            factor: 2
+            maxDuration: 3m
+  templatePatch: |
+    {{- if eq .hasResources "true" }}
+    spec:
+      sources:
+        - repoURL: '{{ .chartRepo }}'
+          chart: '{{ .chart }}'
+          targetRevision: '{{ .chartVersion }}'
+          helm:
+            releaseName: '{{ .name }}'
+            valueFiles:
+              - '$values/infrastructure/observability/{{ .name }}/values.yaml'
+        - repoURL: https://github.com/yu-min3/goldship-yumin3
+          targetRevision: HEAD
+          ref: values
+        - repoURL: https://github.com/yu-min3/goldship-yumin3
+          targetRevision: HEAD
+          path: infrastructure/observability/{{ .name }}/resources
+    {{- end }}

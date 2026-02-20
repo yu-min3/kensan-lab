@@ -1,0 +1,6 @@
+{
+  "name": "system-infra",
+  "dirName": "system-infra",
+  "namespace": "kube-system",
+  "createNamespace": "false"
+}
