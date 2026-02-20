@@ -1,0 +1,72 @@
+# Custom PrometheusRule: apiserver 障害の早期検知と根本原因特定
+# - apiserver レイテンシ異常
+# - Cilium operator CrashLoop フィードバックループ検知
+# - etcd ディスク I/O ボトルネック（microSD 劣化の先行指標）
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: apiserver-etcd-alerts
+  namespace: monitoring
+  labels:
+    release: prometheus
+    app: kube-prometheus-stack
+spec:
+  groups:
+    # --- apiserver health ---
+    - name: apiserver-health
+      rules:
+        - alert: KubeApiserverHighLatency
+          annotations:
+            summary: "kube-apiserver の LIST/WATCH レイテンシが異常に高い"
+            description: "apiserver の {{ $labels.verb }} リクエスト p99 レイテンシが 5s を超えています（現在値: {{ $value | humanizeDuration }}）。etcd I/O 劣化または CrashLoop による過負荷の可能性があります。"
+            runbook_url: "https://runbooks.prometheus-operator.dev/runbooks/kubernetes/kubeapiserverlatencyhigh"
+          expr: |
+            histogram_quantile(0.99,
+              sum(rate(apiserver_request_duration_seconds_bucket{verb=~"LIST|WATCH"}[10m])) by (le, verb)
+            ) > 5
+          for: 10m
+          labels:
+            severity: warning
+
+    # --- Cilium operator stability ---
+    - name: cilium-operator-health
+      rules:
+        - alert: CiliumOperatorCrashLooping
+          annotations:
+            summary: "Cilium operator が頻繁に再起動しています"
+            description: "Cilium operator ({{ $labels.pod }}) が過去1時間に {{ $value }} 回再起動しました。apiserver への負荷蓄積によるフィードバックループの可能性があります。"
+          expr: |
+            increase(kube_pod_container_status_restarts_total{
+              namespace="kube-system",
+              container="cilium-operator"
+            }[1h]) > 3
+          for: 5m
+          labels:
+            severity: warning
+
+    # --- etcd disk health (microSD I/O bottleneck detection) ---
+    - name: etcd-disk-health
+      rules:
+        - alert: EtcdSlowWalFsync
+          annotations:
+            summary: "etcd WAL fsync が遅い — ディスク I/O ボトルネックの可能性"
+            description: "etcd WAL fsync の p99 が 100ms を超えています（現在値: {{ $value | humanizeDuration }}）。microSD カードの劣化または I/O 飽和が疑われます。"
+          expr: |
+            histogram_quantile(0.99,
+              sum(rate(etcd_disk_wal_fsync_duration_seconds_bucket[10m])) by (le, instance)
+            ) > 0.1
+          for: 10m
+          labels:
+            severity: warning
+
+        - alert: EtcdSlowBackendCommit
+          annotations:
+            summary: "etcd backend commit が遅い"
+            description: "etcd backend commit の p99 が 250ms を超えています（現在値: {{ $value | humanizeDuration }}）。ディスク I/O の劣化により apiserver のレスポンス低下を引き起こす可能性があります。"
+          expr: |
+            histogram_quantile(0.99,
+              sum(rate(etcd_disk_backend_commit_duration_seconds_bucket[10m])) by (le, instance)
+            ) > 0.25
+          for: 10m
+          labels:
+            severity: warning
