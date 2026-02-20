@@ -1,0 +1,6 @@
+{
+  "name": "env-kensan-data",
+  "dirName": "kensan-data",
+  "namespace": "kensan-data",
+  "createNamespace": "true"
+}

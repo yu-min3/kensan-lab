@@ -1,0 +1,9 @@
+{
+  "name": "loki",
+  "chart": "loki",
+  "chartRepo": "https://grafana.github.io/helm-charts",
+  "chartVersion": "6.46.0",
+  "namespace": "monitoring",
+  "hasResources": "false",
+  "createNamespace": "false"
+}

@@ -1,0 +1,35 @@
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: environments
+  namespace: argocd
+spec:
+  goTemplate: true
+  goTemplateOptions: ["missingkey=error"]
+  generators:
+    - git:
+        repoURL: https://github.com/yu-min3/goldship-yumin3
+        revision: HEAD
+        files:
+          - path: infrastructure/environments/*/config.json
+  template:
+    metadata:
+      name: '{{ .name }}'
+      namespace: argocd
+      finalizers:
+        - resources-finalizer.argocd.argoproj.io
+    spec:
+      project: platform-project
+      source:
+        repoURL: https://github.com/yu-min3/goldship-yumin3
+        targetRevision: HEAD
+        path: 'infrastructure/environments/{{ .dirName }}'
+      destination:
+        server: https://kubernetes.default.svc
+        namespace: '{{ .namespace }}'
+      syncPolicy:
+        automated:
+          prune: true
+          selfHeal: true
+        syncOptions:
+          - CreateNamespace={{ default "true" .createNamespace }}
