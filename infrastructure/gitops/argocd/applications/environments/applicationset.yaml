@@ -24,6 +24,8 @@ spec:
         repoURL: https://github.com/yu-min3/goldship-yumin3
         targetRevision: HEAD
         path: 'infrastructure/environments/{{ .dirName }}'
+        directory:
+          exclude: 'config.json'
       destination:
         server: https://kubernetes.default.svc
         namespace: '{{ .namespace }}'
