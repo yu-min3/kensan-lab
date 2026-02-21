@@ -13,6 +13,7 @@
 - [ ] **ネットワークインターフェース**の変更（Cilium L2 Announcement）
 - [ ] **TLS証明書用の認証情報**の設定（Cert-Manager + DNS Provider）
 - [ ] **Sealed Secrets**の再生成（新しいクラスター用）
+- [ ] **Alertmanager Slack Webhook**の設定（通知を有効化する場合）
 
 ## 必須変更項目
 
@@ -341,6 +342,7 @@ spec:
 | `base-infra/keycloak/overlays/dev/postgresql-sealed-secret.yaml` | Keycloak PostgreSQL（開発） |
 | `base-infra/keycloak/overlays/dev/keycloak-sealed-secret.yaml` | Keycloak Admin認証情報（開発） |
 | `base-infra/prometheus/grafana-sealed-secret.yaml` | Grafana Admin認証情報 |
+| `infrastructure/observability/prometheus/resources/alertmanager-slack-sealed-secret.yaml` | Alertmanager Slack Webhook URL |
 | `base-infra/cert-manager/route53-credentials-sealed.yaml` | AWS Route53認証情報 |
 
 #### 一般的な再生成手順
@@ -521,6 +523,7 @@ kubectl describe certificate -n istio-system wildcard-tls
 - [ ] ネットワークインターフェース名を確認・変更した
 - [ ] TLS証明書用の認証情報を設定した
 - [ ] すべてのSealed Secretsを再生成した
+- [ ] Alertmanager Slack Webhook を設定した（通知を使用する場合）
 - [ ] Kustomizeビルドが成功することを確認した
 - [ ] 個人情報が残っていないことを確認した
 
