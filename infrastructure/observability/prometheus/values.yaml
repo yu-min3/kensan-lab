@@ -22,6 +22,7 @@ prometheus:
   enabled: true
   podDisruptionBudget:
     enabled: true
+    minAvailable: null
     maxUnavailable: 1
   prometheusSpec:
     # Schedule on high-performance node (NVMe I/O for TSDB)
@@ -88,6 +89,7 @@ alertmanager:
   enabled: true
   podDisruptionBudget:
     enabled: true
+    minAvailable: null
     maxUnavailable: 1
   alertmanagerSpec:
     # Slack webhook Secret を pod に /etc/alertmanager/secrets/<name>/ としてマウント
@@ -177,6 +179,8 @@ nodeExporter:
 kube-state-metrics:
   enabled: true
   podDisruptionBudget:
+    enabled: true
+    minAvailable: null
     maxUnavailable: 1
   resources:
     limits:
