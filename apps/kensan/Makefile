@@ -1,6 +1,8 @@
 .PHONY: up down build logs ps clean frontend backend db storage help dev dev-backend e2e-install e2e e2e-ui e2e-headed demo-seed demo-clean backup restore db-backup db-restore storage-backup storage-restore \
        lakehouse lakehouse-dremio lakehouse-trino lakehouse-all lakehouse-down openmetadata openmetadata-down \
-       prod-up prod-down prod-logs prod-lakehouse deploy
+       prod-up prod-down prod-logs prod-lakehouse deploy \
+       k8s-build k8s-build-frontend k8s-build-backend k8s-push k8s-push-frontend k8s-push-backend \
+       k8s-deploy-dev k8s-deploy-prod k8s-deploy k8s-release-dev k8s-release-prod k8s-release
 
 # Default target
 .DEFAULT_GOAL := help
@@ -150,6 +152,92 @@ prod-lakehouse:
 ## Example: JWT_SECRET=xxx GOOGLE_API_KEY=xxx make deploy
 deploy:
 	@bash scripts/gce-deploy.sh
+
+# =============================================================================
+# Kubernetes (k8s) Image Build, Push & Deploy
+# =============================================================================
+# Podman でイメージをビルドし GHCR に push → newTag 更新 PR を作成する。
+# フロントエンドは VITE_* を空文字でビルドし、相対URL（k8s HTTPRoute パスベースルーティング対応）にする。
+#
+# クイックリファレンス:
+#   make k8s-release-dev TAG=v0.0.2    # dev:  build → push → PR作成
+#   make k8s-release-prod TAG=v0.0.2   # prod: build → push → PR作成
+#   make k8s-release TAG=v0.0.2        # both: build → push → PR作成
+#
+#   make k8s-deploy-dev TAG=v0.0.2     # dev:  PR作成のみ (build/push済み前提)
+#   make k8s-deploy-prod TAG=v0.0.2    # prod: PR作成のみ
+#   make k8s-deploy TAG=v0.0.2         # both: PR作成のみ
+
+REGISTRY ?= ghcr.io/yu-min3
+TAG ?= latest
+
+# --- Build ---
+
+## Build all k8s images (frontend + backend)
+k8s-build: k8s-build-frontend k8s-build-backend
+
+## Build frontend for k8s (VITE_* empty = relative URLs for HTTPRoute)
+k8s-build-frontend:
+	podman build \
+	  --build-arg VITE_USER_SERVICE_URL= \
+	  --build-arg VITE_TASK_SERVICE_URL= \
+	  --build-arg VITE_TIMEBLOCK_SERVICE_URL= \
+	  --build-arg VITE_ANALYTICS_SERVICE_URL= \
+	  --build-arg VITE_AI_SERVICE_URL= \
+	  --build-arg VITE_MEMO_SERVICE_URL= \
+	  --build-arg VITE_NOTE_SERVICE_URL= \
+	  -t $(REGISTRY)/kensan-frontend:$(TAG) \
+	  frontend/
+
+## Build all backend services for k8s
+k8s-build-backend:
+	@for svc in user task timeblock analytics memo note; do \
+	  echo "Building $$svc-service..."; \
+	  podman build -t $(REGISTRY)/kensan-$$svc:$(TAG) \
+	    -f backend/services/$$svc/Dockerfile backend/; \
+	done
+	podman build -t $(REGISTRY)/kensan-ai:$(TAG) kensan-ai/
+
+# --- Push ---
+
+## Push all k8s images to GHCR
+k8s-push: k8s-push-frontend k8s-push-backend
+
+## Push frontend image to GHCR
+k8s-push-frontend:
+	podman push $(REGISTRY)/kensan-frontend:$(TAG)
+
+## Push all backend images to GHCR
+k8s-push-backend:
+	@for svc in user task timeblock analytics memo note ai; do \
+	  echo "Pushing kensan-$$svc..."; \
+	  podman push $(REGISTRY)/kensan-$$svc:$(TAG); \
+	done
+
+# --- Deploy (newTag 更新 + PR作成) ---
+
+## Deploy dev: update newTag + create PR
+k8s-deploy-dev:
+	@bash scripts/k8s-create-pr.sh dev $(TAG)
+
+## Deploy prod: update newTag + create PR
+k8s-deploy-prod:
+	@bash scripts/k8s-create-pr.sh prod $(TAG)
+
+## Deploy dev+prod: update newTag + create PR
+k8s-deploy:
+	@bash scripts/k8s-create-pr.sh all $(TAG)
+
+# --- Release (build + push + deploy) ---
+
+## Full release dev: build + push + PR
+k8s-release-dev: k8s-build k8s-push k8s-deploy-dev
+
+## Full release prod: build + push + PR
+k8s-release-prod: k8s-build k8s-push k8s-deploy-prod
+
+## Full release dev+prod: build + push + PR
+k8s-release: k8s-build k8s-push k8s-deploy
 
 # =============================================================================
 # Lakehouse (delegates to lakehouse/Makefile, requires app stack running)
@@ -374,6 +462,16 @@ help:
 	@echo "  prod-logs      View production logs"
 	@echo "  prod-lakehouse Start lakehouse (prod, ports hidden)"
 	@echo "  deploy         Deploy to GCE via SSH (requires JWT_SECRET, GOOGLE_API_KEY)"
+	@echo ""
+	@echo "Kubernetes (k8s):"
+	@echo "  k8s-release TAG=x         Build + push + PR (dev+prod)"
+	@echo "  k8s-release-dev TAG=x     Build + push + PR (dev only)"
+	@echo "  k8s-release-prod TAG=x    Build + push + PR (prod only)"
+	@echo "  k8s-deploy TAG=x          Update newTag + PR only (dev+prod)"
+	@echo "  k8s-deploy-dev TAG=x      Update newTag + PR only (dev only)"
+	@echo "  k8s-deploy-prod TAG=x     Update newTag + PR only (prod only)"
+	@echo "  k8s-build TAG=x           Build all images (podman)"
+	@echo "  k8s-push TAG=x            Push all images to GHCR"
 	@echo ""
 	@echo "Utilities:"
 	@echo "  health    Check health of all services"
