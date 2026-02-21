@@ -26,6 +26,15 @@ spec:
       labels:
         app: user-service
     spec:
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+            - matchExpressions:
+              - key: kubernetes.io/arch
+                operator: In
+                values:
+                - amd64
       containers:
       - name: user-service
         image: ghcr.io/yu-min3/kensan-user:latest
