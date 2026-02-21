@@ -1,17 +1,24 @@
-archive/*
+# Environment & secrets
 .env
 *.env
-mcp-server-kubernetes/*
-CLAUDE.md
-GEMINI.md
-AGENTS.md
+kubeconfig
+*-raw.yaml
+
+# Temporary files
 temp.txt
 temp/*
-kubeconfig
-.claude
+
+# AI assistant (personal overrides)
+CLAUDE.local.md
+.claude/settings.local.json
+GEMINI.md
+AGENTS.md
+
+# Local / IDE
 .serena
 my_docs/*
 .DS_Store
 
-# Only Sealed Secrets should be committed
-*-raw.yaml
+# Archived / deprecated
+archive/*
+mcp-server-kubernetes/*
