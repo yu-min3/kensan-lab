@@ -34,6 +34,12 @@ spec:
     syncOptions:
       - CreateNamespace=false
       - ServerSideApply=true
+    retry:
+      limit: 5
+      backoff:
+        duration: 5s
+        factor: 2
+        maxDuration: 3m
 
   # Cilium runtime-generated CRs
   ignoreDifferences:
