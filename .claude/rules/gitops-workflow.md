@@ -1,6 +1,5 @@
 ---
 description: GitOps principles, forbidden operations, and workflow conventions
-globs:
 ---
 
 # GitOps Workflow Rules

@@ -12,14 +12,13 @@ Upgrade `$ARGUMENTS[0]` to chart version `$ARGUMENTS[1]`.
 
 1. **Locate Application CR**:
    - Search: `infrastructure/gitops/argocd/applications/**/$ARGUMENTS[0]/app.yaml`
-   - If not found, check `config.json` pattern
 
 2. **Read current version**:
    - Show current `targetRevision` value
    - Confirm the upgrade: `current → $ARGUMENTS[1]`
 
 3. **Update targetRevision**:
-   - Edit `spec.sources[0].targetRevision` (or equivalent in config.json) to `$ARGUMENTS[1]`
+   - Edit `spec.sources[0].targetRevision` in the Application CR to `$ARGUMENTS[1]`
 
 4. **Check for breaking changes**:
    - If major version bump, warn the user to review changelog

@@ -1,6 +1,6 @@
 ---
 description: Helm multi-source Application pattern for Argo CD managed components
-globs: "**/values.yaml, **/app.yaml, **/config.json"
+globs: "**/values.yaml, **/app.yaml"
 ---
 
 # Helm Multi-Source Application Pattern

@@ -15,7 +15,6 @@
       "Bash(kubectl get:*)",
       "Bash(kubectl describe:*)",
       "Bash(kubectl logs:*)",
-      "Bash(kubectl exec:*)",
       "Bash(kubectl kustomize:*)",
       "Bash(kubectl top:*)",
       "Bash(kubectl config:*)",
@@ -103,9 +102,9 @@
       "Bash(pkill:*)",
       "Bash(shutdown:*)",
       "Bash(reboot:*)",
-      "Read(./.env)",
-      "Read(./.env.*)",
-      "Read(./secrets/**)",
+      "Read(**/.env)",
+      "Read(**/.env.*)",
+      "Read(**/secrets/**)",
       "Read(**/.git/config)",
       "Read(**/*credentials*)",
       "Read(**/temp/*-raw.yaml)"
@@ -119,6 +118,12 @@
       "Bash(git stash:*)",
       "Bash(kubectl apply:*)",
       "Bash(kubectl delete:*)",
+      "Bash(kubectl exec:*)",
+      "Bash(kubectl scale:*)",
+      "Bash(kubectl set:*)",
+      "Bash(kubectl label:*)",
+      "Bash(kubectl annotate:*)",
+      "Bash(kubectl patch:*)",
       "Bash(docker:*)"
     ]
   },
@@ -129,7 +134,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "input=$(cat); cmd=$(echo \"$input\" | jq -r '.tool_input.command // empty'); if echo \"$cmd\" | grep -qE 'kubectl\\s+(apply|delete|patch|replace|edit)\\s' && echo \"$cmd\" | grep -qE '(-n|--namespace=?)\\s*(kube-system|argocd|istio-system)'; then echo 'BLOCKED: Direct mutation of protected namespace. Use GitOps workflow (edit files → git push → Argo CD sync).' >&2; exit 2; fi"
+            "command": "input=$(cat); cmd=$(echo \"$input\" | jq -r '.tool_input.command // empty' 2>/dev/null) || exit 0; if echo \"$cmd\" | grep -qE 'kubectl.*(apply|delete|patch|replace|edit|scale|set|label|annotate)' && echo \"$cmd\" | grep -qE '(-n|--namespace[= ])\\s*(kube-system|argocd|istio-system|monitoring|cert-manager)'; then echo 'BLOCKED: Direct mutation of protected namespace (kube-system, argocd, istio-system, monitoring, cert-manager). Use GitOps workflow instead.' >&2; exit 2; fi"
           }
         ]
       }
