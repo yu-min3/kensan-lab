@@ -7,5 +7,7 @@ metadata:
     goldship.platform/environment: infrastructure
     goldship.platform/tier: platform
     goldship.platform/component: service-mesh
+    pod-security.kubernetes.io/enforce: baseline
+    pod-security.kubernetes.io/warn: restricted
   annotations:
     argocd.argoproj.io/sync-wave: "-3" # Create namespace first (before CRDs)

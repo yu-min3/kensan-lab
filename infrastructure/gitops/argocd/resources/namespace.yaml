@@ -7,3 +7,5 @@ metadata:
     goldship.platform/environment: infrastructure
     goldship.platform/tier: platform
     goldship.platform/component: gitops
+    pod-security.kubernetes.io/enforce: baseline
+    pod-security.kubernetes.io/warn: restricted
