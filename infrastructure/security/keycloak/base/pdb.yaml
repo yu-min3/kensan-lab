@@ -1,0 +1,19 @@
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: keycloak-pdb
+spec:
+  maxUnavailable: 1
+  selector:
+    matchLabels:
+      app: keycloak
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: postgresql-pdb
+spec:
+  maxUnavailable: 1
+  selector:
+    matchLabels:
+      app: postgresql

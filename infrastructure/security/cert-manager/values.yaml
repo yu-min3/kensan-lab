@@ -6,3 +6,13 @@
 # Install CRDs with the chart (required for Certificate, ClusterIssuer, etc.)
 crds:
   enabled: true
+
+# PodDisruptionBudget
+podDisruptionBudget:
+  enabled: true
+  maxUnavailable: 1
+
+webhook:
+  podDisruptionBudget:
+    enabled: true
+    maxUnavailable: 1

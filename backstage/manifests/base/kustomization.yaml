@@ -12,3 +12,4 @@ resources:
 - backstage-deployment.yaml
 - backstage-service.yaml
 - httproute.yaml
+- pdb.yaml

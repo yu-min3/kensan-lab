@@ -74,5 +74,9 @@ grafana.ini:
 # Default settings
 defaultDashboardsTimezone: Asia/Tokyo
 
+# PodDisruptionBudget
+podDisruptionBudget:
+  maxUnavailable: 1
+
 # Pod annotations
 podAnnotations: {}
