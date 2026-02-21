@@ -375,7 +375,7 @@ graph LR
 | `grafana/dashboards/kensan-service-overview.json` | Service Overview ダッシュボード定義 |
 | `grafana/dashboards/kensan-request-explorer.json` | Request Explorer ダッシュボード定義 |
 
-**ノイズ除去フィルター:** OTel Collector の `filter/drop-http-send` プロセッサーで、FastAPI SSE ストリーミング時の `http send` スパン（yield ごとに μs 単位で生成、情報価値なし）を除外している。設定は `otel-collector-config.yaml` を参照。
+**ノイズ除去フィルター:** FastAPI SSE ストリーミング時の `http send` スパン（yield ごとに μs 単位で生成、情報価値なし）は、アプリ側の `_FilteringSpanProcessor`（`kensan-ai/src/kensan_ai/telemetry.py`）でエクスポート前にドロップしている。Collector に到達する前に除外するため、シリアライズ・ネットワーク転送コストを削減できる。
 
 ---
 

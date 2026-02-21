@@ -20,6 +20,32 @@ class TelemetryConfig:
 _shutdown_funcs: list = []
 
 
+class _FilteringSpanProcessor:
+    """SSE ストリーミングのノイズスパンをエクスポート前にドロップ。
+
+    FastAPI の自動計装は SSE yield ごとに "http send" スパンを生成するが、
+    μs 単位で情報価値がないためフィルタリングする。
+    """
+
+    def __init__(self, delegate):
+        self._delegate = delegate
+
+    def on_start(self, span, parent_context=None):
+        self._delegate.on_start(span, parent_context)
+
+    def on_end(self, span):
+        name = span.name
+        if "http send" in name and "/api/v1/agent/stream" in name:
+            return
+        self._delegate.on_end(span)
+
+    def shutdown(self):
+        self._delegate.shutdown()
+
+    def force_flush(self, timeout_millis=30000):
+        return self._delegate.force_flush(timeout_millis)
+
+
 def initialize_telemetry(config: TelemetryConfig) -> None:
     """Initialize OpenTelemetry TracerProvider, MeterProvider, and LoggerProvider.
 
@@ -59,7 +85,8 @@ def initialize_telemetry(config: TelemetryConfig) -> None:
         # Traces
         span_exporter = OTLPSpanExporter(endpoint=f"{endpoint}/v1/traces")
         tp = TracerProvider(resource=resource)
-        tp.add_span_processor(BatchSpanProcessor(span_exporter))
+        batch_processor = BatchSpanProcessor(span_exporter)
+        tp.add_span_processor(_FilteringSpanProcessor(batch_processor))
         trace.set_tracer_provider(tp)
         _shutdown_funcs.append(tp.shutdown)
 
