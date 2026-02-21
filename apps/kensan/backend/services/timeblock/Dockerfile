@@ -1,7 +1,8 @@
 # Build stage
-FROM golang:1.24-alpine AS builder
+FROM --platform=$BUILDPLATFORM golang:1.24-alpine AS builder
 
 WORKDIR /app
+ARG TARGETARCH
 
 # Install build dependencies
 RUN apk add --no-cache git
@@ -16,7 +17,7 @@ COPY . .
 # Build the application
 RUN --mount=type=cache,target=/go/pkg/mod \
     --mount=type=cache,target=/root/.cache/go-build \
-    CGO_ENABLED=0 GOOS=linux go build -ldflags="-w -s" -o timeblock-service ./services/timeblock/cmd
+    CGO_ENABLED=0 GOOS=linux GOARCH=$TARGETARCH go build -ldflags="-w -s" -o timeblock-service ./services/timeblock/cmd
 
 # Runtime stage
 FROM alpine:3.19

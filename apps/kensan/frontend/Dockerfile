@@ -1,5 +1,8 @@
 # Frontend Dockerfile (Production Build)
-FROM node:22-alpine
+# Multi-stage: build runs on host arch (no QEMU), runtime uses nginx on target platform.
+
+# --- Build stage (runs natively on host architecture) ---
+FROM --platform=$BUILDPLATFORM node:22-alpine AS builder
 
 WORKDIR /app
 
@@ -31,12 +34,22 @@ COPY . .
 # Build for production (MSW disabled because import.meta.env.DEV is false)
 RUN npm run build
 
-# Observability proxy targets (Docker internal network)
-ENV LOKI_URL=http://loki:3100
-ENV TEMPO_URL=http://tempo:3200
+# --- Runtime stage (target platform) ---
+FROM nginx:alpine
 
-# Expose preview server port
-EXPOSE 5173
+# Copy built assets
+COPY --from=builder /app/dist /usr/share/nginx/html
 
-# Start preview server (serves production build)
-CMD ["npm", "run", "preview", "--", "--host", "0.0.0.0", "--port", "5173"]
+# SPA fallback: all routes serve index.html
+RUN printf 'server {\n\
+    listen 80;\n\
+    root /usr/share/nginx/html;\n\
+    index index.html;\n\
+    location / {\n\
+        try_files $uri $uri/ /index.html;\n\
+    }\n\
+}\n' > /etc/nginx/conf.d/default.conf
+
+EXPOSE 80
+
+CMD ["nginx", "-g", "daemon off;"]
