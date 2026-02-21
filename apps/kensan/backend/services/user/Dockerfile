@@ -23,6 +23,7 @@ RUN apk add --no-cache ca-certificates tzdata
 WORKDIR /app
 
 COPY --from=builder /app/server .
+COPY --from=builder /app/migrations-v2/seeds /app/seeds
 
 RUN adduser -D -g '' appuser
 USER appuser
