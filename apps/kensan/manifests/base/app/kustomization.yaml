@@ -13,6 +13,7 @@ resources:
   - kensan-ai.yaml
   - httproute.yaml
   - authz-policy.yaml
+  - pdb.yaml
 
 labels:
 - pairs:

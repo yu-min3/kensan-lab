@@ -1,0 +1,19 @@
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: backstage-pdb
+spec:
+  maxUnavailable: 1
+  selector:
+    matchLabels:
+      app: backstage
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: postgresql-pdb
+spec:
+  maxUnavailable: 1
+  selector:
+    matchLabels:
+      app: postgresql

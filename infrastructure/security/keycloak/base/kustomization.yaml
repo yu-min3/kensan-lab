@@ -7,3 +7,4 @@ resources:
 - keycloak-env-config.yaml
 - keycloak-deployment.yaml
 - keycloak-service.yaml
+- pdb.yaml

@@ -192,6 +192,11 @@ serviceMonitor:
   extraLabels:
     release: prometheus
 
+# PodDisruptionBudget
+podDisruptionBudget:
+  enabled: true
+  maxUnavailable: 1
+
 # Security context
 securityContext: {}
 
