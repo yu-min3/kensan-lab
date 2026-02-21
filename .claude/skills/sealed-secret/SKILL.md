@@ -14,15 +14,11 @@ Create sealed secret `$ARGUMENTS[0]` in namespace `$ARGUMENTS[1]`.
    - Find the component that manages namespace `$ARGUMENTS[1]`
    - Target: `infrastructure/<category>/<component>/resources/` or `infrastructure/environments/<env>/`
 
-2. **Generate raw secret**:
-   ```bash
-   kubectl create secret generic $ARGUMENTS[0] \
-     --namespace=$ARGUMENTS[1] \
-     --from-literal=KEY1=value1 \
-     --dry-run=client -o yaml > temp/$ARGUMENTS[0]-raw.yaml
-   ```
+2. **Collect secret data**:
    - Ask the user what key-value pairs to include
-   - Write the command to `temp/create-secret.sh`
+   - Construct `kubectl create secret generic` command with `--from-literal` flags
+   - Write the command to `temp/create-secret.sh` (per script output rule)
+   - Run the script to generate `temp/$ARGUMENTS[0]-raw.yaml`
 
 3. **Seal the secret**:
    ```bash
