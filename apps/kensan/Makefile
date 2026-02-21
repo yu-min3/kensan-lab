@@ -170,6 +170,7 @@ deploy:
 
 REGISTRY ?= ghcr.io/yu-min3
 TAG ?= latest
+PLATFORM ?= linux/amd64
 
 # --- Build ---
 
@@ -178,7 +179,7 @@ k8s-build: k8s-build-frontend k8s-build-backend
 
 ## Build frontend for k8s (VITE_* empty = relative URLs for HTTPRoute)
 k8s-build-frontend:
-	podman build \
+	podman build --platform $(PLATFORM) \
 	  --build-arg VITE_USER_SERVICE_URL= \
 	  --build-arg VITE_TASK_SERVICE_URL= \
 	  --build-arg VITE_TIMEBLOCK_SERVICE_URL= \
@@ -193,10 +194,10 @@ k8s-build-frontend:
 k8s-build-backend:
 	@for svc in user task timeblock analytics memo note; do \
 	  echo "Building $$svc-service..."; \
-	  podman build -t $(REGISTRY)/kensan-$$svc:$(TAG) \
+	  podman build --platform $(PLATFORM) -t $(REGISTRY)/kensan-$$svc:$(TAG) \
 	    -f backend/services/$$svc/Dockerfile backend/; \
 	done
-	podman build -t $(REGISTRY)/kensan-ai:$(TAG) kensan-ai/
+	podman build --platform $(PLATFORM) -t $(REGISTRY)/kensan-ai:$(TAG) kensan-ai/
 
 # --- Push ---
 
