@@ -79,3 +79,5 @@ docs/*
 !docs/design/
 !docs/spec/
 !docs/TECHNICAL_HIGHLIGHTS.md
+
+temp/*
