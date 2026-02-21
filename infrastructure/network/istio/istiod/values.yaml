@@ -3,6 +3,12 @@
 #
 # Gateway API support enabled for Kubernetes Gateway API integration
 
+# Disable default PDB (minAvailable: 1 blocks drain on single replica)
+# Re-enable when scaling to 2+ replicas
+global:
+  defaultPodDisruptionBudget:
+    enabled: false
+
 pilot:
   env:
     PILOT_ENABLE_GATEWAY_API: "true"
