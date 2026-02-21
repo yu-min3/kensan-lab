@@ -10,6 +10,7 @@ resources:
   - dagster-daemon.yaml
   - dagster-workspace.yaml
   - lakehouse-env.yaml
+  - pdb.yaml
 
 labels:
 - pairs:
