@@ -131,6 +131,11 @@ alertmanager:
         - matchers:
             - alertname = "InfoInhibitor"
           receiver: "null"
+        # kube-proxy TargetDown — Cilium が kube-proxy を置き換えているため常時発火
+        - matchers:
+            - alertname = "TargetDown"
+            - job = "kube-proxy"
+          receiver: "null"
 
     receivers:
       - name: "null"
