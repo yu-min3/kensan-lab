@@ -26,6 +26,15 @@ spec:
       labels:
         app: note-service
     spec:
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+            - matchExpressions:
+              - key: kubernetes.io/arch
+                operator: In
+                values:
+                - amd64
       containers:
       - name: note-service
         image: ghcr.io/yu-min3/kensan-note:latest
