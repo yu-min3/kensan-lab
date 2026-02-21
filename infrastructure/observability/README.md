@@ -51,6 +51,25 @@
                    │ - Explore    │
                    │ - Alerting   │
                    └──────────────┘
+
+### アラートパイプライン
+
+```
+Prometheus
+  → AlertRules (PrometheusRule CR)
+  → Alertmanager
+      ├── route: Watchdog, InfoInhibitor → null (通知しない)
+      └── route: default → slack-default
+            → Slack Incoming Webhook
+            → #k8s-alerts チャンネル
+```
+
+**カスタムアラートルール** (`resources/apiserver-etcd-alerts.yaml`):
+- `KubeApiserverHighLatency`: apiserver LIST/WATCH の p99 > 5s
+- `CiliumOperatorCrashLooping`: Cilium operator の再起動 > 3回/1h
+- `EtcdSlowWalFsync`: etcd WAL fsync p99 > 100ms (microSD 劣化の先行指標)
+- `EtcdSlowBackendCommit`: etcd backend commit p99 > 250ms
+
 ```
 
 ## コンポーネント
@@ -106,20 +125,27 @@ deployment.environment: <k8s.namespace.name>
 
 ---
 
-### 2. Prometheus
+### 2. Prometheus + Alertmanager
 
-**役割**: メトリクスの時系列データベース
+**役割**: メトリクスの時系列データベース + アラート通知
 
 **デプロイメント**:
-- **Mode**: kube-prometheus-stack
+- **Mode**: kube-prometheus-stack (Prometheus + Alertmanager 含む)
 - **Namespace**: monitoring
-- **Storage**: 既存デプロイメント（詳細は base-infra/prometheus 参照）
+- **Storage**: Prometheus 10Gi + Alertmanager 2Gi PVC (local-path)
 
 **データソース**:
 - OTel Collector からの Remote Write
 - ServiceMonitor による自動スクレイピング（OTel Collector, Tempo, Loki 自身のメトリクス）
 
-**保持期間**: 設定による（default: 15日）
+**保持期間**: 7日 (retentionSize: 9GB)
+
+**Alertmanager 通知設定**:
+- **通知先**: Slack Incoming Webhook (`api_url_file` で Secret から読み込み)
+- **Webhook URL**: SealedSecret で管理 (`resources/alertmanager-slack-sealed-secret.yaml`)
+- **ルーティング**: Watchdog/InfoInhibitor → null、その他 → Slack
+- **再通知間隔**: 4時間
+- **復旧通知**: 有効 (`send_resolved: true`)
 
 ---
 
