@@ -6,6 +6,7 @@ resources:
   - postgresql.yaml
   - minio.yaml
   - minio-init-job.yaml
+  - pdb.yaml
 
 labels:
 - pairs:
