@@ -20,6 +20,9 @@ prometheusOperator:
 # Prometheus instance
 prometheus:
   enabled: true
+  podDisruptionBudget:
+    enabled: true
+    maxUnavailable: 1
   prometheusSpec:
     # Schedule on high-performance node (NVMe I/O for TSDB)
     affinity:
@@ -83,6 +86,9 @@ grafana:
 # Alertmanager
 alertmanager:
   enabled: true
+  podDisruptionBudget:
+    enabled: true
+    maxUnavailable: 1
   alertmanagerSpec:
     resources:
       requests:
@@ -115,6 +121,8 @@ nodeExporter:
 # Kube State Metrics - monitors Kubernetes object states
 kube-state-metrics:
   enabled: true
+  podDisruptionBudget:
+    maxUnavailable: 1
   resources:
     limits:
       cpu: 100m
