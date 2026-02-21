@@ -1,0 +1,9 @@
+{
+  "name": "prometheus",
+  "chart": "kube-prometheus-stack",
+  "chartRepo": "https://prometheus-community.github.io/helm-charts",
+  "chartVersion": "79.5.0",
+  "namespace": "monitoring",
+  "hasResources": "true",
+  "createNamespace": "true"
+}

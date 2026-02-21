@@ -686,7 +686,7 @@ flowchart LR
 | `gen_ai.client.operation.duration` | Histogram | エージェント実行時間 (秒) |
 | `gen_ai.client.operation.count` | Counter | エージェント実行回数 |
 
-自動計装: FastAPI (HTTPスパン)、asyncpg (DBスパン)、httpx (外部HTTPスパン)。`OTEL_ENABLED=false` で全no-op。
+自動計装: FastAPI (HTTPスパン)、asyncpg (DBスパン)、httpx (外部HTTPスパン)。`OTEL_ENABLED=false` で全no-op。SSE ストリーミング (`/api/v1/agent/stream`) の `http send` スパンは `_FilteringSpanProcessor` でエクスポート前にドロップ（yield ごとに μs 単位で生成されるノイズを除去）。
 
 ### InteractionLogger OTel ログ
 

@@ -21,6 +21,9 @@ import {
   X,
   Archive,
   ArchiveRestore,
+  Check,
+  Loader2,
+  AlertCircle,
 } from 'lucide-react'
 import { PageGuide } from '@/components/guide/PageGuide'
 
@@ -75,9 +78,21 @@ export function N02NoteEdit() {
   const drawioContentIdRef = useRef<string | undefined>(undefined)
   const mindmapContentIdRef = useRef<string | undefined>(undefined)
 
+  // Auto-save state
+  const [autoSaveStatus, setAutoSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle')
+  const autoSaveTimerRef = useRef<ReturnType<typeof setTimeout>>()
+  const lastSavedJsonRef = useRef<string>('')
+  const isLoadedRef = useRef(false)
+  const skipNextFetchRef = useRef(false)
+
   // Fetch existing note + note_contents
   useEffect(() => {
     if (id) {
+      // Skip re-fetch after auto-save created a new note
+      if (skipNextFetchRef.current) {
+        skipNextFetchRef.current = false
+        return
+      }
       setIsLoading(true)
       Promise.all([
         fetchNote(id),
@@ -130,7 +145,7 @@ export function N02NoteEdit() {
             markdownText = ''
           }
 
-          setEditorValue({
+          const loadedValue: NoteEditorValue = {
             type: note.type,
             title: note.title,
             content: markdownText,
@@ -145,7 +160,10 @@ export function N02NoteEdit() {
             hasDrawio,
             mindmapContent: mindmapText,
             hasMindmap,
-          })
+          }
+          setEditorValue(loadedValue)
+          lastSavedJsonRef.current = JSON.stringify(loadedValue)
+          isLoadedRef.current = true
           setIsLoading(false)
         })
         .catch(() => {
@@ -156,36 +174,130 @@ export function N02NoteEdit() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id, fetchNote, navigate])
 
-  // Get denormalized names for saving
-  const getDenormalizedData = () => {
-    const milestone = editorValue.milestoneId
-      ? getMilestoneById(editorValue.milestoneId)
-      : undefined
-    const goal = editorValue.goalId
-      ? getGoalById(editorValue.goalId)
-      : milestone
-      ? getGoalById(milestone.goalId)
-      : undefined
-
-    return {
-      milestoneName: milestone?.name,
-      goalId: goal?.id || editorValue.goalId,
-      goalName: goal?.name,
-      goalColor: goal?.color,
+  // Mark new notes as loaded immediately
+  useEffect(() => {
+    if (isNew) {
+      isLoadedRef.current = true
     }
-  }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
-  // Convert typeMetadata to API metadata format
-  const buildMetadata = () => {
-    if (!editorValue.typeMetadata) return undefined
-    const entries = Object.entries(editorValue.typeMetadata).filter(([, v]) => v !== '')
-    if (entries.length === 0) return undefined
-    return entries.map(([key, value]) => ({ key, value }))
-  }
+  // TODO(human): Draft recovery from localStorage
+  // When auto-save fails (e.g., session expired → 401), the content is saved to
+  // localStorage under key `kensan-draft-${id || 'new'}` as a JSON NoteEditorValue.
+  // Implement a useEffect that checks for a saved draft on mount and recovers it.
+  // Consider: auto-restore silently? Or show a toast asking the user?
 
   // Store editorValue in a ref so ensureNoteId always reads the latest
   const editorValueRef = useRef(editorValue)
   editorValueRef.current = editorValue
+
+  // Core save logic (shared by manual save and auto-save)
+  const performSave = async (): Promise<void> => {
+    const ev = editorValueRef.current
+
+    const milestone = ev.milestoneId ? getMilestoneById(ev.milestoneId) : undefined
+    const goal = ev.goalId
+      ? getGoalById(ev.goalId)
+      : milestone
+        ? getGoalById(milestone.goalId)
+        : undefined
+
+    const metadataEntries = ev.typeMetadata
+      ? Object.entries(ev.typeMetadata).filter(([, v]) => v !== '')
+      : []
+
+    const noteData = {
+      type: ev.type,
+      title: ev.title?.trim() || undefined,
+      content: ev.content,
+      format: 'markdown' as const,
+      date: ev.date,
+      taskId: ev.taskId,
+      milestoneId: ev.milestoneId,
+      milestoneName: milestone?.name,
+      goalId: goal?.id || ev.goalId,
+      goalName: goal?.name,
+      goalColor: goal?.color,
+      tagIds: ev.tagIds,
+      metadata: metadataEntries.length > 0
+        ? metadataEntries.map(([key, value]) => ({ key, value }))
+        : undefined,
+    }
+
+    let savedNoteId: string | undefined
+    if (currentNoteIdRef.current && isNew) {
+      await updateNote(currentNoteIdRef.current, noteData)
+      savedNoteId = currentNoteIdRef.current
+    } else if (isNew) {
+      const created = await createNote(noteData)
+      savedNoteId = created.id
+      currentNoteIdRef.current = created.id
+      setExistingNote(created)
+      skipNextFetchRef.current = true
+      navigate(`/notes/${created.id}`, { replace: true })
+    } else if (id) {
+      await updateNote(id, noteData)
+      savedNoteId = id
+    }
+
+    if (savedNoteId) {
+      // Markdown content
+      if (markdownContentIdRef.current) {
+        await noteContents.updateContent(savedNoteId, markdownContentIdRef.current, {
+          content: ev.content,
+        })
+      } else {
+        const created = await noteContents.createContent(savedNoteId, {
+          contentType: 'markdown',
+          content: ev.content,
+          sortOrder: 0,
+        })
+        markdownContentIdRef.current = created.id
+      }
+
+      // Drawio content
+      if (ev.hasDrawio) {
+        if (drawioContentIdRef.current) {
+          await noteContents.updateContent(savedNoteId, drawioContentIdRef.current, {
+            content: ev.drawioContent || '',
+          })
+        } else {
+          const created = await noteContents.createContent(savedNoteId, {
+            contentType: 'drawio',
+            content: ev.drawioContent || '',
+            sortOrder: 1,
+          })
+          drawioContentIdRef.current = created.id
+        }
+      } else if (drawioContentIdRef.current) {
+        await noteContents.deleteContent(savedNoteId, drawioContentIdRef.current)
+        drawioContentIdRef.current = undefined
+      }
+
+      // Mindmap content
+      if (ev.hasMindmap) {
+        if (mindmapContentIdRef.current) {
+          await noteContents.updateContent(savedNoteId, mindmapContentIdRef.current, {
+            content: ev.mindmapContent || '',
+          })
+        } else {
+          const created = await noteContents.createContent(savedNoteId, {
+            contentType: 'mindmap',
+            content: ev.mindmapContent || '',
+            sortOrder: 2,
+          })
+          mindmapContentIdRef.current = created.id
+        }
+      } else if (mindmapContentIdRef.current) {
+        await noteContents.deleteContent(savedNoteId, mindmapContentIdRef.current)
+        mindmapContentIdRef.current = undefined
+      }
+    }
+  }
+
+  const performSaveRef = useRef(performSave)
+  performSaveRef.current = performSave
 
   const ensureNoteId = useCallback(async (): Promise<string> => {
     if (currentNoteIdRef.current) return currentNoteIdRef.current
@@ -213,95 +325,15 @@ export function N02NoteEdit() {
   }, [ensureNoteId])
 
   const handleSave = async () => {
+    if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current)
     setIsSaving(true)
     try {
-      const denormalized = getDenormalizedData()
-      const noteData = {
-        type: editorValue.type,
-        title: editorValue.title?.trim() || undefined,
-        content: editorValue.content,
-        format: 'markdown' as const,
-        date: editorValue.date,
-        taskId: editorValue.taskId,
-        milestoneId: editorValue.milestoneId,
-        milestoneName: denormalized.milestoneName,
-        goalId: denormalized.goalId,
-        goalName: denormalized.goalName,
-        goalColor: denormalized.goalColor,
-        tagIds: editorValue.tagIds,
-        metadata: buildMetadata(),
-      }
-
-      let savedNoteId: string | undefined
-      if (currentNoteIdRef.current && isNew) {
-        await updateNote(currentNoteIdRef.current, noteData)
-        savedNoteId = currentNoteIdRef.current
-      } else if (isNew) {
-        const created = await createNote(noteData)
-        savedNoteId = created.id
-        currentNoteIdRef.current = created.id
-      } else if (id) {
-        await updateNote(id, noteData)
-        savedNoteId = id
-      }
-
-      // Save note_contents (markdown + drawio)
-      if (savedNoteId) {
-        // Markdown content
-        if (markdownContentIdRef.current) {
-          await noteContents.updateContent(savedNoteId, markdownContentIdRef.current, {
-            content: editorValue.content,
-          })
-        } else {
-          const created = await noteContents.createContent(savedNoteId, {
-            contentType: 'markdown',
-            content: editorValue.content,
-            sortOrder: 0,
-          })
-          markdownContentIdRef.current = created.id
-        }
-
-        // Drawio content
-        if (editorValue.hasDrawio) {
-          if (drawioContentIdRef.current) {
-            await noteContents.updateContent(savedNoteId, drawioContentIdRef.current, {
-              content: editorValue.drawioContent || '',
-            })
-          } else {
-            const created = await noteContents.createContent(savedNoteId, {
-              contentType: 'drawio',
-              content: editorValue.drawioContent || '',
-              sortOrder: 1,
-            })
-            drawioContentIdRef.current = created.id
-          }
-        } else if (drawioContentIdRef.current) {
-          // hasDrawio toggled off — delete the drawio content
-          await noteContents.deleteContent(savedNoteId, drawioContentIdRef.current)
-          drawioContentIdRef.current = undefined
-        }
-
-        // Mindmap content
-        if (editorValue.hasMindmap) {
-          if (mindmapContentIdRef.current) {
-            await noteContents.updateContent(savedNoteId, mindmapContentIdRef.current, {
-              content: editorValue.mindmapContent || '',
-            })
-          } else {
-            const created = await noteContents.createContent(savedNoteId, {
-              contentType: 'mindmap',
-              content: editorValue.mindmapContent || '',
-              sortOrder: 2,
-            })
-            mindmapContentIdRef.current = created.id
-          }
-        } else if (mindmapContentIdRef.current) {
-          // hasMindmap toggled off — delete the mindmap content
-          await noteContents.deleteContent(savedNoteId, mindmapContentIdRef.current)
-          mindmapContentIdRef.current = undefined
-        }
-      }
-
+      await performSave()
+      lastSavedJsonRef.current = JSON.stringify(editorValueRef.current)
+      setAutoSaveStatus('saved')
+      // Clear any emergency draft from localStorage
+      const draftKey = `kensan-draft-${currentNoteIdRef.current || 'new'}`
+      localStorage.removeItem(draftKey)
       toast.success('保存しました')
       navigate('/notes')
     } catch {
@@ -310,6 +342,43 @@ export function N02NoteEdit() {
       setIsSaving(false)
     }
   }
+
+  // Auto-save: debounce 3s after editorValue changes
+  useEffect(() => {
+    if (!isLoadedRef.current) return
+
+    const currentJson = JSON.stringify(editorValue)
+    if (currentJson === lastSavedJsonRef.current) return
+
+    // Don't auto-save empty new notes
+    if (isNew && !currentNoteIdRef.current && !editorValue.title?.trim() && !editorValue.content?.trim()) return
+
+    setAutoSaveStatus('idle')
+    if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current)
+    autoSaveTimerRef.current = setTimeout(async () => {
+      setAutoSaveStatus('saving')
+      try {
+        await performSaveRef.current()
+        lastSavedJsonRef.current = JSON.stringify(editorValueRef.current)
+        setAutoSaveStatus('saved')
+        // Clear any emergency draft
+        const draftKey = `kensan-draft-${currentNoteIdRef.current || 'new'}`
+        localStorage.removeItem(draftKey)
+      } catch {
+        setAutoSaveStatus('error')
+        // Emergency: save to localStorage so content survives session expiry
+        try {
+          const draftKey = `kensan-draft-${currentNoteIdRef.current || 'new'}`
+          localStorage.setItem(draftKey, currentJson)
+        } catch { /* localStorage full */ }
+      }
+    }, 3000)
+
+    return () => {
+      if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current)
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [editorValue, isNew])
 
   const handleDelete = async () => {
     if (id) {
@@ -381,7 +450,25 @@ export function N02NoteEdit() {
               : `${typeDisplayName}を編集`}
           </h1>
         </div>
-        <div className="flex gap-2">
+        <div className="flex items-center gap-2">
+          {autoSaveStatus === 'saving' && (
+            <span className="flex items-center gap-1 text-xs text-muted-foreground">
+              <Loader2 className="h-3 w-3 animate-spin" />
+              自動保存中...
+            </span>
+          )}
+          {autoSaveStatus === 'saved' && (
+            <span className="flex items-center gap-1 text-xs text-green-600">
+              <Check className="h-3 w-3" />
+              保存済み
+            </span>
+          )}
+          {autoSaveStatus === 'error' && (
+            <span className="flex items-center gap-1 text-xs text-destructive">
+              <AlertCircle className="h-3 w-3" />
+              保存失敗
+            </span>
+          )}
           {!isNew && existingNote && (
             <>
               <Button
