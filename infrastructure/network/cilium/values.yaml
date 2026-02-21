@@ -7,9 +7,11 @@
 kubeProxyReplacement: true
 
 # API server client rate limiting
+# Increased from default (qps:10/burst:20) to prevent lease renewal
+# timeouts on WiFi-only clusters where latency spikes are common.
 k8sClientRateLimit:
-  qps: 10
-  burst: 20
+  qps: 20
+  burst: 40
 
 # Pod CIDR for the cluster
 k8s:
@@ -21,8 +23,13 @@ ipam:
   mode: kubernetes
 
 # L2 announcements for LoadBalancer services (bare-metal)
+# Lease timings relaxed for WiFi-only cluster stability.
+# Defaults: leaseDuration=15s, leaseRenewDeadline=10s, leaseRetryPeriod=2s
 l2announcements:
   enabled: true
+  leaseDuration: 30s
+  leaseRenewDeadline: 20s
+  leaseRetryPeriod: 4s
 
 # Enable external IPs support
 externalIPs:

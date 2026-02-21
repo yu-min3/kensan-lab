@@ -59,14 +59,14 @@ lsmod | grep amdgpu
 
 ### 1.3 ネットワーク設定
 
-netplan で静的 IP を設定する。M4 Neo は有線（eth0 / enp* 系）を使用する。
+netplan で静的 IP を設定する。M4 Neo は WiFi（`wlp3s0`）を使用する（有線ポート `eno1`/`enp4s0` は未接続）。
 
 ```yaml
 # /etc/netplan/01-static.yaml
 network:
   version: 2
-  ethernets:
-    eth0:          # 実際のインターフェース名に合わせる（ip a で確認）
+  wifis:
+    wlp3s0:        # 実際のインターフェース名に合わせる（ip a で確認）
       addresses:
         - 192.168.1.110/24
       routes:
@@ -77,13 +77,16 @@ network:
           - 192.168.1.1
           - 8.8.8.8
       dhcp4: false
+      access-points:
+        "YOUR_SSID":
+          password: "YOUR_PASSWORD"
 ```
 
 ```bash
 sudo netplan apply
 ```
 
-> **インターフェース名の確認**: `ip a` で実際のインターフェース名（`eth0`, `enp2s0` 等）を確認し、netplan と後続の Cilium 設定に反映すること。
+> **インターフェース名の確認**: `ip a` で実際のインターフェース名（`wlp3s0` 等）を確認し、netplan と後続の Cilium 設定に反映すること。RPi は `wlan0`、M4 Neo は `wlp3s0` を使用している。
 
 ホスト名の設定:
 
@@ -182,7 +185,7 @@ sudo kubeadm join 192.168.1.107:6443 --token <token> --discovery-token-ca-cert-h
 ### 1.8 Cilium 設定変更（重要）
 
 既存の Cilium 設定は `wlan0`（Raspberry Pi の WiFi インターフェース）のみを対象としている。
-M4 Neo は有線 `eth0` 系を使用するため、**クラスタ全体**の Cilium 設定を変更する必要がある。
+M4 Neo は WiFi `wlp3s0` を使用するため、**クラスタ全体**の Cilium 設定を変更して両方のインターフェース名にマッチさせる必要がある。
 
 #### `infrastructure/network/cilium/values.yaml` の変更
 
@@ -190,12 +193,12 @@ M4 Neo は有線 `eth0` 系を使用するため、**クラスタ全体**の Cil
 # 変更前:
 devices: wlan0
 
-# 変更後（正規表現でインターフェース名をマッチ）:
-devices: "eth+ wlan+"
+# 変更後（auto-detect に変更し、全ノードのインターフェースを自動認識）:
+devices: ""   # auto-detect（wlan0, wlp3s0 等を自動認識）
 ```
 
-> `eth+` は `eth0`, `enp2s0` 等にマッチし、`wlan+` は `wlan0` にマッチする。
-> Cilium の `devices` は Linux のデバイス名ワイルドカードを受け付ける。
+> 空文字列（auto-detect）により、RPi の `wlan0` と M4 Neo の `wlp3s0` の両方が自動的に認識される。
+> Cilium の `devices` は Linux のデバイス名ワイルドカードも受け付けるが、auto-detect が推奨。
 
 #### `infrastructure/network/cilium/resources/lb-ippool.yaml` の変更
 
@@ -208,12 +211,12 @@ spec:
 # 変更後（正規表現パターン）:
 spec:
   interfaces:
-  - "^eth.*"
   - "^wlan.*"
+  - "^wlp.*"
 ```
 
 > CiliumL2AnnouncementPolicy の `interfaces` フィールドは正規表現を受け付ける。
-> これにより M4 Neo の eth 系と RPi の wlan0 の両方で L2 Announcement が機能する。
+> `^wlan.*` は RPi の `wlan0` に、`^wlp.*` は M4 Neo の `wlp3s0` にマッチする。
 
 #### 変更の適用
 
@@ -221,7 +224,7 @@ spec:
 # values.yaml を変更後、Git に push すれば Argo CD が自動 sync する
 git add infrastructure/network/cilium/values.yaml
 git add infrastructure/network/cilium/resources/lb-ippool.yaml
-git commit -m "Cilium: マルチインターフェース対応（eth + wlan）"
+git commit -m "Cilium: マルチインターフェース対応（wlan + wlp）"
 git push
 
 # Cilium agent の再起動を確認
@@ -629,7 +632,7 @@ kubectl -n kube-system logs -l k8s-app=cilium --tail=50
 
 よくある原因:
 - CRI-O が起動していない → `sudo systemctl status crio`
-- Cilium agent がクラッシュ → Cilium の `devices` 設定が M4 Neo のインターフェース名に合っていない
+- Cilium agent がクラッシュ → Cilium の `devices` 設定が M4 Neo の WiFi インターフェース名（`wlp3s0`）に合っていない
 - swap が有効 → `sudo swapoff -a` で無効化
 
 ### Cilium agent 起動失敗
@@ -642,7 +645,7 @@ kubectl -n kube-system exec -it ds/cilium -- cilium status
 kubectl -n kube-system exec -it ds/cilium -- cilium status --verbose | grep "Devices"
 ```
 
-`devices` の設定が M4 Neo のインターフェース名にマッチしない場合、Cilium agent が起動に失敗する。
+`devices` の設定が M4 Neo の WiFi インターフェース名（`wlp3s0`）にマッチしない場合、Cilium agent が起動に失敗する。
 `ip a` で実際のインターフェース名を確認し、`values.yaml` の `devices` パターンを修正すること。
 
 ### exec format error
@@ -686,8 +689,8 @@ kubectl get ciliuml2announcementpolicies -o yaml
 kubectl get lease -n kube-system | grep cilium
 ```
 
-`CiliumL2AnnouncementPolicy` の `interfaces` に M4 Neo のインターフェース名が含まれていることを確認する。
-Phase 1.8 の手順で正規表現パターンに変更済みであることを確認。
+`CiliumL2AnnouncementPolicy` の `interfaces` に M4 Neo の WiFi インターフェース名（`wlp3s0`）が含まれていることを確認する。
+Phase 1.8 の手順で正規表現パターン（`^wlan.*`, `^wlp.*`）に変更済みであることを確認。
 
 ### PersistentVolume 問題
 
