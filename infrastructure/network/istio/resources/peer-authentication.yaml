@@ -1,0 +1,23 @@
+## Mesh-wide mTLS: PERMISSIVE mode
+## Accepts both mTLS and plaintext connections.
+## This is the safe first step before migrating to STRICT.
+##
+## Namespaces with sidecar injection (mTLS active):
+##   app-dev, app-prod, backstage, kensan-dev, kensan-prod,
+##   platform-auth-dev, platform-auth-prod
+##
+## Namespaces without sidecar (plaintext only):
+##   monitoring, cert-manager, kube-system, argocd, kensan-data
+##
+## To upgrade to STRICT:
+##   1. Enable sidecar injection on all namespaces
+##   2. Verify all inter-namespace communication works with mTLS
+##   3. Change mode to STRICT
+apiVersion: security.istio.io/v1
+kind: PeerAuthentication
+metadata:
+  name: default
+  namespace: istio-system
+spec:
+  mtls:
+    mode: PERMISSIVE
