@@ -7,3 +7,5 @@ metadata:
     goldship.platform/environment: infrastructure
     goldship.platform/tier: platform
     goldship.platform/component: core
+    pod-security.kubernetes.io/enforce: privileged
+    pod-security.kubernetes.io/warn: baseline

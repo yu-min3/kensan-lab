@@ -7,3 +7,5 @@ metadata:
     goldship.platform/environment: development
     goldship.platform/tier: application
     istio-injection: enabled
+    pod-security.kubernetes.io/enforce: baseline
+    pod-security.kubernetes.io/warn: restricted
