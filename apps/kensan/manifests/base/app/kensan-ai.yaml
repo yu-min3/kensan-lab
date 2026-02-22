@@ -66,18 +66,23 @@ spec:
               key: JWT_SECRET
         # AI provider
         - name: AI_PROVIDER
-          value: google
-        - name: GOOGLE_API_KEY
+          value: anthropic
+        - name: ANTHROPIC_API_KEY
           valueFrom:
             secretKeyRef:
               name: kensan-ai-credentials
-              key: GOOGLE_API_KEY
-        - name: GOOGLE_MODEL
-          value: gemini-2.0-flash
+              key: ANTHROPIC_API_KEY
+        - name: ANTHROPIC_MODEL
+          value: claude-sonnet-4-20250514
         - name: EMBEDDING_PROVIDER
-          value: gemini
-        - name: GEMINI_EMBEDDING_MODEL
-          value: gemini-embedding-001
+          value: openai
+        - name: OPENAI_API_KEY
+          valueFrom:
+            secretKeyRef:
+              name: kensan-ai-credentials
+              key: OPENAI_API_KEY
+        - name: EMBEDDING_MODEL
+          value: text-embedding-3-small
         # MinIO (note storage)
         - name: MINIO_ENDPOINT
           value: minio.kensan-data.svc.cluster.local:9000
