@@ -58,7 +58,7 @@ func Load() *Config {
 		JWT: JWTConfig{
 			Secret:     getEnv("JWT_SECRET", "your-secret-key-change-in-production"),
 			Issuer:     getEnv("JWT_ISSUER", "kensan"),
-			ExpireHour: getEnvAsInt("JWT_EXPIRE_HOUR", 24),
+			ExpireHour: getEnvAsInt("JWT_EXPIRE_HOUR", 720),
 		},
 		Telemetry: TelemetryConfig{
 			Enabled:      getEnvAsBool("OTEL_ENABLED", false),
