@@ -33,7 +33,7 @@ class Settings(BaseSettings):
         return f"postgresql://{self.db_user}:{self.db_password}@{self.db_host}:{self.db_port}/{self.db_name}"
 
     # AI Provider ("anthropic", "google", or "google-adk")
-    ai_provider: str = "google-adk"
+    ai_provider: str = "anthropic"
 
     # Anthropic API
     anthropic_api_key: str = ""

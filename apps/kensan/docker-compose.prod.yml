@@ -78,9 +78,9 @@ services:
     ports: !reset []
     environment:
       SERVER_ENV: production
-      AI_PROVIDER: google
-      GOOGLE_API_KEY: ${GOOGLE_API_KEY}
-      GOOGLE_MODEL: ${GOOGLE_MODEL:-gemini-2.0-flash}
+      AI_PROVIDER: anthropic
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY}
+      ANTHROPIC_MODEL: ${ANTHROPIC_MODEL:-claude-sonnet-4-20250514}
       JWT_SECRET: ${JWT_SECRET}
       CORS_ALLOWED_ORIGINS: "https://kensan.yu-min3.com,http://${GCE_IP}"
 
