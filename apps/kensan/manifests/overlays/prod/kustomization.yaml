@@ -6,6 +6,7 @@ namespace: kensan-prod
 resources:
   - ../../base/app
   - env-config.yaml
+  - kensan-ai-credentials-sealed.yaml
 
 patches:
   - path: httproute-patch.yaml
