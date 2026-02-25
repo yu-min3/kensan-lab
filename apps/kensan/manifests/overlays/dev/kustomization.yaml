@@ -6,6 +6,8 @@ namespace: kensan-dev
 resources:
   - ../../base/app
   - env-config.yaml
+  - kensan-app-credentials-sealed.yaml
+  - kensan-minio-app-credentials-sealed.yaml
   - kensan-ai-credentials-sealed.yaml
 
 images:
