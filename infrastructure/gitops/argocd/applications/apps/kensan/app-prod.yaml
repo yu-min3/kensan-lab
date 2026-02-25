@@ -6,7 +6,7 @@ metadata:
   finalizers:
     - resources-finalizer.argocd.argoproj.io
 spec:
-  project: platform-project
+  project: app-project-prod
   source:
     repoURL: https://github.com/yu-min3/goldship-yumin3
     targetRevision: HEAD
