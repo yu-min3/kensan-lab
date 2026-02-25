@@ -1,0 +1,45 @@
+apiVersion: argoproj.io/v1alpha1
+kind: AppProject
+metadata:
+  name: app-project-prod
+  namespace: argocd
+  finalizers:
+  - resources-finalizer.argocd.argoproj.io
+spec:
+  description: Application Developer project for production and data environments
+
+  sourceRepos:
+  - "https://github.com/yu-min3/goldship-yumin3"
+
+  destinations:
+  - namespace: kensan-prod
+    server: "https://kubernetes.default.svc"
+  - namespace: kensan-data
+    server: "https://kubernetes.default.svc"
+
+  # No cluster-scoped resources allowed for application developers
+  clusterResourceWhitelist: []
+
+  namespaceResourceWhitelist:
+  # Workloads
+  - group: "apps"
+    kind: Deployment
+  - group: "apps"
+    kind: StatefulSet
+  - group: "batch"
+    kind: Job
+  - group: "policy"
+    kind: PodDisruptionBudget
+  # Networking
+  - group: ""
+    kind: Service
+  - group: "gateway.networking.k8s.io"
+    kind: HTTPRoute
+  # Configuration
+  - group: ""
+    kind: ConfigMap
+  - group: ""
+    kind: Secret
+  # Istio Security
+  - group: "security.istio.io"
+    kind: AuthorizationPolicy
