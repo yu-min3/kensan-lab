@@ -52,27 +52,41 @@ spec:
         - podSelector: {}
 
 ---
-## Allow egress to Kubernetes API server and Let's Encrypt ACME
+## Allow egress to Kubernetes API server (Cilium identity-based)
+## Cilium は DNAT 後に NetworkPolicy を評価するため、標準 NetworkPolicy の
+## namespaceSelector/ipBlock では API Server にマッチしない。
+## toEntities: kube-apiserver を使い IP ハードコードを回避する。
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: allow-apiserver-egress
+  namespace: cert-manager
+spec:
+  endpointSelector: {}
+  egress:
+    - toEntities:
+        - kube-apiserver
+
+---
+## Allow egress to Let's Encrypt ACME (external HTTPS only)
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
-  name: allow-apiserver-acme-egress
+  name: allow-acme-egress
   namespace: cert-manager
 spec:
   podSelector: {}
   policyTypes:
     - Egress
   egress:
-    # Kubernetes API server
     - to:
-        - namespaceSelector:
-            matchLabels:
-              kubernetes.io/metadata.name: kube-system
+        - ipBlock:
+            cidr: 0.0.0.0/0
+            except:
+              - 10.0.0.0/8
+              - 172.16.0.0/12
+              - 192.168.0.0/16
       ports:
-        - protocol: TCP
-          port: 6443
-    # Let's Encrypt ACME (external HTTPS)
-    - ports:
         - protocol: TCP
           port: 443
 
