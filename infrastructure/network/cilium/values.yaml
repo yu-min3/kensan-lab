@@ -6,6 +6,10 @@
 # Replace kube-proxy entirely with Cilium
 kubeProxyReplacement: true
 
+# Allow Istio CNI to coexist as a chained plugin
+cni:
+  exclusive: false
+
 # API server client rate limiting
 # Increased from default (qps:10/burst:20) to prevent lease renewal
 # timeouts on WiFi-only clusters where latency spikes are common.
