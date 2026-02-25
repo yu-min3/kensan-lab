@@ -12,7 +12,7 @@
 | 信頼インフラ | kube-system | なし | CNI (Cilium) が動作、制限すると壊れる |
 | 信頼インフラ | istio-system | なし | 全 sidecar への xDS push が必要 |
 | 信頼インフラ | monitoring | なし | 全 namespace のスクレイプ/データ受信が必要 |
-| プラットフォーム | argocd | あり | API server + GitHub のみ |
+| 信頼インフラ | argocd | なし | API server egress が Cilium kube-proxy replacement で制御不可 |
 | プラットフォーム | backstage | あり | PostgreSQL + GitHub + Argo CD |
 | プラットフォーム | platform-auth-prod | あり | PostgreSQL のみ |
 | プラットフォーム | platform-auth-dev | あり | PostgreSQL のみ |
@@ -53,7 +53,6 @@
 
 | Namespace | Egress 先 | Ingress 元 |
 |-----------|----------|-----------|
-| argocd | kube-system (DNS, API:6443), external (443) | istio-system, monitoring, 同一 namespace |
 | backstage | kube-system (DNS), istio-system, argocd, external (443) | istio-system, monitoring, 同一 namespace |
 | platform-auth-* | kube-system (DNS), istio-system | istio-system, monitoring, 同一 namespace |
 | cert-manager | kube-system (DNS, API:6443), external (443) | monitoring, webhook (10250), 同一 namespace |
