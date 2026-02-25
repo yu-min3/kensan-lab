@@ -40,6 +40,9 @@ spec:
     kind: ConfigMap
   - group: ""
     kind: Secret
+  # Sealed Secrets
+  - group: "bitnami.com"
+    kind: SealedSecret
   # Istio Security
   - group: "security.istio.io"
     kind: AuthorizationPolicy
