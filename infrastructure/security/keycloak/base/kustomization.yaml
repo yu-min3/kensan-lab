@@ -8,3 +8,4 @@ resources:
 - keycloak-deployment.yaml
 - keycloak-service.yaml
 - pdb.yaml
+- network-policy.yaml
