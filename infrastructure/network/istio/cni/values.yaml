@@ -1,0 +1,11 @@
+# Chart config: infrastructure/gitops/argocd/applications/network/istio-cni/app.yaml
+# Version: 1.27.3
+#
+# Istio CNI plugin — delegates iptables setup to a DaemonSet,
+# removing the need for NET_ADMIN/NET_RAW in application pods.
+# Required for PSS baseline enforcement on app namespaces.
+
+# Cilium coexistence (chained plugin mode — default)
+cni:
+  cniBinDir: /opt/cni/bin
+  cniConfDir: /etc/cni/net.d
