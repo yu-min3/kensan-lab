@@ -45,6 +45,15 @@ externalIPs:
 # Required for mixed-interface clusters (RPi: wlan0, M4 Neo: wlp3s0).
 # L2 announcement interfaces are controlled separately in lb-ippool.yaml.
 
+# DaemonSet update strategy
+# Default maxUnavailable=2 は4ノードクラスタで同時に半数の Agent が停止し、
+# kube-proxy replacement 環境では ClusterIP ルーティングが消失する。
+# Operator のいるノードの Agent が再起動中に API Server 到達不能 → Operator crash の原因。
+updateStrategy:
+  type: RollingUpdate
+  rollingUpdate:
+    maxUnavailable: 1
+
 # Cilium Operator settings
 # - replicas: 1 (default 2) — 4ノードクラスタで十分。CrashLoop 時の apiserver 負荷を半減
 # - resources: light workload パターンに準拠
