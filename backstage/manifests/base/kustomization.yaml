@@ -13,3 +13,4 @@ resources:
 - backstage-service.yaml
 - httproute.yaml
 - pdb.yaml
+- network-policy.yaml
