@@ -120,6 +120,29 @@ spec:
           port: 4318
 
 ---
+## Allow external HTTPS egress for Dagster (Slack, Gmail, weather APIs, etc.)
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-dagster-external-egress
+  namespace: kensan-data
+spec:
+  podSelector:
+    matchExpressions:
+      - key: app
+        operator: In
+        values:
+          - dagster-daemon
+          - dagster-webserver
+          - dagster-user-code
+  policyTypes:
+    - Egress
+  egress:
+    - ports:
+        - protocol: TCP
+          port: 443
+
+---
 ## Allow Prometheus scraping from monitoring namespace
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
