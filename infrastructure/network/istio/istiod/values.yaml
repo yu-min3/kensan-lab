@@ -10,6 +10,8 @@ global:
     enabled: false
 
 pilot:
+  cni:
+    enabled: true
   env:
     PILOT_ENABLE_GATEWAY_API: "true"
     PILOT_ENABLE_GATEWAY_API_STATUS: "true"
