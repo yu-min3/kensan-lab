@@ -41,11 +41,20 @@ spec:
         image: postgres:16-alpine
         env:
         - name: POSTGRES_USER
-          value: dagster
+          valueFrom:
+            secretKeyRef:
+              name: kensan-lakehouse-credentials
+              key: DAGSTER_PG_USER
         - name: POSTGRES_PASSWORD
-          value: dagster
+          valueFrom:
+            secretKeyRef:
+              name: kensan-lakehouse-credentials
+              key: DAGSTER_PG_PASSWORD
         - name: POSTGRES_DB
-          value: dagster
+          valueFrom:
+            secretKeyRef:
+              name: kensan-lakehouse-credentials
+              key: DAGSTER_PG_DB
         - name: PGDATA
           value: /var/lib/postgresql/data/pgdata
         ports:
@@ -65,12 +74,12 @@ spec:
             memory: 256Mi
         livenessProbe:
           exec:
-            command: ["pg_isready", "-U", "dagster"]
+            command: ["sh", "-c", "pg_isready -U $POSTGRES_USER"]
           initialDelaySeconds: 30
           periodSeconds: 10
         readinessProbe:
           exec:
-            command: ["pg_isready", "-U", "dagster"]
+            command: ["sh", "-c", "pg_isready -U $POSTGRES_USER"]
           initialDelaySeconds: 5
           periodSeconds: 5
       volumes:
