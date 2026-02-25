@@ -23,7 +23,19 @@
       "Bash(helm:*)",
       "Bash(kubeseal:*)",
       "Bash(podman:*)",
-      "Bash(gh:*)",
+      "Bash(gh pr view:*)",
+      "Bash(gh pr list:*)",
+      "Bash(gh pr diff:*)",
+      "Bash(gh pr checks:*)",
+      "Bash(gh pr status:*)",
+      "Bash(gh issue view:*)",
+      "Bash(gh issue list:*)",
+      "Bash(gh issue status:*)",
+      "Bash(gh repo view:*)",
+      "Bash(gh run view:*)",
+      "Bash(gh run list:*)",
+      "Bash(gh api:*)",
+      "Bash(gh auth status:*)",
       "Bash(curl:*)",
 
       "Bash(git log:*)",
@@ -124,7 +136,14 @@
       "Bash(kubectl label:*)",
       "Bash(kubectl annotate:*)",
       "Bash(kubectl patch:*)",
-      "Bash(docker:*)"
+      "Bash(docker:*)",
+      "Bash(gh pr create:*)",
+      "Bash(gh pr merge:*)",
+      "Bash(gh pr close:*)",
+      "Bash(gh pr edit:*)",
+      "Bash(gh pr comment:*)",
+      "Bash(gh issue create:*)",
+      "Bash(gh issue close:*)"
     ]
   },
   "hooks": {
