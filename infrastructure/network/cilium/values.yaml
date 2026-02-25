@@ -29,11 +29,12 @@ ipam:
 # L2 announcements for LoadBalancer services (bare-metal)
 # Lease timings relaxed for WiFi-only cluster stability.
 # Defaults: leaseDuration=15s, leaseRenewDeadline=10s, leaseRetryPeriod=2s
+# Previous: 30s/20s/4s — still caused intermittent timeouts on WiFi
 l2announcements:
   enabled: true
-  leaseDuration: 30s
-  leaseRenewDeadline: 20s
-  leaseRetryPeriod: 4s
+  leaseDuration: 60s
+  leaseRenewDeadline: 40s
+  leaseRetryPeriod: 8s
 
 # Enable external IPs support
 externalIPs:
