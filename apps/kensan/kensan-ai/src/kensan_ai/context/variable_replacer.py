@@ -1,7 +1,9 @@
 """Variable replacer for dynamic system prompt substitution."""
 
+import asyncio
 import json
 import re
+from collections.abc import Coroutine
 from datetime import date, datetime, timedelta
 from typing import Any
 from uuid import UUID
@@ -149,42 +151,50 @@ class VariableReplacer:
         # Fetch all needed data
         replacements: dict[str, str] = {}
 
+        # Async variable name → factory (callable that returns a coroutine)
+        _ASYNC_FACTORIES = {
+            "user_memory": VariableReplacer._get_user_memory,
+            "today_schedule": VariableReplacer._get_today_schedule,
+            "tomorrow_schedule": VariableReplacer._get_tomorrow_schedule,
+            "pending_tasks": VariableReplacer._get_pending_tasks,
+            "today_entries": VariableReplacer._get_today_entries,
+            "recent_context": VariableReplacer._get_recent_context,
+            "weekly_summary": VariableReplacer._get_weekly_summary,
+            "goal_progress": VariableReplacer._get_goal_progress,
+            "user_patterns": VariableReplacer._get_user_patterns,
+            "yesterday_entries": VariableReplacer._get_yesterday_entries,
+            "recent_learning_notes": VariableReplacer._get_recent_learning_notes,
+        }
+
+        # Sync variable name → callable (lakehouse-based, no await)
+        _SYNC_FETCHERS = {
+            "emotion_summary": VariableReplacer._get_emotion_summary,
+            "interest_profile": VariableReplacer._get_interest_profile,
+            "user_traits": VariableReplacer._get_user_traits,
+            "communication_style": VariableReplacer._get_communication_style,
+        }
+
+        # Process sync variables (current_datetime + lakehouse)
         for var in variables_to_replace:
             if var == "current_datetime":
                 now = datetime.now(_DEFAULT_TZ)
                 weekday_names = ["月", "火", "水", "木", "金", "土", "日"]
                 weekday = weekday_names[now.weekday()]
                 replacements[var] = f"{now.strftime('%Y-%m-%d')}（{weekday}）{now.strftime('%H:%M')} JST"
-            elif var == "user_memory":
-                replacements[var] = await VariableReplacer._get_user_memory(user_id)
-            elif var == "today_schedule":
-                replacements[var] = await VariableReplacer._get_today_schedule(user_id)
-            elif var == "tomorrow_schedule":
-                replacements[var] = await VariableReplacer._get_tomorrow_schedule(user_id)
-            elif var == "pending_tasks":
-                replacements[var] = await VariableReplacer._get_pending_tasks(user_id)
-            elif var == "today_entries":
-                replacements[var] = await VariableReplacer._get_today_entries(user_id)
-            elif var == "recent_context":
-                replacements[var] = await VariableReplacer._get_recent_context(user_id)
-            elif var == "weekly_summary":
-                replacements[var] = await VariableReplacer._get_weekly_summary(user_id)
-            elif var == "goal_progress":
-                replacements[var] = await VariableReplacer._get_goal_progress(user_id)
-            elif var == "user_patterns":
-                replacements[var] = await VariableReplacer._get_user_patterns(user_id)
-            elif var == "emotion_summary":
-                replacements[var] = VariableReplacer._get_emotion_summary(user_id)
-            elif var == "interest_profile":
-                replacements[var] = VariableReplacer._get_interest_profile(user_id)
-            elif var == "user_traits":
-                replacements[var] = VariableReplacer._get_user_traits(user_id)
-            elif var == "communication_style":
-                replacements[var] = VariableReplacer._get_communication_style(user_id)
-            elif var == "yesterday_entries":
-                replacements[var] = await VariableReplacer._get_yesterday_entries(user_id)
-            elif var == "recent_learning_notes":
-                replacements[var] = await VariableReplacer._get_recent_learning_notes(user_id)
+            elif var in _SYNC_FETCHERS:
+                replacements[var] = _SYNC_FETCHERS[var](user_id)
+
+        # Collect async tasks only for variables that are actually needed
+        async_tasks: dict[str, Coroutine] = {}
+        for var in variables_to_replace:
+            if var in _ASYNC_FACTORIES:
+                async_tasks[var] = _ASYNC_FACTORIES[var](user_id)
+
+        # Execute all async fetchers in parallel
+        if async_tasks:
+            results = await asyncio.gather(*async_tasks.values())
+            for key, result in zip(async_tasks.keys(), results):
+                replacements[key] = result
 
         # Replace variables in the prompt
         result = system_prompt
