@@ -5,6 +5,7 @@ resources:
   - kensan-lakehouse-credentials-sealed.yaml
   - dagster-postgres.yaml
   - polaris.yaml
+  - polaris-init-job.yaml
   - dagster-user-code.yaml
   - dagster-webserver.yaml
   - dagster-daemon.yaml
