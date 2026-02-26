@@ -26,4 +26,4 @@ images:
 - name: ghcr.io/yu-min3/kensan-note
   newTag: v0.0.2
 - name: ghcr.io/yu-min3/kensan-ai
-  newTag: v0.0.2
+  newTag: v0.0.3

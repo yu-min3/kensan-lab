@@ -38,6 +38,7 @@ class Settings(BaseSettings):
     # Anthropic API
     anthropic_api_key: str = ""
     anthropic_model: str = "claude-sonnet-4-20250514"
+    anthropic_fast_model: str = "claude-haiku-4-5-20251001"
 
     # Google GenAI API
     google_api_key: str = ""

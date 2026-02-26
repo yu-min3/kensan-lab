@@ -37,7 +37,7 @@ from kensan_ai.api.schemas import (
     ConversationRateRequest,
 )
 from kensan_ai.api.sse import sse_event
-from kensan_ai.agents.chat import select_tools, get_deferred_write_tools
+from kensan_ai.agents.chat import select_tools, get_deferred_write_tools, select_model
 from kensan_ai.context import Situation, ContextResolver, detect_situation
 from kensan_ai.db.connection import get_connection
 from kensan_ai.tools import execute_tool
@@ -296,12 +296,16 @@ async def agent_stream(
         # Compute deferred write tools: these will be unlocked after readonly tool execution
         deferred_tools = get_deferred_write_tools(allowed_tools, context.allowed_tools) or None
 
+    # 3.7. Auto-select model based on message complexity
+    selected_model = select_model(request.message, request.situation)
+
     # 4. Create agent runner (Anthropic or Gemini based on ai_provider setting)
     agent = create_agent_runner(
         system_prompt=system_prompt,
         allowed_tools=allowed_tools,
         max_turns=max_turns,
         temperature=temperature,
+        model=selected_model,
         context_id=str(context.id),
         context_name=context.name,
         context_version=context.version,

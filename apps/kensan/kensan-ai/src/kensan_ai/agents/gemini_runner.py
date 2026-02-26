@@ -779,6 +779,7 @@ class GeminiAgentRunner:
 
         yield sse_event("done", {
             "conversation_id": conv_id,
+            "model": self.model,
             "tokens": {
                 "input": total_input_tokens,
                 "output": total_output_tokens,

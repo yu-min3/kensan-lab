@@ -13,6 +13,7 @@ To update the prompt:
 
 import re
 
+from kensan_ai.config import get_settings
 from kensan_ai.tools import is_readonly_tool
 
 SYSTEM_PROMPT = """## 現在の日時
@@ -478,3 +479,46 @@ def select_tools(
 
     # base_tools（許可リスト）とのANDで返す
     return [t for t in base_tools if t in selected]
+
+
+# =========================================================================
+# Auto Model Selection (Haiku / Sonnet)
+# =========================================================================
+
+COMPLEX_PATTERNS: list[str] = [
+    "レビュー", "週次", "振り返り", "分析", "進捗", "レポート",
+    "計画", "プランニング", "相談", "アドバイス",
+    "なぜ", "どうして", "原因", "改善",
+]
+
+
+def select_model(message: str, situation: str = "auto") -> str:
+    """メッセージの複雑さに基づいてモデルを自動選択。
+
+    review/daily_advice や複雑なキーワードを含むメッセージには Sonnet、
+    それ以外の軽い質問には Haiku を返す。
+
+    Args:
+        message: ユーザーのメッセージテキスト
+        situation: リクエストの situation
+
+    Returns:
+        モデル名の文字列
+    """
+    settings = get_settings()
+
+    # review/daily_advice は常に Sonnet（品質重視）
+    if situation in ("review", "daily_advice"):
+        return settings.anthropic_model
+
+    # 複雑なキーワードが含まれていれば Sonnet
+    for keyword in COMPLEX_PATTERNS:
+        if keyword in message:
+            return settings.anthropic_model
+
+    # メッセージが長い（100文字以上）なら Sonnet
+    if len(message) > 100:
+        return settings.anthropic_model
+
+    # それ以外は Haiku（高速）
+    return settings.anthropic_fast_model
