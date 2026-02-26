@@ -29,6 +29,11 @@ spec:
         imagePullPolicy: Always
         workingDir: /app
         env:
+        # venv activation
+        - name: PATH
+          value: "/app/.venv/bin:/usr/local/bin:/usr/bin:/bin"
+        - name: VIRTUAL_ENV
+          value: "/app/.venv"
         # bootstrap_polaris.py
         - name: POLARIS_MANAGEMENT_URL
           value: "http://polaris:8181/api/management/v1"
