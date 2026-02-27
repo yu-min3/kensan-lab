@@ -45,6 +45,8 @@ spec:
     metadata:
       labels:
         app: polaris
+      annotations:
+        configmap-update: "fix-credential-config-key"
     spec:
       # k8s注入のPOLARIS_*環境変数がQuarkus設定を汚染しSTS呼び出しを誘発するため無効化
       enableServiceLinks: false
