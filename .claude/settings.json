@@ -11,7 +11,6 @@
       "TodoWrite",
       "Task",
       "mcp__*",
-
       "Bash(kubectl get:*)",
       "Bash(kubectl describe:*)",
       "Bash(kubectl logs:*)",
@@ -37,7 +36,6 @@
       "Bash(gh api:*)",
       "Bash(gh auth status:*)",
       "Bash(curl:*)",
-
       "Bash(git log:*)",
       "Bash(git diff:*)",
       "Bash(git status:*)",
@@ -50,7 +48,6 @@
       "Bash(git show:*)",
       "Bash(git rev-parse:*)",
       "Bash(git remote:*)",
-
       "Bash(npm:*)",
       "Bash(pnpm:*)",
       "Bash(yarn:*)",
@@ -63,7 +60,6 @@
       "Bash(make:*)",
       "Bash(uv:*)",
       "Bash(mise:*)",
-
       "Bash(ls:*)",
       "Bash(cd:*)",
       "Bash(pwd:*)",
@@ -89,7 +85,15 @@
       "Bash(ssh:*)",
       "Bash(test:*)",
       "Bash(xargs:*)",
-      "Bash(top:*)"
+      "Bash(top:*)",
+      "Bash(argocd app get:*)",
+      "Bash(argocd app list:*)",
+      "Bash(argocd app diff:*)",
+      "Bash(argocd app history:*)",
+      "Bash(argocd app logs:*)",
+      "Bash(argocd app manifests:*)",
+      "Bash(argocd app resources:*)",
+      "Bash(argocd app wait:*)"
     ],
     "deny": [
       "Bash(rm -rf:*)",
@@ -130,7 +134,6 @@
       "Bash(git stash:*)",
       "Bash(kubectl apply:*)",
       "Bash(kubectl delete:*)",
-      "Bash(kubectl exec:*)",
       "Bash(kubectl scale:*)",
       "Bash(kubectl set:*)",
       "Bash(kubectl label:*)",
