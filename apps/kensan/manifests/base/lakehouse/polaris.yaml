@@ -4,7 +4,6 @@ metadata:
   name: polaris-config
 data:
   application.properties: |
-    polaris.features."SKIP_CREDENTIAL_SUBSCOPING_INDIRECTION"=true
     quarkus.datasource.db-kind=postgresql
     quarkus.datasource.jdbc.url=jdbc:postgresql://dagster-postgres:5432/polaris
     quarkus.datasource.username=dagster
@@ -47,7 +46,7 @@ spec:
       labels:
         app: polaris
       annotations:
-        configmap-update: "fix-s3-endpoint"
+        configmap-update: "use-minio-sts"
     spec:
       # k8s注入のPOLARIS_*環境変数がQuarkus設定を汚染しSTS呼び出しを誘発するため無効化
       enableServiceLinks: false

@@ -70,7 +70,35 @@ spec:
         - /bin/sh
         - -c
         - |
-          python -m catalog.bootstrap_polaris && python -m catalog.init_catalog
+          python -m catalog.bootstrap_polaris && \
+          python -c "
+          import requests, os, json
+          mgmt = os.environ['POLARIS_MANAGEMENT_URL']
+          cat_url = os.environ['POLARIS_CATALOG_URL']
+          s3_ep = os.environ.get('S3_ENDPOINT', 'http://minio:9000')
+          # Get token
+          resp = requests.post(f'{cat_url}/oauth/tokens',
+            data={'grant_type':'client_credentials','client_id':'root','client_secret':'s3cr3t','scope':'PRINCIPAL_ROLE:ALL'},
+            headers={'Content-Type':'application/x-www-form-urlencoded'})
+          token = resp.json()['access_token']
+          h = {'Authorization': f'Bearer {token}', 'Content-Type': 'application/json'}
+          # Get catalog
+          resp = requests.get(f'{mgmt}/catalogs/kensan-lakehouse', headers=h)
+          cat = resp.json()
+          ev = cat.get('entityVersion', 1)
+          sc = cat.get('storageConfigInfo', {})
+          # Add stsEndpoint if missing
+          if 'stsEndpoint' not in sc or sc['stsEndpoint'] != s3_ep:
+            sc['stsEndpoint'] = s3_ep
+            cat['storageConfigInfo'] = sc
+            resp = requests.put(f'{mgmt}/catalogs/kensan-lakehouse',
+              headers=h, json={'currentEntityVersion': ev, 'catalog': cat})
+            print(f'Updated catalog stsEndpoint -> {s3_ep}: {resp.status_code}')
+            if resp.status_code >= 400: print(resp.text)
+          else:
+            print('stsEndpoint already configured')
+          " && \
+          python -m catalog.init_catalog
         resources:
           requests:
             cpu: 50m
