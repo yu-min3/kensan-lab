@@ -70,9 +70,7 @@ spec:
         - /bin/sh
         - -c
         - |
-          python -m catalog.bootstrap_polaris
-          # TODO: init_catalog は Polaris の STS credential vending 問題を解決後に有効化
-          # python -m catalog.init_catalog
+          python -m catalog.bootstrap_polaris && python -m catalog.init_catalog
         resources:
           requests:
             cpu: 50m
