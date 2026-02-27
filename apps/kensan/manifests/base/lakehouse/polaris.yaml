@@ -4,7 +4,7 @@ metadata:
   name: polaris-config
 data:
   application.properties: |
-    polaris.features.defaults."SKIP_CREDENTIAL_SUBSCOPING_INDIRECTION"=true
+    polaris.features."SKIP_CREDENTIAL_SUBSCOPING_INDIRECTION"=true
     quarkus.datasource.db-kind=postgresql
     quarkus.datasource.jdbc.url=jdbc:postgresql://dagster-postgres:5432/polaris
     quarkus.datasource.username=dagster
