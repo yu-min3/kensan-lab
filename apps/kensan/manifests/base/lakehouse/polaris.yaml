@@ -12,8 +12,9 @@ data:
   aws-config: |
     [default]
     region = us-east-1
+    endpoint_url = http://minio:9000
     s3 =
-        path_style = true
+        addressing_style = path
 ---
 apiVersion: v1
 kind: Service
@@ -46,7 +47,7 @@ spec:
       labels:
         app: polaris
       annotations:
-        configmap-update: "fix-credential-config-key"
+        configmap-update: "fix-s3-endpoint"
     spec:
       # k8s注入のPOLARIS_*環境変数がQuarkus設定を汚染しSTS呼び出しを誘発するため無効化
       enableServiceLinks: false
@@ -61,6 +62,8 @@ spec:
               key: POLARIS_BOOTSTRAP_CREDENTIALS
         - name: AWS_REGION
           value: us-east-1
+        - name: AWS_ENDPOINT_URL_S3
+          value: http://minio:9000
         - name: AWS_ACCESS_KEY_ID
           valueFrom:
             secretKeyRef:
