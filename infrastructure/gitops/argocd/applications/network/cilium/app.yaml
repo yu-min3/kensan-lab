@@ -58,3 +58,21 @@ spec:
       jqPathExpressions:
         - .status
         - .spec
+    # Cilium auto-generates and rotates these TLS secrets in-cluster.
+    # Without ignoring them, selfHeal triggers repeated syncs that
+    # reload BPF programs and can break external LB DNAT.
+    - group: ""
+      kind: Secret
+      name: cilium-ca
+      jqPathExpressions:
+        - .data
+    - group: ""
+      kind: Secret
+      name: hubble-relay-client-certs
+      jqPathExpressions:
+        - .data
+    - group: ""
+      kind: Secret
+      name: hubble-server-certs
+      jqPathExpressions:
+        - .data
