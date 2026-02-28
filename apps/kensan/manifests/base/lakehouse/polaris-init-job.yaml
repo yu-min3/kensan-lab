@@ -41,8 +41,6 @@ spec:
           value: "http://polaris:8181/api/catalog/v1"
         - name: S3_ENDPOINT
           value: "http://minio:9000"
-        - name: S3_BUCKET
-          value: "kensan-lakehouse"
         # init_catalog.py (via config.py)
         - name: POLARIS_URI
           valueFrom:
@@ -70,35 +68,30 @@ spec:
         - /bin/sh
         - -c
         - |
-          python -m catalog.bootstrap_polaris && \
-          python -c "
-          import requests, os, json
-          mgmt = os.environ['POLARIS_MANAGEMENT_URL']
-          cat_url = os.environ['POLARIS_CATALOG_URL']
-          s3_ep = os.environ.get('S3_ENDPOINT', 'http://minio:9000')
-          # Get token
-          resp = requests.post(f'{cat_url}/oauth/tokens',
-            data={'grant_type':'client_credentials','client_id':'root','client_secret':'s3cr3t','scope':'PRINCIPAL_ROLE:ALL'},
-            headers={'Content-Type':'application/x-www-form-urlencoded'})
-          token = resp.json()['access_token']
-          h = {'Authorization': f'Bearer {token}', 'Content-Type': 'application/json'}
-          # Get catalog
-          resp = requests.get(f'{mgmt}/catalogs/kensan-lakehouse', headers=h)
-          cat = resp.json()
-          ev = cat.get('entityVersion', 1)
-          sc = cat.get('storageConfigInfo', {})
-          # Add stsEndpoint if missing
-          if 'stsEndpoint' not in sc or sc['stsEndpoint'] != s3_ep:
-            sc['stsEndpoint'] = s3_ep
-            cat['storageConfigInfo'] = sc
-            resp = requests.put(f'{mgmt}/catalogs/kensan-lakehouse',
-              headers=h, json={'currentEntityVersion': ev, 'catalog': cat})
-            print(f'Updated catalog stsEndpoint -> {s3_ep}: {resp.status_code}')
-            if resp.status_code >= 400: print(resp.text)
-          else:
-            print('stsEndpoint already configured')
+          for ENV in dev prod; do
+            echo "=== Setting up kensan-${ENV} ==="
+            export CATALOG_NAME="kensan-${ENV}"
+            export S3_BUCKET="kensan-lakehouse-${ENV}"
+            export POLARIS_WAREHOUSE="kensan-${ENV}"
+
+            # bootstrap: monkey-patch でモジュール変数を上書き（イメージリビルド前の暫定対応）
+            python -c "
+          import catalog.bootstrap_polaris as bp
+          import os
+          bp.CATALOG_NAME = os.environ['CATALOG_NAME']
+          bp.S3_BUCKET = os.environ['S3_BUCKET']
+          bp.main()
           " && \
-          python -m catalog.init_catalog
+            # init_catalog: config.py が POLARIS_WAREHOUSE を env から読む
+            python -m catalog.init_catalog
+
+            if [ $? -ne 0 ]; then
+              echo "ERROR: Setup failed for kensan-${ENV}"
+              exit 1
+            fi
+            echo "=== Done: kensan-${ENV} ==="
+          done
+          echo "All catalogs initialized successfully."
         resources:
           requests:
             cpu: 50m
