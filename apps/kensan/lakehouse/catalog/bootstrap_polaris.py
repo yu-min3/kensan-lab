@@ -27,7 +27,7 @@ ROOT_CLIENT_SECRET = os.environ.get("POLARIS_ROOT_CLIENT_SECRET", "s3cr3t")
 S3_ENDPOINT = os.environ.get("S3_ENDPOINT", "http://localhost:9000")
 S3_BUCKET = os.environ.get("S3_BUCKET", "kensan-lakehouse")
 
-CATALOG_NAME = "kensan-lakehouse"
+CATALOG_NAME = os.environ.get("CATALOG_NAME", "kensan-lakehouse")
 
 
 def get_token() -> str:
