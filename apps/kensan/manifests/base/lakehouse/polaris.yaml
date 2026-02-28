@@ -47,7 +47,7 @@ spec:
       enableServiceLinks: false
       containers:
       - name: polaris
-        image: apache/polaris:apache-polaris-1.3.0-incubating
+        image: apache/polaris:1.3.0-incubating
         env:
         - name: POLARIS_BOOTSTRAP_CREDENTIALS
           valueFrom:
