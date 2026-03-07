@@ -23,6 +23,8 @@ export interface TimelineItemContentProps {
   noGoalLabel?: string
   /** Extra element shown after task name (e.g. "REC" badge) */
   trailingBadge?: React.ReactNode
+  /** When true, prefix end time with "翌" to indicate midnight crossover */
+  crossesMidnight?: boolean
 }
 
 /**
@@ -41,6 +43,7 @@ export function TimelineItemContent({
   actions,
   noGoalLabel = '目標なし',
   trailingBadge,
+  crossesMidnight,
 }: TimelineItemContentProps) {
   const hasGoal = !!(goalId && goalColor)
 
@@ -131,7 +134,7 @@ export function TimelineItemContent({
           </span>
         )}
         <span className="text-[10px] shrink-0 ml-auto">
-          {startTimeLabel} - {endTimeLabel}
+          {startTimeLabel} - {crossesMidnight && <span className="text-[9px] text-muted-foreground/70">翌</span>}{endTimeLabel}
         </span>
       </div>
     </>

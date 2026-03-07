@@ -24,7 +24,9 @@ import {
   snapToInterval,
   yToMinutes,
   calculateTimeFromY,
+  calculateOverlapLayout,
 } from './utils'
+import type { OverlapLayout } from './utils'
 import type { ResizeEdge, PreviewTime } from './types'
 
 // ズーム設定
@@ -63,6 +65,7 @@ export interface BlockRenderContext {
   block: TimelineBlock
   displayTimes: { startTime: string; endTime: string }
   isResizing: boolean
+  overlapLayout: OverlapLayout
   getTopPx: (time: string) => number
   getHeightPx: (startTime: string, endTime: string) => number
   onDragStart: (e: React.MouseEvent) => void
@@ -583,6 +586,16 @@ function TimelineColumnComponent({
     onEmptyDoubleClick,
   } = useTimelineColumnContext()
 
+  // 重複レイアウト計算（表示時間ベース — ドラッグ中のプレビュー位置も反映）
+  const overlapLayouts = useMemo(() => {
+    return calculateOverlapLayout(
+      blocks.map(b => {
+        const dt = getDisplayTimes(b)
+        return { id: b.id, startTime: dt.startTime, endTime: dt.endTime }
+      })
+    )
+  }, [blocks, getDisplayTimes])
+
   const { setNodeRef, isOver } = useDroppable({
     id: droppableId,
     data: droppableData,
@@ -682,6 +695,7 @@ function TimelineColumnComponent({
           const displayTimes = getDisplayTimes(block)
           const top = getTopPx(displayTimes.startTime)
           const height = getHeightPx(displayTimes.startTime, displayTimes.endTime)
+          const layout = overlapLayouts.get(block.id) || { column: 0, totalColumns: 1 }
 
           // カスタムレンダラーが指定されている場合はそれを使用
           if (renderBlock) {
@@ -691,6 +705,7 @@ function TimelineColumnComponent({
                   block,
                   displayTimes,
                   isResizing,
+                  overlapLayout: layout,
                   getTopPx,
                   getHeightPx,
                   onDragStart: (e) => onDragStart(e, block),
@@ -701,19 +716,23 @@ function TimelineColumnComponent({
             )
           }
 
-          // デフォルトのシンプルな表示
+          // デフォルトのシンプルな表示（重複時はサブカラム配置）
+          const pad = 2 // px
+          const gap = layout.totalColumns > 1 ? 1 : 0 // px gap between sub-columns
           return (
             <div
               key={block.id}
               data-block
               className={cn(
-                'absolute left-0.5 right-0.5 rounded-sm overflow-hidden text-[9px] px-1 leading-tight transition-opacity group',
+                'absolute rounded-sm overflow-hidden text-[9px] px-1 leading-tight transition-opacity group',
                 block.color ? 'text-white' : 'text-foreground bg-muted border',
                 onBlockResize && 'cursor-grab active:cursor-grabbing'
               )}
               style={{
                 top,
                 height,
+                left: `calc(${pad}px + ${layout.column} * (100% - ${pad * 2}px) / ${layout.totalColumns} + ${gap}px)`,
+                width: `calc((100% - ${pad * 2}px) / ${layout.totalColumns} - ${gap * 2}px)`,
                 backgroundColor: block.color || undefined,
               }}
               title={`${block.label} (${displayTimes.startTime}-${displayTimes.endTime})`}

@@ -3,6 +3,7 @@ export { TimeBlockTimelineGrid } from './TimeBlockTimelineGrid'
 export { TimelineItemContent } from './TimelineItemContent'
 export { TimelineCore } from './TimelineCore'
 export type { TimelineBlock, TimelineColumn, TimelineCoreProps, OverlayRenderContext, BlockRenderContext } from './TimelineCore'
+export type { OverlapLayout } from './utils'
 export {
   formatTime,
   getMinutesFromTime,
