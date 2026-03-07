@@ -1,6 +1,6 @@
 """
 Silver Explorer Assets: Bronze AI Explorer → Silver AI Explorer
-インタラクション単位サマリーとイベント単位テーブルを作成
+dev/prod 両カタログに対して変換を実行
 """
 
 from dagster import AssetExecutionContext, MaterializeResult, MetadataValue, asset
@@ -21,11 +21,13 @@ def silver_ai_explorer_interactions(
     context: AssetExecutionContext,
     iceberg_catalog: IcebergCatalogResource,
 ):
-    catalog = iceberg_catalog.get_catalog()
-    count = transform_explorer_interactions(catalog)
-    context.log.info(f"Transformed {count} explorer interactions")
+    total = 0
+    for env, catalog in iceberg_catalog.get_catalogs().items():
+        count = transform_explorer_interactions(catalog)
+        context.log.info(f"[{env}] Transformed {count} explorer interactions")
+        total += count
     return MaterializeResult(
-        metadata={"interaction_count": MetadataValue.int(count)}
+        metadata={"interaction_count": MetadataValue.int(total)}
     )
 
 
@@ -38,9 +40,11 @@ def silver_ai_explorer_events(
     context: AssetExecutionContext,
     iceberg_catalog: IcebergCatalogResource,
 ):
-    catalog = iceberg_catalog.get_catalog()
-    count = transform_explorer_events(catalog)
-    context.log.info(f"Transformed {count} explorer events")
+    total = 0
+    for env, catalog in iceberg_catalog.get_catalogs().items():
+        count = transform_explorer_events(catalog)
+        context.log.info(f"[{env}] Transformed {count} explorer events")
+        total += count
     return MaterializeResult(
-        metadata={"event_count": MetadataValue.int(count)}
+        metadata={"event_count": MetadataValue.int(total)}
     )

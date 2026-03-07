@@ -41,6 +41,8 @@ spec:
           value: "http://polaris:8181/api/catalog/v1"
         - name: S3_ENDPOINT
           value: "http://minio:9000"
+        - name: S3_ENDPOINT_INTERNAL
+          value: "http://minio:9000"
         # init_catalog.py (via config.py)
         - name: POLARIS_URI
           valueFrom:
@@ -49,11 +51,6 @@ spec:
               key: POLARIS_URI
         - name: POLARIS_CREDENTIAL
           value: "root:s3cr3t"
-        - name: POLARIS_WAREHOUSE
-          valueFrom:
-            configMapKeyRef:
-              name: kensan-lakehouse-env
-              key: POLARIS_WAREHOUSE
         - name: S3_ACCESS_KEY
           valueFrom:
             secretKeyRef:

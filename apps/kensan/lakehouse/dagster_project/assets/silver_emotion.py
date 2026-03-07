@@ -1,6 +1,7 @@
 """
 Silver Emotion Asset: LLM感情抽出
 bronze.notes_raw + bronze.tasks_raw → silver.emotion_segments
+dev/prod 両カタログに対して実行
 """
 
 import os
@@ -22,7 +23,6 @@ def silver_emotion_segments(
 ):
     from google import genai
 
-    catalog = iceberg_catalog.get_catalog()
     api_key = os.environ.get("GOOGLE_API_KEY", "")
     if not api_key:
         context.log.warning("GOOGLE_API_KEY not set, skipping emotion extraction")
@@ -30,5 +30,7 @@ def silver_emotion_segments(
 
     client = genai.Client(api_key=api_key)
     model = os.environ.get("GOOGLE_MODEL", "gemini-2.0-flash")
-    count = extract_emotions_batch(catalog, client, model)
-    context.log.info(f"Extracted emotions from {count} diary notes")
+
+    for env, catalog in iceberg_catalog.get_catalogs().items():
+        count = extract_emotions_batch(catalog, client, model)
+        context.log.info(f"[{env}] Extracted emotions from {count} diary notes")

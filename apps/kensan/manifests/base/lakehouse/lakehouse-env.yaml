@@ -4,7 +4,7 @@ metadata:
   name: kensan-lakehouse-env
 data:
   POLARIS_URI: "http://polaris.kensan-data.svc.cluster.local:8181/api/catalog"
-  POLARIS_WAREHOUSE: "kensan-lakehouse"
+  LAKEHOUSE_ENVS: "dev,prod"
   LAKEHOUSE_S3_ENDPOINT: "http://minio.kensan-data.svc.cluster.local:9000"
   LAKEHOUSE_ENABLED: "true"
   AWS_REGION: "us-east-1"

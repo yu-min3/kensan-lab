@@ -29,7 +29,7 @@ def setup_logging(name: str, level: int = logging.INFO) -> logging.Logger:
     return logger
 
 
-def get_catalog() -> Catalog:
+def get_catalog(warehouse: str | None = None) -> Catalog:
     """Polaris Iceberg REST Catalog への接続を返す"""
     return load_catalog(
         "polaris",
@@ -38,7 +38,7 @@ def get_catalog() -> Catalog:
             "uri": os.environ.get("POLARIS_URI", "http://localhost:8181/api/catalog"),
             "credential": os.environ.get("POLARIS_CREDENTIAL", "root:s3cr3t"),
             "scope": "PRINCIPAL_ROLE:ALL",
-            "warehouse": os.environ.get("POLARIS_WAREHOUSE", "kensan-lakehouse"),
+            "warehouse": warehouse or os.environ.get("POLARIS_WAREHOUSE", "kensan-lakehouse"),
             "s3.endpoint": os.environ.get("S3_ENDPOINT", "http://localhost:9000"),
             "s3.access-key-id": os.environ.get("S3_ACCESS_KEY", "kensan"),
             "s3.secret-access-key": os.environ.get("S3_SECRET_KEY", "kensan-minio"),
@@ -46,6 +46,22 @@ def get_catalog() -> Catalog:
             "s3.region": "us-east-1",
         },
     )
+
+
+def get_lakehouse_envs() -> list[str]:
+    """LAKEHOUSE_ENVS 環境変数から対象環境リストを取得"""
+    raw = os.environ.get("LAKEHOUSE_ENVS", "")
+    if raw:
+        return [e.strip() for e in raw.split(",") if e.strip()]
+    # フォールバック: POLARIS_WAREHOUSE から単一環境
+    warehouse = os.environ.get("POLARIS_WAREHOUSE", "kensan-lakehouse")
+    return [warehouse]
+
+
+def get_catalog_for_env(env: str) -> Catalog:
+    """指定環境のカタログを返す (env: "dev" or "prod")"""
+    warehouse = f"kensan-{env}" if not env.startswith("kensan-") else env
+    return get_catalog(warehouse=warehouse)
 
 
 def get_pg_dsn() -> str:

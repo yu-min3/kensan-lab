@@ -1,6 +1,6 @@
 """
 Silver Assets: Bronze → Silver 変換
-既存の transform.py をラップ
+dev/prod 両カタログに対して変換を実行
 """
 
 from dagster import AssetExecutionContext, asset
@@ -25,8 +25,9 @@ from pipelines.silver.transform import (
 def silver_time_entries(
     context: AssetExecutionContext, iceberg_catalog: IcebergCatalogResource
 ):
-    catalog = iceberg_catalog.get_catalog()
-    transform_time_entries(catalog)
+    for env, catalog in iceberg_catalog.get_catalogs().items():
+        transform_time_entries(catalog)
+        context.log.info(f"[{env}] Transformed time_entries")
 
 
 @asset(
@@ -37,8 +38,9 @@ def silver_time_entries(
 def silver_tasks(
     context: AssetExecutionContext, iceberg_catalog: IcebergCatalogResource
 ):
-    catalog = iceberg_catalog.get_catalog()
-    transform_tasks(catalog)
+    for env, catalog in iceberg_catalog.get_catalogs().items():
+        transform_tasks(catalog)
+        context.log.info(f"[{env}] Transformed tasks")
 
 
 @asset(
@@ -49,8 +51,9 @@ def silver_tasks(
 def silver_notes(
     context: AssetExecutionContext, iceberg_catalog: IcebergCatalogResource
 ):
-    catalog = iceberg_catalog.get_catalog()
-    transform_notes(catalog)
+    for env, catalog in iceberg_catalog.get_catalogs().items():
+        transform_notes(catalog)
+        context.log.info(f"[{env}] Transformed notes")
 
 
 @asset(
@@ -61,8 +64,9 @@ def silver_notes(
 def silver_ai_interactions(
     context: AssetExecutionContext, iceberg_catalog: IcebergCatalogResource
 ):
-    catalog = iceberg_catalog.get_catalog()
-    transform_ai_interactions(catalog)
+    for env, catalog in iceberg_catalog.get_catalogs().items():
+        transform_ai_interactions(catalog)
+        context.log.info(f"[{env}] Transformed ai_interactions")
 
 
 @asset(
@@ -73,8 +77,9 @@ def silver_ai_interactions(
 def silver_ai_token_usage(
     context: AssetExecutionContext, iceberg_catalog: IcebergCatalogResource
 ):
-    catalog = iceberg_catalog.get_catalog()
-    transform_ai_token_usage(catalog)
+    for env, catalog in iceberg_catalog.get_catalogs().items():
+        transform_ai_token_usage(catalog)
+        context.log.info(f"[{env}] Transformed ai_token_usage")
 
 
 @asset(
@@ -85,8 +90,9 @@ def silver_ai_token_usage(
 def silver_ai_facts(
     context: AssetExecutionContext, iceberg_catalog: IcebergCatalogResource
 ):
-    catalog = iceberg_catalog.get_catalog()
-    transform_ai_facts(catalog)
+    for env, catalog in iceberg_catalog.get_catalogs().items():
+        transform_ai_facts(catalog)
+        context.log.info(f"[{env}] Transformed ai_facts")
 
 
 @asset(
@@ -97,5 +103,6 @@ def silver_ai_facts(
 def silver_ai_reviews(
     context: AssetExecutionContext, iceberg_catalog: IcebergCatalogResource
 ):
-    catalog = iceberg_catalog.get_catalog()
-    transform_ai_reviews(catalog)
+    for env, catalog in iceberg_catalog.get_catalogs().items():
+        transform_ai_reviews(catalog)
+        context.log.info(f"[{env}] Transformed ai_reviews")
