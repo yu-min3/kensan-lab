@@ -22,6 +22,11 @@ interface RequestOptions {
 class HttpClient {
   private authToken: string | null = null
   private onUnauthorizedCallback: (() => void) | null = null
+  private _silent = false
+
+  setSilent(value: boolean) {
+    this._silent = value
+  }
 
   setAuthToken(token: string | null) {
     this.authToken = token
@@ -68,10 +73,12 @@ class HttpClient {
           const errorMessage = err instanceof Error ? err.message : 'Unknown network error'
           span.setStatus({ code: SpanStatusCode.ERROR, message: errorMessage })
           span.recordException(err instanceof Error ? err : new Error(errorMessage))
-          toast.error('Network Error', {
-            description: `${method} ${endpoint}: ${errorMessage}`,
-            duration: 5000,
-          })
+          if (!this._silent) {
+            toast.error('Network Error', {
+              description: `${method} ${endpoint}: ${errorMessage}`,
+              duration: 5000,
+            })
+          }
           throw new ApiError(0, 'NETWORK_ERROR', errorMessage)
         }
 
@@ -98,11 +105,13 @@ class HttpClient {
             throw new ApiError(response.status, errorCode, errorMessage)
           }
 
-          // その他のエラー: 赤いトーストを表示
-          toast.error('エラーが発生しました', {
-            description: errorMessage,
-            duration: 5000,
-          })
+          // その他のエラー: silent モードでなければ赤いトーストを表示
+          if (!this._silent) {
+            toast.error('エラーが発生しました', {
+              description: errorMessage,
+              duration: 5000,
+            })
+          }
 
           throw new ApiError(response.status, errorCode, errorMessage)
         }
