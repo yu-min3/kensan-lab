@@ -60,9 +60,6 @@ function createStackedBarTooltip(
       <div className="rounded-lg border bg-popover px-3 py-2 text-sm text-popover-foreground shadow-md">
         <p className="font-medium mb-1">
           {label}
-          {payload[0]?.payload?.day && label !== payload[0].payload.day && (
-            <span className="text-muted-foreground ml-1">({payload[0].payload.day})</span>
-          )}
         </p>
         {nonZeroItems.map((item) => {
           const goal = goalList.find((g) => g.id === item.dataKey)
@@ -139,7 +136,7 @@ export function A01AnalyticsReport() {
     }
 
     const data = dailyStudyHours.map((d) => {
-      const entry: Record<string, string | number> = { date: d.date, day: d.day }
+      const entry: Record<string, string | number> = { date: d.date, day: d.day, label: `${d.date}(${d.day})` }
       if (hasByGoal && d.byGoal) {
         for (const g of d.byGoal) {
           if (!goals.has(g.id)) {
@@ -399,7 +396,7 @@ export function A01AnalyticsReport() {
             <BarChart data={stackedChartData}>
               <CartesianGrid strokeDasharray="3 3" />
               <XAxis
-                dataKey={period === 'month' || period === 'custom' ? 'date' : 'day'}
+                dataKey="label"
                 fontSize={12}
                 interval={period === 'month' ? 2 : 0}
               />

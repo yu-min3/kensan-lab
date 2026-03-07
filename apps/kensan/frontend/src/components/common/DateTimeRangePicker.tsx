@@ -75,11 +75,13 @@ export function DateTimeRangePicker({
   const start = useMemo(() => parseDatetime(startDatetime), [startDatetime])
   const end = useMemo(() => parseDatetime(endDatetime), [endDatetime])
 
-  // Calculate current duration in minutes
+  // Calculate current duration in minutes (date-aware)
   const currentDuration = useMemo(() => {
-    const startTotal = start.hour * 60 + start.minute
-    const endTotal = end.hour * 60 + end.minute
-    return endTotal - startTotal
+    const startDate = new Date(start.date)
+    startDate.setHours(start.hour, start.minute, 0, 0)
+    const endDate = new Date(end.date)
+    endDate.setHours(end.hour, end.minute, 0, 0)
+    return Math.round((endDate.getTime() - startDate.getTime()) / 60000)
   }, [start, end])
 
   // Update start datetime
@@ -92,44 +94,47 @@ export function DateTimeRangePicker({
     onEndChange(buildDatetime(date, hour, minute))
   }
 
+  // Compute end date+time from a start time + duration, allowing midnight crossover
+  const computeEnd = (startDate: Date, startH: number, startM: number, durationMinutes: number) => {
+    const d = new Date(startDate)
+    d.setHours(startH, startM, 0, 0)
+    d.setMinutes(d.getMinutes() + durationMinutes)
+    return { date: d, hour: d.getHours(), minute: d.getMinutes() }
+  }
+
   // Handle start time change - auto-adjust end to maintain duration
   const handleStartHourChange = (value: string) => {
     const newHour = parseInt(value)
     const duration = Math.max(currentDuration, 30) // min 30 min
-    const startTotal = newHour * 60 + start.minute
-    const endTotal = Math.min(startTotal + duration, 23 * 60 + 55)
-    const endHour = Math.floor(endTotal / 60)
-    const endMinute = endTotal % 60
+    const newEnd = computeEnd(start.date, newHour, start.minute, duration)
 
     updateStart(start.date, newHour, start.minute)
-    updateEnd(end.date, endHour, endMinute)
+    updateEnd(newEnd.date, newEnd.hour, newEnd.minute)
   }
 
   const handleStartMinuteChange = (value: string) => {
     const newMinute = parseInt(value)
     const duration = Math.max(currentDuration, 30)
-    const startTotal = start.hour * 60 + newMinute
-    const endTotal = Math.min(startTotal + duration, 23 * 60 + 55)
-    const endHour = Math.floor(endTotal / 60)
-    const endMinute = endTotal % 60
+    const newEnd = computeEnd(start.date, start.hour, newMinute, duration)
 
     updateStart(start.date, start.hour, newMinute)
-    updateEnd(end.date, endHour, endMinute)
+    updateEnd(newEnd.date, newEnd.hour, newEnd.minute)
   }
 
-  const handleDateChange = (date: Date | undefined) => {
+  const handleStartDateChange = (date: Date | undefined) => {
     if (!date) return
     updateStart(date, start.hour, start.minute)
+  }
+
+  const handleEndDateChange = (date: Date | undefined) => {
+    if (!date) return
     updateEnd(date, end.hour, end.minute)
   }
 
-  // Apply duration preset
+  // Apply duration preset (allows midnight crossover)
   const applyDuration = (durationMinutes: number) => {
-    const startTotal = start.hour * 60 + start.minute
-    const endTotal = Math.min(startTotal + durationMinutes, 23 * 60 + 55)
-    const endHour = Math.floor(endTotal / 60)
-    const endMinute = endTotal % 60
-    updateEnd(end.date, endHour, endMinute)
+    const newEnd = computeEnd(start.date, start.hour, start.minute, durationMinutes)
+    updateEnd(newEnd.date, newEnd.hour, newEnd.minute)
   }
 
   const formatDuration = (mins: number) => {
@@ -145,7 +150,7 @@ export function DateTimeRangePicker({
     <div className="space-y-3">
       {/* Row 1: Date + Start time ~ End time */}
       <div className="flex gap-2 items-center flex-wrap">
-        {/* Date picker */}
+        {/* Start date picker */}
         <Popover>
           <PopoverTrigger asChild>
             <Button
@@ -163,7 +168,7 @@ export function DateTimeRangePicker({
             <Calendar
               mode="single"
               selected={start.date}
-              onSelect={handleDateChange}
+              onSelect={handleStartDateChange}
               initialFocus
             />
           </PopoverContent>
@@ -206,6 +211,30 @@ export function DateTimeRangePicker({
         </div>
 
         <span className="text-muted-foreground">〜</span>
+
+        {/* End date picker */}
+        <Popover>
+          <PopoverTrigger asChild>
+            <Button
+              variant="outline"
+              className={cn(
+                'w-[120px] justify-start text-left font-normal h-9',
+                !end.date && 'text-muted-foreground'
+              )}
+            >
+              <CalendarIcon className="mr-2 h-4 w-4" />
+              {format(end.date, 'MM/dd (E)', { locale: ja })}
+            </Button>
+          </PopoverTrigger>
+          <PopoverContent className="w-auto p-0" align="start">
+            <Calendar
+              mode="single"
+              selected={end.date}
+              onSelect={handleEndDateChange}
+              initialFocus
+            />
+          </PopoverContent>
+        </Popover>
 
         {/* End time */}
         <div className="flex items-center gap-0.5">

@@ -157,7 +157,7 @@ services:
         - VITE_NOTE_SERVICE_URL=http://localhost:8091
     container_name: kensan-frontend
     ports:
-      - "5173:5173"
+      - "5173:80"
     networks:
       - kensan-network
 
