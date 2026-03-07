@@ -127,7 +127,7 @@ const mockNoteTypes = [
     color: '#8B5CF6',
     constraints: { dateRequired: false, titleRequired: true, contentRequired: true, dailyUnique: false },
     metadataSchema: [
-      { key: 'author', label: '著者', labelEn: 'Author', type: 'string', required: true, constraints: {} },
+      { key: 'author', label: '著者', labelEn: 'Author', type: 'string', required: false, constraints: {} },
       { key: 'rating', label: '評価', labelEn: 'Rating', type: 'integer', required: false, constraints: { min: 1, max: 5 } },
       { key: 'isbn', label: 'ISBN', labelEn: 'ISBN', type: 'string', required: false, constraints: {} },
       { key: 'publisher', label: '出版社', labelEn: 'Publisher', type: 'string', required: false, constraints: {} },
