@@ -18,7 +18,7 @@ import {
 import type { TimelineBlock as CoreBlock, TimelineColumn, OverlayRenderContext, RunningTimerData, BlockRenderContext } from './timeline'
 import { TimelineItemContent } from './timeline/TimelineItemContent'
 import type { ActionButton } from './timeline/TimelineItemContent'
-import { getLocalTime } from '@/lib/timezone'
+import { getLocalTime, getLocalDate } from '@/lib/timezone'
 import { useSettingsStore } from '@/stores/useSettingsStore'
 
 interface TimeBlockTimelineProps {
@@ -170,6 +170,7 @@ export function TimeBlockTimeline({
           const hasGoal = !!(entry.goalId && entry.goalColor)
           const entryStartTime = toLocalTime(entry.startDatetime)
           const entryEndTime = toLocalTime(entry.endDatetime)
+          const entryCrossesMidnight = getLocalDate(entry.startDatetime, timezone) !== getLocalDate(entry.endDatetime, timezone)
 
           return (
             <div
@@ -204,6 +205,7 @@ export function TimeBlockTimeline({
                   milestoneName={entry.milestoneName}
                   startTimeLabel={formatTime(entryStartTime)}
                   endTimeLabel={formatTime(entryEndTime)}
+                  crossesMidnight={entryCrossesMidnight}
                   actions={(() => {
                     const a: ActionButton[] = []
                     if (onEntryClick) a.push({ type: 'edit', onClick: () => onEntryClick(entry) })
@@ -275,7 +277,9 @@ export function TimeBlockTimeline({
     if (!originalBlock) return null
 
     const hasGoal = !!(originalBlock.goalId && originalBlock.goalColor)
+    const blockCrossesMidnight = getLocalDate(originalBlock.startDatetime, timezone) !== getLocalDate(originalBlock.endDatetime, timezone)
     const isTimerRunning = !!runningTimer
+    const { column, totalColumns } = ctx.overlapLayout
 
     // アクションボタン
     const actions: ActionButton[] = []
@@ -308,13 +312,20 @@ export function TimeBlockTimeline({
       })
     }
 
+    // 重複レイアウト: サブカラム配置のCSS計算
+    const pad = 4 // px (left-1 / right-1 相当)
+    const gap = totalColumns > 1 ? 1 : 0 // px
+    // comparison モード: 左48%のみ使用、通常: 全幅使用
+    const availableWidth = showComparison ? '48%' : `calc(100% - ${pad}px)`
+    const colLeft = `calc(${pad}px + ${column} * ${availableWidth} / ${totalColumns} + ${gap}px)`
+    const colWidth = `calc(${availableWidth} / ${totalColumns} - ${gap * 2}px)`
+
     return (
       <div
         data-block
         aria-label={`${originalBlock.taskName || 'Time block'} ${formatTime(ctx.displayTimes.startTime)}-${formatTime(ctx.displayTimes.endTime)}`}
         className={cn(
           'absolute rounded-md px-2 py-1 text-xs group overflow-hidden',
-          showComparison ? 'left-1 right-[52%]' : 'left-1 right-1',
           onBlockResize && 'cursor-grab',
           ctx.isResizing && 'cursor-grabbing',
           !hasGoal && 'border border-dashed border-muted-foreground/40'
@@ -326,6 +337,8 @@ export function TimeBlockTimeline({
           top: `${ctx.getTopPx(ctx.displayTimes.startTime)}px`,
           height: `${ctx.getHeightPx(ctx.displayTimes.startTime, ctx.displayTimes.endTime)}px`,
           minHeight: '24px',
+          left: colLeft,
+          width: colWidth,
         }}
       >
         {/* Goal color left border */}
@@ -363,6 +376,7 @@ export function TimeBlockTimeline({
             milestoneName={originalBlock.milestoneName}
             startTimeLabel={formatTime(ctx.displayTimes.startTime)}
             endTimeLabel={formatTime(ctx.displayTimes.endTime)}
+            crossesMidnight={blockCrossesMidnight}
             actions={actions.length > 0 ? actions : undefined}
           />
         </div>
@@ -378,7 +392,7 @@ export function TimeBlockTimeline({
         )}
       </div>
     )
-  }, [blockMap, showComparison, runningTimer, onBlockClick, onBlockDelete, onBlockResize, onBlockStartTimer])
+  }, [blockMap, showComparison, runningTimer, onBlockClick, onBlockDelete, onBlockResize, onBlockStartTimer, timezone])
 
   // ドロップインジケーター
   const renderDropIndicator = useCallback((_columnId: string, ctx: OverlayRenderContext) => {
