@@ -1,0 +1,75 @@
+## Default deny all (zero-trust baseline)
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny-all
+  namespace: cloudflare-tunnel
+spec:
+  podSelector: {}
+  policyTypes:
+    - Ingress
+    - Egress
+
+---
+## Allow DNS resolution
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-dns
+  namespace: cloudflare-tunnel
+spec:
+  podSelector: {}
+  policyTypes:
+    - Egress
+  egress:
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
+
+---
+## Allow egress to Cloudflare Edge (Tunnel establishment, HTTPS/QUIC)
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-cloudflare-edge-egress
+  namespace: cloudflare-tunnel
+spec:
+  podSelector:
+    matchLabels:
+      app: cloudflared
+  policyTypes:
+    - Egress
+  egress:
+    - ports:
+        - protocol: TCP
+          port: 443
+        - protocol: UDP
+          port: 7844
+
+---
+## Allow egress to Istio Gateway (forward proxied requests)
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-gateway-egress
+  namespace: cloudflare-tunnel
+spec:
+  podSelector:
+    matchLabels:
+      app: cloudflared
+  policyTypes:
+    - Egress
+  egress:
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: istio-system
+      ports:
+        - protocol: TCP
+          port: 80

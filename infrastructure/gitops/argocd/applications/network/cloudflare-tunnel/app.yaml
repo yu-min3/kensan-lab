@@ -1,0 +1,31 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: cloudflare-tunnel
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: platform-project
+
+  source:
+    repoURL: https://github.com/yu-min3/goldship-yumin3
+    targetRevision: HEAD
+    path: infrastructure/network/cloudflare-tunnel/resources
+
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: cloudflare-tunnel
+
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+    retry:
+      limit: 5
+      backoff:
+        duration: 5s
+        factor: 2
+        maxDuration: 3m
