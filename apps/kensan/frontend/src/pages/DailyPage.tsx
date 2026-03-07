@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { Button } from '@/components/ui/button'
 import { Sheet, SheetContent } from '@/components/ui/sheet'
@@ -54,6 +54,22 @@ export function DailyPage() {
   const [dragOverY, setDragOverY] = useState<number | null>(null)
   const [activeDragData, setActiveDragData] = useState<TaskDragData | null>(null)
 
+  // ネイティブポインター位置を追跡（@dnd-kit の delta はスクロール補正を含むため、
+  // getBoundingClientRect() と組み合わせるとスクロール量が二重カウントされる）
+  const pointerYRef = useRef<number | null>(null)
+
+  useEffect(() => {
+    if (!isDraggingTask) {
+      pointerYRef.current = null
+      return
+    }
+    const handlePointerMove = (e: PointerEvent) => {
+      pointerYRef.current = e.clientY
+    }
+    window.addEventListener('pointermove', handlePointerMove)
+    return () => window.removeEventListener('pointermove', handlePointerMove)
+  }, [isDraggingTask])
+
   // DnD sensors
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -90,10 +106,10 @@ export function DailyPage() {
 
     // ドロップ先がタイムラインの場合のみY座標を更新
     if (event.over?.id === 'timeblock-timeline-droppable') {
-      const { activatorEvent, delta } = event
-      if (activatorEvent && 'clientY' in activatorEvent) {
-        const initialY = (activatorEvent as MouseEvent).clientY
-        setDragOverY(initialY + delta.y)
+      // ネイティブ pointer の clientY を使用。@dnd-kit の delta はスクロール補正を
+      // 含むため、getBoundingClientRect() と合わせるとズレる。
+      if (pointerYRef.current !== null) {
+        setDragOverY(pointerYRef.current)
       }
     } else {
       setDragOverY(null)
