@@ -13,6 +13,7 @@ import { useNoteContents } from '@/hooks/useNoteContents'
 import { getNoteTypeIcon } from '@/lib/noteTypeIcons'
 import { validateMetadata } from '@/components/note/MetadataForm'
 import { notesApi } from '@/api/services/notes'
+import { httpClient } from '@/api/client'
 import type { NoteType, Note } from '@/types'
 import { format } from 'date-fns'
 import {
@@ -357,6 +358,7 @@ export function N02NoteEdit() {
     if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current)
     autoSaveTimerRef.current = setTimeout(async () => {
       setAutoSaveStatus('saving')
+      httpClient.setSilent(true)
       try {
         await performSaveRef.current()
         lastSavedJsonRef.current = JSON.stringify(editorValueRef.current)
@@ -371,6 +373,8 @@ export function N02NoteEdit() {
           const draftKey = `kensan-draft-${currentNoteIdRef.current || 'new'}`
           localStorage.setItem(draftKey, currentJson)
         } catch { /* localStorage full */ }
+      } finally {
+        httpClient.setSilent(false)
       }
     }, 3000)
 
