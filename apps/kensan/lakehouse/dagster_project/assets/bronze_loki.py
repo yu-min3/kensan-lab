@@ -1,9 +1,8 @@
 """
 Bronze Loki Asset: Loki → Iceberg Bronze層
 AI Explorer イベントを Loki から取得して Bronze に append
+dev/prod 両カタログに書き込む
 """
-
-import os
 
 from dagster import AssetExecutionContext, MaterializeResult, MetadataValue, asset
 
@@ -21,15 +20,19 @@ def bronze_ai_explorer_events_raw(
     iceberg_catalog: IcebergCatalogResource,
     loki: LokiResource,
 ):
-    catalog = iceberg_catalog.get_catalog()
+    catalogs = iceberg_catalog.get_catalogs()
     loki_url = loki.get_base_url()
     state = load_state()
 
     prev_ns = state.get(TABLE_NAME, "0")
-    state = ingest_loki_events(catalog, loki_url, state)
-    save_state(state)
 
-    new_ns = state.get(TABLE_NAME, "0")
+    result_state = state
+    for env, catalog in catalogs.items():
+        result_state = ingest_loki_events(catalog, loki_url, dict(state))
+        context.log.info(f"[{env}] Ingested Loki events")
+
+    save_state(result_state)
+    new_ns = result_state.get(TABLE_NAME, "0")
 
     return MaterializeResult(
         metadata={
@@ -37,5 +40,6 @@ def bronze_ai_explorer_events_raw(
             "mode": MetadataValue.text("append"),
             "prev_timestamp_ns": MetadataValue.text(prev_ns),
             "new_timestamp_ns": MetadataValue.text(new_ns),
+            "environments": MetadataValue.text(",".join(catalogs.keys())),
         }
     )

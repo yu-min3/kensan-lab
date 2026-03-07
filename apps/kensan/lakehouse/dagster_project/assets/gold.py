@@ -1,6 +1,6 @@
 """
 Gold Assets: Silver → Gold 週次集計
-既存の aggregate.py をラップ
+dev/prod 両カタログに対して集計を実行
 """
 
 from dagster import AssetExecutionContext, asset
@@ -25,8 +25,9 @@ from pipelines.gold.aggregate import (
 def gold_weekly_summary(
     context: AssetExecutionContext, iceberg_catalog: IcebergCatalogResource
 ):
-    catalog = iceberg_catalog.get_catalog()
-    aggregate_weekly_summary(catalog)
+    for env, catalog in iceberg_catalog.get_catalogs().items():
+        aggregate_weekly_summary(catalog)
+        context.log.info(f"[{env}] Aggregated weekly_summary")
 
 
 @asset(
@@ -37,8 +38,9 @@ def gold_weekly_summary(
 def gold_goal_progress(
     context: AssetExecutionContext, iceberg_catalog: IcebergCatalogResource
 ):
-    catalog = iceberg_catalog.get_catalog()
-    aggregate_goal_progress(catalog)
+    for env, catalog in iceberg_catalog.get_catalogs().items():
+        aggregate_goal_progress(catalog)
+        context.log.info(f"[{env}] Aggregated goal_progress")
 
 
 @asset(
@@ -49,8 +51,9 @@ def gold_goal_progress(
 def gold_ai_usage_weekly(
     context: AssetExecutionContext, iceberg_catalog: IcebergCatalogResource
 ):
-    catalog = iceberg_catalog.get_catalog()
-    aggregate_ai_usage_weekly(catalog)
+    for env, catalog in iceberg_catalog.get_catalogs().items():
+        aggregate_ai_usage_weekly(catalog)
+        context.log.info(f"[{env}] Aggregated ai_usage_weekly")
 
 
 @asset(
@@ -65,8 +68,9 @@ def gold_ai_usage_weekly(
 def gold_ai_quality_weekly(
     context: AssetExecutionContext, iceberg_catalog: IcebergCatalogResource
 ):
-    catalog = iceberg_catalog.get_catalog()
-    aggregate_ai_quality_weekly(catalog)
+    for env, catalog in iceberg_catalog.get_catalogs().items():
+        aggregate_ai_quality_weekly(catalog)
+        context.log.info(f"[{env}] Aggregated ai_quality_weekly")
 
 
 @asset(
@@ -77,8 +81,9 @@ def gold_ai_quality_weekly(
 def gold_user_interest_profile(
     context: AssetExecutionContext, iceberg_catalog: IcebergCatalogResource
 ):
-    catalog = iceberg_catalog.get_catalog()
-    aggregate_interest_profile(catalog)
+    for env, catalog in iceberg_catalog.get_catalogs().items():
+        aggregate_interest_profile(catalog)
+        context.log.info(f"[{env}] Aggregated interest_profile")
 
 
 @asset(
@@ -89,8 +94,9 @@ def gold_user_interest_profile(
 def gold_user_trait_profile(
     context: AssetExecutionContext, iceberg_catalog: IcebergCatalogResource
 ):
-    catalog = iceberg_catalog.get_catalog()
-    aggregate_trait_profile(catalog)
+    for env, catalog in iceberg_catalog.get_catalogs().items():
+        aggregate_trait_profile(catalog)
+        context.log.info(f"[{env}] Aggregated trait_profile")
 
 
 @asset(
@@ -101,5 +107,6 @@ def gold_user_trait_profile(
 def gold_emotion_weekly(
     context: AssetExecutionContext, iceberg_catalog: IcebergCatalogResource
 ):
-    catalog = iceberg_catalog.get_catalog()
-    aggregate_emotion_weekly(catalog)
+    for env, catalog in iceberg_catalog.get_catalogs().items():
+        aggregate_emotion_weekly(catalog)
+        context.log.info(f"[{env}] Aggregated emotion_weekly")

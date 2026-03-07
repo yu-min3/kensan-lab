@@ -6,7 +6,7 @@ import os
 
 from dagster import ConfigurableResource
 
-from catalog.config import get_catalog, get_pg_dsn
+from catalog.config import get_catalog, get_catalog_for_env, get_lakehouse_envs, get_pg_dsn
 
 
 class IcebergCatalogResource(ConfigurableResource):
@@ -14,6 +14,10 @@ class IcebergCatalogResource(ConfigurableResource):
 
     def get_catalog(self):
         return get_catalog()
+
+    def get_catalogs(self) -> dict:
+        """全環境のカタログを返す: {"dev": Catalog, "prod": Catalog}"""
+        return {env: get_catalog_for_env(env) for env in get_lakehouse_envs()}
 
 
 class PostgresDsnResource(ConfigurableResource):

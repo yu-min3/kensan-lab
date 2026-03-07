@@ -68,7 +68,7 @@ def create_catalog(token: str) -> None:
             "storageConfigInfo": {
                 "storageType": "S3",
                 "endpoint": S3_ENDPOINT,
-                "endpointInternal": S3_ENDPOINT.replace("localhost", "kensan-minio"),
+                "endpointInternal": os.environ.get("S3_ENDPOINT_INTERNAL", S3_ENDPOINT.replace("localhost", "kensan-minio")),
                 "pathStyleAccess": True,
             },
         }

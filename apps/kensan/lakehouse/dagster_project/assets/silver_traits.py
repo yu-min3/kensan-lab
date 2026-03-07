@@ -1,6 +1,7 @@
 """
 Silver Trait Asset: LLM性質抽出
 bronze.notes_raw + bronze.tags_raw + bronze.note_tags_raw → silver.user_trait_segments
+dev/prod 両カタログに対して実行
 """
 
 import os
@@ -22,7 +23,6 @@ def silver_user_trait_segments(
 ):
     from google import genai
 
-    catalog = iceberg_catalog.get_catalog()
     api_key = os.environ.get("GOOGLE_API_KEY", "")
     if not api_key:
         context.log.warning("GOOGLE_API_KEY not set, skipping trait extraction")
@@ -30,5 +30,7 @@ def silver_user_trait_segments(
 
     client = genai.Client(api_key=api_key)
     model = os.environ.get("GOOGLE_MODEL", "gemini-2.0-flash")
-    count = extract_traits_batch(catalog, client, model)
-    context.log.info(f"Extracted {count} trait segments")
+
+    for env, catalog in iceberg_catalog.get_catalogs().items():
+        count = extract_traits_batch(catalog, client, model)
+        context.log.info(f"[{env}] Extracted {count} trait segments")
