@@ -31,6 +31,15 @@ spec:
       labels:
         app: minio
     spec:
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+            - matchExpressions:
+              - key: hardware-class
+                operator: In
+                values:
+                - high-performance
       containers:
       - name: minio
         image: minio/minio:RELEASE.2024-12-18T13-15-44Z
