@@ -8,3 +8,6 @@ spec:
     kind: Gateway
     name: gateway-prod
     namespace: istio-system
+  hostnames:
+  - "kensan.app.yu-min3.com"
+  - "kensan.yu-min3.com"
