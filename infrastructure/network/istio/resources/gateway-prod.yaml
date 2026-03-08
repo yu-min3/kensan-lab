@@ -20,6 +20,18 @@ spec:
           matchLabels:
             goldship.platform/environment: production
 
+  # Cloudflare Tunnel 経由のアクセス用（HTTP のみ、TLS は Cloudflare Edge が終端）
+  - name: http-tunnel
+    protocol: HTTP
+    port: 80
+    hostname: "kensan.yu-min3.com"
+    allowedRoutes:
+      namespaces:
+        from: Selector
+        selector:
+          matchLabels:
+            goldship.platform/environment: production
+
   - name: https
     protocol: HTTPS
     port: 443
