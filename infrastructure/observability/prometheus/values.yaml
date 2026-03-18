@@ -148,7 +148,7 @@ alertmanager:
             send_resolved: true
             title: '{{ if eq .Status "firing" }}🔥{{ else }}✅{{ end }} [{{ .Status | toUpper }}] {{ .CommonLabels.alertname }}'
             text: >-
-              *クラスタ:* goldship | *namespace:* {{ .CommonLabels.namespace }}
+              *クラスタ:* kensan-lab | *namespace:* {{ .CommonLabels.namespace }}
 
               {{ range .Alerts }}
               *{{ .Labels.alertname }}* ({{ .Labels.severity }})

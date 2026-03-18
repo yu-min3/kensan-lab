@@ -1,9 +1,9 @@
 # This .dockerignore is for building Backstage Docker image
-# Build context is the parent directory (goldship/)
+# Build context is the parent directory (kensan-lab/)
 # We need to exclude everything except backstage-app/
 
-# Exclude base-infra (Kubernetes manifests not needed in image)
-base-infra
+# Exclude infrastructure (Kubernetes manifests not needed in image)
+infrastructure
 
 # Exclude docs (not needed in image)
 docs

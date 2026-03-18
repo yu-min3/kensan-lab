@@ -18,7 +18,7 @@ spec:
         releaseName: istio-cni
         valueFiles:
           - $values/infrastructure/network/istio/cni/values.yaml
-    - repoURL: https://github.com/yu-min3/goldship-yumin3
+    - repoURL: https://github.com/yu-min3/kensan-lab
       targetRevision: HEAD
       ref: values
 

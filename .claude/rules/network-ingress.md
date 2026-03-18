@@ -26,19 +26,19 @@ Three Istio Gateways in `infrastructure/network/istio/resources/`:
 
 | Gateway | Domain Pattern | Certificate Secret |
 |---------|---------------|--------------------|
-| gateway-platform | `*.platform.example.com` | `wildcard-platform-tls` |
-| gateway-prod | `*.apps.example.com` | `wildcard-apps-tls` |
-| gateway-dev | `*.apps.example.com` | `wildcard-apps-tls` |
+| gateway-platform | `*.platform.yu-min3.com` | `wildcard-platform-tls` |
+| gateway-prod | `*.app.yu-min3.com` | `wildcard-apps-tls` |
+| gateway-dev | `*.app.yu-min3.com` | `wildcard-apps-tls` |
 
 ## Domain Examples
 
-- Backstage: `backstage.platform.example.com`
-- Argo CD: `argocd.platform.example.com`
-- Prometheus: `prometheus.platform.example.com`
-- Grafana: `grafana.platform.example.com`
-- Keycloak (prod): `auth.platform.example.com`
-- Keycloak (dev): `auth-dev.platform.example.com`
-- Apps: `<appname>.apps.example.com`
+- Backstage: `backstage.platform.yu-min3.com`
+- Argo CD: `argocd.platform.yu-min3.com`
+- Prometheus: `prometheus.platform.yu-min3.com`
+- Grafana: `grafana.platform.yu-min3.com`
+- Keycloak (prod): `auth.platform.yu-min3.com`
+- Keycloak (dev): `auth-dev.platform.yu-min3.com`
+- Apps: `<appname>.app.yu-min3.com`
 
 ## HTTPRoute Convention
 

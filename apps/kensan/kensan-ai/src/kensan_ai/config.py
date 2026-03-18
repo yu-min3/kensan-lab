@@ -21,7 +21,7 @@ class Settings(BaseSettings):
     db_host: str = "localhost"
     db_port: int = 5432
     db_user: str = "kensan"
-    db_password: str = "kensan"
+    db_password: str = ""
     db_name: str = "kensan"
 
     @computed_field
@@ -54,13 +54,13 @@ class Settings(BaseSettings):
 
     # MinIO Storage (read-only access for note content)
     minio_endpoint: str = "localhost:9000"
-    minio_access_key: str = "kensan"
-    minio_secret_key: str = "kensan-minio"
+    minio_access_key: str = ""
+    minio_secret_key: str = ""
     minio_bucket: str = "kensan-notes"
     minio_use_ssl: bool = False
 
     # JWT (for verifying tokens from user-service)
-    jwt_secret: str = "dev-secret-key-change-in-production"
+    jwt_secret: str = ""
 
     # Server
     server_port: int = 8089
@@ -81,11 +81,11 @@ class Settings(BaseSettings):
 
     # Lakehouse (Iceberg direct write via Polaris)
     polaris_uri: str = "http://localhost:8181/api/catalog"
-    polaris_credential: str = "root:s3cr3t"
+    polaris_credential: str = ""
     polaris_warehouse: str = "kensan-lakehouse"
     lakehouse_s3_endpoint: str = "http://localhost:9000"
-    lakehouse_s3_access_key: str = "kensan"
-    lakehouse_s3_secret_key: str = "kensan-minio"
+    lakehouse_s3_access_key: str = ""
+    lakehouse_s3_secret_key: str = ""
     lakehouse_s3_bucket: str = "kensan-lakehouse"
     lakehouse_enabled: bool = False
 

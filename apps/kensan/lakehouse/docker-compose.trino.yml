@@ -17,7 +17,7 @@ services:
     container_name: kensan-superset-db
     environment:
       POSTGRES_USER: superset
-      POSTGRES_PASSWORD: superset
+      POSTGRES_PASSWORD: <your-superset-db-password>
       POSTGRES_DB: superset
     volumes:
       - superset_db_data:/var/lib/postgresql/data
@@ -46,11 +46,11 @@ services:
     ports:
       - "8088:8088"
     environment:
-      SUPERSET_SECRET_KEY: kensan-superset-secret-key-change-in-prod
-      SQLALCHEMY_DATABASE_URI: postgresql+psycopg2://superset:superset@superset-db:5432/superset
+      SUPERSET_SECRET_KEY: <your-superset-secret-key>
+      SQLALCHEMY_DATABASE_URI: postgresql+psycopg2://superset:<your-superset-db-password>@superset-db:5432/superset
       REDIS_URL: redis://redis:6379/0
       ADMIN_USERNAME: admin
-      ADMIN_PASSWORD: admin
+      ADMIN_PASSWORD: <your-superset-admin-password>
       ADMIN_EMAIL: admin@kensan.dev
       ADMIN_FIRST_NAME: Admin
       ADMIN_LAST_NAME: User

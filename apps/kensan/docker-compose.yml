@@ -86,7 +86,7 @@ services:
     container_name: kensan-postgres
     environment:
       POSTGRES_USER: kensan
-      POSTGRES_PASSWORD: kensan
+      POSTGRES_PASSWORD: <your-db-password>
       POSTGRES_DB: kensan
     ports:
       - "5432:5432"
@@ -108,7 +108,7 @@ services:
     command: server /data --console-address ":9001"
     environment:
       MINIO_ROOT_USER: kensan
-      MINIO_ROOT_PASSWORD: kensan-minio
+      MINIO_ROOT_PASSWORD: <your-minio-password>
     ports:
       - "9000:9000"
       - "9001:9001"
@@ -132,7 +132,7 @@ services:
         condition: service_healthy
     entrypoint: >
       /bin/sh -c "
-      mc alias set local http://minio:9000 kensan kensan-minio &&
+      mc alias set local http://minio:9000 kensan <your-minio-password> &&
       mc mb --ignore-existing local/kensan-notes &&
       mc mb --ignore-existing local/kensan-lakehouse &&
       echo '{\"CORSRules\":[{\"AllowedOrigins\":[\"http://localhost:5173\"],\"AllowedMethods\":[\"GET\",\"PUT\"],\"AllowedHeaders\":[\"*\"],\"MaxAgeSeconds\":3600}]}' | mc cors set local/kensan-notes /dev/stdin
@@ -175,7 +175,7 @@ services:
       DB_HOST: postgres
       DB_PORT: 5432
       DB_USER: kensan
-      DB_PASSWORD: kensan
+      DB_PASSWORD: <your-db-password>
       DB_NAME: kensan
       JWT_SECRET: ${JWT_SECRET:-dev-secret-key-change-in-production}
       OTEL_ENABLED: "true"
@@ -202,7 +202,7 @@ services:
       DB_HOST: postgres
       DB_PORT: 5432
       DB_USER: kensan
-      DB_PASSWORD: kensan
+      DB_PASSWORD: <your-db-password>
       DB_NAME: kensan
       JWT_SECRET: ${JWT_SECRET:-dev-secret-key-change-in-production}
       OTEL_ENABLED: "true"
@@ -226,7 +226,7 @@ services:
       DB_HOST: postgres
       DB_PORT: 5432
       DB_USER: kensan
-      DB_PASSWORD: kensan
+      DB_PASSWORD: <your-db-password>
       DB_NAME: kensan
       JWT_SECRET: ${JWT_SECRET:-dev-secret-key-change-in-production}
       OTEL_ENABLED: "true"
@@ -250,7 +250,7 @@ services:
       DB_HOST: postgres
       DB_PORT: 5432
       DB_USER: kensan
-      DB_PASSWORD: kensan
+      DB_PASSWORD: <your-db-password>
       DB_NAME: kensan
       JWT_SECRET: ${JWT_SECRET:-dev-secret-key-change-in-production}
       OTEL_ENABLED: "true"
@@ -274,7 +274,7 @@ services:
       DB_HOST: postgres
       DB_PORT: 5432
       DB_USER: kensan
-      DB_PASSWORD: kensan
+      DB_PASSWORD: <your-db-password>
       DB_NAME: kensan
       JWT_SECRET: ${JWT_SECRET:-dev-secret-key-change-in-production}
       AI_PROVIDER: ${AI_PROVIDER:-anthropic}
@@ -287,7 +287,7 @@ services:
       EMBEDDING_MODEL: ${EMBEDDING_MODEL:-text-embedding-3-small}
       MINIO_ENDPOINT: minio:9000
       MINIO_ACCESS_KEY: kensan
-      MINIO_SECRET_KEY: kensan-minio
+      MINIO_SECRET_KEY: <your-minio-password>
       MINIO_BUCKET: kensan-notes
       MINIO_USE_SSL: "false"
       OTEL_ENABLED: "true"
@@ -295,11 +295,11 @@ services:
       OTEL_SEMCONV_STABILITY_OPT_IN: "http"
       LAKEHOUSE_ENABLED: "true"
       POLARIS_URI: "http://polaris:8181/api/catalog"
-      POLARIS_CREDENTIAL: "root:s3cr3t"
+      POLARIS_CREDENTIAL: "<your-polaris-credential>"
       POLARIS_WAREHOUSE: "kensan-lakehouse"
       LAKEHOUSE_S3_ENDPOINT: "http://minio:9000"
       LAKEHOUSE_S3_ACCESS_KEY: "kensan"
-      LAKEHOUSE_S3_SECRET_KEY: "kensan-minio"
+      LAKEHOUSE_S3_SECRET_KEY: "<your-minio-password>"
     ports:
       - "8089:8089"
     depends_on:
@@ -328,10 +328,10 @@ services:
       - "8181:8181"
       - "8182:8182"
     environment:
-      POLARIS_BOOTSTRAP_CREDENTIALS: "POLARIS,root,s3cr3t"
+      POLARIS_BOOTSTRAP_CREDENTIALS: "<your-polaris-bootstrap-credentials>"
       AWS_REGION: us-east-1
       AWS_ACCESS_KEY_ID: kensan
-      AWS_SECRET_ACCESS_KEY: kensan-minio
+      AWS_SECRET_ACCESS_KEY: <your-minio-password>
     volumes:
       - ./lakehouse/polaris-config/application.properties:/deployments/config/application.properties:ro
       - ./lakehouse/polaris-config/aws-config:/root/.aws/config:ro
@@ -351,7 +351,7 @@ services:
     container_name: kensan-dagster-postgres
     environment:
       POSTGRES_USER: dagster
-      POSTGRES_PASSWORD: dagster
+      POSTGRES_PASSWORD: <your-dagster-db-password>
       POSTGRES_DB: dagster
     volumes:
       - dagster_pg_data:/var/lib/postgresql/data
@@ -373,7 +373,7 @@ services:
       - ./lakehouse/.env
     environment:
       DAGSTER_HOME: /app
-      DAGSTER_PG_URL: postgresql://dagster:dagster@dagster-postgres:5432/dagster
+      DAGSTER_PG_URL: postgresql://dagster:<your-dagster-db-password>@dagster-postgres:5432/dagster
       DAGSTER_CURRENT_IMAGE: kensan-dagster-user-code
     extra_hosts:
       - "host.docker.internal:host-gateway"
@@ -393,7 +393,7 @@ services:
       - ./lakehouse/.env
     environment:
       DAGSTER_HOME: /app
-      DAGSTER_PG_URL: postgresql://dagster:dagster@dagster-postgres:5432/dagster
+      DAGSTER_PG_URL: postgresql://dagster:<your-dagster-db-password>@dagster-postgres:5432/dagster
     ports:
       - "3070:3070"
     depends_on:
@@ -414,7 +414,7 @@ services:
       - ./lakehouse/.env
     environment:
       DAGSTER_HOME: /app
-      DAGSTER_PG_URL: postgresql://dagster:dagster@dagster-postgres:5432/dagster
+      DAGSTER_PG_URL: postgresql://dagster:<your-dagster-db-password>@dagster-postgres:5432/dagster
     depends_on:
       dagster-postgres:
         condition: service_healthy
@@ -434,7 +434,7 @@ services:
       DB_HOST: postgres
       DB_PORT: 5432
       DB_USER: kensan
-      DB_PASSWORD: kensan
+      DB_PASSWORD: <your-db-password>
       DB_NAME: kensan
       JWT_SECRET: ${JWT_SECRET:-dev-secret-key-change-in-production}
       OTEL_ENABLED: "true"
@@ -458,12 +458,12 @@ services:
       DB_HOST: postgres
       DB_PORT: 5432
       DB_USER: kensan
-      DB_PASSWORD: kensan
+      DB_PASSWORD: <your-db-password>
       DB_NAME: kensan
       JWT_SECRET: ${JWT_SECRET:-dev-secret-key-change-in-production}
       STORAGE_ENDPOINT: minio:9000
       STORAGE_ACCESS_KEY: kensan
-      STORAGE_SECRET_KEY: kensan-minio
+      STORAGE_SECRET_KEY: <your-minio-password>
       STORAGE_BUCKET: kensan-notes
       STORAGE_USE_SSL: "false"
       STORAGE_PUBLIC_URL: http://localhost:9000/kensan-notes

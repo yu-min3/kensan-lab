@@ -13,4 +13,4 @@ make build TAG=v1.0.0
 make push TAG=v1.0.0
 
 # Kubernetes にデプロイ
-kubectl apply -f ../base-infra/backstage/
+kubectl apply -f ../infrastructure/backstage/

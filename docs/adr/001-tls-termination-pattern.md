@@ -1,206 +1,206 @@
-# ADR-001: TLS終端パターンの選択
+# ADR-001: TLS Termination Pattern Selection
 
-## ステータス
+## Status
 
-採用済み (Accepted)
+Accepted
 
-## 日付
+## Date
 
 2025-11-07
 
-## コンテキスト
+## Context
 
-プラットフォームインフラサービス（Argo CD、Grafana、Prometheus、Keycloak、Hubble UIなど）を外部に公開する際、TLS終端をどこで行うかを決定する必要がある。
+When exposing platform infrastructure services (Argo CD, Grafana, Prometheus, Keycloak, Hubble UI, etc.) externally, we need to decide where TLS termination occurs.
 
-### TLS終端の3つのパターン
+### Three TLS Termination Patterns
 
-#### 1. Edge Termination（エッジ終端）
-
-```
-[ブラウザ] --HTTPS--> [Gateway] --HTTP--> [Backend]
-                      ↑ TLS終端
-```
-
-- **特徴**: GatewayでTLS証明書を管理し、バックエンドにはHTTPで転送
-- **メリット**:
-  - 証明書管理が1箇所（Gateway）で集中管理
-  - バックエンドのTLS設定不要
-  - 複数サービスで証明書を共有可能
-  - パフォーマンスが良い（暗号化/復号化は1回）
-- **デメリット**:
-  - Gateway→Backend間は平文（クラスター内）
-
-#### 2. Passthrough Termination（パススルー）
+#### 1. Edge Termination
 
 ```
-[ブラウザ] --HTTPS--> [Gateway] --HTTPS--> [Backend]
-                      ↑ 暗号化のまま転送  ↑ TLS終端
+[Browser] --HTTPS--> [Gateway] --HTTP--> [Backend]
+                      ^ TLS termination
 ```
 
-- **特徴**: Gatewayは暗号化トラフィックをそのまま転送、バックエンドで終端
-- **メリット**:
-  - End-to-endで暗号化
-  - バックエンドが証明書を完全制御
-- **デメリット**:
-  - 各バックエンドに証明書が必要
-  - GatewayでL7ルーティング不可（暗号化されているため）
-  - HTTPヘッダー操作・認証処理不可
+- **Characteristics**: Gateway manages TLS certificates and forwards HTTP to the backend
+- **Pros**:
+  - Centralized certificate management at a single point (Gateway)
+  - No TLS configuration needed on backends
+  - Certificates can be shared across multiple services
+  - Good performance (encryption/decryption happens only once)
+- **Cons**:
+  - Traffic between Gateway and Backend is plaintext (within the cluster)
 
-#### 3. Re-encryption（再暗号化）
+#### 2. Passthrough Termination
 
 ```
-[ブラウザ] --HTTPS--> [Gateway] --HTTPS--> [Backend]
-                      ↑ TLS終端        ↑ TLS終端
-                      ↓ TLS再暗号化
+[Browser] --HTTPS--> [Gateway] --HTTPS--> [Backend]
+                      ^ Forwards encrypted   ^ TLS termination
 ```
 
-- **特徴**: Gatewayで復号化後、再度暗号化してバックエンドに転送
-- **メリット**:
-  - End-to-endで暗号化
-  - GatewayでL7処理可能（ヘッダー挿入、認証など）
-  - Gateway→Backend間も暗号化
-- **デメリット**:
-  - 最も複雑
-  - パフォーマンスオーバーヘッド（2回の暗号化/復号化）
-  - Gateway、Backend両方に証明書必要
-  - **Istio SidecarがService Meshとして必須**（重い）
+- **Characteristics**: Gateway forwards encrypted traffic as-is; backend terminates TLS
+- **Pros**:
+  - End-to-end encryption
+  - Backend has full control over certificates
+- **Cons**:
+  - Each backend needs its own certificate
+  - No L7 routing at the Gateway (traffic is encrypted)
+  - Cannot perform HTTP header manipulation or authentication
 
-## 決定事項
+#### 3. Re-encryption
 
-**Edge Termination（エッジ終端）を採用する**
+```
+[Browser] --HTTPS--> [Gateway] --HTTPS--> [Backend]
+                      ^ TLS termination  ^ TLS termination
+                      v TLS re-encryption
+```
 
-すべてのプラットフォームインフラサービスで、Istio GatewayによるEdge Terminationパターンを使用する。
+- **Characteristics**: Gateway decrypts then re-encrypts before forwarding to the backend
+- **Pros**:
+  - End-to-end encryption
+  - L7 processing possible at the Gateway (header injection, authentication, etc.)
+  - Gateway-to-Backend communication is also encrypted
+- **Cons**:
+  - Most complex approach
+  - Performance overhead (two rounds of encryption/decryption)
+  - Certificates needed on both Gateway and Backend
+  - **Istio Sidecar required as a Service Mesh** (heavyweight)
 
-### 適用対象サービス
+## Decision
+
+**Adopt Edge Termination**
+
+Use the Edge Termination pattern with Istio Gateway for all platform infrastructure services.
+
+### Services in Scope
 
 - Argo CD
 - Grafana
 - Prometheus
 - Keycloak (Prod/Dev)
 - Hubble UI
-- 将来追加されるプラットフォームサービス
+- Future platform services
 
-### 実装方法
+### Implementation Approach
 
-1. **Gateway側**:
-   - Istio Gatewayで Let's Encrypt証明書を使用（cert-manager自動管理）
-   - `*.platform.your-org.com` ワイルドカード証明書
-   - TLS終端（`tls.mode: Terminate`）
+1. **Gateway side**:
+   - Use Let's Encrypt certificates on Istio Gateway (auto-managed by cert-manager)
+   - Wildcard certificate `*.platform.your-org.com`
+   - TLS termination (`tls.mode: Terminate`)
 
-2. **Backend側**:
-   - サービスはHTTPで動作（insecure mode）
-   - 例: Argo CD `server.insecure: "true"`
-   - ClusterIP Serviceで公開
+2. **Backend side**:
+   - Services operate in HTTP mode (insecure mode)
+   - Example: Argo CD `server.insecure: "true"`
+   - Exposed via ClusterIP Service
 
 3. **HTTPRoute**:
-   - バックエンドサービスのHTTPポート（通常80番）を指定
+   - Targets the backend service's HTTP port (typically port 80)
 
-## 理由
+## Rationale
 
-### Edge Terminationを選択した理由
+### Why Edge Termination Was Chosen
 
-1. **証明書管理の簡素化**
-   - Let's Encryptの証明書を1箇所（cert-manager + Gateway）で管理
-   - 各バックエンドサービスに証明書を配布する必要がない
-   - 証明書更新が自動化され、影響範囲が限定的
+1. **Simplified Certificate Management**
+   - Manage Let's Encrypt certificates in one place (cert-manager + Gateway)
+   - No need to distribute certificates to each backend service
+   - Certificate renewal is automated with limited blast radius
 
-2. **パフォーマンス**
-   - 暗号化/復号化が1回のみ（Gatewayのみ）
-   - Bare-metal Raspberry Pi環境での省リソース
+2. **Performance**
+   - Encryption/decryption happens only once (at the Gateway)
+   - Resource-efficient for bare-metal Raspberry Pi environment
 
-3. **運用性**
-   - バックエンドサービスのTLS設定が不要
-   - Helmチャートや既存マニフェストをそのまま利用可能
-   - トラブルシューティングが容易
+3. **Operational Simplicity**
+   - No TLS configuration needed on backend services
+   - Helm charts and existing manifests can be used as-is
+   - Easier troubleshooting
 
-4. **クラスター内通信の信頼性**
-   - Kubernetes クラスター内は信頼できるネットワークとして扱う
-   - NetworkPolicyで名前空間間の通信を制御可能
-   - 物理的に隔離されたベアメタル環境
+4. **Intra-Cluster Trust**
+   - Kubernetes intra-cluster network is treated as trusted
+   - NetworkPolicy can control inter-namespace communication
+   - Physically isolated bare-metal environment
 
-### Re-encryptionを見送った理由
+### Why Re-encryption Was Not Chosen
 
-1. **Istio Sidecar注入が必須**
-   - Service Mesh（mTLS）を有効にする必要がある
-   - 各PodにEnvoy Sidecarが注入される
-   - **リソースオーバーヘッドが大きい**（Raspberry Pi環境では重い）
+1. **Istio Sidecar Injection Required**
+   - Service Mesh (mTLS) must be enabled
+   - Envoy Sidecar injected into each Pod
+   - **Significant resource overhead** (heavyweight for Raspberry Pi environment)
 
-2. **複雑性の増加**
-   - 証明書を2箇所で管理（Gateway + Backend）
-   - デバッグが困難
-   - パフォーマンスオーバーヘッド（2回の暗号化/復号化）
+2. **Increased Complexity**
+   - Certificates managed in two places (Gateway + Backend)
+   - Difficult to debug
+   - Performance overhead (two rounds of encryption/decryption)
 
-3. **本環境での必要性が低い**
-   - クラスター内は物理的に隔離されたベアメタル環境
-   - NetworkPolicyで十分な制御が可能
-   - プラットフォームインフラサービスは管理者のみがアクセス
+3. **Low Necessity for This Environment**
+   - Physically isolated bare-metal environment
+   - NetworkPolicy provides sufficient control
+   - Platform infrastructure services are accessed only by administrators
 
-### Passthroughを見送った理由
+### Why Passthrough Was Not Chosen
 
-1. **L7ルーティング不可**
-   - HTTPヘッダーベースのルーティングができない
-   - 将来的なKeycloak JWT認証統合が困難
+1. **No L7 Routing**
+   - HTTP header-based routing is not possible
+   - Future Keycloak JWT authentication integration would be difficult
 
-2. **証明書管理の複雑化**
-   - 各バックエンドに証明書が必要
-   - Let's Encryptの証明書を個別に管理する必要
+2. **Complex Certificate Management**
+   - Each backend needs its own certificate
+   - Let's Encrypt certificates must be managed individually
 
-## 結果
+## Consequences
 
-### 実装上の注意点
+### Implementation Notes
 
-1. **バックエンドサービスの設定**
+1. **Backend Service Configuration**
 
-   各サービスで「TLS終端はプロキシが処理」と明示的に設定する必要がある：
+   Each service must explicitly indicate that "TLS termination is handled by the proxy":
 
    - **Argo CD**: `server.insecure: "true"` in ConfigMap
-   - **Grafana**: デフォルトでHTTP対応（追加設定不要）
-   - **Prometheus**: デフォルトでHTTP対応（追加設定不要）
-   - **Keycloak**: `KC_PROXY=edge` 環境変数
+   - **Grafana**: HTTP by default (no additional configuration needed)
+   - **Prometheus**: HTTP by default (no additional configuration needed)
+   - **Keycloak**: `KC_PROXY=edge` environment variable
 
-2. **リダイレクトループの回避**
+2. **Avoiding Redirect Loops**
 
-   バックエンドサービスがHTTPS強制リダイレクトを行う場合、無限ループが発生する。
-   必ず insecure/edge mode を有効にすること。
+   If a backend service enforces HTTPS redirects, an infinite loop will occur.
+   Always enable insecure/edge mode.
 
-3. **証明書の範囲**
+3. **Certificate Scope**
 
-   - `*.platform.your-org.com`: プラットフォームインフラ用
-   - `*.app.your-org.com`: アプリケーション用（将来）
+   - `*.platform.your-org.com`: For platform infrastructure
+   - `*.app.your-org.com`: For applications (future)
 
-   Let's Encryptのワイルドカード証明書は1レベルのサブドメインのみカバーするため、
-   階層的なサブドメイン構造に応じて証明書を分ける。
+   Let's Encrypt wildcard certificates cover only one level of subdomain,
+   so certificates should be separated according to hierarchical subdomain structure.
 
-### トレードオフ
+### Trade-offs
 
-**セキュリティ vs パフォーマンス/運用性**
+**Security vs Performance/Operability**
 
-- ✅ 採用: クラスター内は平文、運用が容易、パフォーマンスが良い
-- ❌ 不採用: End-to-end暗号化、複雑、重い
+- Adopted: Plaintext within the cluster, easy operations, good performance
+- Not adopted: End-to-end encryption, complex, heavyweight
 
-本環境では、以下の理由により Edge Termination が適切：
-- 物理的に隔離されたベアメタル環境
-- Raspberry Pi のリソース制約
-- プラットフォームインフラサービスは管理者のみがアクセス
-- NetworkPolicyによる名前空間間の通信制御
+Edge Termination is appropriate for this environment for the following reasons:
+- Physically isolated bare-metal environment
+- Raspberry Pi resource constraints
+- Platform infrastructure services accessed only by administrators
+- Inter-namespace communication control via NetworkPolicy
 
-### 将来的な再検討の条件
+### Conditions for Future Reconsideration
 
-以下の場合、Re-encryptionパターンへの移行を検討する：
+Consider migrating to the Re-encryption pattern in the following cases:
 
-1. **コンプライアンス要件**
-   - 規制によりEnd-to-end暗号化が必須となった場合
+1. **Compliance Requirements**
+   - When regulations mandate end-to-end encryption
 
-2. **マルチテナント環境**
-   - 複数組織のアプリケーションを同一クラスターでホストする場合
+2. **Multi-Tenant Environment**
+   - When hosting applications from multiple organizations on the same cluster
 
-3. **ゼロトラストネットワーク**
-   - クラスター内通信も暗号化が必要なセキュリティポリシーを採用する場合
+3. **Zero-Trust Networking**
+   - When adopting a security policy that requires encryption for intra-cluster communication
 
-4. **ハードウェアアップグレード**
-   - より高性能なノードに移行し、Istio Sidecarのオーバーヘッドが許容範囲内になった場合
+4. **Hardware Upgrade**
+   - When migrating to higher-performance nodes where Istio Sidecar overhead becomes acceptable
 
-## 参考資料
+## References
 
 - [Istio Gateway API - TLS Configuration](https://istio.io/latest/docs/tasks/traffic-management/ingress/gateway-api/#configuring-tls)
 - [Argo CD - Running Argo CD behind a proxy](https://argo-cd.readthedocs.io/en/stable/operator-manual/ingress/)

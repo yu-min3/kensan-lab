@@ -1,110 +1,110 @@
-# Grafana 独立デプロイ
+# Grafana Independent Deployment
 
-## 概要
+## Overview
 
-Grafana を kube-prometheus-stack から分離し、Observability スタック全体（Prometheus/Tempo/Loki）の統一された可視化レイヤーとして独立デプロイしています。
+Grafana has been separated from kube-prometheus-stack and independently deployed as the unified visualization layer for the entire Observability stack (Prometheus/Tempo/Loki).
 
-現在は Argo CD の Helm multi-source Application として管理されています。
+It is currently managed as an Argo CD Helm multi-source Application.
 - Application CR: `infrastructure/gitops/argocd/applications/observability/grafana/app.yaml`
 - Helm values: `infrastructure/observability/grafana/values.yaml`
-- カスタムリソース: `infrastructure/observability/grafana/resources/`
+- Custom resources: `infrastructure/observability/grafana/resources/`
 
-## Grafana values の主要設定
+## Key Grafana Values Settings
 
-ファイル: `infrastructure/observability/grafana/values.yaml`
+File: `infrastructure/observability/grafana/values.yaml`
 
-- `admin.existingSecret`: Sealed Secret から admin credentials を取得
-- `sidecar.datasources.enabled`: ConfigMap から datasources を自動検出
-- `sidecar.dashboards.enabled`: ConfigMap から dashboards を自動検出
-- `sidecar.datasources.defaultDatasourceEnabled: false`: 組み込み Prometheus を無効化
+- `admin.existingSecret`: Retrieve admin credentials from Sealed Secret
+- `sidecar.datasources.enabled`: Auto-discover datasources from ConfigMaps
+- `sidecar.dashboards.enabled`: Auto-discover dashboards from ConfigMaps
+- `sidecar.datasources.defaultDatasourceEnabled: false`: Disable the built-in Prometheus datasource
 
-## Sealed Secret 作成手順
+## Sealed Secret Creation Steps
 
-Grafana の admin パスワードを Sealed Secret として管理しています。新規クラスターでは再作成が必要です。
+The Grafana admin password is managed as a Sealed Secret. It must be recreated for new clusters.
 
 ```bash
-# Raw secret 作成
+# Create raw secret
 kubectl create secret generic grafana-admin-secret \
   --namespace=monitoring \
   --from-literal=admin-user=admin \
   --from-literal=admin-password=<YOUR_PASSWORD> \
   --dry-run=client -o yaml > temp/grafana-admin-secret-raw.yaml
 
-# Sealed Secret 化
+# Seal the secret
 kubeseal --controller-name=sealed-secrets \
   --controller-namespace=kube-system \
   --format=yaml \
   < temp/grafana-admin-secret-raw.yaml \
   > infrastructure/observability/grafana/resources/grafana-admin-sealed-secret.yaml
 
-# Raw secret 削除
+# Delete the raw secret
 rm temp/grafana-admin-secret-raw.yaml
 ```
 
-## OTel ダッシュボード更新
+## OTel Dashboard Updates
 
-Grafana.com から公式ダッシュボードを取得してConfigMapを更新するスクリプト：
+Script to fetch official dashboards from Grafana.com and update ConfigMaps:
 
 ```bash
 docs/bootstrapping/scripts/13-generate-grafana-dashboards.sh
 ```
 
-出力先: `infrastructure/observability/grafana/resources/dashboards.yaml`
+Output: `infrastructure/observability/grafana/resources/dashboards.yaml`
 
-## 動作確認
+## Verification
 
 ### Datasources
 
-Grafana UI → Configuration → Data Sources で以下が表示されること：
-- **Prometheus** (default, exemplars 有効)
+Grafana UI -> Configuration -> Data Sources should display:
+- **Prometheus** (default, exemplars enabled)
 - **Tempo** (tracing)
 - **Loki** (logs)
 
 ### Dashboards
 
-Grafana UI → Dashboards → Browse で以下が表示されること：
-- **OpenTelemetry** フォルダ: OTel APM, OTel for HTTP Services
-- **General** フォルダ: Kubernetes 監視ダッシュボード群
+Grafana UI -> Dashboards -> Browse should display:
+- **OpenTelemetry** folder: OTel APM, OTel for HTTP Services
+- **General** folder: Kubernetes monitoring dashboards
 
-### Sidecar ログ
+### Sidecar Logs
 
 ```bash
 kubectl logs -n monitoring deployment/grafana -c grafana-sc-datasources --tail=10
 kubectl logs -n monitoring deployment/grafana -c grafana-sc-dashboard --tail=10
 ```
 
-## トラブルシューティング
+## Troubleshooting
 
-### Grafana Pod が CrashLoopBackOff
+### Grafana Pod in CrashLoopBackOff
 
-**症状**: `Only one datasource per organization can be marked as default`
+**Symptom**: `Only one datasource per organization can be marked as default`
 
-**解決策**: `values.yaml` で `sidecar.datasources.defaultDatasourceEnabled: false` を設定
+**Fix**: Set `sidecar.datasources.defaultDatasourceEnabled: false` in `values.yaml`
 
-### Datasources が表示されない
+### Datasources Not Showing
 
-ConfigMap に `grafana_datasource: "1"` ラベルが必要。
+ConfigMap requires the `grafana_datasource: "1"` label.
 
 ```bash
 kubectl get configmap -n monitoring -l grafana_datasource=1
 ```
 
-### Dashboards が表示されない
+### Dashboards Not Showing
 
-ConfigMap に `grafana_dashboard: "1"` ラベルが必要。
+ConfigMap requires the `grafana_dashboard: "1"` label.
 
 ```bash
 kubectl get configmap -n monitoring -l grafana_dashboard=1
 ```
 
-## ファイル構成
+## File Structure
 
 ```
 infrastructure/observability/grafana/
 ├── values.yaml                         # Helm values
 └── resources/
-    ├── datasources.yaml                # Prometheus/Tempo/Loki datasource 定義
-    ├── dashboards.yaml                 # OTel ダッシュボード ConfigMap
+    ├── datasources.yaml                # Prometheus/Tempo/Loki datasource definitions
+    ├── dashboards.yaml                 # OTel dashboard ConfigMap
     ├── grafana-admin-sealed-secret.yaml
     └── httproute.yaml
 
@@ -115,7 +115,7 @@ infrastructure/observability/prometheus/
     └── grafana-sealed-secret.yaml
 ```
 
-## 参考リンク
+## References
 
 - [Grafana Official Helm Chart](https://github.com/grafana/helm-charts/tree/main/charts/grafana)
 - [Grafana Sidecar Documentation](https://github.com/kiwigrid/k8s-sidecar)

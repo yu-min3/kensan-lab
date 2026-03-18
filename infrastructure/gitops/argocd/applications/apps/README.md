@@ -4,9 +4,9 @@
 
 ## ⚠️ 重要: リポジトリ命名規則
 
-**全てのアプリケーションリポジトリは `goldship-apps-` プレフィックスを持つ必要があります。**
+**全てのアプリケーションリポジトリは `kensan-lab-apps-` プレフィックスを持つ必要があります。**
 
-- **正しい例**: `goldship-apps-my-app`, `goldship-apps-api-server`
+- **正しい例**: `kensan-lab-apps-my-app`, `kensan-lab-apps-api-server`
 - **誤った例**: `my-app`, `api-server`, `app-my-app`
 
 このプレフィックスは：
@@ -22,10 +22,10 @@
 apps/
 ├── my-app/
 │   └── argocd-apps.yaml    # app-dev-my-app と app-prod-my-app を含む
-│                           # リポジトリ: goldship-apps-my-app
+│                           # リポジトリ: kensan-lab-apps-my-app
 ├── api-server/
 │   └── argocd-apps.yaml    # app-dev-api-server と app-prod-api-server を含む
-│                           # リポジトリ: goldship-apps-api-server
+│                           # リポジトリ: kensan-lab-apps-api-server
 └── README.md
 ```
 
@@ -34,7 +34,7 @@ apps/
 1. **開発者**がBackstageのSoftware Templatesから新規アプリケーションを作成
    - アプリケーション名入力: `my-app`
 2. **Backstage**が自動的に以下を生成：
-   - アプリケーションリポジトリ: `github.com/yu-min3/goldship-apps-my-app`
+   - アプリケーションリポジトリ: `github.com/yu-min3/kensan-lab-apps-my-app`
    - このリポジトリ（platform-config）へのPull Request（Application CRを含む）
 3. **Platform Engineer**がPRをレビューしてマージ
 4. **Argo CD**が自動的に新しいApplicationを検出してsync
@@ -53,7 +53,7 @@ metadata:
 spec:
   project: app-project-dev
   source:
-    repoURL: https://github.com/yu-min3/goldship-apps-<app-name>.git
+    repoURL: https://github.com/yu-min3/kensan-lab-apps-<app-name>.git
     targetRevision: main
     path: overlays/dev
   destination:
@@ -71,7 +71,7 @@ metadata:
 spec:
   project: app-project-prod
   source:
-    repoURL: https://github.com/yu-min3/goldship-apps-<app-name>.git
+    repoURL: https://github.com/yu-min3/kensan-lab-apps-<app-name>.git
     targetRevision: main
     path: overlays/prod
   destination:
