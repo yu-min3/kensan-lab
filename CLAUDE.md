@@ -2,7 +2,7 @@
 
 ## Repository Overview
 
-**goldship** — Kubernetes GitOps platform for bare-metal multi-arch cluster. Manages cluster infrastructure, security, and Argo CD control structures. Owned by Platform Engineers (PE); enables Application Developers (AD) to deploy via Backstage.
+**kensan-lab** — Kubernetes GitOps platform for bare-metal multi-arch cluster. Manages cluster infrastructure, security, and Argo CD control structures. Owned by Platform Engineers (PE); enables Application Developers (AD) to deploy via Backstage.
 
 ## Technology Stack
 
@@ -96,14 +96,14 @@ cd backstage/app && make all TAG=v1.0.0    # Build + push (Podman)
 
 - **コマンド出力**: シェルコマンドを提示する際は `temp/` にスクリプトファイル（`.sh`）として書き出す。改行崩れ防止。
 - **言語**: 日本語での対話を優先。
+- **コミットメッセージ**: 1行目は50文字以内で簡潔に。本文は不要（diffを見ればわかる）。
 
-## Placeholders (Pre-Publication)
+## Domain & Network
 
-ユーザはデプロイ前に以下を置換すること:
-- `<your-git-org>` → GitHub org/username
-- `example.com` → 実ドメイン
-- `192.168.0.240-249` → LB IP range
-- All Sealed Secrets → regenerate for target cluster
+- **ドメイン**: `yu-min3.com`（Cloudflare DNS）
+- **LB IP range**: `192.168.0.240-249`
+- **GitHub org**: `yu-min3`
+- フォークする場合は `docs/configuration.md` を参照してドメイン等を置換すること
 
 ## Documentation
 

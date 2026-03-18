@@ -10,7 +10,7 @@ spec:
 
   # Source repositories that applications can pull from
   sourceRepos:
-  - "https://github.com/yu-min3/goldship-yumin3"
+  - "https://github.com/yu-min3/kensan-lab"
   - "*" # Allow Helm charts and other external sources
 
   # Destinations where applications can be deployed

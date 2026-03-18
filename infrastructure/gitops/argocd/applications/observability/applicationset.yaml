@@ -8,7 +8,7 @@ spec:
   goTemplateOptions: ["missingkey=error"]
   generators:
     - git:
-        repoURL: https://github.com/yu-min3/goldship-yumin3
+        repoURL: https://github.com/yu-min3/kensan-lab
         revision: HEAD
         files:
           - path: infrastructure/observability/*/config.json
@@ -30,7 +30,7 @@ spec:
             releaseName: '{{ .name }}'
             valueFiles:
               - '$values/infrastructure/observability/{{ .name }}/values.yaml'
-        - repoURL: https://github.com/yu-min3/goldship-yumin3
+        - repoURL: https://github.com/yu-min3/kensan-lab
           targetRevision: HEAD
           ref: values
       destination:
@@ -60,10 +60,10 @@ spec:
             releaseName: '{{ .name }}'
             valueFiles:
               - '$values/infrastructure/observability/{{ .name }}/values.yaml'
-        - repoURL: https://github.com/yu-min3/goldship-yumin3
+        - repoURL: https://github.com/yu-min3/kensan-lab
           targetRevision: HEAD
           ref: values
-        - repoURL: https://github.com/yu-min3/goldship-yumin3
+        - repoURL: https://github.com/yu-min3/kensan-lab
           targetRevision: HEAD
           path: infrastructure/observability/{{ .name }}/resources
     {{- end }}

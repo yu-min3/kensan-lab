@@ -5,7 +5,7 @@ services:
     container_name: kensan-postgres
     environment:
       POSTGRES_USER: kensan
-      POSTGRES_PASSWORD: kensan
+      POSTGRES_PASSWORD: <your-db-password>
       POSTGRES_DB: kensan
     ports:
       - "5432:5432"
@@ -29,7 +29,7 @@ services:
       DB_HOST: postgres
       DB_PORT: 5432
       DB_USER: kensan
-      DB_PASSWORD: kensan
+      DB_PASSWORD: <your-db-password>
       DB_NAME: kensan
       JWT_SECRET: ${JWT_SECRET:-your-secret-key-change-in-production}
     ports:
@@ -49,7 +49,7 @@ services:
       DB_HOST: postgres
       DB_PORT: 5432
       DB_USER: kensan
-      DB_PASSWORD: kensan
+      DB_PASSWORD: <your-db-password>
       DB_NAME: kensan
       JWT_SECRET: ${JWT_SECRET:-your-secret-key-change-in-production}
     ports:
@@ -69,7 +69,7 @@ services:
       DB_HOST: postgres
       DB_PORT: 5432
       DB_USER: kensan
-      DB_PASSWORD: kensan
+      DB_PASSWORD: <your-db-password>
       DB_NAME: kensan
       JWT_SECRET: ${JWT_SECRET:-your-secret-key-change-in-production}
     ports:
@@ -89,7 +89,7 @@ services:
       DB_HOST: postgres
       DB_PORT: 5432
       DB_USER: kensan
-      DB_PASSWORD: kensan
+      DB_PASSWORD: <your-db-password>
       DB_NAME: kensan
       JWT_SECRET: ${JWT_SECRET:-your-secret-key-change-in-production}
     ports:
@@ -109,7 +109,7 @@ services:
       DB_HOST: postgres
       DB_PORT: 5432
       DB_USER: kensan
-      DB_PASSWORD: kensan
+      DB_PASSWORD: <your-db-password>
       DB_NAME: kensan
       JWT_SECRET: ${JWT_SECRET:-your-secret-key-change-in-production}
     ports:
@@ -129,13 +129,13 @@ services:
       DB_HOST: postgres
       DB_PORT: 5432
       DB_USER: kensan
-      DB_PASSWORD: kensan
+      DB_PASSWORD: <your-db-password>
       DB_NAME: kensan
       JWT_SECRET: ${JWT_SECRET:-your-secret-key-change-in-production}
       # MinIO/S3設定
       STORAGE_ENDPOINT: minio:9000
       STORAGE_ACCESS_KEY: kensan
-      STORAGE_SECRET_KEY: kensan123
+      STORAGE_SECRET_KEY: <your-minio-password>
       STORAGE_BUCKET: kensan-notes
       STORAGE_USE_SSL: "false"
       STORAGE_PUBLIC_URL: http://localhost:9000/kensan-notes
@@ -154,7 +154,7 @@ services:
     command: server /data --console-address ":9001"
     environment:
       MINIO_ROOT_USER: kensan
-      MINIO_ROOT_PASSWORD: kensan123
+      MINIO_ROOT_PASSWORD: <your-minio-password>
     ports:
       - "9000:9000"   # S3 API
       - "9001:9001"   # Web Console
@@ -175,7 +175,7 @@ services:
         condition: service_healthy
     entrypoint: >
       /bin/sh -c "
-      mc alias set myminio http://minio:9000 kensan kensan123;
+      mc alias set myminio http://minio:9000 kensan <your-minio-password>;
       mc mb myminio/kensan-notes --ignore-existing;
       mc anonymous set download myminio/kensan-notes;
       echo 'Bucket kensan-notes created successfully';

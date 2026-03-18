@@ -17,7 +17,7 @@ globs: "infrastructure/environments/**, **/projects/**"
 
 | Repository | Owner | Content |
 |-----------|-------|---------|
-| **goldship** (this repo) | Platform Engineers | Cluster infra, Helm values, Argo CD Projects/Apps |
+| **kensan-lab** (this repo) | Platform Engineers | Cluster infra, Helm values, Argo CD Projects/Apps |
 | **backstage/app/templates/** | Platform Engineers | Scaffolding templates (Kustomize-based) |
 | **app-\<name\>** (per app) | App Developers | App code, Dockerfile, `base/` + `overlays/{dev,prod}/` |
 

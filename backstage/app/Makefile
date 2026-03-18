@@ -42,7 +42,7 @@ help:
 	@echo "  make run           - Run built image locally"
 	@echo "  make clean         - Remove local Docker image"
 	@echo ""
-	@echo "GitOps Deployment (for goldship):"
+	@echo "GitOps Deployment (for kensan-lab):"
 	@echo "  make update-image  - Build, push, and update kustomization.yaml"
 	@echo "  make deploy        - Create PR for deployment (build, push, branch, commit)"
 	@echo "  make commit-deploy - Commit kustomization.yaml changes only"
@@ -148,20 +148,20 @@ clean:
 	$(CONTAINER_RUNTIME) rmi $(FULL_IMAGE) || true
 
 #==============================================================================
-# GitOps Deployment (goldship specific)
+# GitOps Deployment (kensan-lab specific)
 #==============================================================================
 
 .PHONY: update-image
 update-image: build push
 	@echo "Updating Kustomize overlay with tag: $(TAG)..."
-	cd ../base-infra/backstage/overlays/prod && \
+	cd ../infrastructure/backstage/overlays/prod && \
 		kustomize edit set image ghcr.io/$(GITHUB_USER)/backstage:$(TAG)
 	@echo ""
 	@echo "✅ Image built, pushed, and kustomization.yaml updated"
 	@echo "   Image: $(FULL_IMAGE)"
 	@echo ""
 	@echo "Next steps:"
-	@echo "  - Review changes: git diff ../base-infra/backstage/overlays/prod/kustomization.yaml"
+	@echo "  - Review changes: git diff ../infrastructure/backstage/overlays/prod/kustomization.yaml"
 	@echo "  - Deploy via GitOps: make deploy TAG=$(TAG)"
 	@echo "  - Or commit manually: make commit-deploy TAG=$(TAG)"
 
@@ -170,7 +170,7 @@ deploy: update-image
 	@echo "Creating deployment branch..."
 	cd .. && git checkout -b deploy-backstage-$(TAG)
 	@echo "Committing change to Git..."
-	cd .. && git add base-infra/backstage/overlays/prod/kustomization.yaml
+	cd .. && git add infrastructure/backstage/overlays/prod/kustomization.yaml
 	cd .. && git commit -m "Deploy Backstage $(TAG)"
 	@echo "Pushing to remote..."
 	cd .. && git push origin deploy-backstage-$(TAG)
@@ -192,7 +192,7 @@ deploy: update-image
 .PHONY: commit-deploy
 commit-deploy:
 	@echo "Committing Kustomize overlay change..."
-	cd .. && git add base-infra/backstage/overlays/prod/kustomization.yaml
+	cd .. && git add infrastructure/backstage/overlays/prod/kustomization.yaml
 	cd .. && git commit -m "Deploy Backstage $(TAG)"
 	cd .. && git push
 	@echo "✅ Committed and pushed"
@@ -201,11 +201,11 @@ commit-deploy:
 .PHONY: preview
 preview:
 	@echo "Previewing deployment with tag: $(TAG)..."
-	@cd ../base-infra/backstage/overlays/prod && \
+	@cd ../infrastructure/backstage/overlays/prod && \
 		kustomize edit set image ghcr.io/$(GITHUB_USER)/backstage:$(TAG)
 	@echo ""
 	@echo "Generated Deployment (image section):"
-	@kubectl kustomize ../base-infra/backstage/overlays/prod | grep -A10 "kind: Deployment" | grep -A5 "containers:" || echo "  (Could not extract container section)"
+	@kubectl kustomize ../infrastructure/backstage/overlays/prod | grep -A10 "kind: Deployment" | grep -A5 "containers:" || echo "  (Could not extract container section)"
 	@echo ""
 	@echo "Full manifests:"
-	@echo "  kubectl kustomize ../base-infra/backstage/overlays/prod"
+	@echo "  kubectl kustomize ../infrastructure/backstage/overlays/prod"

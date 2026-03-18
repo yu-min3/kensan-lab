@@ -18,10 +18,10 @@ spec:
         releaseName: cert-manager
         valueFiles:
           - $values/infrastructure/security/cert-manager/values.yaml
-    - repoURL: https://github.com/yu-min3/goldship-yumin3
+    - repoURL: https://github.com/yu-min3/kensan-lab
       targetRevision: HEAD
       ref: values
-    - repoURL: https://github.com/yu-min3/goldship-yumin3
+    - repoURL: https://github.com/yu-min3/kensan-lab
       targetRevision: HEAD
       path: infrastructure/security/cert-manager/resources
 

@@ -1,40 +1,40 @@
-# Kustomize使用ガイドライン
+# Kustomize Usage Guidelines
 
-このドキュメントでは、`base-infra/`ディレクトリ内でKustomizeを使用するタイミングと使用しないタイミングのガイドラインを定義します。
+This document defines guidelines for when to use and when not to use Kustomize within the `infrastructure/` directory.
 
-## 使い分けの原則
+## Guiding Principles
 
-プラットフォームコンポーネントは、**更新頻度**と**環境分離の必要性**に基づいて3つのTierに分類されます。
+Platform components are classified into three tiers based on **update frequency** and **need for environment separation**.
 
-### Tier 1: Kustomize必須（頻繁な更新 + 環境分離）
+### Tier 1: Kustomize Required (Frequent Updates + Environment Separation)
 
-**対象コンポーネント:**
-- Keycloak（`platform-auth-dev` / `platform-auth-prod`）
-- カスタムアプリケーション（ユーザーが作成するアプリ）
+**Target Components:**
+- Keycloak (`platform-auth-dev` / `platform-auth-prod`)
+- Custom applications (user-created apps)
 
-**理由:**
-- イメージタグの頻繁な更新（デプロイのたびに`newTag`変更）
-- 環境別の設定差分が必要（dev/prod）
-- 環境固有のリソース（HTTPRoute、Secret等）
+**Rationale:**
+- Frequent image tag updates (`newTag` changes with every deployment)
+- Environment-specific configuration differences required (dev/prod)
+- Environment-specific resources (HTTPRoute, Secrets, etc.)
 
-**構造:**
+**Structure:**
 ```
 component/
 ├── base/
 │   ├── kustomization.yaml
-│   ├── deployment.yaml       # イメージはプレースホルダー
+│   ├── deployment.yaml       # Image uses placeholder
 │   ├── service.yaml
 │   └── ...
 └── overlays/
     ├── dev/
-    │   ├── kustomization.yaml  # namespace, newTag, dev固有リソース
+    │   ├── kustomization.yaml  # namespace, newTag, dev-specific resources
     │   └── dev-specific.yaml
     └── prod/
-        ├── kustomization.yaml  # namespace, newTag, prod固有リソース
+        ├── kustomization.yaml  # namespace, newTag, prod-specific resources
         └── prod-specific.yaml
 ```
 
-**kustomization.yaml例:**
+**kustomization.yaml example:**
 ```yaml
 # overlays/prod/kustomization.yaml
 apiVersion: kustomize.config.k8s.io/v1beta1
@@ -44,31 +44,31 @@ namespace: platform-auth-prod
 
 resources:
 - ../../base
-- httproute.yaml              # prod固有リソース
+- httproute.yaml              # prod-specific resource
 - postgresql-sealed-secret.yaml
 
 images:
 - name: quay.io/keycloak/keycloak
-  newTag: 26.0.7               # ← イメージタグ更新箇所
+  newTag: 26.0.7               # <- Image tag update point
 
 patches:
-- path: keycloak-patch.yaml    # 環境別のreplicas、resources等
+- path: keycloak-patch.yaml    # Environment-specific replicas, resources, etc.
   target:
     kind: Deployment
     name: keycloak
 ```
 
-### Tier 2: Kustomize推奨（頻繁な更新、環境分離なし）
+### Tier 2: Kustomize Recommended (Frequent Updates, No Environment Separation)
 
-**対象コンポーネント:**
-- Backstage（`backstage`）
+**Target Components:**
+- Backstage (`backstage`)
 
-**理由:**
-- イメージタグの頻繁な更新（Backstageアプリの継続的デプロイ）
-- 本番環境のみ（IDPは環境分離不要）
-- `kustomize edit set image`でのタグ更新を自動化可能
+**Rationale:**
+- Frequent image tag updates (continuous deployment of Backstage app)
+- Production only (IDP does not need environment separation)
+- Tag updates can be automated with `kustomize edit set image`
 
-**構造:**
+**Structure:**
 ```
 backstage/
 ├── base/
@@ -78,10 +78,10 @@ backstage/
 │   └── ...
 └── overlays/
     └── prod/
-        └── kustomization.yaml  # newTagのみ管理
+        └── kustomization.yaml  # Manages newTag only
 ```
 
-**kustomization.yaml例:**
+**kustomization.yaml example:**
 ```yaml
 # overlays/prod/kustomization.yaml
 apiVersion: kustomize.config.k8s.io/v1beta1
@@ -92,26 +92,26 @@ resources:
 
 images:
 - name: ghcr.io/your-org/backstage
-  newTag: v0.0.5               # ← CI/CDで自動更新
+  newTag: v0.0.5               # <- Auto-updated by CI/CD
 ```
 
-**更新コマンド:**
+**Update command:**
 ```bash
-# CI/CDパイプラインやMakefileで実行
-cd base-infra/backstage/overlays/prod
+# Run in CI/CD pipeline or Makefile
+cd infrastructure/backstage/overlays/prod
 kustomize edit set image ghcr.io/your-org/backstage:v0.0.6
 
-# または
+# Or
 sed -i 's/newTag: v.*/newTag: v0.0.6/' kustomization.yaml
 
 git add kustomization.yaml
 git commit -m "Update Backstage to v0.0.6"
-git push  # → Argo CDが自動同期
+git push  # -> Argo CD auto-syncs
 ```
 
-### Tier 3: フラットYAML（インフラ層、更新頻度低）
+### Tier 3: Flat YAML (Infrastructure Layer, Low Update Frequency)
 
-**対象コンポーネント:**
+**Target Components:**
 - Cilium CNI + LoadBalancer (`cilium/`)
 - Istio Control Plane + Gateways (`istio/`)
 - Cert-Manager (`cert-manager/`)
@@ -119,27 +119,27 @@ git push  # → Argo CDが自動同期
 - Sealed Secrets Controller (`sealed-secret/`)
 - Gateway API CRDs (`gateway-api/`)
 - Local Path Provisioner (`local-path-provisioner/`)
-- Namespace定義 (`app-dev/`, `app-prod/`, `kube-system/`)
+- Namespace definitions (`app-dev/`, `app-prod/`, `kube-system/`)
 
-**理由:**
-- 更新頻度が極めて低い（四半期〜年1回のバージョンアップ）
-- 環境差分がない（単一インスタンス）
-- 大規模な生成マニフェスト（Helm出力、operator CRD等）
-- 追加の複雑性を導入する価値がない
+**Rationale:**
+- Extremely low update frequency (quarterly to annual version upgrades)
+- No environment differences (single instance)
+- Large generated manifests (Helm output, operator CRDs, etc.)
+- Not worth introducing additional complexity
 
-**構造:**
+**Structure:**
 ```
 component/
-├── component.yaml            # Helm template出力やoperatorマニフェスト
+├── component.yaml            # Helm template output or operator manifests
 ├── namespace.yaml
 ├── httproute.yaml
 └── additional-config.yaml
 ```
 
-**例外: Istioの番号prefix:**
+**Exception: Istio number prefixes:**
 ```
 istio/
-├── 00-namespace.yaml         # デプロイ順序を明示
+├── 00-namespace.yaml         # Explicit deployment order
 ├── 01-istio-base.yaml        # CRDs
 ├── 02-istiod.yaml            # Control Plane
 ├── gateway-platform.yaml
@@ -147,28 +147,28 @@ istio/
 └── gateway-prod.yaml
 ```
 
-数値prefixは、Argo CDの同期順序が重要な場合（CRD → リソース）に使用します。
+Numeric prefixes are used when Argo CD sync order matters (CRDs -> resources).
 
-## 判断フローチャート
+## Decision Flowchart
 
 ```
-コンポーネントを追加する際:
-  │
-  ├─ 環境別（dev/prod）の設定が必要？
-  │   └─ YES → Kustomize (Tier 1)
-  │
-  ├─ イメージタグを頻繁に更新する？（週1回以上）
-  │   └─ YES → Kustomize (Tier 2)
-  │
-  ├─ 将来的に環境を増やす可能性がある？（staging等）
-  │   └─ YES → Kustomize (Tier 1)
-  │
-  └─ 上記すべてNO → フラットYAML (Tier 3)
+When adding a component:
+  |
+  ├─ Does it need environment-specific (dev/prod) configuration?
+  │   └─ YES -> Kustomize (Tier 1)
+  |
+  ├─ Are image tags updated frequently? (once a week or more)
+  │   └─ YES -> Kustomize (Tier 2)
+  |
+  ├─ Is there a possibility of adding environments in the future? (staging, etc.)
+  │   └─ YES -> Kustomize (Tier 1)
+  |
+  └─ All of the above are NO -> Flat YAML (Tier 3)
 ```
 
-## Argo CD Application CRでの参照
+## Referencing in Argo CD Application CRs
 
-### Kustomizeベース:
+### Kustomize-Based:
 ```yaml
 apiVersion: argoproj.io/v1alpha1
 kind: Application
@@ -176,12 +176,12 @@ metadata:
   name: keycloak-prod
 spec:
   source:
-    repoURL: https://github.com/your-org/goldship.git
+    repoURL: https://github.com/your-org/kensan-lab.git
     targetRevision: main
-    path: base-infra/keycloak/overlays/prod  # ← overlaysを指定
+    path: infrastructure/security/keycloak/overlays/prod  # <- Point to overlays
 ```
 
-### フラットYAMLベース:
+### Flat YAML-Based:
 ```yaml
 apiVersion: argoproj.io/v1alpha1
 kind: Application
@@ -189,58 +189,58 @@ metadata:
   name: cilium
 spec:
   source:
-    repoURL: https://github.com/your-org/goldship.git
+    repoURL: https://github.com/your-org/kensan-lab.git
     targetRevision: main
-    path: base-infra/cilium                 # ← ディレクトリを直接指定
+    path: infrastructure/network/cilium                   # <- Point to directory directly
     directory:
       recurse: true
 ```
 
-## ベストプラクティス
+## Best Practices
 
-### 1. Kustomizeを使用する場合
-
-**DO:**
-- `base/`に環境非依存のリソースを配置
-- `overlays/`に環境固有の設定を配置
-- `kustomization.yaml`でイメージタグを管理
-- patchesで最小限の差分のみ適用
-
-**DON'T:**
-- `base/`に環境固有の値をハードコード
-- overlaysで全リソースを再定義（patchesを使用）
-- Kustomizeの複雑な機能（vars, generators等）を過度に使用
-
-### 2. フラットYAMLを使用する場合
+### 1. When Using Kustomize
 
 **DO:**
-- 生成元を明記（`# Generated by: helm template ...`）
-- 大きなファイルは分割を検討（istioの例）
-- 必要に応じて番号prefixで順序を制御
+- Place environment-independent resources in `base/`
+- Place environment-specific configuration in `overlays/`
+- Manage image tags in `kustomization.yaml`
+- Apply only minimal diffs with patches
 
 **DON'T:**
-- 手動で大規模なYAMLを編集（再生成を推奨）
-- Kustomizeを無理に適用（YAGNI原則）
+- Hardcode environment-specific values in `base/`
+- Redefine all resources in overlays (use patches instead)
+- Overuse complex Kustomize features (vars, generators, etc.)
 
-### 3. 移行ガイドライン
+### 2. When Using Flat YAML
 
-既存のフラットYAMLをKustomizeに移行する場合:
+**DO:**
+- Clearly note the generation source (`# Generated by: helm template ...`)
+- Consider splitting large files (see the Istio example)
+- Use numeric prefixes to control order as needed
 
-1. **環境分離の必要性を評価**
-   - 現在: 単一環境で運用
-   - 将来: dev/staging/prod環境を追加予定 → 移行を検討
+**DON'T:**
+- Manually edit large YAML files (prefer regeneration)
+- Force Kustomize where it's not needed (YAGNI principle)
 
-2. **更新頻度を確認**
-   - 過去3ヶ月で5回以上イメージタグ更新 → 移行を検討
-   - 年1回のバージョンアップのみ → 現状維持
+### 3. Migration Guidelines
 
-3. **段階的に移行**
+When migrating existing flat YAML to Kustomize:
+
+1. **Evaluate the need for environment separation**
+   - Current: Operating in a single environment
+   - Future: Planning to add dev/staging/prod environments -> Consider migration
+
+2. **Check update frequency**
+   - More than 5 image tag updates in the last 3 months -> Consider migration
+   - Only annual version upgrades -> Maintain current approach
+
+3. **Migrate gradually**
    ```bash
-   # Step 1: base/に既存ファイルを移動
+   # Step 1: Move existing files to base/
    mkdir -p component/base
    mv component/*.yaml component/base/
 
-   # Step 2: kustomization.yamlを作成
+   # Step 2: Create kustomization.yaml
    cat > component/base/kustomization.yaml <<EOF
    apiVersion: kustomize.config.k8s.io/v1beta1
    kind: Kustomization
@@ -250,7 +250,7 @@ spec:
    - service.yaml
    EOF
 
-   # Step 3: overlays/prod/を作成
+   # Step 3: Create overlays/prod/
    mkdir -p component/overlays/prod
    cat > component/overlays/prod/kustomization.yaml <<EOF
    apiVersion: kustomize.config.k8s.io/v1beta1
@@ -262,16 +262,16 @@ spec:
      newTag: v1.0.0
    EOF
 
-   # Step 4: Argo CD Application CRを更新
-   # path: base-infra/component → base-infra/component/overlays/prod
+   # Step 4: Update the Argo CD Application CR
+   # path: infrastructure/component -> infrastructure/component/overlays/prod
    ```
 
-## まとめ
+## Summary
 
-| Tier | 対象 | 構造 | 更新頻度 | 環境分離 |
-|------|------|------|----------|----------|
-| **1** | Keycloak, カスタムアプリ | Kustomize (base + overlays/dev + overlays/prod) | 高 | あり |
-| **2** | Backstage | Kustomize (base + overlays/prod) | 高 | なし |
-| **3** | Cilium, Istio, Cert-Manager, Prometheus等 | フラットYAML | 低 | なし |
+| Tier | Target | Structure | Update Frequency | Environment Separation |
+|------|--------|------|----------|----------|
+| **1** | Keycloak, Custom apps | Kustomize (base + overlays/dev + overlays/prod) | High | Yes |
+| **2** | Backstage | Kustomize (base + overlays/prod) | High | No |
+| **3** | Cilium, Istio, Cert-Manager, Prometheus, etc. | Flat YAML | Low | No |
 
-**原則**: 必要な時のみKustomizeを使用。過度な抽象化は避け、シンプルさを保つ（KISS原則）。
+**Principle**: Use Kustomize only when necessary. Avoid excessive abstraction and keep things simple (KISS principle).

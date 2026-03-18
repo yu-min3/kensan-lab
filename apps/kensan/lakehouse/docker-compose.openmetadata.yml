@@ -6,7 +6,7 @@ services:
     command: "--work_mem=10MB"
     environment:
       POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: password
+      POSTGRES_PASSWORD: <your-postgres-password>
     ports:
       - "5433:5432"
     volumes:
@@ -49,7 +49,7 @@ services:
       DB_HOST: openmetadata-postgres
       DB_PORT: "5432"
       DB_USER: openmetadata_user
-      DB_USER_PASSWORD: openmetadata_password
+      DB_USER_PASSWORD: <your-db-password>
       OM_DATABASE: openmetadata_db
       ELASTICSEARCH_HOST: openmetadata-elasticsearch
       ELASTICSEARCH_PORT: "9200"
@@ -73,8 +73,8 @@ services:
       PIPELINE_SERVICE_CLIENT_VERIFY_SSL: "no-ssl"
       PIPELINE_SERVICE_CLIENT_CLASS_NAME: org.openmetadata.service.clients.pipeline.airflow.AirflowRESTClient
       AIRFLOW_USERNAME: admin
-      AIRFLOW_PASSWORD: admin
-      FERNET_KEY: jJ/9sz0g0OHxsfxOoSfdFdmk3ysNmPRnH3TUAbz3IHA=
+      AIRFLOW_PASSWORD: <your-airflow-password>
+      FERNET_KEY: <your-fernet-key>
       JWT_ISSUER: "open-metadata.org"
       JWT_KEY_ID: "Gb389a-9f76-gdjs-a92j-0242bk94356"
       AUTHENTICATION_ENABLE_SELF_SIGNUP: "true"
@@ -101,7 +101,7 @@ services:
       DB_HOST: openmetadata-postgres
       DB_PORT: "5432"
       DB_USER: openmetadata_user
-      DB_USER_PASSWORD: openmetadata_password
+      DB_USER_PASSWORD: <your-db-password>
       OM_DATABASE: openmetadata_db
       ELASTICSEARCH_HOST: openmetadata-elasticsearch
       ELASTICSEARCH_PORT: "9200"
@@ -128,8 +128,8 @@ services:
       PIPELINE_SERVICE_CLIENT_ENABLED: "true"
       SERVER_HOST_API_URL: http://openmetadata-server:8585/api
       AIRFLOW_USERNAME: admin
-      AIRFLOW_PASSWORD: admin
-      FERNET_KEY: jJ/9sz0g0OHxsfxOoSfdFdmk3ysNmPRnH3TUAbz3IHA=
+      AIRFLOW_PASSWORD: <your-airflow-password>
+      FERNET_KEY: <your-fernet-key>
       JWT_ISSUER: "open-metadata.org"
       JWT_KEY_ID: "Gb389a-9f76-gdjs-a92j-0242bk94356"
       SECRET_MANAGER: db
@@ -162,10 +162,10 @@ services:
       AIRFLOW__API__AUTH_BACKENDS: "airflow.api.auth.backend.basic_auth,airflow.api.auth.backend.session"
       AIRFLOW__CORE__EXECUTOR: LocalExecutor
       AIRFLOW__OPENMETADATA_AIRFLOW_APIS__DAG_GENERATED_CONFIGS: "/opt/airflow/dag_generated_configs"
-      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow_user:airflow_pass@openmetadata-postgres:5432/airflow_db
+      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow_user:<your-airflow-db-password>@openmetadata-postgres:5432/airflow_db
       _AIRFLOW_DB_MIGRATE: "true"
       _AIRFLOW_WWW_USER_CREATE: "true"
-      _AIRFLOW_WWW_USER_PASSWORD: admin
+      _AIRFLOW_WWW_USER_PASSWORD: <your-airflow-www-password>
     ports:
       - "8080:8080"
     volumes:
