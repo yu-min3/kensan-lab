@@ -117,7 +117,7 @@ exporters: [loki]
 
 **リソース属性付加**:
 ```yaml
-cluster.name: goldship
+cluster.name: kensan-lab
 deployment.environment: <k8s.namespace.name>
 ```
 

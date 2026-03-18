@@ -15,4 +15,4 @@ kubeseal --format=yaml \
   --controller-name=sealed-secrets \
   --controller-namespace=kube-system \
   < ../../temp/grafana-secret-raw.yaml \
-  > ../../base-infra/prometheus/grafana-sealed-secret.yaml
+  > ../../infrastructure/prometheus/grafana-sealed-secret.yaml

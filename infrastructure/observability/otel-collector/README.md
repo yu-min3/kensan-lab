@@ -161,7 +161,7 @@ batch:
 resource:
   attributes:
     - key: cluster.name
-      value: goldship
+      value: kensan-lab
       action: upsert
     - key: deployment.environment
       from_attribute: k8s.namespace.name

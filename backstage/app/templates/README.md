@@ -4,8 +4,8 @@ This directory contains Backstage templates for creating new applications with G
 
 ## Architecture
 
-Part of the goldship GitOps architecture:
-- **goldship**: Platform infrastructure and Backstage application (managed by Platform Engineers)
+Part of the kensan-lab GitOps architecture:
+- **kensan-lab**: Platform infrastructure and Backstage application (managed by Platform Engineers)
   - `backstage-app/templates/`: Application templates (this directory)
 - **app-\<name\>**: Generated application repositories (managed by Application Developers)
 
@@ -68,7 +68,7 @@ Backstage will automatically:
 - Create a new GitHub repository (`app-<name>`)
 - Generate Kustomize manifests (base + dev/prod overlays)
 - Create Argo CD Application CRs for both environments
-- Commit Application CRs to `goldship` repository
+- Commit Application CRs to `kensan-lab` repository
 - Register the app in Backstage catalog
 
 ### 4. Deploy Your Application
@@ -126,7 +126,7 @@ fastapi-template/
 
 ## Links
 
-- [Platform Repository](https://github.com/yu-min3/goldship)
+- [Platform Repository](https://github.com/yu-min3/kensan-lab)
 - [Architecture Documentation](../../docs/architecture/)
 - [Backstage Documentation](../README.platform.md)
 

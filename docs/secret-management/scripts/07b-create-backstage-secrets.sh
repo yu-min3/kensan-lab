@@ -10,7 +10,7 @@ kubectl create secret generic postgresql-secret \
   --dry-run=client -o yaml > ../../temp/backstage-postgresql-secret-raw.yaml
 
 kubeseal --format=yaml < ../../temp/backstage-postgresql-secret-raw.yaml \
-  > ../../base-infra/backstage/postgresql-secret.yaml
+  > ../../infrastructure/backstage/postgresql-secret.yaml
 
 
 # Backstage Secret
@@ -22,4 +22,4 @@ kubectl create secret generic backstage-secret \
   --dry-run=client -o yaml > ../../temp/backstage-secret-raw.yaml
 
 kubeseal --format=yaml < ../../temp/backstage-secret-raw.yaml \
-  > ../../base-infra/backstage/backstage-secret.yaml
+  > ../../infrastructure/backstage/backstage-secret.yaml

@@ -1,44 +1,44 @@
-# シークレット管理ガイド
+# Secret Management Guide
 
-このプラットフォームでは、Gitリポジトリに機密情報を安全に保存するため、[Sealed Secrets](https://github.com/bitnami-labs/sealed-secrets) を使用します。このガイドでは、各種コンポーネントで必要となるシークレットの作成と暗号化の手順を説明します。
+This platform uses [Sealed Secrets](https://github.com/bitnami-labs/sealed-secrets) to securely store sensitive information in the Git repository. This guide explains the procedures for creating and encrypting secrets needed by various components.
 
-## 前提条件
+## Prerequisites
 
-- `kubeseal` CLIがインストール済みであること。
-- Sealed Secretsコントローラーがクラスターにデプロイ済みであること（`base-infra/sealed-secret/controller.yaml`）。
-- `kubectl` がクラスターに接続可能であること。
+- `kubeseal` CLI is installed.
+- Sealed Secrets controller is deployed to the cluster (`infrastructure/security/sealed-secret/controller.yaml`).
+- `kubectl` can connect to the cluster.
 
-## Sealed Secretsの仕組み
+## How Sealed Secrets Work
 
-1.  `kubectl create secret --dry-run=client` で生のSecret（YAML）を生成します。
-2.  生のSecretを `kubeseal` CLIにパイプで渡して暗号化します。
-3.  暗号化された `SealedSecret` リソース（YAML）が生成されます。
-4.  この `SealedSecret` をGitにコミットし、Argo CDでデプロイします。
-5.  クラスター上で動作するSealed Secretsコントローラーが `SealedSecret` を復号化し、通常の `Secret` リソースを作成します。
+1. Generate a raw Secret (YAML) using `kubectl create secret --dry-run=client`.
+2. Pipe the raw Secret to the `kubeseal` CLI for encryption.
+3. An encrypted `SealedSecret` resource (YAML) is generated.
+4. Commit this `SealedSecret` to Git and deploy it with Argo CD.
+5. The Sealed Secrets controller running in the cluster decrypts the `SealedSecret` and creates a regular `Secret` resource.
 
-**注意**: 暗号化前の生のSecretは絶対にGitにコミットしないでください。`.gitignore` に `temp/` ディレクトリが含まれていることを確認してください。
+**Important**: Never commit raw (unencrypted) Secrets to Git. Ensure the `temp/` directory is included in `.gitignore`.
 
 ---
 
-## 1. GHCR用イメージプルシークレット
+## 1. GHCR Image Pull Secret
 
-GitHub Container Registry (GHCR) からプライベートコンテナイメージをプルするための認証情報です。
+Authentication credentials for pulling private container images from GitHub Container Registry (GHCR).
 
-以下のスクリプトを実行します。スクリプト内のプレースホルダ (`<github-username>`, `<PAT>` など) をご自身の情報に置き換えてから実行してください。
+Run the following script. Replace the placeholders (`<github-username>`, `<PAT>`, etc.) with your own information before executing.
 
 ```bash
 ./scripts/05-create-ghcr-secret.sh
 ```
 
-これにより、`base-infra/sealed-secret/ghcr-pull-secret-prod.yaml` のような暗号化された`SealedSecret`が生成されます。
+This generates an encrypted `SealedSecret` such as `infrastructure/security/sealed-secret/ghcr-pull-secret-prod.yaml`.
 
 ---
 
-## 2. Grafana管理者パスワード
+## 2. Grafana Admin Password
 
-Prometheusスタックに含まれるGrafanaの管理者パスワードを設定します。
+Set the admin password for Grafana included in the Prometheus stack.
 
-以下のスクリプトを実行すると、ランダムなパスワードが生成され、暗号化された`SealedSecret`が `base-infra/prometheus/grafana-sealed-secret.yaml` に保存されます。
+Running the following script generates a random password and saves the encrypted `SealedSecret` to `infrastructure/observability/prometheus/grafana-sealed-secret.yaml`.
 
 ```bash
 ./scripts/06a-create-grafana-secret.sh
@@ -46,16 +46,16 @@ Prometheusスタックに含まれるGrafanaの管理者パスワードを設定
 
 ---
 
-## 3. Backstage用シークレット
+## 3. Backstage Secrets
 
-Backstageが使用するPostgreSQLデータベースの認証情報と、GitHub連携用のPersonal Access Tokenを設定します。
+Set up the PostgreSQL database credentials and GitHub Personal Access Token used by Backstage.
 
-以下のスクリプトを実行します。スクリプト内のプレースホルダ (`<strong-password>`, `<github-pat>`) をご自身の情報に置き換えてから実行してください。
+Run the following script. Replace the placeholders (`<strong-password>`, `<github-pat>`) with your own information before executing.
 
 ```bash
 ./scripts/07b-create-backstage-secrets.sh
 ```
 
-これにより、以下の2つの暗号化済みファイルが生成されます。
-- `base-infra/backstage/postgresql-secret.yaml`
-- `base-infra/backstage/backstage-secret.yaml`
+This generates the following two encrypted files:
+- `backstage/manifests/base/postgresql-secret.yaml`
+- `backstage/manifests/base/backstage-secret.yaml`

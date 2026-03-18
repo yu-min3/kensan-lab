@@ -1,86 +1,85 @@
-# プロジェクトロードマップ (Project Roadmap)
+# Project Roadmap
 
-このドキュメントは、プロジェクトの現在のステータス、短期的な目標、そして長期的なビジョンを示します。
+This document outlines the current status, short-term goals, and long-term vision for the project.
 
-## 現在のステータス (Current Status)
+## Current Status
 
-✅ **Backstageによるアプリケーション自動デプロイ基盤の完成**
+**Automated application deployment platform via Backstage is complete.**
 
-プラットフォームのコア機能（GitOps, サービスメッシュ, 監視）は安定稼働しています。
-現在、**BackstageのFastAPIテンプレートが完成しており、開発者はUIから数クリックでFastAPIアプリケーションを自動生成し、Kubernetesクラスタ（Dev/Prod）へ自動的にデプロイ可能**です。
+The platform's core capabilities (GitOps, service mesh, monitoring) are running stably. The **Backstage FastAPI template is complete, enabling developers to auto-generate FastAPI applications with just a few clicks from the UI and automatically deploy them to the Kubernetes cluster (Dev/Prod)**.
 
-## 次の目標 (Next Up)
+## Next Up
 
-プラットフォームの機能を拡充し、より本番グレードのユースケースに対応するための開発を進めています。
+Development is underway to expand platform capabilities and support more production-grade use cases.
 
-- **🚧 プラットフォームの汎用化と機能強化**
-  - [ ] **x86系ノードへの対応**: 現在のARMベース（Raspberry Pi等）に加え、一般的なx86サーバーでの動作検証とサポートを追加する。
-  - [ ] **Streamlitテンプレートの作成**: データサイエンス系ユースケースのため、新たにStreamlitアプリケーション用のBackstageテンプレートを開発する。
+- **Platform Generalization and Feature Enhancements**
+  - [ ] **x86 Node Support**: Add validation and support for running on general x86 servers, in addition to the current ARM-based (Raspberry Pi, etc.) setup.
+  - [ ] **Streamlit Template**: Develop a new Backstage template for Streamlit applications to support data science use cases.
 
-- **🔐 セキュリティと認証の強化**
-  - [ ] **Istio GatewayでのKeycloak認証**: アプリケーションへの全外部トラフィックに対し、Istio GatewayレイヤーでKeycloakによるJWT認証を必須にする。
-  - [ ] **サービスメッシュ認証の徹底**: Workload-to-Workload通信に厳格なmTLS認証を適用し、認可ポリシー(AuthorizationPolicy)を整備する。
+- **Security and Authentication Enhancements**
+  - [ ] **Keycloak Authentication at Istio Gateway**: Require Keycloak JWT authentication at the Istio Gateway layer for all external traffic to applications.
+  - [ ] **Thorough Service Mesh Authentication**: Apply strict mTLS authentication for workload-to-workload communication and establish authorization policies (AuthorizationPolicy).
 
-- **🔭 可観測性の向上**
-  - [ ] **OpenTelemetryの導入**: 分散トレーシングを実現し、アプリケーションのパフォーマンスボトルネックやエラー追跡を容易にする。
+- **Observability Improvements**
+  - [ ] **OpenTelemetry Adoption**: Implement distributed tracing to facilitate performance bottleneck identification and error tracking in applications.
 
-- **✨ 開発者エクスペリエンスの向上**
-  - [ ] Backstage UIの改善（カタログ登録、ドキュメント拡充）。
-  - [ ] エンドツーエンドのテストを拡充し、プラットフォームの信頼性をさらに高める。
+- **Developer Experience Improvements**
+  - [ ] Improve the Backstage UI (catalog registration, documentation enhancements).
+  - [ ] Expand end-to-end testing to further increase platform reliability.
 
-## 将来的な構想 (Future Goals)
+## Future Goals
 
-以下の機能は、コア機能が完全に検証された後の拡張候補です。
+The following features are extension candidates after core features have been fully validated.
 
-- **セキュリティ & コンプライアンス**
-  - OPA/Gatekeeperによるポリシー強制
-  - Trivyなどによるコンテナ脆弱性スキャン
-  - SBOM（ソフトウェア部品表）の自動生成
+- **Security & Compliance**
+  - Policy enforcement with OPA/Gatekeeper
+  - Container vulnerability scanning with Trivy, etc.
+  - Automatic SBOM (Software Bill of Materials) generation
 
-- **開発者エクスペリエンスの向上**
-  - リソースクォータによるマルチテナンシーの実現
-  - カナリアリリースなど、より高度なデプロイ戦略のサポート
-  - Backstageでのシークレット初期設定の自動化
+- **Developer Experience Improvements**
+  - Multi-tenancy through resource quotas
+  - Support for advanced deployment strategies such as canary releases
+  - Automation of initial secret setup in Backstage
 
-- **運用 & 可観測性の強化**
-  - Veleroなどによる災害復旧（DR）手順の確立
+- **Operations & Observability Enhancements**
+  - Establishing disaster recovery (DR) procedures with Velero, etc.
 
 ---
 
-## 完了したマイルストーン (Completed Milestones)
+## Completed Milestones
 
 <details>
-<summary>過去に完了したフェーズの詳細はこちらをクリック</summary>
+<summary>Click here for details on previously completed phases</summary>
 
-### Phase 1: クラスター初期化 ✅ 完了
+### Phase 1: Cluster Initialization -- Completed
 
-ベアメタルKubernetesクラスターの基盤をセットアップしました。
+Set up the bare-metal Kubernetes cluster foundation.
 
-- **達成事項**:
-  - ベアメタルハードウェア上でKubernetesクラスターが稼働
-  - CRI-Oコンテナランタイムを設定
-  - kube-proxy置き換えを有効にしたCilium CNIとLoadBalancerを導入
-  - Sealed Secretsコントローラーをインストールし、GHCR認証情報を暗号化
+- **Achievements**:
+  - Kubernetes cluster running on bare-metal hardware
+  - CRI-O container runtime configured
+  - Cilium CNI with LoadBalancer introduced with kube-proxy replacement enabled
+  - Sealed Secrets controller installed and GHCR credentials encrypted
 
-### Phase 2: GitOps基盤構築 ✅ 完了
+### Phase 2: GitOps Foundation -- Completed
 
-Argo CDをGitOpsエンジンとして確立し、インフラ管理を整備しました。
+Established Argo CD as the GitOps engine and organized infrastructure management.
 
-- **達成事項**:
-  - Argo CDが稼働し、Platform/App用のGitOps Projectsを確立
-  - "App of Apps" パターンによるインフラの完全GitOps化
-  - Namespaceラベルの統一設計を導入
-  - CRD分離パターンを導入し、Git Diffの可読性とデプロイ順序を改善
+- **Achievements**:
+  - Argo CD operational with Platform/App GitOps Projects established
+  - Full GitOps management of infrastructure via "App of Apps" pattern
+  - Unified namespace label design introduced
+  - CRD splitting pattern introduced, improving Git diff readability and deployment order
 
-### Phase 3: サービスメッシュと認証 ✅ 完了
+### Phase 3: Service Mesh and Authentication -- Completed
 
-セキュリティとアクセス制御のコアコンポーネントをデプロイしました。
+Deployed core security and access control components.
 
-- **達成事項**:
-  - **Istio**: Control Planeと環境別Gatewayをデプロイし、mTLSを有効化
-  - **Keycloak**: Prod/Dev環境用のKeycloakインスタンスをKustomizeベースで構築
-  - **Cert-Manager**: Let's Encryptと連携し、ワイルドカード証明書の自動発行・更新を実現
-  - **Prometheus**: 監視スタックをデプロイし、ServiceMonitorによる自動収集を確立
-  - **Backstage**: カスタムビルドした開発者ポータルをデプロイ
+- **Achievements**:
+  - **Istio**: Control Plane and environment-specific Gateways deployed, mTLS enabled
+  - **Keycloak**: Keycloak instances for Prod/Dev environments built with Kustomize
+  - **Cert-Manager**: Automatic wildcard certificate issuance and renewal with Let's Encrypt integration
+  - **Prometheus**: Monitoring stack deployed with automatic collection via ServiceMonitor
+  - **Backstage**: Custom-built developer portal deployed
 
 </details>

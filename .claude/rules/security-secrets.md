@@ -35,8 +35,4 @@ globs: "**/sealed-secret*, infrastructure/security/**"
 
 - JWT-based auth for prod/dev environments
 - Istio RequestAuthentication + AuthorizationPolicy per application
-- Prod: `auth.platform.example.com`, Dev: `auth-dev.platform.example.com`
-
-## Placeholder Secrets (Pre-Publication)
-
-All Sealed Secrets currently contain `PLACEHOLDER_ENCRYPTED_DATA_REGENERATE_FOR_YOUR_CLUSTER`. Users must regenerate with their own cluster's sealing key.
+- Prod: `auth.platform.yu-min3.com`, Dev: `auth-dev.platform.yu-min3.com`

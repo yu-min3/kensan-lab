@@ -1,6 +1,6 @@
 # Backstage Developer Portal
 
-A production-ready Backstage application for the goldship GitOps Kubernetes platform, with integrated application scaffolding templates and optimized for bare-metal deployment.
+A production-ready Backstage application for the kensan-lab GitOps Kubernetes platform, with integrated application scaffolding templates and optimized for bare-metal deployment.
 
 ## ✨ Features
 
@@ -29,8 +29,8 @@ A production-ready Backstage application for the goldship GitOps Kubernetes plat
 ### 1. Clone the Repository
 
 ```bash
-git clone https://github.com/yu-min3/goldship.git
-cd goldship/backstage-app
+git clone https://github.com/yu-min3/kensan-lab.git
+cd kensan-lab/backstage-app
 ```
 
 ### 2. Configure Environment Variables
@@ -207,7 +207,7 @@ make run
 
 #### 4. Production Deployment
 
-Deploy to goldship cluster:
+Deploy to kensan-lab cluster:
 
 ```bash
 # Full GitOps deployment
@@ -236,7 +236,7 @@ If you need to deploy manually without GitOps:
 
 ```bash
 # Apply manifests directly
-kubectl apply -f ../base-infra/backstage/
+kubectl apply -f ../infrastructure/backstage/
 
 # Check deployment
 kubectl get pods -n backstage
@@ -335,7 +335,7 @@ This section describes the architecture of the application templates used by Bac
 
 **Responsibility**: Backstage scaffolding templates for new applications (Kustomize-based)
 **Administrator**: Platform Engineer (PE)
-**Location**: `backstage-app/templates/` within the `goldship` repository
+**Location**: `backstage-app/templates/` within the `kensan-lab` repository
 **Status**: ✅ Implemented
 
 #### Directory Structure
@@ -377,7 +377,7 @@ backstage-app/templates/
 2.  **Backstage Registration**: The template is registered in the Backstage catalog.
 3.  **AD Selection**: AD selects the template from the Backstage UI.
 4.  **Repository Generation**: Backstage scaffolds a new `app-<name>` repository.
-5.  **GitOps Registration**: Backstage automatically commits the Application CR to the `goldship` repository.
+5.  **GitOps Registration**: Backstage automatically commits the Application CR to the `kensan-lab` repository.
 6.  **Automatic Deployment**: Argo CD detects the change and deploys to both environments.
 
 ---
@@ -540,7 +540,7 @@ npx playwright show-report e2e-test-report
 
 - **Backstage Documentation**: https://backstage.io/docs
 - **Yarn 4 Documentation**: https://yarnpkg.com
-- **Platform Repository**: https://github.com/yu-min3/goldship
+- **Platform Repository**: https://github.com/yu-min3/kensan-lab
 - **CLAUDE.md**: See repository root for AI assistant instructions
 
 ---
@@ -569,4 +569,4 @@ This project follows the Backstage license (Apache 2.0) for framework code.
 
 ---
 
-**Built with ❤️ for the goldship GitOps ecosystem**
+**Built with ❤️ for the kensan-lab GitOps ecosystem**

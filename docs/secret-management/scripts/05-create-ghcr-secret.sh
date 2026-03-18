@@ -13,4 +13,4 @@ kubectl create secret docker-registry ghcr-pull-secret \
 
 # シークレットを暗号化
 kubeseal --format=yaml < ../../temp/ghcr-secret-raw.yaml \
-  > ../../base-infra/sealed-secret/ghcr-pull-secret-prod.yaml
+  > ../../infrastructure/sealed-secret/ghcr-pull-secret-prod.yaml

@@ -1,215 +1,182 @@
-# K8s GitOps Platform
+<div align="center">
 
-A modern GitOps-based Kubernetes platform running on bare-metal hardware, designed to achieve a complete separation of responsibilities between Platform Engineers (PE) and Application Developers (AD).
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/assets/kensan-logo-dark.svg" width="120">
+  <source media="(prefers-color-scheme: light)" srcset="docs/assets/kensan-logo-light.svg" width="120">
+  <img alt="kensan-lab logo" src="docs/assets/kensan-logo-dark.svg" width="120">
+</picture>
 
-## Table of Contents
+# kensan-lab
 
-- [Key Features](#key-features)
-- [Tech Stack](#tech-stack)
-- [Who Should Use This](#who-should-use-this)
-- [Quick Start](#quick-start)
-- [Architecture](#architecture)
-- [Development Workflow](#development-workflow)
-- [Documentation](#documentation)
-- [Security](#security)
-- [Internet Exposure](#internet-exposure)
-- [License](#license)
+**Enterprise-grade Kubernetes on bare-metal — for learning, not for show.**
 
-## Key Features
+*kensan (研鑽) — the Japanese discipline of continuous skill refinement, like sharpening a blade on a whetstone.*
 
-- **GitOps + Service Mesh Ready**: Deploy a production-ready GitOps cluster with Istio service mesh integration out of the box.
-- **Self-Service Application Deployment**: Application developers can deploy apps via Backstage templates, including automatic HTTPRoute distribution for traffic management.
-- **Secure by Default**: Istio service mesh + Keycloak JWT authentication for all external traffic.
-- **Environment Isolation**: Strict separation between production and development environments with dedicated Argo CD Projects.
-- **Declarative Configuration**: All Kubernetes resources managed through Infrastructure as Code in Git.
-- **Automated Deployment**: Changes in Git are automatically synced to the cluster via Argo CD.
-- **Developer Portal**: Backstage with scaffolding templates, TechDocs, and service catalog for streamlined development workflows.
+[![Kubernetes](https://img.shields.io/badge/Kubernetes-v1.32-326CE5?style=flat-square&logo=kubernetes&logoColor=white)](https://kubernetes.io/)
+[![Argo CD](https://img.shields.io/badge/Argo_CD-v2.14-EF7B4D?style=flat-square&logo=argo&logoColor=white)](https://argoproj.github.io/cd/)
+[![Istio](https://img.shields.io/badge/Istio-v1.27-466BB0?style=flat-square&logo=istio&logoColor=white)](https://istio.io/)
+[![Cilium](https://img.shields.io/badge/Cilium-v1.18-F8C517?style=flat-square&logo=cilium&logoColor=black)](https://cilium.io/)
+[![License](https://img.shields.io/badge/License-Apache_2.0-blue?style=flat-square)](./LICENSE)
+
+</div>
+
+---
+
+A bare-metal Kubernetes homelab that mirrors how enterprise platform teams actually run clusters — Argo CD for GitOps, Istio for service mesh, Backstage for developer self-service, and full observability with Prometheus, Grafana, Loki, and Tempo. All running on Raspberry Pis and a mini PC over WiFi.
+
+> This is a **reference architecture**, not a turnkey solution. Published as a learning resource and companion to the author's technical articles. Adapt secrets, domains, and IP ranges for your environment. See [Configuration Guide](./docs/configuration.md).
+
+## Why This Exists
+
+Most homelab repos use Flux + Talos + minimal networking. This one takes a different path — the **enterprise Kubernetes stack** (ArgoCD, Istio, Backstage, Keycloak) deployed on commodity hardware. If you're studying for CKA/CKAD, working as a platform engineer, or want to understand how production clusters are actually structured, this is for you.
+
+**What makes this different:**
+
+- **Argo CD + Helm multi-source** — not Flux. Real-world enterprise GitOps pattern with App of Apps
+- **Istio + Gateway API** — full service mesh with mTLS, not just an ingress controller
+- **Backstage** — developer portal with scaffolding templates. Almost no homelab does this
+- **Keycloak JWT auth** — every external endpoint is authenticated
+- **Multi-arch (ARM64 + AMD64)** — real scheduling constraints, not a uniform cluster
+- **WiFi-only networking** — because not everyone has ethernet drops everywhere
 
 ## Tech Stack
 
 | Category | Technology | Purpose |
 |---|---|---|
-| **Orchestration** | Kubernetes (kubeadm) | Container orchestration on bare-metal |
-| **Container Runtime** | CRI-O | Lightweight container runtime |
-| **Network** | Cilium CNI | Network policy and service mesh integration |
-| **Load Balancer** | Cilium LoadBalancer | L2-based external traffic routing |
-| **Service Mesh** | Istio | Traffic management and security |
-| **Authentication** | Keycloak | JWT-based authentication |
-| **GitOps** | Argo CD | Continuous deployment from Git |
-| **Secret Management** | Sealed Secrets | Encrypted secrets in Git |
-| **Monitoring** | Prometheus + Grafana | Metrics collection and visualization |
-| **Developer Portal** | Backstage | Self-service templates and documentation |
+| **Orchestration** | Kubernetes (kubeadm) | Bare-metal, no managed K8s |
+| **Container Runtime** | CRI-O | Lightweight OCI runtime |
+| **CNI / Load Balancer** | Cilium | kube-proxy replacement, L2 LoadBalancer |
+| **Service Mesh** | Istio + Gateway API | mTLS, traffic management |
+| **Authentication** | Keycloak | JWT-based auth (prod/dev) |
+| **GitOps** | Argo CD | Helm multi-source Application pattern |
+| **Secrets** | Sealed Secrets | Encrypted secrets in Git |
+| **Certificates** | cert-manager + Let's Encrypt | Automated TLS |
+| **Observability** | Prometheus, Grafana, Loki, Tempo | Metrics, dashboards, logs, traces |
+| **Developer Portal** | Backstage | Self-service templates and catalog |
 
-## Who Should Use This
+## Hardware
 
-This platform is ideal for:
+| Device | Qty | Arch | RAM | Role |
+|--------|-----|------|-----|------|
+| Raspberry Pi 5 | 3 | ARM64 | 8 GB | Control plane + workers |
+| Bosgame M4 Neo | 1 | AMD64 | 16 GB | Worker (I/O-heavy workloads) |
 
-### Learning the Golden Kubernetes Stack
-If you're studying **Golden Kubernetes** (a curated set of CNCF tools for production-ready clusters), this repository provides hands-on experience with:
-- ✅ **Argo CD** for GitOps continuous deployment
-- ✅ **Istio** for service mesh and traffic management
-- ✅ **Cilium** for CNI and network policies
-- ✅ **Prometheus + Grafana** for observability
-- ✅ **Backstage** for developer experience
+4 nodes, multi-architecture, all on WiFi. Managed by kubeadm with CRI-O runtime.
 
-**Note**: The following Golden Kubernetes components are not yet implemented:
-- ❌ OpenTelemetry (distributed tracing)
-- ❌ Keyverno (policy management)
-- ❌ Other Argo products (Argo Workflows, Argo Rollouts, Argo Events)
+<details>
+<summary><b>Scheduling Strategy</b></summary>
 
-### Organizations Requiring Secure GitOps Clusters
-This platform is designed for organizations that need:
-- **Security-first architecture**: mTLS service mesh, JWT authentication, encrypted secrets in Git
-- **Compliance and auditability**: Complete Git history of all infrastructure changes
-- **Multi-tenancy**: Strict namespace isolation between teams and environments
-- **Self-service developer workflows**: Reduce bottlenecks by empowering developers with Backstage templates
+| Workload Type | Strategy | Examples |
+|---------------|----------|---------|
+| I/O Heavy | `requiredDuringScheduling: hardware-class=high-performance` | Prometheus, Loki, Tempo, Keycloak |
+| Medium | `preferredDuringScheduling: high-performance` (weight: 80) | OTel Collector |
+| Light | No affinity | Grafana, Hubble UI |
+| AMD64-only | `required: kubernetes.io/arch=amd64` | Backstage |
 
-If your organization values **infrastructure as code, zero-trust networking, and developer productivity**, this platform provides a solid foundation.
-
-## Quick Start
-
-For detailed prerequisites and installation steps, please refer to the [Installation Guide](./docs/installation.md).
-
-### 1. Access Argo CD
-
-```bash
-# Get the Argo CD LoadBalancer IP
-kubectl get svc -n argocd argocd-server -o jsonpath='{.status.loadBalancer.ingress[0].ip}'
-
-# Get the initial password
-kubectl get secret argocd-initial-admin-secret -n argocd -o jsonpath="{.data.password}" | base64 -d
-```
-
-Access `http://<ARGOCD_IP>` in your browser and log in with the username `admin` and the password.
-
-### 2. Check Deployment Status
-
-```bash
-# Check all Applications
-kubectl get applications -n argocd
-
-# Check resources in a specific Namespace
-kubectl get all -n monitoring
-kubectl get all -n backstage
-kubectl get all -n istio-system
-```
+</details>
 
 ## Architecture
 
 ### Multi-Repository GitOps Strategy
 
-The platform consists of multiple Git repositories to separate responsibilities:
+```
+Platform Engineer (PE)                    Application Developer (AD)
+        |                                          |
+        v                                          v
++------------------+    Argo CD Application   +--------------+
+|  kensan-lab      |<------- CR ------------->|  app-<name>  |
+|  (this repo)     |    auto-created by       |  repository  |
+|                  |    Backstage              |              |
+| infrastructure/  |                          | overlays/    |
+| backstage/       |                          |   dev/       |
+| apps/            |                          |   prod/      |
++--------+---------+                          +------+-------+
+         |                                          |
+         +------------> Argo CD <-------------------+
+                           |
+                     +-----v-----+
+                     | Kubernetes |
+                     |  Cluster   |
+                     +-----------+
+```
 
-1.  **`goldship`** (This repository): Infrastructure, security, Argo CD control structure, Backstage templates (managed by PE).
-2.  **`app-<name>`**: Application code and deployment settings (managed by AD, one repository per app).
+### Environment Isolation
 
-For a detailed breakdown of the repository structure and design decisions, please see the [architecture documentation](./docs/architecture/).
+| Tier | Namespaces | Owner | Argo CD Project |
+|---|---|---|---|
+| **Infrastructure** | `istio-system`, `argocd`, `monitoring`, `backstage` | Platform Engineer | `platform-project` |
+| **Application** | `app-prod`, `app-dev` | App Developer | `app-project-prod`, `app-project-dev` |
 
-### Environment Isolation and Namespace Design
+<details>
+<summary><b>Development Workflow</b></summary>
 
-| Tier | Namespaces | Labels | Administrator | Argo CD Project |
-|---|---|---|---|---|
-| **Infrastructure** | `kube-system`, `istio-system`, `argocd`, `monitoring`, `backstage`, `platform-auth-prod`, `platform-auth-dev` | `goldship.platform/tier: platform`<br>`goldship.platform/environment: infrastructure` | PE | `platform-project` |
-| **Application** | `app-prod`, `app-dev` | `goldship.platform/tier: application`<br>`goldship.platform/environment: production\|development` | AD | `app-project-prod`, `app-project-dev` |
+**Platform Engineer (PE)**:
+1. Modify infrastructure settings in this repository
+2. Commit and push → Argo CD automatically syncs
 
-## Development Workflow
+**Application Developer (AD)**:
+1. Create a new app from Backstage template
+2. Backstage auto-creates `app-<name>` repo + Argo CD Application CR
+3. Develop in `app-<name>` repo → Argo CD auto-deploys
 
-### Platform Engineer (PE)
+</details>
 
-1.  Modify infrastructure settings in this repository (`goldship`).
-2.  Commit and push the changes to Git.
-3.  Argo CD automatically syncs the changes to the cluster.
-4.  Check the deployment status in the Argo CD UI.
+## Repository Structure
 
-### Application Developer (AD)
-
-1.  Create a new app from a template in the Backstage UI.
-2.  Backstage automatically creates a new `app-<name>` repository and commits the Argo CD Application CR to the `goldship` repository.
-3.  Develop code in the generated `app-<name>` repository.
-4.  Update the image tag in `overlays/dev/kustomization.yaml`.
-5.  Argo CD detects the changes and automatically redeploys the application.
-
-## Documentation
-
-This project includes detailed documentation in the `docs/` directory, primarily in Japanese.
-
-### Getting Started
-- **[Installation Guide](./docs/installation.md)**: Prerequisites and setup for the platform.
-- **[Configuration Guide](./docs/configuration.md)**: How to modify settings for your own environment.
-- **[Bootstrapping Guide](./docs/bootstrapping/index.md)**: Reference for generating manifests from scratch.
-- **[Secret Management Guide](./docs/secret-management/index.md)**: How to create and manage secrets.
-
-### Architecture
-- **[Platform Architecture](./docs/architecture/design.md)**: Core design principles, tech stack, and security model.
-- **[Repository Structure](./docs/architecture/repository-structure.md)**: The multi-repository GitOps strategy and file layout.
-- **[Namespace Label Design](./docs/namespace-label-design.md)**: The unified namespace labeling strategy.
-- **[Architecture Decision Records (ADR)](./docs/adr/)**: Key design decisions.
-
-### Development
-- **[Kustomize Usage Guidelines](./docs/kustomize-guidelines.md)**: When and how to use Kustomize in `base-infra/`.
-- **[Implementation Roadmap](./docs/roadmap.md)**: Project phases and current progress.
+```
+infrastructure/                    # Core platform (GitOps-managed)
+├── gitops/argocd/                # Argo CD: applications/, projects/, root-apps/
+├── observability/                # Prometheus, Grafana, Loki, Tempo, OTel Collector
+├── network/                      # Cilium, Istio, Gateway API
+├── security/                     # cert-manager, Sealed Secrets, Keycloak
+├── environments/                 # app-dev, app-prod, observability, system-infra
+└── storage/                      # local-path-provisioner
+backstage/                        # Developer portal (app/ + manifests/)
+apps/                             # Sample applications
+docs/                             # ADRs, architecture, bootstrapping guides
+```
 
 ## Security
 
-- **Encrypted Secrets**: Sealed Secrets encrypts credentials before committing to Git.
-- **RBAC**: Kubernetes RBAC enforces least-privilege access.
-- **Network Policies**: Cilium network policies control traffic between Pods.
-- **Service Mesh**: Istio provides mTLS and traffic encryption.
-- **JWT Authentication**: Keycloak validates all external requests.
-- **GitOps Audit**: A complete Git history of all infrastructure changes.
+| Layer | Implementation |
+|-------|---------------|
+| **Secrets** | Sealed Secrets — encrypted in Git, decrypted in-cluster |
+| **Network** | Cilium network policies + Istio mTLS |
+| **Auth** | Keycloak JWT validation on all external traffic |
+| **RBAC** | Least-privilege access per namespace |
+| **Audit** | Complete Git history of all infrastructure changes |
 
-> **Important**: Never commit unencrypted secrets.
+<details>
+<summary><b>Internet Exposure</b></summary>
 
-## Internet Exposure
+The platform uses Cilium LoadBalancer with L2 announcements for local network access.
 
-### Current Limitations
+For internet exposure, three options are supported:
+1. **Port Forwarding** — Simple home lab setup with Dynamic DNS
+2. **Cloudflare Tunnel** — Zero Trust access without exposing home IP (recommended)
+3. **VPS Reverse Proxy** — Production setup with WireGuard/Tailscale
 
-This platform currently uses **Cilium LoadBalancer with L2 announcements** for local network access. Services are exposed on the local network (e.g., `192.168.0.240-249`) but are **not accessible from the internet**.
+See [Configuration Guide](./docs/configuration.md) for details.
 
-### Exposing Services to the Internet
+</details>
 
-If you need to expose cluster endpoints to the internet, you'll need to set up one of the following:
+## Documentation
 
-#### Option 1: Port Forwarding (Simple Home Lab Setup)
-For home labs or testing environments:
+| Category | Links |
+|----------|-------|
+| **Getting Started** | [Installation](./docs/installation.md) / [Configuration](./docs/configuration.md) / [Bootstrapping](./docs/bootstrapping/index.md) / [Secret Management](./docs/secret-management/index.md) |
+| **Architecture** | [Platform Design](./docs/architecture/design.md) / [Repository Structure](./docs/architecture/repository-structure.md) / [Namespace Labels](./docs/namespace-label-design.md) / [ADRs](./docs/adr/) |
+| **Development** | [Kustomize Guidelines](./docs/kustomize-guidelines.md) / [Roadmap](./docs/roadmap.md) |
+| **日本語** | [Japanese documentation (日本語ドキュメント)](./docs/ja/) |
 
-1. **Configure your router** to forward ports (80, 443) to the Istio Gateway LoadBalancer IP
-2. **Set up Dynamic DNS** (e.g., DuckDNS, No-IP) if you don't have a static public IP
-3. **Update DNS records** to point your domain to your public IP
-4. **Configure TLS certificates** using Let's Encrypt with DNS-01 or HTTP-01 challenges
+## Sample Application: kensan
 
-**Example using cert-manager**:
-```bash
-# Install cert-manager
-kubectl apply -f https://github.com/cert-manager/cert-manager/releases/download/v1.13.0/cert-manager.yaml
+The `apps/kensan/` directory contains a full-stack application running on this platform — a personal productivity tool built with React, Go microservices, Python AI agents, and an Iceberg data lakehouse (Dagster + Polaris). It serves as both a real workload and a showcase of what the platform supports: multi-service deployments, database management, observability integration, and CI/CD via ArgoCD.
 
-# Create ClusterIssuer for Let's Encrypt
-# See docs/internet-exposure.md for detailed configuration
-```
+## Acknowledgments
 
-#### Option 2: Cloudflare Tunnel (Zero Trust Access)
-For secure internet access without exposing your home IP:
-
-1. Set up **Cloudflare Tunnel** (cloudflared)
-2. Configure tunnel routes to your Istio Gateway
-3. Manage access via Cloudflare's Zero Trust dashboard
-
-This approach provides DDoS protection, automatic TLS, and doesn't require port forwarding.
-
-#### Option 3: VPS Reverse Proxy (Production Setup)
-For production deployments:
-
-1. Deploy a **VPS with a public IP** (e.g., DigitalOcean, AWS EC2)
-2. Set up **WireGuard VPN** or **Tailscale** between your cluster and the VPS
-3. Configure **Nginx/Traefik** on the VPS to proxy traffic to your cluster
-4. Manage TLS certificates on the VPS
-
-### Documentation
-
-Detailed guides for each approach will be added to `docs/internet-exposure.md`. The setup is relatively straightforward and typically takes 1-2 hours depending on the chosen method.
-
-**Recommended for beginners**: Start with Cloudflare Tunnel for the easiest setup with built-in security.
+Inspired by the [Home Operations](https://discord.gg/home-operations) community and projects like [khuedoan/homelab](https://github.com/khuedoan/homelab) and [onedr0p/home-ops](https://github.com/onedr0p/home-ops).
 
 ## License
 
-This project is licensed under the Apache-2.0 License. See the [LICENSE](./LICENSE) file for details.
+[Apache-2.0](./LICENSE)
