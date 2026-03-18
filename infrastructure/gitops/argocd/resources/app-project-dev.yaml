@@ -9,7 +9,7 @@ spec:
   description: Application Developer project for development environments
 
   sourceRepos:
-  - "https://github.com/yu-min3/goldship-yumin3"
+  - "https://github.com/yu-min3/kensan-lab"
 
   destinations:
   - namespace: kensan-dev

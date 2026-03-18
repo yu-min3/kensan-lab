@@ -60,7 +60,7 @@ spec:
             - GitHub Actionsビルドパイプライン
             - コンテナイメージ名: `ghcr.io/{owner}/{repo}:{tag}`
 
-            💡 推奨命名: `goldship-apps-{アプリ名}` (追跡しやすいため)
+            💡 推奨命名: `kensan-lab-apps-{アプリ名}` (追跡しやすいため)
           ui:field: RepoUrlPicker
           ui:options:
             allowedHosts:
@@ -142,7 +142,7 @@ spec:
       name: Create Argo CD Applications (Dev & Prod)
       action: publish:github:pull-request
       input:
-        repoUrl: github.com?repo=goldship&owner=yu-min3
+        repoUrl: github.com?repo=kensan-lab&owner=yu-min3
         branchName: add-app-${{ parameters.name }}
         title: 'Add Application: ${{ parameters.name }}'
         description: |
@@ -159,7 +159,7 @@ spec:
           - **Domain**: `${{ parameters.domain }}`
           - **System**: `${{ parameters.system }}`
 
-          **Location**: `base-infra/argocd/applications/apps/${{ parameters.name }}/argocd-apps.yaml`
+          **Location**: `infrastructure/gitops/argocd/applications/apps/${{ parameters.name }}/argocd-apps.yaml`
 
           ## 🔐 Repository Authentication
 
@@ -179,7 +179,7 @@ spec:
           2. Authenticate to the repository using Credential Templates
           3. Sync the application to both Dev and Prod environments
         sourcePath: .backstage
-        targetPath: base-infra/argocd/applications/apps/${{ parameters.name }}
+        targetPath: infrastructure/gitops/argocd/applications/apps/${{ parameters.name }}
 
     # Step 4: Register component in Backstage catalog
     - id: register

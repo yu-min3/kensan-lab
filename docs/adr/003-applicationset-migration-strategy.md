@@ -1,93 +1,93 @@
-# ADR-003: ApplicationSet 移行戦略 — App of Apps との混在設計
+# ADR-003: ApplicationSet Migration Strategy -- Coexistence with App of Apps
 
-## ステータス
+## Status
 
-採用済み (Accepted)
+Accepted
 
-## 日付
+## Date
 
 2026-02-20
 
-## コンテキスト
+## Context
 
-プラットフォームの Argo CD 管理は App of Apps パターンで運用されてきた。`platform-root-app` が `applications/` ディレクトリを再帰スキャンし、各カテゴリの Application CR をデプロイする構成である。
+The platform's Argo CD management has operated on the App of Apps pattern. `platform-root-app` recursively scans the `applications/` directory and deploys the Application CRs for each category.
 
-### 課題
+### Issues
 
-運用が進むにつれ、以下の問題が顕在化した：
+As operations progressed, the following problems became apparent:
 
-1. **ボイラープレートの重複**: 同カテゴリ内のアプリは構造が類似しているが、個別の `app.yaml` に設定が散在
-2. **設定の不統一**: finalizer、retry、ServerSideApply の有無がアプリごとにバラバラ
-   - 例: grafana は SSA なし・retry あり、loki は SSA あり・retry あり、env-kensan-* は finalizer なし
-3. **新規追加の手間**: 新コンポーネント追加時に `app.yaml` を丸ごとコピー＆編集が必要
+1. **Boilerplate duplication**: Apps within the same category have similar structures, but settings are scattered across individual `app.yaml` files
+2. **Configuration inconsistency**: Presence of finalizer, retry, and ServerSideApply varies per app
+   - Example: grafana has no SSA with retry, loki has SSA with retry, env-kensan-* has no finalizer
+3. **Effort for new additions**: Adding a new component requires copying and editing an entire `app.yaml`
 
-### 検討した選択肢
+### Options Considered
 
-| 選択肢 | 概要 |
+| Option | Summary |
 |--------|------|
-| A. 全て App of Apps のまま維持 | 現状維持。シンプルだがボイラープレート問題は解消されない |
-| B. 全て ApplicationSet に移行 | 一貫性は最大化されるが、固有設定のある app で templatePatch が複雑化 |
-| C. カテゴリごとに最適なパターンを選択（混在） | 均一なカテゴリは ApplicationSet、固有設定が多いカテゴリは個別 Application |
+| A. Keep everything as App of Apps | Maintain current state. Simple but doesn't resolve boilerplate issues |
+| B. Migrate everything to ApplicationSet | Maximum consistency, but templatePatch becomes complex for apps with unique settings |
+| C. Choose the optimal pattern per category (mixed) | Uniform categories use ApplicationSet; categories with many unique settings use individual Applications |
 
-## 決定
+## Decision
 
-**選択肢 C: カテゴリごとに最適なパターンを選択する混在構成を採用する。**
+**Adopt Option C: A mixed configuration selecting the optimal pattern per category.**
 
-### 判定基準
+### Selection Criteria
 
-<!-- TODO(human): 各カテゴリを ApplicationSet vs 個別 Application に振り分けた判定基準を記述してください -->
+<!-- TODO(human): Document the criteria used to classify each category as ApplicationSet vs individual Application -->
 
-### 判定結果
+### Classification Results
 
-| カテゴリ | アプリ数 | パターン | 主な理由 |
+| Category | App Count | Pattern | Primary Reason |
 |---------|---------|---------|---------|
-| Observability | 5 | ApplicationSet | Helm multi-source で構造が均一、今後も追加の可能性 |
-| Environments | 5 | ApplicationSet | single source で構造が均一、namespace 追加が頻繁 |
-| Network | 5 | 個別 Application | sync-wave 依存、ignoreDifferences が固有 |
-| Security | 3 | 個別 Application | Helm/Kustomize 混在、sync-wave あり |
-| GitOps | 1 | 個別 Application | 自己管理、複雑な ignoreDifferences |
-| Backstage | 1 | 個別 Application | 単独 Kustomize アプリ |
-| Apps | 3 | 個別 Application | Backstage 自動コミット、イメージタグ個別更新 |
+| Observability | 5 | ApplicationSet | Uniform structure with Helm multi-source, likely more additions in the future |
+| Environments | 5 | ApplicationSet | Uniform structure with single source, frequent namespace additions |
+| Network | 5 | Individual Application | sync-wave dependencies, unique ignoreDifferences |
+| Security | 3 | Individual Application | Mixed Helm/Kustomize, sync-waves present |
+| GitOps | 1 | Individual Application | Self-managed, complex ignoreDifferences |
+| Backstage | 1 | Individual Application | Single Kustomize app |
+| Apps | 3 | Individual Application | Auto-committed by Backstage, individual image tag updates |
 
-### ApplicationSet 設計
+### ApplicationSet Design
 
 #### Observability ApplicationSet
 - **Generator**: Git File Generator (`infrastructure/observability/*/config.json`)
-- **テンプレート**: Helm multi-source（chart source + values ref）
-- **templatePatch**: `hasResources: "true"` の場合に 3rd source（resources/）を追加
-- **統一ポリシー**: finalizer, ServerSideApply, retry を全アプリに適用
+- **Template**: Helm multi-source (chart source + values ref)
+- **templatePatch**: Add 3rd source (resources/) when `hasResources: "true"`
+- **Unified Policy**: Apply finalizer, ServerSideApply, and retry to all apps
 
 #### Environments ApplicationSet
 - **Generator**: Git File Generator (`infrastructure/environments/*/config.json`)
-- **テンプレート**: single source（Git directory）
-- **統一ポリシー**: finalizer を全アプリに適用
+- **Template**: Single source (Git directory)
+- **Unified Policy**: Apply finalizer to all apps
 
-### 移行の安全性設計
+### Migration Safety Design
 
-2-commit 戦略で無停止移行を実現：
+Zero-downtime migration achieved through a 2-commit strategy:
 
-1. **Commit 1**: 対象 Application CR から `resources-finalizer.argocd.argoproj.io` を除去
-   - Argo CD sync 後、finalizer が外れる（管理下リソースには影響なし）
-2. **Commit 2**: ApplicationSet CR を追加し、旧 Application CR を削除
-   - root-app が旧 Application を prune（finalizer なし → cascade 削除なし）
-   - ApplicationSet controller が同名の Application CR を再生成
-   - クラスタ上のワークロードは中断なし
+1. **Commit 1**: Remove `resources-finalizer.argocd.argoproj.io` from target Application CRs
+   - After Argo CD sync, the finalizer is removed (no impact on managed resources)
+2. **Commit 2**: Add ApplicationSet CR and delete the old Application CRs
+   - root-app prunes the old Applications (no finalizer = no cascade deletion)
+   - ApplicationSet controller regenerates Application CRs with the same names
+   - Cluster workloads continue without interruption
 
-## 結果
+## Consequences
 
-### メリット
+### Benefits
 
-- **設定の一元管理**: テンプレートにより finalizer / SSA / retry が自動的に統一
-- **新規追加の簡素化**: `config.json` + `values.yaml` を置くだけで Application が自動生成
-- **固有設定の保全**: 個別 Application を残すことで、sync-wave や ignoreDifferences の複雑性を維持
+- **Centralized configuration management**: Templates automatically unify finalizer / SSA / retry settings
+- **Simplified new additions**: Just place `config.json` + `values.yaml` and an Application is auto-generated
+- **Preservation of unique settings**: Keeping individual Applications preserves sync-wave and ignoreDifferences complexity
 
-### デメリット
+### Drawbacks
 
-- **認知モデルが 2 つ必要**: 「この app はどこを見ればいい？」がカテゴリにより異なる
-  - 対策: `applications/README.md` にパターン使い分けテーブルを配置
-- **root-app が ApplicationSet と Application の両方をデプロイ**: Argo CD コミュニティでは認知されたパターンだが、純粋な単一パターンではない
+- **Two mental models needed**: "Where do I look for this app?" differs by category
+  - Mitigation: Place a pattern usage table in `applications/README.md`
+- **root-app deploys both ApplicationSets and Applications**: A recognized pattern in the Argo CD community, but not a purely single pattern approach
 
-### 今後の検討事項
+### Future Considerations
 
-- Network カテゴリのアプリが増えた場合、ApplicationSet + merge generator で sync-wave を吸収できるか検証
-- Backstage テンプレートが生成する Application CR の形式が統一されれば、Apps カテゴリも ApplicationSet 化を検討
+- If the Network category grows, evaluate whether ApplicationSet + merge generator can absorb sync-wave requirements
+- If the Application CR format generated by Backstage templates becomes unified, consider converting the Apps category to ApplicationSet as well

@@ -1,172 +1,173 @@
-# K8s GitOps プラットフォームアーキテクチャ
+# K8s GitOps Platform Architecture
 
-## 1. プロジェクトのビジョンと技術スタック
+## 1. Project Vision and Technology Stack
 
-本プロジェクトは、プラットフォームエンジニア（PE）とアプリケーション開発者（AD）の責務を完全に分離し、GitOpsを中心としたモダンな開発プラットフォームを構築することを目的としています。プラットフォームは、CRI-Oをコンテナランタイムとして使用し、ベアメタルのRaspberry Piハードウェア上で動作します。
+This project aims to build a modern development platform centered on GitOps, with a complete separation of responsibilities between Platform Engineers (PE) and Application Developers (AD). The platform runs on bare-metal Raspberry Pi hardware using CRI-O as the container runtime.
 
-### 技術スタック
+### Technology Stack
 
-| カテゴリ | コンポーネント | 役割 |
+| Category | Component | Role |
 |---------|-----------|------|
-| オーケストレーション | Kubernetes (`kubeadm`) | ベアメタルインフラ上のコンテナオーケストレーション |
-| コンテナランタイム | CRI-O | 軽量なコンテナランタイムインターフェース |
-| ネットワーク | Cilium | CNI、ネットワークポリシー、サービスメッシュ統合 |
-| ロードバランサ | Cilium LoadBalancer | L2アナウンスベースの外部トラフィックルーティング（MetalLBを置き換え） |
-| サービスメッシュ | Istio | 外部トラフィック認証、アプリ間制御、セキュリティ |
-| 認証/認可 | Keycloak | ユーザーアカウント管理とJWT発行 |
-| 証明書管理 | cert-manager | Let's Encrypt + Route53 DNSチャレンジによるワイルドカード証明書自動発行・更新 |
-| GitOps | Argo CD | すべてのアプリケーションとインフラの自動デプロイと追跡 |
-| シークレット管理 | Sealed Secrets | Gitリポジトリでのシークレット安全管理（GHCR認証情報） |
-| モニタリング | Prometheus | クラスターおよびアプリケーションメトリクスの収集（未実装） |
-| 開発者ポータル | Backstage | アプリケーションテンプレート展開、ドキュメント、カタログ（デプロイ済み） |
+| Orchestration | Kubernetes (`kubeadm`) | Container orchestration on bare-metal infrastructure |
+| Container Runtime | CRI-O | Lightweight container runtime interface |
+| Networking | Cilium | CNI, network policies, service mesh integration |
+| Load Balancer | Cilium LoadBalancer | L2 announcement-based external traffic routing (replaces MetalLB) |
+| Service Mesh | Istio | External traffic authentication, inter-service control, security |
+| Authentication/Authorization | Keycloak | User account management and JWT issuance |
+| Certificate Management | cert-manager | Automatic wildcard certificate issuance and renewal via Let's Encrypt + Route53 DNS challenge |
+| GitOps | Argo CD | Automated deployment and tracking of all applications and infrastructure |
+| Secret Management | Sealed Secrets | Secure secret management in Git repositories (GHCR credentials) |
+| Monitoring | Prometheus | Cluster and application metrics collection (not yet implemented) |
+| Developer Portal | Backstage | Application template deployment, documentation, catalog (deployed) |
 
 
-## 2. 環境と権限の分離設計
+## 2. Environment and Permission Separation Design
 
-プラットフォームは3層分離モデルを使用します：
+The platform uses a three-layer separation model:
 
-| 層 | Namespace例 | 管理者 | Argo CD Project | 目的と責務 |
+| Layer | Example Namespaces | Manager | Argo CD Project | Purpose and Responsibilities |
 |-------|-------------------|---------------|-----------------|------------------------------|
-| 1. 基盤層 | `istio-system`, `monitoring`, `argocd`, `platform-auth` | PE | `platform-project` | クラスターのコアコンポーネント管理。PEのみアクセス可。 |
-| 2. 環境層 | `app-prod`, `app-dev` | AD | `app-project-prod`, `app-project-dev` | ライフサイクルの分離。ADは自身の環境Namespace内のリソースのみ操作可。 |
-| 3. アプリ層 | `app-prod-<app-name>` | AD | N/A | アプリケーションごとのセキュリティ/リソース分離。 |
+| 1. Infrastructure | `istio-system`, `monitoring`, `argocd`, `platform-auth` | PE | `platform-project` | Core cluster component management. PE-only access. |
+| 2. Environment | `app-prod`, `app-dev` | AD | `app-project-prod`, `app-project-dev` | Lifecycle separation. ADs can only operate on resources within their own environment namespace. |
+| 3. Application | `app-prod-<app-name>` | AD | N/A | Per-application security/resource isolation. |
 
-### セキュリティ境界
+### Security Boundaries
 
-- **基盤層**: `platform-project`経由でPEが排他的に管理。Istio、Prometheus、Argo CD、Keycloakを含む。
-- **環境層**: ProdとDev用の独立したArgo CD Project。ADは自身のNamespaceリソースのみアクセス可。
-- **アプリ層**: アプリケーション単位の分離のための将来的な拡張。
+- **Infrastructure Layer**: Exclusively managed by PE via `platform-project`. Includes Istio, Prometheus, Argo CD, and Keycloak.
+- **Environment Layer**: Independent Argo CD Projects for Prod and Dev. ADs can only access their own namespace resources.
+- **Application Layer**: Future extension for per-application isolation.
 
-## 3. Gitリポジトリ構成（GitOps）
+## 3. Git Repository Structure (GitOps)
 
-すべてのKubernetesリソース定義はGitリポジトリで管理されます。プラットフォームは複数リポジトリ戦略を使用します：
+All Kubernetes resource definitions are managed in Git repositories. The platform uses a multi-repository strategy:
 
-| リポジトリ | 責務 | 管理者 | 追跡対象リソース |
+| Repository | Responsibility | Manager | Tracked Resources |
 |-----------|---------------|---------------|-------------------|
-| `goldship` | クラスター基盤、セキュリティ、Argo CD制御構造（App Project、Root Apps） | PE | Istio、Keycloak、Sealed Secrets、Namespaces、RBAC、Argo CD Applications |
-| `backstage-app/templates/` | Backstage用のアプリケーション雛形（Kustomizeベース） | PE | Backstageテンプレート定義、ベースKubernetesマニフェスト（goldship内） |
-| `app-<app-name>` | アプリケーションコード、Dockerfile、TechDocs、環境別デプロイ設定 | AD | アプリケーションコード、イメージタグパッチ、レプリカパッチ |
+| `kensan-lab` | Cluster infrastructure, security, Argo CD control structures (App Projects, Root Apps) | PE | Istio, Keycloak, Sealed Secrets, Namespaces, RBAC, Argo CD Applications |
+| `backstage-app/templates/` | Application scaffolding templates for Backstage (Kustomize-based) | PE | Backstage template definitions, base Kubernetes manifests (in kensan-lab) |
+| `app-<app-name>` | Application code, Dockerfile, TechDocs, environment-specific deployment configuration | AD | Application code, image tag patches, replica patches |
 
-### GitOpsワークフロー
+### GitOps Workflow
 
-1. すべてのK8sリソースはGitリポジトリで定義
-2. Argo CDが継続的に変更を監視して同期
-3. Argo CDはRoot Applicationsによる「App of Apps」パターンを使用
-4. アプリケーション開発者はBackstageテンプレート経由で新規アプリを作成
-5. ADがBackstage経由で新規アプリを作成すると：
-   - Kustomize構造を持つ新しい`app-<name>`リポジトリが作成される
-   - BackstageがApplication CRを`goldship/base-infra/argocd/applications/`に自動コミット
-   - Argo CDが新しいApplication CRを検出し、DevとProd両環境にデプロイ
+1. All K8s resources are defined in Git repositories
+2. Argo CD continuously monitors and syncs changes
+3. Argo CD uses the "App of Apps" pattern via Root Applications
+4. Application developers create new apps through Backstage templates
+5. When an AD creates a new app via Backstage:
+   - A new `app-<name>` repository with Kustomize structure is created
+   - Backstage auto-commits Application CRs to `kensan-lab/infrastructure/argocd/applications/`
+   - Argo CD detects the new Application CRs and deploys to both Dev and Prod environments
 
-## 4. ネットワークとトラフィック管理
+## 4. Network and Traffic Management
 
-### Cilium LoadBalancer with L2アナウンス
+### Cilium LoadBalancer with L2 Announcements
 
-プラットフォームはCiliumの組み込みLoadBalancer機能とL2アナウンスを使用し、MetalLBを置き換えます：
+The platform uses Cilium's built-in LoadBalancer capability with L2 announcements, replacing MetalLB:
 
-- **IPプール**: `192.168.0.240-192.168.0.249`（`base-infra/cilium/lb-ippool.yaml`で定義）
-- **L2アナウンスインターフェース**: `wlan0`(家庭用wifiで機能)
-- **Lease管理**: リーダー選出にKubernetes lease APIを使用
-- **RBAC**: `coordination.k8s.io/leases`リソースへの適切な権限
+- **IP Pool**: `192.168.0.240-192.168.0.249` (defined in `infrastructure/network/cilium/resources/lb-ippool.yaml`)
+- **L2 Announcement Interfaces**: `wlan0` (functional on home WiFi)
+- **Lease Management**: Uses Kubernetes lease API for leader election
+- **RBAC**: Appropriate permissions for `coordination.k8s.io/leases` resources
 
-### Istioサービスメッシュ統合
+### Istio Service Mesh Integration
 
-- **Istio Gateway**: 環境ごと（Prod/Dev）に`base-infra/istio/`で定義
-  - `gateway-prod`: 本番環境用Gateway (HTTPS/TLS termination with cert-manager)
-  - `gateway-dev`: 開発環境用Gateway (HTTPS/TLS termination with cert-manager)
-- **HTTPRoute**: Kubernetes Gateway APIを使用したルーティング設定
-  - アプリケーションはHTTPRouteリソースで適切なGatewayにアタッチ
-  - パスベースルーティングとホストベースルーティングをサポート
-- **TLS証明書**: cert-managerがLet's Encryptから自動取得
-  - ワイルドカード証明書 (`*.your-org.com`) をRoute53 DNSチャレンジで管理
-  - 証明書は `wildcard-tls` Secretとして各環境Namespaceに配置
-- **認証/認可**: Keycloak JWT検証による外部トラフィック認証（実装予定）
-- **Authorization Policy**: アプリケーションごとの細かいアクセス制御（実装予定）
+- **Istio Gateway**: Defined per environment (Prod/Dev) in `infrastructure/network/istio/`
+  - `gateway-prod`: Production Gateway (HTTPS/TLS termination with cert-manager)
+  - `gateway-dev`: Development Gateway (HTTPS/TLS termination with cert-manager)
+- **HTTPRoute**: Routing configuration using Kubernetes Gateway API
+  - Applications attach to the appropriate Gateway via HTTPRoute resources
+  - Supports path-based and host-based routing
+- **TLS Certificates**: Automatically obtained from Let's Encrypt by cert-manager
+  - Wildcard certificates (`*.your-org.com`) managed via Route53 DNS challenge
+  - Certificates placed as `wildcard-tls` Secrets in each environment namespace
+- **Authentication/Authorization**: External traffic authentication via Keycloak JWT validation (planned)
+- **Authorization Policy**: Fine-grained access control per application (planned)
 
-## 5. シークレット管理戦略
+## 5. Secret Management Strategy
 
-- 機密シークレット（GHCR認証情報）はSealed Secretsで暗号化
-- Sealed SecretはGitに安全にコミット可能
-- クラスター内のSealed Secretsコントローラーが通常のK8s Secretsに復号化
-- アプリNamespace内のServiceAccountsがプライベートイメージpull用に`ghcr-pull-secret`を参照
+- Sensitive secrets (GHCR credentials) are encrypted with Sealed Secrets
+- Sealed Secrets can be safely committed to Git
+- The Sealed Secrets controller in the cluster decrypts them into regular K8s Secrets
+- ServiceAccounts in app namespaces reference `ghcr-pull-secret` for private image pulls
 
-## 6. 開発者エクスペリエンス
+## 6. Developer Experience
 
-### Backstage統合
+### Backstage Integration
 
-Backstageは`backstage` Namespace内にデプロイされ、以下のコンポーネントで構成されています：
+Backstage is deployed in the `backstage` namespace and consists of the following components:
 
-- **PostgreSQL StatefulSet**: Backstageのメタデータ永続化用データベース
-- **Backstage Deployment**: カスタムイメージ (`ghcr.io/your-org/backstage`) を使用
-- **HTTPRoute**: Istio Gateway経由での外部アクセス設定
-- **Sealed Secrets**: PostgreSQL認証情報とGitHub Personal Access Tokenを安全に管理
+- **PostgreSQL StatefulSet**: Database for Backstage metadata persistence
+- **Backstage Deployment**: Uses a custom image (`ghcr.io/your-org/backstage`)
+- **HTTPRoute**: External access configuration via Istio Gateway
+- **Sealed Secrets**: Securely manages PostgreSQL credentials and GitHub Personal Access Token
 
-#### 主要機能
+#### Key Features
 
-- **テンプレートスキャフォールディング**: ADがBackstageを使用してPE管理のテンプレートから新規アプリを作成（実装予定）
-- **自動GitOps**: BackstageがArgo CD Application CRを`goldship`に自動コミット（実装予定）
-- **TechDocs**: アプリケーションドキュメントがBackstage上で直接レンダリング（実装予定）
-- **カタログ**: すべてのアプリケーションがBackstageカタログに登録され、発見可能に（実装予定）
+- **Template Scaffolding**: ADs use Backstage to create new apps from PE-managed templates (planned)
+- **Automated GitOps**: Backstage auto-commits Argo CD Application CRs to `kensan-lab` (planned)
+- **TechDocs**: Application documentation rendered directly on Backstage (planned)
+- **Catalog**: All applications registered in the Backstage catalog for discoverability (planned)
 
-### 関心の分離
+### Separation of Concerns
 
-- **PEの責務**: インフラ、セキュリティ、テンプレート、プラットフォーム設定
-- **ADの責務**: アプリケーションコード、環境別設定（イメージタグ、レプリカ数）
-- **明確な境界**: ADはインフラを変更できず、他チームのリソースにもアクセス不可
+- **PE Responsibilities**: Infrastructure, security, templates, platform configuration
+- **AD Responsibilities**: Application code, environment-specific settings (image tags, replica counts)
+- **Clear Boundaries**: ADs cannot modify infrastructure or access other teams' resources
 
-## 7. モニタリングと可観測性
+## 7. Monitoring and Observability
 
-- **Prometheus**: すべてのクラスターコンポーネントとアプリケーションからメトリクス収集
-- **ServiceMonitor**: 各アプリケーションにServiceMonitor CRが含まれ、自動的にメトリクス収集
-- **Istioテレメトリー**: サービスメッシュが分散トレーシングと可観測性を提供
+- **Prometheus**: Collects metrics from all cluster components and applications
+- **ServiceMonitor**: Each application includes a ServiceMonitor CR for automatic metrics collection
+- **Istio Telemetry**: Service mesh provides distributed tracing and observability
 
-## 8. 設計原則
+## 8. Design Principles
 
-1. **GitOps優先**: すべての変更はGitコミットとArgo CD同期を経由
-2. **最小権限**: RBACが必要最小限の権限を強制
-3. **環境分離**: ProdとDev環境間の厳格な分離
-4. **セルフサービス**: ADがPEの介入なしでアプリケーションをデプロイ・管理可能
-5. **デフォルトでセキュア**: すべての外部エンドポイントでIstio + Keycloak認証
-6. **宣言的設定**: すべてのリソースをYAMLマニフェストで宣言的に定義
-7. **イミュータブルインフラ**: クラスターへの直接変更は一切行わない
+1. **GitOps First**: All changes go through Git commits and Argo CD sync
+2. **Least Privilege**: RBAC enforces minimum required permissions
+3. **Environment Isolation**: Strict separation between Prod and Dev environments
+4. **Self-Service**: ADs can deploy and manage applications without PE intervention
+5. **Secure by Default**: Istio + Keycloak authentication on all external endpoints
+6. **Declarative Configuration**: All resources defined declaratively in YAML manifests
+7. **Immutable Infrastructure**: No direct changes to the cluster
 
-## 9. 現在の実装状況
+## 9. Current Implementation Status
 
-### ✅ 実装完了
-- **Phase 1: クラスター初期化**
-  - Kubeadmによるクラスター構築
-  - Cilium CNI with LoadBalancer (L2アナウンス)
+### Completed
+
+- **Phase 1: Cluster Initialization**
+  - Cluster setup with kubeadm
+  - Cilium CNI with LoadBalancer (L2 announcements)
   - Sealed Secrets controller
-  - GHCR pull secrets (Prod/Dev環境)
+  - GHCR pull secrets (Prod/Dev environments)
 
-- **Phase 2: GitOps基盤**
-  - Argo CD デプロイ (LoadBalancer: 192.168.0.240)
+- **Phase 2: GitOps Foundation**
+  - Argo CD deployment (LoadBalancer: 192.168.0.240)
   - Argo CD Projects (platform-project, app-project-prod, app-project-dev)
-  - App-of-Apps パターン実装
-  - Namespace分離 (app-prod, app-dev)
+  - App-of-Apps pattern implementation
+  - Namespace separation (app-prod, app-dev)
 
-- **Phase 3: サービスメッシュ・認証基盤**
+- **Phase 3: Service Mesh and Authentication Foundation**
   - Istio Control Plane (`istio-system`)
   - Istio Gateway (Prod/Dev) with HTTPS/TLS termination
-  - cert-manager + Let's Encrypt (Route53 DNSチャレンジ)
-  - ワイルドカード証明書 (`*.your-org.com`) 自動管理
-  - Keycloak (Prod/Dev環境) デプロイ
-  - Backstage デプロイ (PostgreSQL + Backstage Deployment + HTTPRoute)
+  - cert-manager + Let's Encrypt (Route53 DNS challenge)
+  - Wildcard certificate (`*.your-org.com`) automatic management
+  - Keycloak (Prod/Dev environments) deployment
+  - Backstage deployment (PostgreSQL + Backstage Deployment + HTTPRoute)
 
-### 🚧 実装予定
-- **Phase 4: モニタリング**
-  - Prometheus デプロイ
-  - ServiceMonitor設定
-  - Grafana ダッシュボード
+### Planned
 
-- **Phase 5: 開発者エクスペリエンス**
-  - Backstage テンプレート作成 (backstage-app/templates/)
-  - Argo CD Application CR 自動生成機能
-  - TechDocs 統合
-  - Backstage Catalog 登録
+- **Phase 4: Monitoring**
+  - Prometheus deployment
+  - ServiceMonitor configuration
+  - Grafana dashboards
 
-- **Phase 6: アプリケーション検証**
-  - 新規アプリケーション作成フロー検証 (Dev/Prod)
-  - Istio + Keycloak JWT認証検証
-  - GitOps自動デプロイフロー検証
+- **Phase 5: Developer Experience**
+  - Backstage template creation (backstage-app/templates/)
+  - Argo CD Application CR auto-generation
+  - TechDocs integration
+  - Backstage Catalog registration
 
+- **Phase 6: Application Validation**
+  - New application creation flow validation (Dev/Prod)
+  - Istio + Keycloak JWT authentication validation
+  - GitOps automated deployment flow validation

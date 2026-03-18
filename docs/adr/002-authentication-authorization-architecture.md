@@ -1,265 +1,265 @@
-# ADR-002: 認証認可アーキテクチャの段階的実装
+# ADR-002: Phased Implementation of Authentication and Authorization Architecture
 
-## ステータス
+## Status
 
-採用済み (Accepted)
+Accepted
 
-## 日付
+## Date
 
 2025-11-08
 
-## コンテキスト
+## Context
 
-プラットフォームインフラサービス（Backstage、Argo CD、Grafana、Prometheus、Hubble UI、Keycloakなど）へのアクセス制御を実装する必要がある。
+Access control needs to be implemented for platform infrastructure services (Backstage, Argo CD, Grafana, Prometheus, Hubble UI, Keycloak, etc.).
 
-### 要件
+### Requirements
 
-1. **段階的な導入**: 開発初期は無認証で、徐々に認証・認可を強化
-2. **統合認証基盤**: Keycloakを中心とした統一的な認証体験
-3. **サービス特性への対応**: SPA、API、UIのみなど、各サービスの特性に応じた認証方式
-4. **将来的な拡張性**: 細かい権限制御（RBAC）への対応
-5. **運用性**: 新しいサービス追加時の認証設定が容易
+1. **Phased adoption**: Start with no authentication in early development, gradually strengthen auth
+2. **Unified authentication platform**: Unified authentication experience centered on Keycloak
+3. **Service-specific handling**: Authentication methods suited to each service's characteristics (SPA, API, UI-only)
+4. **Future extensibility**: Support for fine-grained permission control (RBAC)
+5. **Operability**: Easy authentication setup when adding new services
 
-### プラットフォームサービス一覧
+### Platform Service Inventory
 
-| サービス | URL | サービス特性 | 認可の必要性 |
+| Service | URL | Service Characteristics | Authorization Needs |
 |---------|-----|------------|------------|
-| Keycloak (Prod) | keycloak.platform.your-org.com | 認証サーバー | なし（自己認証） |
-| Keycloak (Dev) | keycloak-dev.platform.your-org.com | 認証サーバー | なし（自己認証） |
-| Backstage | backstage.platform.your-org.com | SPA + API | 高（Permission Framework） |
-| Argo CD | argocd.platform.your-org.com | UI + API | 高（RBAC） |
-| Grafana | grafana.platform.your-org.com | UI + API | 中（Role Mapping） |
-| Prometheus | prometheus.platform.your-org.com | UI + API | 低（全員同じ権限でOK） |
-| Hubble | hubble.platform.your-org.com | UI | 低（全員同じ権限でOK） |
+| Keycloak (Prod) | keycloak.platform.your-org.com | Auth server | None (self-authenticating) |
+| Keycloak (Dev) | keycloak-dev.platform.your-org.com | Auth server | None (self-authenticating) |
+| Backstage | backstage.platform.your-org.com | SPA + API | High (Permission Framework) |
+| Argo CD | argocd.platform.your-org.com | UI + API | High (RBAC) |
+| Grafana | grafana.platform.your-org.com | UI + API | Medium (Role Mapping) |
+| Prometheus | prometheus.platform.your-org.com | UI + API | Low (same permissions for everyone) |
+| Hubble | hubble.platform.your-org.com | UI | Low (same permissions for everyone) |
 
-### 検討した認証パターン
+### Authentication Patterns Considered
 
-#### パターンA: サービス個別認証
+#### Pattern A: Per-Service Authentication
 
-各サービスが独自にOIDC/OAuth2を実装
-
-```
-ブラウザ → Backstage (OIDC) → Keycloak
-ブラウザ → Argo CD (OIDC) → Keycloak
-ブラウザ → Grafana (OAuth2) → Keycloak
-ブラウザ → Prometheus (認証なし)
-```
-
-**メリット:**
-- 各サービスのネイティブ機能を最大限活用
-- サービス単位で障害が分離
-
-**デメリット:**
-- 各サービスでOIDC設定が必要（運用負荷）
-- Prometheus/Hubbleなど、OIDC非対応サービスは保護できない
-- 新サービス追加時に都度設定が必要
-
-#### パターンB: Gateway一括認証（OAuth2 Proxy）
-
-Istio GatewayでOAuth2 Proxyを使った一括認証（AWS ALB + Cognito風）
+Each service implements OIDC/OAuth2 independently
 
 ```
-ブラウザ → Istio Gateway → OAuth2 Proxy → Keycloak
-                              ↓ 認証済み
-                         すべてのサービス
+Browser -> Backstage (OIDC) -> Keycloak
+Browser -> Argo CD (OIDC) -> Keycloak
+Browser -> Grafana (OAuth2) -> Keycloak
+Browser -> Prometheus (no auth)
 ```
 
-**メリット:**
-- 一箇所で認証管理（運用が容易）
-- すべてのサービスが自動的に保護される
-- 新サービス追加時も設定不要
-- Prometheusなど非OIDC対応サービスも保護可能
-- 1回のログインで全サービスにアクセス可能（Cookie共有）
+**Pros:**
+- Maximizes each service's native capabilities
+- Failure isolation per service
 
-**デメリット:**
-- 各サービスのネイティブ認証機能は使えない
-- 細かい認可制御はアプリ側で実装が必要
-- OAuth2 Proxyが単一障害点（冗長化必要）
+**Cons:**
+- OIDC configuration needed for each service (operational burden)
+- Cannot protect non-OIDC services like Prometheus/Hubble
+- Configuration required for each new service
 
-#### パターンC: ハイブリッド（Gateway + サービス個別）
+#### Pattern B: Gateway-Level Authentication (OAuth2 Proxy)
 
-Gateway認証をベースに、必要なサービスのみ追加の認証・認可を実装
+Unified authentication at the Istio Gateway using OAuth2 Proxy (similar to AWS ALB + Cognito)
 
 ```
-ブラウザ → Istio Gateway → OAuth2 Proxy（認証Layer 1）
-                              ↓ JWT付与
-                         ┌────┴────┐
+Browser -> Istio Gateway -> OAuth2 Proxy -> Keycloak
+                              | Authenticated
+                         All services
+```
+
+**Pros:**
+- Authentication managed in one place (easy operations)
+- All services automatically protected
+- No configuration needed when adding new services
+- Non-OIDC services like Prometheus can also be protected
+- Single login provides access to all services (cookie sharing)
+
+**Cons:**
+- Cannot use each service's native auth features
+- Fine-grained authorization must be implemented at the app level
+- OAuth2 Proxy is a single point of failure (redundancy needed)
+
+#### Pattern C: Hybrid (Gateway + Per-Service)
+
+Gateway authentication as the base, with additional auth/authorization only for services that need it
+
+```
+Browser -> Istio Gateway -> OAuth2 Proxy (Auth Layer 1)
+                              | JWT issued
+                         +----+----+
                     Backstage    Prometheus
-                         ↓            ↓
-                    OIDC検証     そのまま信頼
-                  Permission      （認証済み）
+                         |            |
+                    OIDC verification  Trusted as-is
+                  Permission           (Authenticated)
                   Framework
-                  （認可Layer 2）
+                  (Auth Layer 2)
 ```
 
-**メリット:**
-- パターンBのメリットを全て享受
-- 必要なサービスのみ細かい認可制御を追加可能
-- 段階的な導入が容易（Phase 2 → Phase 3）
-- OAuth2 ProxyがJWTを転送するため、サービス側で再利用可能
+**Pros:**
+- All benefits of Pattern B
+- Fine-grained authorization can be added only where needed
+- Easy phased adoption (Phase 2 -> Phase 3)
+- OAuth2 Proxy forwards JWT, allowing downstream services to reuse it
 
-**デメリット:**
-- 最も複雑（ただし段階的に構築可能）
+**Cons:**
+- Most complex (but can be built incrementally)
 
-## 決定事項
+## Decision
 
-**パターンC: ハイブリッド認証（Gateway + サービス個別）を採用する**
+**Adopt Pattern C: Hybrid Authentication (Gateway + Per-Service)**
 
-### 段階的実装フェーズ
+### Phased Implementation
 
-#### Phase 1: 無認証（現状）
+#### Phase 1: No Authentication (Current State)
 
 ```yaml
-状態: すべてのサービスが無認証でアクセス可能
-期間: 開発初期
-用途: プラットフォーム構築と動作確認
+State: All services accessible without authentication
+Duration: Early development
+Purpose: Platform construction and verification
 ```
 
-#### Phase 2: Gateway一括認証（OAuth2 Proxy）
+#### Phase 2: Gateway-Level Authentication (OAuth2 Proxy)
 
 ```
-ブラウザ → Istio Gateway (gateway-platform)
-              ↓
-         OAuth2 Proxy (ExtAuthz) ←→ Keycloak
-              ↓ 認証済み（JWT付与）
-         ┌────┴────┬─────────┬──────────┐
+Browser -> Istio Gateway (gateway-platform)
+              |
+         OAuth2 Proxy (ExtAuthz) <-> Keycloak
+              | Authenticated (JWT issued)
+         +----+----+----------+---------+
     Backstage  Prometheus  Argo CD  Grafana
-         ↓          ↓         ↓        ↓
-    ヘッダー    ヘッダー   ヘッダー  ヘッダー
-    読み取り    読み取り   読み取り  読み取り
+         |          |         |        |
+    Header      Header     Header   Header
+    read        read       read     read
 ```
 
-**実装内容:**
-- OAuth2 Proxyデプロイ（auth-system namespace）
-- Istio ExtAuthz設定（EnvoyFilter）
-- Keycloak Realm `platform` 作成
-- OAuth2 Proxy用Client作成
-- 基本的なRole/Group設定（platform-admin）
+**Implementation:**
+- Deploy OAuth2 Proxy (auth-system namespace)
+- Configure Istio ExtAuthz (EnvoyFilter)
+- Create Keycloak Realm `platform`
+- Create OAuth2 Proxy Client
+- Basic Role/Group setup (platform-admin)
 
-**効果:**
-- ✅ すべてのサービスが自動的に保護される
-- ✅ 1回のログインで全サービスアクセス可能
-- ✅ 運用負荷が最小
+**Benefits:**
+- All services automatically protected
+- Single login provides access to all services
+- Minimal operational burden
 
-**各サービスの対応:**
-- OAuth2 Proxyから `Authorization: Bearer <JWT>` ヘッダーを受け取る
-- `X-Auth-Request-User`, `X-Auth-Request-Email` ヘッダーを信頼
-- 認可は行わない（全員が全機能にアクセス可能）
+**Per-Service Handling:**
+- Receives `Authorization: Bearer <JWT>` header from OAuth2 Proxy
+- Trusts `X-Auth-Request-User`, `X-Auth-Request-Email` headers
+- No authorization performed (everyone has full access)
 
-#### Phase 3: 多層認証（Gateway + サービス個別認可）
+#### Phase 3: Multi-Layer Authentication (Gateway + Per-Service Authorization)
 
 ```
-ブラウザ → Istio Gateway → OAuth2 Proxy（認証Layer 1）
-                              ↓ JWT付与
-         ┌────────────────────┴─────────────────┐
+Browser -> Istio Gateway -> OAuth2 Proxy (Auth Layer 1)
+                              | JWT issued
+         +--------------------+---------------------+
     Backstage                            Prometheus
-         ↓                                    ↓
-    Proxy Provider                       変更なし
-    （JWT検証）                          （Phase 2のまま）
-         ↓
+         |                                    |
+    Proxy Provider                       No change
+    (JWT verification)                  (Remains at Phase 2)
+         |
     Permission Framework
-    （認可Layer 2）
-         ↓
-    細かい権限制御
-    - カタログ読み取り: 全員
-    - テンプレート実行: Developers
-    - カタログ削除: Platform Engineers
+    (Auth Layer 2)
+         |
+    Fine-grained permissions
+    - Catalog read: Everyone
+    - Template execution: Developers
+    - Catalog deletion: Platform Engineers
 ```
 
-**実装内容（サービス毎に段階的に）:**
+**Implementation (per service, incrementally):**
 
 1. **Backstage**:
    ```typescript
-   // auth-backend-module-proxy-provider 追加
-   // Permission Framework 有効化
-   // Keycloak groupsクレームに基づくRBAC
+   // Add auth-backend-module-proxy-provider
+   // Enable Permission Framework
+   // RBAC based on Keycloak groups claim
    ```
 
 2. **Argo CD**:
    ```yaml
-   # OIDC設定追加
-   # JWT検証
-   # policy.csv でロールマッピング
+   # Add OIDC configuration
+   # JWT verification
+   # Role mapping via policy.csv
    ```
 
 3. **Grafana**:
    ```yaml
-   # Generic OAuth設定
-   # role_attribute_path でロールマッピング
+   # Generic OAuth configuration
+   # Role mapping via role_attribute_path
    ```
 
 4. **Prometheus/Hubble**:
-   - 変更なし（Phase 2のOAuth2 Proxyのみで十分）
+   - No changes (OAuth2 Proxy from Phase 2 is sufficient)
 
-**効果:**
-- ✅ OAuth2 Proxyの設定は変更不要
-- ✅ 必要なサービスのみ細かい認可を追加
-- ✅ JWT検証が2回行われる（多層防御）
-- ✅ サービス毎に段階的に移行可能
+**Benefits:**
+- No changes needed to OAuth2 Proxy configuration
+- Fine-grained authorization added only to services that need it
+- JWT verification occurs twice (defense in depth)
+- Can migrate service by service incrementally
 
-### 認証方式の使い分け
+### Authentication Method by Service
 
-| サービス | Phase 2 | Phase 3 | 理由 |
+| Service | Phase 2 | Phase 3 | Rationale |
 |---------|---------|---------|------|
-| **Backstage** | OAuth2 Proxy | OAuth2 Proxy + Proxy Provider + Permission Framework | SPA、細かい権限必要 |
-| **Argo CD** | OAuth2 Proxy | OAuth2 Proxy + OIDC + RBAC | ネイティブRBACサポート良好 |
-| **Grafana** | OAuth2 Proxy | OAuth2 Proxy + Generic OAuth + Role Mapping | ロールマッピング必要 |
-| **Prometheus** | OAuth2 Proxy | **変更なし** | OIDC非対応、全員同じ権限でOK |
-| **Hubble** | OAuth2 Proxy | **変更なし** | OIDC非対応、全員同じ権限でOK |
+| **Backstage** | OAuth2 Proxy | OAuth2 Proxy + Proxy Provider + Permission Framework | SPA, needs fine-grained permissions |
+| **Argo CD** | OAuth2 Proxy | OAuth2 Proxy + OIDC + RBAC | Good native RBAC support |
+| **Grafana** | OAuth2 Proxy | OAuth2 Proxy + Generic OAuth + Role Mapping | Role mapping needed |
+| **Prometheus** | OAuth2 Proxy | **No change** | No OIDC support, same permissions for everyone |
+| **Hubble** | OAuth2 Proxy | **No change** | No OIDC support, same permissions for everyone |
 
-## 理由
+## Rationale
 
-### ハイブリッド方式を選択した理由
+### Why the Hybrid Approach Was Chosen
 
-#### 1. 段階的導入が容易
+#### 1. Easy Phased Adoption
 
-**Phase 1 → Phase 2:**
+**Phase 1 -> Phase 2:**
 ```bash
-# OAuth2 Proxyをデプロイするだけ
-kubectl apply -f base-infra/oauth2-proxy/
-kubectl apply -f base-infra/istio/oauth2-proxy-extauthz.yaml
+# Just deploy OAuth2 Proxy
+kubectl apply -f infrastructure/oauth2-proxy/
+kubectl apply -f infrastructure/network/istio/oauth2-proxy-extauthz.yaml
 
-# すべてのサービスが自動的に保護される
-# 各サービスの設定変更は不要
+# All services are automatically protected
+# No configuration changes needed per service
 ```
 
-**Phase 2 → Phase 3:**
+**Phase 2 -> Phase 3:**
 ```bash
-# サービス毎に段階的に移行
-# 1. Backstageだけ先に移行
-kubectl apply -f base-infra/backstage/
-# OAuth2 Proxyは変更不要
+# Migrate service by service
+# 1. Backstage first
+kubectl apply -f backstage/manifests/
+# OAuth2 Proxy unchanged
 
-# 2. 次にArgo CD
-kubectl apply -f base-infra/argocd/
-# OAuth2 Proxyは変更不要
+# 2. Then Argo CD
+kubectl apply -f infrastructure/gitops/argocd/
+# OAuth2 Proxy unchanged
 
-# Prometheus/Hubbleは移行不要（Phase 2のまま）
+# Prometheus/Hubble need no migration (stays at Phase 2)
 ```
 
-#### 2. 運用負荷の最小化
+#### 2. Minimal Operational Burden
 
-- **Phase 2**: 一箇所（OAuth2 Proxy）で認証管理
-- **Phase 3**: 必要なサービスのみ追加設定
-- 新サービス追加時は自動的にOAuth2 Proxyで保護される
+- **Phase 2**: Authentication managed in one place (OAuth2 Proxy)
+- **Phase 3**: Additional configuration only for services that need it
+- New services are automatically protected by OAuth2 Proxy
 
-#### 3. 多層防御の実現
+#### 3. Defense in Depth
 
 ```
-Layer 1（Gateway）: OAuth2 Proxy
-  - 無効なJWTを早期に排除
-  - すべてのサービスに対する基本的な保護
+Layer 1 (Gateway): OAuth2 Proxy
+  - Rejects invalid JWTs early
+  - Basic protection for all services
 
-Layer 2（Application）: サービス個別認可
-  - JWTを再検証
-  - 細かいリソースレベルの権限制御
+Layer 2 (Application): Per-service authorization
+  - Re-verifies JWT
+  - Fine-grained resource-level permission control
   - Backstage Permission Framework
   - Argo CD RBAC
 ```
 
-#### 4. JWTの再利用
+#### 4. JWT Reuse
 
-OAuth2 Proxyは以下の設定でJWTを下流に転送:
+OAuth2 Proxy forwards JWT to downstream services with these settings:
 
 ```yaml
 args:
@@ -268,69 +268,69 @@ args:
 - --set-authorization-header=true
 ```
 
-各サービスは `Authorization: Bearer <JWT>` ヘッダーを受け取り:
-- Phase 2: ヘッダーを読み取るだけ（検証しない）
-- Phase 3: JWTを検証 + groupsクレームで認可
+Each service receives the `Authorization: Bearer <JWT>` header:
+- Phase 2: Just reads the header (no verification)
+- Phase 3: Verifies JWT + authorizes based on groups claim
 
-**OAuth2 Proxyは邪魔にならない** → JWTをパスするだけ
+**OAuth2 Proxy stays out of the way** -- it just passes the JWT through
 
-#### 5. サービス特性への対応
+#### 5. Handling Service-Specific Characteristics
 
-| サービス特性 | 対応方法 |
+| Service Characteristic | Approach |
 |------------|----------|
-| **OIDC対応（Backstage/Argo CD/Grafana）** | Phase 3で個別OIDC実装 |
-| **OIDC非対応（Prometheus/Hubble）** | Phase 2のOAuth2 Proxyのみ |
-| **細かい認可必要（Backstage/Argo CD）** | Phase 3でPermission Framework/RBAC |
-| **認可不要（Prometheus/Hubble）** | Phase 2のまま |
+| **OIDC-capable (Backstage/Argo CD/Grafana)** | Individual OIDC implementation in Phase 3 |
+| **Non-OIDC (Prometheus/Hubble)** | OAuth2 Proxy only from Phase 2 |
+| **Fine-grained authorization needed (Backstage/Argo CD)** | Permission Framework/RBAC in Phase 3 |
+| **No authorization needed (Prometheus/Hubble)** | Stays at Phase 2 |
 
-### パターンA（サービス個別認証）を見送った理由
+### Why Pattern A (Per-Service Authentication) Was Not Chosen
 
-1. **Prometheus/Hubble が保護できない**
-   - OIDC実装がない
-   - Basic認証では不十分
+1. **Cannot protect Prometheus/Hubble**
+   - No OIDC implementation
+   - Basic auth is insufficient
 
-2. **運用負荷が高い**
-   - 各サービスでOIDC設定が必要
-   - 新サービス追加時に都度設定
+2. **High operational burden**
+   - OIDC configuration needed for each service
+   - Configuration required for each new service
 
-3. **ユーザー体験が悪い**
-   - サービス毎にリダイレクトの可能性
-   - Cookie/Sessionが共有されない
+3. **Poor user experience**
+   - Potential redirects per service
+   - Cookies/Sessions not shared
 
-### パターンB（Gateway認証のみ）を見送った理由
+### Why Pattern B (Gateway Authentication Only) Was Not Chosen
 
-Phase 2ではパターンBを採用するが、将来的に以下の課題がある:
+Pattern B is adopted for Phase 2, but has the following limitations long-term:
 
-1. **細かい認可ができない**
-   - Backstageで「テンプレート実行は開発者のみ」などの制御が不可能
-   - Argo CDで「本番デプロイはPlatform Engineersのみ」などの制御が不可能
+1. **Cannot do fine-grained authorization**
+   - Cannot control "only developers can execute templates" in Backstage
+   - Cannot control "only Platform Engineers can deploy to production" in Argo CD
 
-2. **各サービスの機能を活かせない**
-   - Backstage Permission Frameworkが使えない
-   - Argo CD RBACが使えない
+2. **Cannot leverage service-specific features**
+   - Cannot use Backstage Permission Framework
+   - Cannot use Argo CD RBAC
 
-→ **Phase 3でハイブリッド化することで解決**
+-> **Resolved by hybridizing in Phase 3**
 
-## 実装詳細
+## Implementation Details
 
-### Keycloak Realm設計
+### Keycloak Realm Design
 
 ```yaml
 Realm: platform
 
 Clients:
   - oauth2-proxy-client (Confidential, Standard Flow)
-    # OAuth2 Proxy用
+    # For OAuth2 Proxy
     # Redirect URI: https://auth.platform.your-org.com/oauth2/callback
 
-  - backstage-client (Confidential, Standard Flow) # Phase 3で使用
-  - argocd-client (Confidential, Standard Flow)    # Phase 3で使用
-  - grafana-client (Confidential, Standard Flow)   # Phase 3で使用
+  - backstage-client (Confidential, Standard Flow) # Used in Phase 3
+  - argocd-client (Confidential, Standard Flow)    # Used in Phase 3
+  - grafana-client (Confidential, Standard Flow)   # Used in Phase 3
 
 Roles:
-  - platform-admin     # すべてのサービスにフルアクセス
-  - platform-developer # 限定的なアクセス
-  - platform-viewer    # 読み取りのみ
+  - platform-admin     # Full access to all services
+  - platform-developer # Limited access
+  - platform-viewer    # Read-only
 
 Groups:
   - platform-engineers
@@ -347,7 +347,7 @@ Users:
     groups: [platform-engineers]
 ```
 
-### OAuth2 Proxy設定（Phase 2）
+### OAuth2 Proxy Configuration (Phase 2)
 
 ```yaml
 apiVersion: apps/v1
@@ -366,22 +366,22 @@ spec:
     - --client-id=oauth2-proxy-client
     - --client-secret=$(CLIENT_SECRET)
 
-    # Cookie設定（全サブドメインで共有）
+    # Cookie settings (shared across all subdomains)
     - --cookie-name=_oauth2_proxy
     - --cookie-secure=true
     - --cookie-domain=.platform.your-org.com
 
-    # JWT転送（Phase 3で使用）
+    # JWT forwarding (used in Phase 3)
     - --pass-access-token=true
     - --pass-authorization-header=true
     - --set-authorization-header=true
 
-    # 認証設定
+    # Authentication settings
     - --email-domain=*
     - --skip-provider-button=true
 ```
 
-### Istio ExtAuthz設定（Phase 2）
+### Istio ExtAuthz Configuration (Phase 2)
 
 ```yaml
 # Istio ConfigMap
@@ -398,7 +398,7 @@ extensionProviders:
     - x-auth-request-access-token
 
 ---
-# AuthorizationPolicy（すべてのリクエストを認証）
+# AuthorizationPolicy (authenticate all requests)
 apiVersion: security.istio.io/v1
 kind: AuthorizationPolicy
 metadata:
@@ -412,10 +412,10 @@ spec:
   provider:
     name: oauth2-proxy
   rules:
-  - {}  # すべてのリクエスト
+  - {}  # All requests
 
 ---
-# 例外パス（認証スキップ）
+# Exception paths (skip authentication)
 apiVersion: security.istio.io/v1
 kind: AuthorizationPolicy
 metadata:
@@ -424,13 +424,13 @@ metadata:
 spec:
   action: ALLOW
   rules:
-  # OAuth2 Proxyコールバック
+  # OAuth2 Proxy callback
   - to:
     - operation:
         hosts: ["auth.platform.your-org.com"]
         paths: ["/oauth2/*"]
 
-  # Keycloak（認証サーバー自体）
+  # Keycloak (the auth server itself)
   - to:
     - operation:
         hosts:
@@ -438,21 +438,21 @@ spec:
         - "keycloak-dev.platform.your-org.com"
 ```
 
-### Backstage設定（Phase 3）
+### Backstage Configuration (Phase 3)
 
 ```yaml
 # app-config.kubernetes.yaml
 auth:
   environment: production
   providers:
-    # OAuth2 Proxyからのヘッダーを信頼
+    # Trust headers from OAuth2 Proxy
     proxy:
       signIn:
         resolvers:
         - resolver: forwardedUserMatchingUserEntityEmail
 
 permission:
-  enabled: true  # Phase 3で有効化
+  enabled: true  # Enable in Phase 3
 ```
 
 ```typescript
@@ -461,12 +461,12 @@ export class PlatformPermissionPolicy implements PermissionPolicy {
   async handle(request, user): Promise<PolicyDecision> {
     const groups = user?.identity.ownershipEntityRefs || [];
 
-    // Platform Engineers: すべて許可
+    // Platform Engineers: Allow everything
     if (groups.includes('group:default/platform-engineers')) {
       return { result: AuthorizeResult.ALLOW };
     }
 
-    // App Developers: 制限付きアクセス
+    // App Developers: Limited access
     if (groups.includes('group:default/app-developers')) {
       if (
         request.permission === catalogEntityReadPermission ||
@@ -482,169 +482,169 @@ export class PlatformPermissionPolicy implements PermissionPolicy {
 }
 ```
 
-## 結果
+## Consequences
 
-### 認証フロー（Phase 2）
+### Authentication Flow (Phase 2)
 
 ```
-1. ユーザー → https://backstage.platform.your-org.com
+1. User -> https://backstage.platform.your-org.com
 
-2. Istio Gateway → OAuth2 Proxyに認証確認
+2. Istio Gateway -> Check authentication with OAuth2 Proxy
    GET /oauth2/auth
    Headers: Cookie, X-Forwarded-*
 
-3-A. Cookie有効（認証済み）:
-   OAuth2 Proxy → 200 OK
+3-A. Valid cookie (authenticated):
+   OAuth2 Proxy -> 200 OK
    Headers:
      Authorization: Bearer <JWT>
      X-Auth-Request-User: admin@example.com
      X-Auth-Request-Email: admin@example.com
 
-   → Backstageにリクエスト転送
-   → Backstage: ヘッダー読み取り（検証なし）
-   → レスポンス返却
+   -> Forward request to Backstage
+   -> Backstage: Read headers (no verification)
+   -> Return response
 
-3-B. Cookie無効（未認証）:
-   OAuth2 Proxy → 302 Redirect
+3-B. Invalid cookie (unauthenticated):
+   OAuth2 Proxy -> 302 Redirect
    Location: https://keycloak.platform.your-org.com/realms/platform/...
 
-   → Keycloakでログイン
-   → OAuth2 Proxyがトークン取得
-   → Cookie設定
-   → 元のURLにリダイレクト
-   → 3-Aのフローへ
+   -> Login at Keycloak
+   -> OAuth2 Proxy obtains token
+   -> Set cookie
+   -> Redirect to original URL
+   -> Proceed to flow 3-A
 ```
 
-### 認証フロー（Phase 3 - Backstage例）
+### Authentication Flow (Phase 3 - Backstage Example)
 
 ```
-1. ユーザー → https://backstage.platform.your-org.com
+1. User -> https://backstage.platform.your-org.com
 
-2. OAuth2 Proxy（Layer 1）:
-   - Cookie検証
-   - JWT付与: Authorization: Bearer <JWT>
+2. OAuth2 Proxy (Layer 1):
+   - Cookie verification
+   - JWT issued: Authorization: Bearer <JWT>
 
-3. Backstage（Layer 2）:
-   - Authorizationヘッダー受信
-   - JWTデコード: { email: "admin@example.com", groups: ["platform-engineers"] }
-   - Keycloak公開鍵でJWT検証
-   - Permission Framework: groupsに基づいて認可判定
+3. Backstage (Layer 2):
+   - Receives Authorization header
+   - JWT decoded: { email: "admin@example.com", groups: ["platform-engineers"] }
+   - JWT verified with Keycloak public key
+   - Permission Framework: Authorization decision based on groups
 
-   例: catalogEntityDeletePermission
-   → groups.includes('platform-engineers') → ALLOW
-   → groups.includes('app-developers') → DENY
+   Example: catalogEntityDeletePermission
+   -> groups.includes('platform-engineers') -> ALLOW
+   -> groups.includes('app-developers') -> DENY
 ```
 
-### メリット
+### Benefits
 
-1. **段階的導入**
-   - Phase 1: 無認証（開発）
-   - Phase 2: Gateway認証（一括保護）
-   - Phase 3: 多層認証（細かい権限）
+1. **Phased Adoption**
+   - Phase 1: No authentication (development)
+   - Phase 2: Gateway authentication (blanket protection)
+   - Phase 3: Multi-layer authentication (fine-grained permissions)
 
-2. **運用負荷の最小化**
-   - Phase 2: 一箇所で認証管理
-   - Phase 3: 必要なサービスのみ追加設定
-   - OAuth2 Proxyの設定変更不要
+2. **Minimal Operational Burden**
+   - Phase 2: Authentication managed in one place
+   - Phase 3: Additional configuration only for services that need it
+   - No changes to OAuth2 Proxy configuration
 
-3. **柔軟性**
-   - サービス特性に応じた認証方式
-   - Prometheus/Hubbleは Phase 2のまま
-   - Backstage/Argo CDは Phase 3で細かい認可
+3. **Flexibility**
+   - Authentication methods suited to service characteristics
+   - Prometheus/Hubble stay at Phase 2
+   - Backstage/Argo CD get fine-grained authorization in Phase 3
 
-4. **多層防御**
-   - Gateway: 無効なJWT早期排除
-   - Application: リソースレベル認可
+4. **Defense in Depth**
+   - Gateway: Early rejection of invalid JWTs
+   - Application: Resource-level authorization
 
-5. **ユーザー体験**
-   - 1回のログインで全サービスアクセス
-   - Cookie共有（.platform.your-org.com）
+5. **User Experience**
+   - Single login provides access to all services
+   - Cookie sharing (.platform.your-org.com)
 
-### デメリットと対策
+### Drawbacks and Mitigations
 
-1. **複雑性の増加**
-   - 対策: 段階的に構築（Phase 1 → 2 → 3）
-   - Phase 2までは非常にシンプル
+1. **Increased Complexity**
+   - Mitigation: Build incrementally (Phase 1 -> 2 -> 3)
+   - Very simple up through Phase 2
 
-2. **OAuth2 Proxyが単一障害点**
-   - 対策: レプリカ数2で冗長化
-   - PodDisruptionBudgetで可用性確保
+2. **OAuth2 Proxy as Single Point of Failure**
+   - Mitigation: 2 replicas for redundancy
+   - PodDisruptionBudget for availability
 
-3. **パフォーマンスオーバーヘッド**
-   - ExtAuthz呼び出しのレイテンシ
-   - 対策: OAuth2 Proxyをistio-system namespaceに配置（近接性）
-   - 対策: Cookieキャッシュにより認証済みリクエストは高速
+3. **Performance Overhead**
+   - ExtAuthz call latency
+   - Mitigation: Place OAuth2 Proxy in istio-system namespace (proximity)
+   - Mitigation: Cookie caching makes authenticated requests fast
 
-4. **デバッグの難しさ**
-   - 対策: 各レイヤーでログ出力
+4. **Debugging Difficulty**
+   - Mitigation: Log output at each layer
    - OAuth2 Proxy: `--auth-logging=true`
-   - Backstage: Permission Frameworkログ
+   - Backstage: Permission Framework logs
 
-### トレードオフ
+### Trade-offs
 
-**複雑性 vs 柔軟性**
+**Complexity vs Flexibility**
 
-- ✅ 採用: Phase 2でシンプルに開始、Phase 3で柔軟性を追加
-- ❌ 不採用: 最初から全サービスOIDC実装（運用負荷大）
-- ❌ 不採用: Gateway認証のみ（細かい認可不可）
+- Adopted: Start simple with Phase 2, add flexibility in Phase 3
+- Not adopted: OIDC implementation for all services from the start (high operational burden)
+- Not adopted: Gateway authentication only (cannot do fine-grained authorization)
 
-**多層防御 vs パフォーマンス**
+**Defense in Depth vs Performance**
 
-- ✅ 採用: 2回のJWT検証（Gateway + Application）
-- ❌ 不採用: 1回のみの検証（セキュリティ低下）
+- Adopted: Two rounds of JWT verification (Gateway + Application)
+- Not adopted: Single verification only (reduced security)
 
-本環境では、以下の理由によりハイブリッド方式が適切:
-- プラットフォームサービスは管理者・開発者が使用（セキュリティ重要）
-- 段階的導入により開発初期の負荷を軽減
-- 将来的な細かい権限制御に対応
+The hybrid approach is appropriate for this environment because:
+- Platform services are used by administrators and developers (security matters)
+- Phased adoption reduces burden during early development
+- Supports fine-grained permission control in the future
 
-## 実装ロードマップ
+## Implementation Roadmap
 
-### Phase 1: 現状維持（完了）
-- すべて無認証
-- プラットフォーム構築に集中
+### Phase 1: Maintain Current State (Complete)
+- Everything without authentication
+- Focus on platform construction
 
-### Phase 2: Gateway認証（2週間後）
+### Phase 2: Gateway Authentication (2 weeks out)
 
 **Week 1:**
-1. Keycloak Realm `platform` 作成
-2. OAuth2 Proxy用Client作成
-3. Admin user/group作成
-4. Client Secretsの取得
+1. Create Keycloak Realm `platform`
+2. Create OAuth2 Proxy Client
+3. Create admin user/group
+4. Obtain Client Secrets
 
 **Week 2:**
-1. OAuth2 Proxy Deployment/Service作成
-2. Sealed Secretsで秘密情報管理
-3. HTTPRoute（auth.platform.your-org.com）作成
-4. Istio ExtAuthz設定
-5. 動作確認
+1. Create OAuth2 Proxy Deployment/Service
+2. Manage secrets with Sealed Secrets
+3. Create HTTPRoute (auth.platform.your-org.com)
+4. Configure Istio ExtAuthz
+5. Verify functionality
 
-**成果:**
-- すべてのサービスが保護される
-- 1回のログインで全サービスアクセス可能
+**Outcome:**
+- All services protected
+- Single login provides access to all services
 
-### Phase 3: 多層認証（1ヶ月後以降、段階的に）
+### Phase 3: Multi-Layer Authentication (1 month out, incrementally)
 
 **Month 1: Backstage**
-1. Proxy Providerモジュール追加
-2. Permission Framework有効化
-3. カスタムポリシー実装
-4. groupsクレームベースのRBAC
+1. Add Proxy Provider module
+2. Enable Permission Framework
+3. Implement custom policy
+4. Groups claim-based RBAC
 
 **Month 2: Argo CD**
-1. OIDC設定追加
-2. policy.csvでロールマッピング
-3. 動作確認
+1. Add OIDC configuration
+2. Role mapping via policy.csv
+3. Verify functionality
 
 **Month 3: Grafana**
-1. Generic OAuth設定
-2. role_attribute_pathでロールマッピング
-3. 動作確認
+1. Generic OAuth configuration
+2. Role mapping via role_attribute_path
+3. Verify functionality
 
 **Prometheus/Hubble:**
-- 変更なし（Phase 2のまま）
+- No changes (stays at Phase 2)
 
-## 参考資料
+## References
 
 - [OAuth2 Proxy Documentation](https://oauth2-proxy.github.io/oauth2-proxy/)
 - [Istio External Authorization](https://istio.io/latest/docs/tasks/security/authorization/authz-custom/)

@@ -1,4 +1,4 @@
-# ADR-004: NetworkPolicy 設計
+# ADR-004: NetworkPolicy Design
 
 ## Status
 
@@ -10,82 +10,82 @@ Accepted
 
 ## Context
 
-goldship クラスタは Cilium を CNI として使用しており、NetworkPolicy の enforce 機能が利用可能である。しかし、これまで NetworkPolicy は 1 つも定義されておらず、全 namespace 間の通信が無制限に許可されていた。
+The kensan-lab cluster uses Cilium as its CNI and has NetworkPolicy enforcement capabilities available. However, no NetworkPolicy has been defined so far, leaving unrestricted communication permitted between all namespaces.
 
-gitops-evaluation-report.md で「P1 (Critical): NetworkPolicy が存在しない」と指摘されており、セキュリティ強化の一環として導入する。
+The gitops-evaluation-report.md flagged "P1 (Critical): No NetworkPolicy exists," and this is being introduced as part of security hardening.
 
 ## Decision
 
-### 1. Default-Deny + Allow パターン
+### 1. Default-Deny + Allow Pattern
 
-各対象 namespace に default-deny（ingress + egress 両方）を配置し、必要な通信のみを明示的に許可する。
+Place default-deny (both ingress and egress) in each target namespace, explicitly allowing only necessary communication.
 
-### 2. 信頼インフラ層（NetworkPolicy 対象外）
+### 2. Trusted Infrastructure Layer (NetworkPolicy Exempt)
 
-以下の 4 namespace は NetworkPolicy を適用しない：
+The following 4 namespaces are exempt from NetworkPolicy:
 
-| Namespace | 理由 |
+| Namespace | Reason |
 |-----------|------|
-| **kube-system** | Cilium（CNI）自身が動作する。default-deny を適用すると NetworkPolicy の enforce 機構自体が壊れる可能性がある |
-| **istio-system** | istiod は全 sidecar 注入 namespace に xDS config を push する。対象 namespace が増えるたびにポリシー更新が必要になり運用コストが高い |
-| **monitoring** | Prometheus は全 namespace をスクレイプし、OTel Collector は全 namespace からデータを受信する。monitoring の egress を制限すると新しい namespace 追加のたびにポリシー更新が必要 |
-| **argocd** | Argo CD は Kubernetes API server、GitHub、Helm registries と通信する。Cilium kube-proxy replacement 環境では `kubernetes.default.svc` への egress が namespaceSelector では制御できず、NetworkPolicy が API server 通信をブロックしてしまう |
+| **kube-system** | Cilium (CNI) itself runs here. Applying default-deny could break the NetworkPolicy enforcement mechanism itself |
+| **istio-system** | istiod pushes xDS config to all sidecar-injected namespaces. Policy updates would be needed every time a target namespace is added, causing high operational costs |
+| **monitoring** | Prometheus scrapes all namespaces and OTel Collector receives data from all namespaces. Restricting monitoring egress would require policy updates with every new namespace |
+| **argocd** | Argo CD communicates with the Kubernetes API server, GitHub, and Helm registries. In a Cilium kube-proxy replacement environment, egress to `kubernetes.default.svc` cannot be controlled with namespaceSelector, and NetworkPolicy would block API server communication |
 
-これらは PSS で `privileged`（kube-system）または `baseline`（istio-system, monitoring, argocd）が適用されており、別のレイヤーで保護されている。
+These are protected at another layer with PSS: `privileged` (kube-system) or `baseline` (istio-system, monitoring, argocd).
 
-### 3. 標準 Kubernetes NetworkPolicy を使用
+### 3. Use Standard Kubernetes NetworkPolicy
 
-CiliumNetworkPolicy（L7 フィルタリング、DNS-based policy 等）ではなく、標準の `networking.k8s.io/v1` NetworkPolicy を使用する。
+Use standard `networking.k8s.io/v1` NetworkPolicy rather than CiliumNetworkPolicy (L7 filtering, DNS-based policy, etc.).
 
-理由：
-- ポータビリティ（Cilium 以外の CNI でも動作）
-- Kubernetes ネイティブのリソースであり、学習コストが低い
-- L3/L4 レベルの制御で現時点では十分
+Rationale:
+- Portability (works with CNIs other than Cilium)
+- Native Kubernetes resource with lower learning curve
+- L3/L4 level control is sufficient for current needs
 
-将来的に L7 レベルの制御（HTTP パスベース、DNS ベース）が必要になった場合に CiliumNetworkPolicy への移行を検討する。
+Consider migrating to CiliumNetworkPolicy in the future if L7 level control (HTTP path-based, DNS-based) becomes necessary.
 
-### 4. 共通ポリシーパターン
+### 4. Common Policy Patterns
 
-全対象 namespace に以下の共通ポリシーを配置：
+The following common policies are placed in all target namespaces:
 
-| ポリシー名 | 種別 | 内容 |
+| Policy Name | Type | Content |
 |-----------|------|------|
-| `default-deny-all` | Ingress + Egress | 全通信を拒否（ベースライン） |
-| `allow-dns` | Egress | kube-system:53/UDP,TCP を許可 |
-| `allow-intra-namespace` | Ingress + Egress | 同一 namespace 内の Pod 間通信を許可 |
-| `allow-prometheus-scrape` | Ingress | monitoring namespace からのスクレイプを許可 |
+| `default-deny-all` | Ingress + Egress | Deny all traffic (baseline) |
+| `allow-dns` | Egress | Allow kube-system:53/UDP,TCP |
+| `allow-intra-namespace` | Ingress + Egress | Allow Pod-to-Pod communication within the same namespace |
+| `allow-prometheus-scrape` | Ingress | Allow scraping from the monitoring namespace |
 
-Istio sidecar 注入 namespace には追加で：
+For Istio sidecar-injected namespaces, additionally:
 
-| ポリシー名 | 種別 | 内容 |
+| Policy Name | Type | Content |
 |-----------|------|------|
-| `allow-istio` | Ingress + Egress | istio-system との双方向通信を許可（xDS + Gateway ルーティング） |
+| `allow-istio` | Ingress + Egress | Allow bidirectional communication with istio-system (xDS + Gateway routing) |
 
-### 5. ファイル配置
+### 5. File Placement
 
-| Namespace | 配置先 | 管理方式 |
+| Namespace | Location | Management Method |
 |-----------|--------|---------|
 | kensan-prod | `infrastructure/environments/kensan-prod/network-policy.yaml` | ApplicationSet (Git directory) |
 | kensan-dev | `infrastructure/environments/kensan-dev/network-policy.yaml` | ApplicationSet (Git directory) |
 | kensan-data | `infrastructure/environments/kensan-data/network-policy.yaml` | ApplicationSet (Git directory) |
 | backstage | `backstage/manifests/base/network-policy.yaml` | Kustomize |
-| platform-auth-* | `infrastructure/security/keycloak/base/network-policy.yaml` | Kustomize (base で共有) |
+| platform-auth-* | `infrastructure/security/keycloak/base/network-policy.yaml` | Kustomize (shared in base) |
 | cert-manager | `infrastructure/security/cert-manager/resources/network-policy.yaml` | Argo CD resources source |
 
 ## Consequences
 
 ### Positive
 
-- namespace 間の不正な通信がブロックされる
-- 通信パターンがコードとして宣言的に管理される
-- 新しい namespace/サービス追加時に通信要件の明示化が強制される
+- Unauthorized communication between namespaces is blocked
+- Communication patterns are declaratively managed as code
+- Communication requirements are forced to be made explicit when adding new namespaces/services
 
 ### Negative
 
-- 新しい通信パターンを追加する際に NetworkPolicy の更新が必要（意図的なトレードオフ）
-- デバッグ時に通信がブロックされている原因の特定に時間がかかる可能性がある
+- NetworkPolicy updates are required when adding new communication patterns (intentional trade-off)
+- Identifying blocked communication as the root cause during debugging may take time
 
 ### Risks
 
-- 既存の通信パターンの見落としにより、デプロイ直後にサービスがダウンする可能性がある
-- 対策: マージ後に各 Application の sync 状況と Pod の通信を確認する
+- Overlooked existing communication patterns could cause service outages immediately after deployment
+- Mitigation: Verify each Application's sync status and Pod communication after merging

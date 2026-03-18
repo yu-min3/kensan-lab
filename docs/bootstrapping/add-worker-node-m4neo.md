@@ -1,15 +1,15 @@
-# Bosgame M4 Neo ワーカーノード追加手順
+# Adding a Bosgame M4 Neo Worker Node
 
-## 概要
+## Overview
 
-Bosgame M4 Neo（AMD64）を既存の Raspberry Pi 5（ARM64）クラスタにワーカーノードとして追加する手順書。
-amdgpu カーネルモジュールの不安定さを回避するため、Ubuntu Server にクリーンインストールしヘッドレスワーカーとして運用する。
+Procedure for adding a Bosgame M4 Neo (AMD64) as a worker node to the existing Raspberry Pi 5 (ARM64) cluster.
+To avoid instability from the amdgpu kernel module, perform a clean install of Ubuntu Server and operate as a headless worker.
 
-ARM64 + AMD64 のマルチアーキテクチャクラスタとなるため、Phase 1（ノード参加）→ Phase 2（ワークロード最適化）→ Phase 3（マルチアーキテクチャイメージ対応）の3段階で構成する。
+Since this creates a multi-architecture cluster (ARM64 + AMD64), the process is organized in three stages: Phase 1 (node join) -> Phase 2 (workload optimization) -> Phase 3 (multi-architecture image support).
 
-## ノード構成
+## Node Configuration
 
-| ノード | ホスト名 | IP | ハードウェア | アーキテクチャ | 役割 |
+| Node | Hostname | IP | Hardware | Architecture | Role |
 |--------|----------|----|-------------|--------------|------|
 | Master | master | 192.168.1.107 | Raspberry Pi 5 (8GB) | ARM64 | control-plane |
 | Worker1 | worker1 | 192.168.1.108 | Raspberry Pi 5 (8GB) | ARM64 | worker |
@@ -18,28 +18,28 @@ ARM64 + AMD64 のマルチアーキテクチャクラスタとなるため、Pha
 
 ---
 
-## Phase 1: ノードセットアップとクラスター参加
+## Phase 1: Node Setup and Cluster Join
 
-> **セットアップスクリプト**: Phase 1 の手順は `temp/setup-m4neo.sh` にまとめてあります。
-> M4 Neo 上で実行してください。
+> **Setup Script**: Phase 1 steps are consolidated in `temp/setup-m4neo.sh`.
+> Run it on the M4 Neo.
 
-### 1.1 Ubuntu Server 24.04 LTS インストール
+### 1.1 Install Ubuntu Server 24.04 LTS
 
-USB ブートメディアから Ubuntu Server 24.04 LTS を最小構成でインストールする。
+Install Ubuntu Server 24.04 LTS in minimal configuration from a USB boot media.
 
-- **Profile**: minimal（最小インストール）
-- **追加パッケージ**: OpenSSH Server のみ選択
-- **ユーザー名**: 任意（以降 `yu` として記載）
-- **ディスク**: 内蔵 NVMe 全体を使用（LVM 推奨）
+- **Profile**: minimal (minimal installation)
+- **Additional packages**: Select only OpenSSH Server
+- **Username**: Your choice (referred to as `yu` hereafter)
+- **Disk**: Use the entire internal NVMe (LVM recommended)
 
-> **注意**: Desktop 版ではなく Server 版を使用すること。amdgpu ドライバの不安定さを根本的に回避する。
+> **Note**: Use the Server edition, not Desktop. This fundamentally avoids amdgpu driver instability.
 
-### 1.2 amdgpu カーネルモジュール無効化
+### 1.2 Disable the amdgpu Kernel Module
 
-Ubuntu Server でも amdgpu モジュールがロードされる場合がある。ヘッドレス運用のため完全に無効化する。
+The amdgpu module may still be loaded on Ubuntu Server. Completely disable it for headless operation.
 
 ```bash
-# /etc/modprobe.d/blacklist-amdgpu.conf を作成
+# Create /etc/modprobe.d/blacklist-amdgpu.conf
 sudo tee /etc/modprobe.d/blacklist-amdgpu.conf <<'EOF'
 # Disable amdgpu for headless worker node stability
 blacklist amdgpu
@@ -50,23 +50,23 @@ sudo update-initramfs -u
 sudo reboot
 ```
 
-再起動後に確認:
+Verify after reboot:
 
 ```bash
 lsmod | grep amdgpu
-# 出力なし = 成功
+# No output = success
 ```
 
-### 1.3 ネットワーク設定
+### 1.3 Network Configuration
 
-netplan で静的 IP を設定する。M4 Neo は WiFi（`wlp3s0`）を使用する（有線ポート `eno1`/`enp4s0` は未接続）。
+Configure a static IP with netplan. The M4 Neo uses WiFi (`wlp3s0`) (wired ports `eno1`/`enp4s0` are disconnected).
 
 ```yaml
 # /etc/netplan/01-static.yaml
 network:
   version: 2
   wifis:
-    wlp3s0:        # 実際のインターフェース名に合わせる（ip a で確認）
+    wlp3s0:        # Adjust to your actual interface name (check with ip a)
       addresses:
         - 192.168.1.110/24
       routes:
@@ -86,20 +86,20 @@ network:
 sudo netplan apply
 ```
 
-> **インターフェース名の確認**: `ip a` で実際のインターフェース名（`wlp3s0` 等）を確認し、netplan と後続の Cilium 設定に反映すること。RPi は `wlan0`、M4 Neo は `wlp3s0` を使用している。
+> **Interface name check**: Use `ip a` to verify the actual interface name (`wlp3s0`, etc.) and reflect it in netplan and subsequent Cilium configuration. RPi nodes use `wlan0`, while M4 Neo uses `wlp3s0`.
 
-ホスト名の設定:
+Set the hostname:
 
 ```bash
 sudo hostnamectl set-hostname m4neo
 ```
 
-### 1.4 カーネルパラメータ
+### 1.4 Kernel Parameters
 
-Kubernetes が必要とするカーネルモジュールとパラメータを設定する。
+Configure the kernel modules and parameters required by Kubernetes.
 
 ```bash
-# カーネルモジュールの永続化
+# Persist kernel modules
 cat <<'EOF' | sudo tee /etc/modules-load.d/k8s.conf
 overlay
 br_netfilter
@@ -108,7 +108,7 @@ EOF
 sudo modprobe overlay
 sudo modprobe br_netfilter
 
-# sysctl パラメータ
+# sysctl parameters
 cat <<'EOF' | sudo tee /etc/sysctl.d/k8s.conf
 net.bridge.bridge-nf-call-iptables  = 1
 net.bridge.bridge-nf-call-ip6tables = 1
@@ -118,20 +118,20 @@ EOF
 sudo sysctl --system
 ```
 
-swap の無効化:
+Disable swap:
 
 ```bash
 sudo swapoff -a
-# /etc/fstab から swap エントリを削除またはコメントアウト
+# Remove or comment out the swap entry in /etc/fstab
 sudo sed -i '/\sswap\s/s/^/#/' /etc/fstab
 ```
 
-### 1.5 CRI-O インストール
+### 1.5 Install CRI-O
 
-CRI-O は既存クラスタと同じバージョンを使用する。master で `crio --version` を確認してからインストールすること。
+Use the same CRI-O version as the existing cluster. Check with `crio --version` on the master before installing.
 
 ```bash
-# CRI-O のリポジトリ追加（v1.31 系の例）
+# Add CRI-O repository (v1.31 series example)
 CRIO_VERSION="v1.31"
 
 curl -fsSL https://pkgs.k8s.io/addons:/cri-o:/stable:/$CRIO_VERSION/deb/Release.key | \
@@ -146,9 +146,9 @@ sudo apt-get install -y cri-o
 sudo systemctl enable --now crio
 ```
 
-### 1.6 kubeadm / kubelet / kubectl インストール
+### 1.6 Install kubeadm / kubelet / kubectl
 
-既存クラスタと同じ Kubernetes バージョンを使用する。master で `kubectl version --short` を確認すること。
+Use the same Kubernetes version as the existing cluster. Check with `kubectl version --short` on the master.
 
 ```bash
 KUBE_VERSION="v1.31"
@@ -168,115 +168,115 @@ sudo systemctl enable --now kubelet
 
 ### 1.7 kubeadm join
 
-**Master ノードで** join トークンを生成する:
+Generate a join token **on the Master node**:
 
 ```bash
-# Master で実行
+# Run on Master
 kubeadm token create --print-join-command
 ```
 
-出力されたコマンドを **M4 Neo で** 実行する:
+Run the output command **on the M4 Neo**:
 
 ```bash
-# M4 Neo で実行（出力されたコマンドをそのまま貼り付け）
+# Run on M4 Neo (paste the output command as-is)
 sudo kubeadm join 192.168.1.107:6443 --token <token> --discovery-token-ca-cert-hash sha256:<hash>
 ```
 
-### 1.8 Cilium 設定変更（重要）
+### 1.8 Cilium Configuration Changes (Important)
 
-既存の Cilium 設定は `wlan0`（Raspberry Pi の WiFi インターフェース）のみを対象としている。
-M4 Neo は WiFi `wlp3s0` を使用するため、**クラスタ全体**の Cilium 設定を変更して両方のインターフェース名にマッチさせる必要がある。
+The existing Cilium configuration targets only `wlan0` (the Raspberry Pi WiFi interface).
+Since the M4 Neo uses WiFi `wlp3s0`, **the cluster-wide** Cilium configuration must be changed to match both interface names.
 
-#### `infrastructure/network/cilium/values.yaml` の変更
+#### Changes to `infrastructure/network/cilium/values.yaml`
 
 ```yaml
-# 変更前:
+# Before:
 devices: wlan0
 
-# 変更後（auto-detect に変更し、全ノードのインターフェースを自動認識）:
-devices: ""   # auto-detect（wlan0, wlp3s0 等を自動認識）
+# After (change to auto-detect to automatically recognize all node interfaces):
+devices: ""   # auto-detect (automatically recognizes wlan0, wlp3s0, etc.)
 ```
 
-> 空文字列（auto-detect）により、RPi の `wlan0` と M4 Neo の `wlp3s0` の両方が自動的に認識される。
-> Cilium の `devices` は Linux のデバイス名ワイルドカードも受け付けるが、auto-detect が推奨。
+> An empty string (auto-detect) causes both RPi's `wlan0` and M4 Neo's `wlp3s0` to be automatically recognized.
+> Cilium's `devices` also accepts Linux device name wildcards, but auto-detect is recommended.
 
-#### `infrastructure/network/cilium/resources/lb-ippool.yaml` の変更
+#### Changes to `infrastructure/network/cilium/resources/lb-ippool.yaml`
 
 ```yaml
-# 変更前:
+# Before:
 spec:
   interfaces:
   - wlan0
 
-# 変更後（正規表現パターン）:
+# After (regex pattern):
 spec:
   interfaces:
   - "^wlan.*"
   - "^wlp.*"
 ```
 
-> CiliumL2AnnouncementPolicy の `interfaces` フィールドは正規表現を受け付ける。
-> `^wlan.*` は RPi の `wlan0` に、`^wlp.*` は M4 Neo の `wlp3s0` にマッチする。
+> CiliumL2AnnouncementPolicy's `interfaces` field accepts regular expressions.
+> `^wlan.*` matches RPi's `wlan0`, and `^wlp.*` matches M4 Neo's `wlp3s0`.
 
-#### 変更の適用
+#### Applying Changes
 
 ```bash
-# values.yaml を変更後、Git に push すれば Argo CD が自動 sync する
+# After changing values.yaml, push to Git and Argo CD will auto-sync
 git add infrastructure/network/cilium/values.yaml
 git add infrastructure/network/cilium/resources/lb-ippool.yaml
-git commit -m "Cilium: マルチインターフェース対応（wlan + wlp）"
+git commit -m "Cilium: multi-interface support (wlan + wlp)"
 git push
 
-# Cilium agent の再起動を確認
+# Verify Cilium agent restart
 kubectl -n kube-system rollout status daemonset/cilium
 ```
 
-### 1.9 参加確認
+### 1.9 Join Verification
 
 ```bash
-# ノードが Ready になっていること
+# Verify the node is Ready
 kubectl get nodes -o wide
 
-# Cilium agent が全ノードで Running であること
+# Verify Cilium agent is Running on all nodes
 kubectl -n kube-system get pods -l k8s-app=cilium -o wide
 
-# アーキテクチャの確認
+# Check architectures
 kubectl get nodes -o custom-columns=NAME:.metadata.name,ARCH:.status.nodeInfo.architecture,OS:.status.nodeInfo.operatingSystem
 
-# L2 Announcement の確認（LoadBalancer IP が応答すること）
+# Verify L2 Announcement (LoadBalancer IPs should respond)
 kubectl get svc -A | grep LoadBalancer
 ```
 
 ---
 
-## Phase 2: ワークロード最適化（nodeAffinity）
+## Phase 2: Workload Optimization (nodeAffinity)
 
-M4 Neo は RPi 5 と比較して CPU・メモリ共に大幅に上回るため、リソース消費の大きいワークロードを優先的にスケジュールする。
+The M4 Neo significantly exceeds the RPi 5 in both CPU and memory, so resource-intensive workloads should be preferentially scheduled there.
 
-### 2.1 ノードラベル設計
+### 2.1 Node Label Design
 
-M4 Neo にカスタムラベルを付与する:
+Assign custom labels to the M4 Neo:
 
 ```bash
 kubectl label node m4neo hardware-class=high-performance
 ```
 
-既存の RPi ノードにもラベルを付けておく（明示的な分類のため）:
+Also label the existing RPi nodes (for explicit classification):
 
 ```bash
 kubectl label node worker1 hardware-class=raspberry-pi
 kubectl label node worker2 hardware-class=raspberry-pi
 ```
 
-### 2.2 nodeAffinity 戦略
+### 2.2 nodeAffinity Strategy
 
-**preferredDuringSchedulingIgnoredDuringExecution**（推奨スケジューリング）を使用する。
+Use **preferredDuringSchedulingIgnoredDuringExecution** (preferred scheduling).
 
-- M4 Neo が利用可能なら**優先的に**スケジュールする
-- M4 Neo がダウンしていても RPi にフォールバックする（可用性を維持）
-- `required` にするとノード障害時にワークロードが起動できなくなるため避ける
+- **Preferentially** schedule to M4 Neo when available
+- Falls back to RPi nodes if M4 Neo is down (maintaining availability)
+- Avoid using `required` as it would prevent workloads from starting during node failure
 
-<!-- TODO(human): nodeAffinity の weight 値と対象コンポーネントのグループ分け -->
+<!-- TODO(human): Determine weight values and component groupings for nodeAffinity -->
 
 ```yaml
 affinity:
@@ -291,23 +291,23 @@ affinity:
                 - high-performance
 ```
 
-### 2.3 各コンポーネントの values.yaml への affinity 追記
+### 2.3 Adding affinity to Each Component's values.yaml
 
-nodeAffinity を追記する対象コンポーネント一覧:
+Components to add nodeAffinity to:
 
-| コンポーネント | ファイル | 追記方法 |
+| Component | File | How to Add |
 |--------------|---------|---------|
-| Prometheus | `infrastructure/observability/prometheus/values.yaml` | `prometheus.prometheusSpec.affinity` に追記 |
-| Grafana | `infrastructure/observability/grafana/values.yaml` | トップレベルに `affinity:` ブロック追加 |
-| Tempo | `infrastructure/observability/tempo/values.yaml` | 既存の `affinity: {}` を書き換え |
-| Loki | `infrastructure/observability/loki/values.yaml` | `singleBinary.affinity` に追記 |
-| OTel Collector | `infrastructure/observability/otel-collector/values.yaml` | 既存の `affinity: {}` を書き換え |
+| Prometheus | `infrastructure/observability/prometheus/values.yaml` | Add to `prometheus.prometheusSpec.affinity` |
+| Grafana | `infrastructure/observability/grafana/values.yaml` | Add top-level `affinity:` block |
+| Tempo | `infrastructure/observability/tempo/values.yaml` | Replace existing `affinity: {}` |
+| Loki | `infrastructure/observability/loki/values.yaml` | Add to `singleBinary.affinity` |
+| OTel Collector | `infrastructure/observability/otel-collector/values.yaml` | Replace existing `affinity: {}` |
 
 #### Prometheus
 
 ```yaml
 # infrastructure/observability/prometheus/values.yaml
-# prometheus.prometheusSpec に追記:
+# Add to prometheus.prometheusSpec:
 prometheus:
   prometheusSpec:
     affinity:
@@ -326,7 +326,7 @@ prometheus:
 
 ```yaml
 # infrastructure/observability/grafana/values.yaml
-# トップレベルに追加:
+# Add at top level:
 affinity:
   nodeAffinity:
     preferredDuringSchedulingIgnoredDuringExecution:
@@ -344,7 +344,7 @@ affinity:
 ```yaml
 # infrastructure/observability/tempo/values.yaml
 # infrastructure/observability/otel-collector/values.yaml
-# 既存の affinity: {} を以下に書き換え:
+# Replace existing affinity: {} with:
 affinity:
   nodeAffinity:
     preferredDuringSchedulingIgnoredDuringExecution:
@@ -361,7 +361,7 @@ affinity:
 
 ```yaml
 # infrastructure/observability/loki/values.yaml
-# singleBinary セクションに追記:
+# Add to singleBinary section:
 singleBinary:
   affinity:
     nodeAffinity:
@@ -375,13 +375,13 @@ singleBinary:
                   - high-performance
 ```
 
-### 2.4 Kustomize 管理コンポーネントのパッチ方針
+### 2.4 Patching Kustomize-Managed Components
 
-Keycloak と Backstage は Kustomize で管理されているため、overlay に strategic merge patch を追加する。
+Keycloak and Backstage are managed with Kustomize, so add strategic merge patches to overlays.
 
-#### Keycloak（prod/dev 各 overlay）
+#### Keycloak (each prod/dev overlay)
 
-`infrastructure/security/keycloak/overlays/prod/affinity-patch.yaml` を作成:
+Create `infrastructure/security/keycloak/overlays/prod/affinity-patch.yaml`:
 
 ```yaml
 apiVersion: apps/v1
@@ -403,73 +403,73 @@ spec:
                       - high-performance
 ```
 
-`kustomization.yaml` の `patches:` に追加:
+Add to `kustomization.yaml`'s `patches:`:
 
 ```yaml
 patches:
   - path: affinity-patch.yaml
 ```
 
-> PostgreSQL StatefulSet にも同様のパッチを適用可能だが、DB はデータローカリティの観点から現在のノードに固定する方が安全な場合もある。PV の配置と合わせて判断すること。
+> A similar patch can be applied to the PostgreSQL StatefulSet, but for databases it may be safer to pin to the current node from a data locality perspective. Make this decision in conjunction with PV placement.
 
 #### Backstage
 
-Backstage も同様の手法で `backstage/manifests/overlays/prod/` にパッチを追加する。
+Apply the same approach by adding a patch to `backstage/manifests/overlays/prod/`.
 
-### 2.5 変更の適用と確認
+### 2.5 Applying Changes and Verification
 
 ```bash
-# 全変更を commit & push（Argo CD が自動 sync）
+# Commit & push all changes (Argo CD auto-syncs)
 git add -A
-git commit -m "nodeAffinity: M4 Neo へ Observability ワークロードを優先スケジュール"
+git commit -m "nodeAffinity: prefer scheduling Observability workloads to M4 Neo"
 git push
 
-# Pod の配置確認
+# Check Pod placement
 kubectl get pods -n monitoring -o wide
 
-# 特定 Pod のスケジューリングイベント確認
+# Check scheduling events for a specific Pod
 kubectl describe pod <pod-name> -n monitoring | grep -A5 "Events:"
 ```
 
 ---
 
-## Phase 3: マルチアーキテクチャイメージビルド対応
+## Phase 3: Multi-Architecture Image Build Support
 
-### 3.1 背景
+### 3.1 Background
 
-既存クラスタは ARM64（Raspberry Pi 5）のみだったため、カスタムイメージは全て ARM64 用にビルドされている。
-M4 Neo（AMD64）が加わると、ARM64 イメージは AMD64 ノードでは **実行できない**（`exec format error`）。
+The existing cluster was ARM64-only (Raspberry Pi 5), so all custom images were built for ARM64.
+With the M4 Neo (AMD64) joining, ARM64 images **cannot run** on AMD64 nodes (`exec format error`).
 
 ```
 standard_init_linux.go: exec user process caused: exec format error
 ```
 
-解決策は 2 つ:
+Two solutions:
 
-1. **マルチプラットフォームイメージ**: 1 つのイメージタグで両アーキテクチャに対応（推奨）
-2. **nodeSelector でピン止め**: 特定のアーキテクチャノードにのみスケジュール（回避策）
+1. **Multi-platform images**: A single image tag supports both architectures (recommended)
+2. **nodeSelector pinning**: Schedule only to specific architecture nodes (workaround)
 
-Phase 3 ではマルチプラットフォームイメージ化を推奨する。
+Phase 3 recommends multi-platform image creation.
 
-### 3.2 対象カスタムイメージ一覧
+### 3.2 Custom Image Inventory
 
-| イメージ | ベースイメージ | 言語 | Dockerfile |
+| Image | Base Image | Language | Dockerfile |
 |---------|-------------|------|-----------|
-| kensan-user | golang → alpine | Go | `apps/kensan/backend/services/user/Dockerfile` |
-| kensan-task | golang → alpine | Go | `apps/kensan/backend/services/task/Dockerfile` |
-| kensan-timeblock | golang → alpine | Go | `apps/kensan/backend/services/timeblock/Dockerfile` |
-| kensan-analytics | golang → alpine | Go | `apps/kensan/backend/services/analytics/Dockerfile` |
-| kensan-memo | golang → alpine | Go | `apps/kensan/backend/services/memo/Dockerfile` |
-| kensan-note | golang → alpine | Go | `apps/kensan/backend/services/note/Dockerfile` |
+| kensan-user | golang -> alpine | Go | `apps/kensan/backend/services/user/Dockerfile` |
+| kensan-task | golang -> alpine | Go | `apps/kensan/backend/services/task/Dockerfile` |
+| kensan-timeblock | golang -> alpine | Go | `apps/kensan/backend/services/timeblock/Dockerfile` |
+| kensan-analytics | golang -> alpine | Go | `apps/kensan/backend/services/analytics/Dockerfile` |
+| kensan-memo | golang -> alpine | Go | `apps/kensan/backend/services/memo/Dockerfile` |
+| kensan-note | golang -> alpine | Go | `apps/kensan/backend/services/note/Dockerfile` |
 | kensan-frontend | node:22-alpine | Node.js | `apps/kensan/frontend/Dockerfile` |
 | kensan-ai | python:3.12-slim | Python | `apps/kensan/kensan-ai/Dockerfile` |
 | backstage | node:22-bookworm-slim | Node.js | `backstage/app/packages/backend/Dockerfile` |
 
-### 3.3 Go サービスの Dockerfile 変更
+### 3.3 Go Service Dockerfile Changes
 
-Go はクロスコンパイルが標準機能として組み込まれているため、最も対応が容易。
+Go has cross-compilation built in as a standard feature, making it the easiest to adapt.
 
-**変更前:**
+**Before:**
 
 ```dockerfile
 FROM golang:1.24-alpine AS builder
@@ -481,7 +481,7 @@ FROM alpine:3.19
 COPY --from=builder /app/server .
 ```
 
-**変更後:**
+**After:**
 
 ```dockerfile
 FROM --platform=$BUILDPLATFORM golang:1.24-alpine AS builder
@@ -495,60 +495,60 @@ FROM alpine:3.19
 COPY --from=builder /app/server .
 ```
 
-ポイント:
-- `--platform=$BUILDPLATFORM`: ビルドステージはホストのアーキテクチャで実行（高速）
-- `ARG TARGETARCH`: ターゲットアーキテクチャが自動注入される（`amd64` or `arm64`）
-- `GOARCH=$TARGETARCH`: Go のクロスコンパイルを利用
+Key points:
+- `--platform=$BUILDPLATFORM`: Build stage runs on the host architecture (fast)
+- `ARG TARGETARCH`: Target architecture is automatically injected (`amd64` or `arm64`)
+- `GOARCH=$TARGETARCH`: Uses Go's cross-compilation
 
-### 3.4 Node.js / Python アプリの対応方針
+### 3.4 Node.js / Python App Strategy
 
-Node.js と Python はインタプリタ言語のため、ベースイメージのアーキテクチャが一致すれば動作する。
-特別な Dockerfile 変更は不要で、ビルド時に `--platform` を指定するだけでよい。
+Node.js and Python are interpreted languages, so they work as long as the base image architecture matches.
+No special Dockerfile changes are needed -- just specify `--platform` at build time.
 
-ただし、**ネイティブ拡張**（`node-gyp` でビルドされるモジュール、Python の C 拡張等）を含む場合は、各アーキテクチャでビルドステージを実行する必要がある。
+However, if **native extensions** (modules built with `node-gyp`, Python C extensions, etc.) are included, build stages must be executed on each architecture.
 
-- **kensan-frontend**: 純粋な Node.js アプリ。変更不要。
-- **kensan-ai**: Python パッケージ。`uv pip install` でネイティブ拡張がある場合は注意。
-- **backstage**: `node-gyp` 依存あり（`isolated-vm`）。各アーキテクチャで `npm install` が必要。
+- **kensan-frontend**: Pure Node.js app. No changes needed.
+- **kensan-ai**: Python package. Watch for native extensions with `uv pip install`.
+- **backstage**: Has `node-gyp` dependency (`isolated-vm`). `npm install` must run on each architecture.
 
-### 3.5 Podman マルチプラットフォームビルド手順
+### 3.5 Podman Multi-Platform Build Procedure
 
-このプラットフォームでは Podman を使用してイメージをビルドする。
+This platform uses Podman for image builds.
 
-#### 事前準備: QEMU エミュレーション
+#### Prerequisites: QEMU Emulation
 
-AMD64 マシン上で ARM64 イメージをビルドする（またはその逆）には、QEMU のユーザーモードエミュレーションが必要。
+Building ARM64 images on an AMD64 machine (or vice versa) requires QEMU user-mode emulation.
 
 ```bash
-# Ubuntu にインストール
+# Install on Ubuntu
 sudo apt-get install -y qemu-user-static
 
-# 確認
+# Verify
 ls /proc/sys/fs/binfmt_misc/qemu-*
 ```
 
-#### マルチプラットフォームビルド
+#### Multi-Platform Build
 
 ```bash
-# マニフェストリストを作成してビルド
+# Create manifest list and build
 podman build --platform linux/amd64,linux/arm64 \
   --manifest ghcr.io/<your-git-org>/kensan-user:v0.1.0 \
   -f apps/kensan/backend/services/user/Dockerfile \
   apps/kensan/backend/
 
-# マニフェストリストを push
+# Push the manifest list
 podman manifest push ghcr.io/<your-git-org>/kensan-user:v0.1.0 \
   docker://ghcr.io/<your-git-org>/kensan-user:v0.1.0
 ```
 
-#### 全サービスの一括ビルド例
+#### Batch Build Example for All Services
 
 ```bash
 REGISTRY="ghcr.io/<your-git-org>"
 TAG="v0.1.0"
 PLATFORMS="linux/amd64,linux/arm64"
 
-# Go サービス
+# Go services
 for svc in user task timeblock analytics memo note; do
   podman build --platform $PLATFORMS \
     --manifest $REGISTRY/kensan-$svc:$TAG \
@@ -558,7 +558,7 @@ for svc in user task timeblock analytics memo note; do
     docker://$REGISTRY/kensan-$svc:$TAG
 done
 
-# フロントエンド
+# Frontend
 podman build --platform $PLATFORMS \
   --manifest $REGISTRY/kensan-frontend:$TAG \
   -f apps/kensan/frontend/Dockerfile \
@@ -568,9 +568,9 @@ podman manifest push $REGISTRY/kensan-frontend:$TAG \
   docker://$REGISTRY/kensan-frontend:$TAG
 ```
 
-### 3.6 GitHub Actions サンプル（将来参考）
+### 3.6 GitHub Actions Sample (Future Reference)
 
-CI/CD でマルチプラットフォームビルドを行う場合の GitHub Actions 例:
+Example GitHub Actions for multi-platform builds in CI/CD:
 
 ```yaml
 # .github/workflows/build-multiarch.yaml
@@ -605,48 +605,48 @@ jobs:
           tags: ghcr.io/${{ github.repository_owner }}/kensan-user:${{ github.ref_name }}
 ```
 
-### 3.7 移行チェックリスト
+### 3.7 Migration Checklist
 
-- [ ] Go サービス（6 個）の Dockerfile に `--platform=$BUILDPLATFORM` / `TARGETARCH` を追加
-- [ ] kensan-frontend のマルチプラットフォームビルドをテスト
-- [ ] kensan-ai のマルチプラットフォームビルドをテスト（ネイティブ拡張の確認）
-- [ ] backstage のマルチプラットフォームビルドをテスト（`isolated-vm` の確認）
-- [ ] 全イメージをマルチプラットフォームで再ビルド & push
-- [ ] クラスタ上で AMD64 ノードに Pod がスケジュールされることを確認
-- [ ] `kubectl describe pod` で `exec format error` が発生しないことを確認
+- [ ] Add `--platform=$BUILDPLATFORM` / `TARGETARCH` to Go service (6) Dockerfiles
+- [ ] Test multi-platform build for kensan-frontend
+- [ ] Test multi-platform build for kensan-ai (check for native extensions)
+- [ ] Test multi-platform build for backstage (check `isolated-vm`)
+- [ ] Rebuild and push all images as multi-platform
+- [ ] Verify Pods are scheduled to AMD64 nodes on the cluster
+- [ ] Verify no `exec format error` occurs with `kubectl describe pod`
 
 ---
 
-## トラブルシューティング
+## Troubleshooting
 
-### ノードが NotReady のまま
+### Node Stuck in NotReady
 
 ```bash
-# kubelet のログを確認
+# Check kubelet logs
 sudo journalctl -u kubelet -f --no-pager
 
-# Cilium agent の状態を確認
+# Check Cilium agent status
 kubectl -n kube-system get pods -l k8s-app=cilium -o wide
 kubectl -n kube-system logs -l k8s-app=cilium --tail=50
 ```
 
-よくある原因:
-- CRI-O が起動していない → `sudo systemctl status crio`
-- Cilium agent がクラッシュ → Cilium の `devices` 設定が M4 Neo の WiFi インターフェース名（`wlp3s0`）に合っていない
-- swap が有効 → `sudo swapoff -a` で無効化
+Common causes:
+- CRI-O not running -> `sudo systemctl status crio`
+- Cilium agent crashing -> Cilium's `devices` setting doesn't match M4 Neo's WiFi interface name (`wlp3s0`)
+- Swap enabled -> Disable with `sudo swapoff -a`
 
-### Cilium agent 起動失敗
+### Cilium Agent Startup Failure
 
 ```bash
-# Cilium のステータス確認
+# Check Cilium status
 kubectl -n kube-system exec -it ds/cilium -- cilium status
 
-# デバイス認識の確認
+# Check device recognition
 kubectl -n kube-system exec -it ds/cilium -- cilium status --verbose | grep "Devices"
 ```
 
-`devices` の設定が M4 Neo の WiFi インターフェース名（`wlp3s0`）にマッチしない場合、Cilium agent が起動に失敗する。
-`ip a` で実際のインターフェース名を確認し、`values.yaml` の `devices` パターンを修正すること。
+If the `devices` setting doesn't match M4 Neo's WiFi interface name (`wlp3s0`), the Cilium agent will fail to start.
+Check the actual interface name with `ip a` and fix the `devices` pattern in `values.yaml`.
 
 ### exec format error
 
@@ -654,22 +654,22 @@ kubectl -n kube-system exec -it ds/cilium -- cilium status --verbose | grep "Dev
 standard_init_linux.go: exec user process caused: exec format error
 ```
 
-AMD64 ノード上で ARM64 イメージが実行された場合に発生する。
+Occurs when an ARM64 image runs on an AMD64 node.
 
 ```bash
-# イメージのアーキテクチャ確認
+# Check image architecture
 podman inspect <image> | grep Architecture
 
-# Pod がどのノードで動いているか確認
+# Check which node the Pod is running on
 kubectl get pod <pod-name> -o wide
 
-# マニフェストリストの確認
+# Check the manifest list
 podman manifest inspect ghcr.io/<your-git-org>/<image>:<tag>
 ```
 
-対処:
-1. Phase 3 のマルチプラットフォームイメージビルドを完了させる
-2. 暫定対応として `nodeSelector` で ARM64 ノードにピン止めする:
+Fixes:
+1. Complete the Phase 3 multi-platform image build
+2. As a temporary workaround, pin to ARM64 nodes with `nodeSelector`:
 
 ```yaml
 spec:
@@ -679,28 +679,28 @@ spec:
         kubernetes.io/arch: arm64
 ```
 
-### L2 Announcement が M4 Neo で機能しない
+### L2 Announcement Not Working on M4 Neo
 
 ```bash
-# L2 Policy の状態確認
+# Check L2 Policy status
 kubectl get ciliuml2announcementpolicies -o yaml
 
-# ノードの Cilium リース確認
+# Check Cilium leases for the node
 kubectl get lease -n kube-system | grep cilium
 ```
 
-`CiliumL2AnnouncementPolicy` の `interfaces` に M4 Neo の WiFi インターフェース名（`wlp3s0`）が含まれていることを確認する。
-Phase 1.8 の手順で正規表現パターン（`^wlan.*`, `^wlp.*`）に変更済みであることを確認。
+Verify that the `CiliumL2AnnouncementPolicy`'s `interfaces` includes M4 Neo's WiFi interface name (`wlp3s0`).
+Confirm the regex pattern (`^wlan.*`, `^wlp.*`) was applied as described in Phase 1.8.
 
-### PersistentVolume 問題
+### PersistentVolume Issues
 
-`local-path-provisioner` はノードローカルにボリュームを作成するため、Pod がノード間を移動すると PV にアクセスできなくなる。
+`local-path-provisioner` creates volumes locally on nodes, so Pods cannot access PVs when migrating between nodes.
 
 ```bash
-# PV のノードアフィニティ確認
+# Check PV node affinity
 kubectl get pv -o custom-columns=NAME:.metadata.name,NODE:.spec.nodeAffinity.required.nodeSelectorTerms[0].matchExpressions[0].values[0]
 ```
 
-対処:
-- StatefulSet（Prometheus, Loki, Tempo, PostgreSQL）は PV のあるノードに自動的にスケジュールされる
-- nodeAffinity で M4 Neo に移動させた場合、既存の PV は RPi 上に残る。データ移行が必要になる場合は PVC を削除して再作成する（データロス注意）
+Fixes:
+- StatefulSets (Prometheus, Loki, Tempo, PostgreSQL) are automatically scheduled to the node with their PV
+- If nodeAffinity moves workloads to M4 Neo, existing PVs remain on the RPi. If data migration is needed, delete and recreate the PVC (be aware of data loss)
