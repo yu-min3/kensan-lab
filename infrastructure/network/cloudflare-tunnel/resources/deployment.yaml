@@ -24,8 +24,6 @@ spec:
             - --metrics
             - 0.0.0.0:2000
             - run
-            - --token
-            - $(TUNNEL_TOKEN)
           env:
             - name: TUNNEL_TOKEN
               valueFrom:
