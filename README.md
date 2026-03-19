@@ -24,77 +24,51 @@
 
 ---
 
-A bare-metal Kubernetes homelab that mirrors how enterprise platform teams actually run clusters — Argo CD for GitOps, Istio for service mesh, Backstage for developer self-service, and full observability with Prometheus, Grafana, Loki, and Tempo. All running on Raspberry Pis and a mini PC over WiFi.
+A bare-metal Kubernetes homelab that mirrors how enterprise platform teams actually run clusters — Argo CD for GitOps, Istio for service mesh, Backstage for developer self-service, and full observability with Prometheus, Grafana, Loki, and Tempo. All running on Raspberry Pis and a mini PC.
 
 > This is a **reference architecture**, not a turnkey solution. Published as a learning resource and companion to the author's technical articles. Adapt secrets, domains, and IP ranges for your environment. See [Configuration Guide](./docs/configuration.md).
 
 ## Why This Exists
 
-Most homelab repos use Flux + Talos + minimal networking. This one takes a different path — the **enterprise Kubernetes stack** (ArgoCD, Istio, Backstage, Keycloak) deployed on commodity hardware. If you're studying for CKA/CKAD, working as a platform engineer, or want to understand how production clusters are actually structured, this is for you.
+This repository is a **self-study platform for enterprise-grade cluster operations** — built by a [Golden Kubestronaut](https://www.cncf.io/training/kubestronaut/) who wanted to put all certifications' worth of knowledge into a real, running system.
+
+Most homelab repos focus on self-hosting apps with lightweight networking. Few go beyond basic ingress into service mesh, zero-trust policies, or developer self-service. This one does — **Istio for mTLS and traffic management, Backstage for golden path templates, Keycloak for IAM**, all managed by Argo CD on bare-metal hardware.
+
+It also serves as a **practical study ground for Golden Kubestronaut** — the platform covers technologies behind 12 out of 16 required certifications (CKA, CKAD, CKS, KCNA, KCSA, PCA, ICA, CCA, CAPA, CGOA, CBA, OTCA). If you're studying for these certs or working as a platform engineer, this is for you.
+
+<div align="center">
+<img src="docs/assets/request-flow.png" alt="Platform Architecture — Request Flow & Component Interaction" width="800">
+<br>
+<sub>How traffic flows through the platform and how components interact</sub>
+</div>
 
 **What makes this different:**
 
-- **Argo CD + Helm multi-source** — not Flux. Real-world enterprise GitOps pattern with App of Apps
+- **Argo CD + Helm multi-source** — real-world enterprise GitOps pattern with App of Apps
 - **Istio + Gateway API** — full service mesh with mTLS, not just an ingress controller
-- **Backstage** — developer portal with scaffolding templates. Almost no homelab does this
-- **Keycloak JWT auth** — every external endpoint is authenticated
+- **Backstage** — developer portal with service catalog, TechDocs, and scaffolding templates
+- **Keycloak** — IAM / SSO deployed and ready for JWT-based gateway auth
 - **Multi-arch (ARM64 + AMD64)** — real scheduling constraints, not a uniform cluster
-- **WiFi-only networking** — because not everyone has ethernet drops everywhere
+- **Runs on WiFi** — proven to work without ethernet, though wired LAN is recommended
 
 ## Tech Stack
 
-<table>
-  <tr>
-    <td><b>Orchestration</b></td>
-    <td><img src="https://img.shields.io/badge/Kubernetes_(kubeadm)-326CE5?style=for-the-badge&logo=kubernetes&logoColor=white" height="28"></td>
-    <td>Bare-metal, no managed K8s</td>
-  </tr>
-  <tr>
-    <td><b>Container Runtime</b></td>
-    <td><img src="https://img.shields.io/badge/CRI--O-1488C6?style=for-the-badge&logoColor=white" height="28"></td>
-    <td>Lightweight OCI runtime</td>
-  </tr>
-  <tr>
-    <td><b>CNI / Load Balancer</b></td>
-    <td><img src="https://img.shields.io/badge/Cilium-F8C517?style=for-the-badge&logo=cilium&logoColor=black" height="28"></td>
-    <td>kube-proxy replacement, L2 LoadBalancer, Hubble</td>
-  </tr>
-  <tr>
-    <td><b>Service Mesh</b></td>
-    <td><img src="https://img.shields.io/badge/Istio-466BB0?style=for-the-badge&logo=istio&logoColor=white" height="28"> <img src="https://img.shields.io/badge/Gateway_API-326CE5?style=for-the-badge&logo=kubernetes&logoColor=white" height="28"></td>
-    <td>mTLS, traffic management, zero trust</td>
-  </tr>
-  <tr>
-    <td><b>Authentication</b></td>
-    <td><img src="https://img.shields.io/badge/Keycloak-4D4D4D?style=for-the-badge&logo=keycloak&logoColor=white" height="28"></td>
-    <td>JWT-based auth, Istio integration</td>
-  </tr>
-  <tr>
-    <td><b>GitOps</b></td>
-    <td><img src="https://img.shields.io/badge/Argo_CD-EF7B4D?style=for-the-badge&logo=argo&logoColor=white" height="28"></td>
-    <td>Helm multi-source Application pattern</td>
-  </tr>
-  <tr>
-    <td><b>Secrets</b></td>
-    <td><img src="https://img.shields.io/badge/Sealed_Secrets-326CE5?style=for-the-badge&logo=kubernetes&logoColor=white" height="28"></td>
-    <td>Encrypted secrets in Git</td>
-  </tr>
-  <tr>
-    <td><b>Certificates</b></td>
-    <td><img src="https://img.shields.io/badge/cert--manager-003A70?style=for-the-badge&logoColor=white" height="28"> <img src="https://img.shields.io/badge/Let's_Encrypt-003A70?style=for-the-badge&logo=letsencrypt&logoColor=white" height="28"></td>
-    <td>Automated TLS</td>
-  </tr>
-  <tr>
-    <td><b>Observability</b></td>
-    <td><img src="https://img.shields.io/badge/Prometheus-E6522C?style=for-the-badge&logo=prometheus&logoColor=white" height="28"> <img src="https://img.shields.io/badge/Grafana-F46800?style=for-the-badge&logo=grafana&logoColor=white" height="28"></td>
-    <td>Metrics, dashboards, logs (Loki), traces (Tempo)</td>
-  </tr>
-  <tr>
-    <td><b>Developer Portal</b></td>
-    <td><img src="https://img.shields.io/badge/Backstage-9BF0E1?style=for-the-badge&logo=backstage&logoColor=black" height="28"></td>
-    <td>Self-service templates and catalog</td>
-  </tr>
-</table>
+| Logo | Name | Description |
+|------|------|-------------|
+| <img src="https://raw.githubusercontent.com/simple-icons/simple-icons/develop/icons/kubernetes.svg" width="24"> | [Kubernetes](https://kubernetes.io/) | Container orchestration (kubeadm, bare-metal) |
+| <img src="https://raw.githubusercontent.com/simple-icons/simple-icons/develop/icons/cilium.svg" width="24"> | [Cilium](https://cilium.io/) | eBPF-based CNI, kube-proxy replacement, L2 LB, Hubble |
+| <img src="https://raw.githubusercontent.com/simple-icons/simple-icons/develop/icons/istio.svg" width="24"> | [Istio](https://istio.io/) | Service mesh — mTLS, Gateway API, traffic management |
+| <img src="https://raw.githubusercontent.com/simple-icons/simple-icons/develop/icons/argo.svg" width="24"> | [Argo CD](https://argoproj.github.io/cd/) | GitOps continuous delivery (Helm multi-source, App of Apps) |
+| <img src="https://raw.githubusercontent.com/simple-icons/simple-icons/develop/icons/backstage.svg" width="24"> | [Backstage](https://backstage.io/) | Developer portal — service catalog, TechDocs, templates |
+| <img src="https://raw.githubusercontent.com/simple-icons/simple-icons/develop/icons/keycloak.svg" width="24"> | [Keycloak](https://www.keycloak.org/) | Identity and access management (IAM / SSO) |
+| <img src="https://raw.githubusercontent.com/simple-icons/simple-icons/develop/icons/prometheus.svg" width="24"> | [Prometheus](https://prometheus.io/) | Metrics collection and alerting |
+| <img src="https://raw.githubusercontent.com/simple-icons/simple-icons/develop/icons/grafana.svg" width="24"> | [Grafana](https://grafana.com/) | Observability dashboards |
+| | [Loki](https://grafana.com/oss/loki/) | Log aggregation |
+| | [Tempo](https://grafana.com/oss/tempo/) | Distributed tracing |
+| | [OpenTelemetry](https://opentelemetry.io/) | Telemetry collection (OTel Collector) |
+| | [cert-manager](https://cert-manager.io/) | Automated TLS certificates (Let's Encrypt) |
+| | [Sealed Secrets](https://sealed-secrets.netlify.app/) | Encrypted secrets in Git |
+| | [Cloudflare Tunnel](https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/) | Zero Trust internet exposure |
 
 ## Hardware
 
@@ -103,7 +77,7 @@ Most homelab repos use Flux + Talos + minimal networking. This one takes a diffe
 | Raspberry Pi 5 | 3 | ARM64 | 8 GB | Control plane + workers |
 | Bosgame M4 Neo | 1 | AMD64 | 16 GB | Worker (I/O-heavy workloads) |
 
-4 nodes, multi-architecture, all on WiFi. Managed by kubeadm with CRI-O runtime.
+4 nodes, multi-architecture. Managed by kubeadm with CRI-O runtime.
 
 <details>
 <summary><b>Scheduling Strategy</b></summary>
@@ -117,83 +91,16 @@ Most homelab repos use Flux + Talos + minimal networking. This one takes a diffe
 
 </details>
 
-## Architecture
+## Architecture & Security
 
-### Multi-Repository GitOps Strategy
+The architecture diagram above shows how the platform is organized into zones:
 
-```mermaid
-graph TB
-    PE["🔧 Platform Engineer"]
-    AD["💻 Application Developer"]
-
-    subgraph repos["Git Repositories"]
-        LAB["<b>kensan-lab</b><br/>(this repo)<br/>infrastructure/ · backstage/ · apps/"]
-        APP["<b>app-&lt;name&gt;</b><br/>repository<br/>overlays/dev · overlays/prod"]
-    end
-
-    subgraph cluster["Kubernetes Cluster"]
-        ARGO["Argo CD"]
-        K8S["Workloads"]
-    end
-
-    PE -->|commit & push| LAB
-    AD -->|commit & push| APP
-    LAB -->|"Backstage creates<br/>Argo CD Application CR"| APP
-    LAB --> ARGO
-    APP --> ARGO
-    ARGO -->|sync| K8S
-
-    style LAB fill:#2d333b,stroke:#EF7B4D,color:#fff
-    style APP fill:#2d333b,stroke:#58a6ff,color:#fff
-    style ARGO fill:#EF7B4D,stroke:#EF7B4D,color:#fff
-    style K8S fill:#326CE5,stroke:#326CE5,color:#fff
-```
-
-### Environment Isolation
-
-| Tier | Namespaces | Owner | Argo CD Project |
-|---|---|---|---|
-| **Infrastructure** | `istio-system`, `argocd`, `monitoring`, `backstage` | Platform Engineer | `platform-project` |
-| **Application** | `app-prod`, `app-dev` | App Developer | `app-project-prod`, `app-project-dev` |
-
-<details>
-<summary><b>Development Workflow</b></summary>
-
-**Platform Engineer (PE)**:
-1. Modify infrastructure settings in this repository
-2. Commit and push → Argo CD automatically syncs
-
-**Application Developer (AD)**:
-1. Create a new app from Backstage template
-2. Backstage auto-creates `app-<name>` repo + Argo CD Application CR
-3. Develop in `app-<name>` repo → Argo CD auto-deploys
-
-</details>
-
-## Repository Structure
-
-```
-infrastructure/                    # Core platform (GitOps-managed)
-├── gitops/argocd/                # Argo CD: applications/, projects/, root-apps/
-├── observability/                # Prometheus, Grafana, Loki, Tempo, OTel Collector
-├── network/                      # Cilium, Istio, Gateway API
-├── security/                     # cert-manager, Sealed Secrets, Keycloak
-├── environments/                 # app-dev, app-prod, observability, system-infra
-└── storage/                      # local-path-provisioner
-backstage/                        # Developer portal (app/ + manifests/)
-apps/                             # Sample applications
-docs/                             # ADRs, architecture, bootstrapping guides
-```
-
-## Security
-
-| Layer | Implementation |
-|-------|---------------|
-| **Secrets** | Sealed Secrets — encrypted in Git, decrypted in-cluster |
-| **Network** | Cilium network policies + Istio mTLS |
-| **Auth** | Keycloak JWT validation on all external traffic |
-| **RBAC** | Least-privilege access per namespace |
-| **Audit** | Complete Git history of all infrastructure changes |
+- **Gateway** — Cloudflare Tunnel (internet) and Cilium L2 LB (LAN) route traffic through Istio Gateway using Gateway API
+- **Applications** — workloads deployed to prod/dev namespaces via Argo CD, plus the kensan app in a dedicated namespace
+- **Internal Developer Platform** — Backstage provides a service catalog (catalog-info.yaml), TechDocs (MkDocs), and Golden Path scaffolding templates
+- **Observability** — applications emit telemetry to OTel Collector, which fans out to Prometheus (metrics), Loki (logs), and Tempo (traces), all visualized in Grafana. AlertManager sends alerts to Slack
+- **Security & Internal Network** — Sealed Secrets for Git-encrypted credentials, Cilium + Istio NetworkPolicy, cert-manager for automated TLS, Pod Security Standards
+- **Argo CD** — manages all zones via GitOps. Split into `platform-project` (infrastructure) and `app-project` (applications)
 
 <details>
 <summary><b>Internet Exposure</b></summary>
@@ -209,6 +116,21 @@ See [Configuration Guide](./docs/configuration.md) for details.
 
 </details>
 
+## Repository Structure
+
+```
+infrastructure/                    # Core platform (GitOps-managed)
+├── gitops/argocd/                # Argo CD: applications/, projects/, root-apps/
+├── observability/                # Prometheus, Grafana, Loki, Tempo, OTel Collector
+├── network/                      # Cilium, Istio, Gateway API
+├── security/                     # cert-manager, Sealed Secrets, Keycloak
+├── environments/                 # app-dev, app-prod, kensan-dev, kensan-prod, kensan-data, observability, system-infra
+└── storage/                      # local-path-provisioner
+backstage/                        # Developer portal (app/ + manifests/)
+apps/                             # Sample applications
+docs/                             # ADRs, architecture, bootstrapping guides
+```
+
 ## Documentation
 
 | Category | Links |
@@ -220,11 +142,11 @@ See [Configuration Guide](./docs/configuration.md) for details.
 
 ## Sample Application: kensan
 
-The `apps/kensan/` directory contains a full-stack application running on this platform — a personal productivity tool built with React, Go microservices, Python AI agents, and an Iceberg data lakehouse (Dagster + Polaris). It serves as both a real workload and a showcase of what the platform supports: multi-service deployments, database management, observability integration, and CI/CD via ArgoCD.
+The `apps/kensan/` directory contains a full-stack application running on this platform — a personal productivity tool built with React, Go microservices, Python AI agents, and an Iceberg data lakehouse (Dagster + Polaris). It serves as both a real workload and a showcase of what the platform supports: multi-service deployments, database management, CI/CD via Argo CD, and full observability integration with OpenTelemetry instrumentation across all services.
 
 ## Acknowledgments
 
-Inspired by the [Home Operations](https://discord.gg/home-operations) community and projects like [khuedoan/homelab](https://github.com/khuedoan/homelab) and [onedr0p/home-ops](https://github.com/onedr0p/home-ops).
+Built with reference to the [Home Operations](https://discord.gg/home-operations) community and other homelab repositories in the Kubernetes ecosystem.
 
 ## License
 
