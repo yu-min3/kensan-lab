@@ -4,9 +4,9 @@ metadata:
   name: istio-system
   labels:
     app.kubernetes.io/managed-by: argocd
-    goldship.platform/environment: infrastructure
-    goldship.platform/tier: platform
-    goldship.platform/component: service-mesh
+    kensan-lab.platform/environment: infrastructure
+    kensan-lab.platform/tier: platform
+    kensan-lab.platform/component: service-mesh
     pod-security.kubernetes.io/enforce: privileged
     pod-security.kubernetes.io/warn: baseline
   annotations:

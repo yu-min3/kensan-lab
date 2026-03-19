@@ -18,7 +18,7 @@ spec:
         from: Selector
         selector:
           matchLabels:
-            goldship.platform/environment: production
+            kensan-lab.platform/environment: production
 
   # Cloudflare Tunnel 経由のアクセス用（HTTP のみ、TLS は Cloudflare Edge が終端）
   - name: http-tunnel
@@ -30,7 +30,7 @@ spec:
         from: Selector
         selector:
           matchLabels:
-            goldship.platform/environment: production
+            kensan-lab.platform/environment: production
 
   - name: https
     protocol: HTTPS
@@ -41,7 +41,7 @@ spec:
         from: Selector
         selector:
           matchLabels:
-            goldship.platform/environment: production
+            kensan-lab.platform/environment: production
     tls:
       mode: Terminate
       certificateRefs:

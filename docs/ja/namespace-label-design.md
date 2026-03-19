@@ -16,19 +16,19 @@
 | ラベルキー | 値 | 説明 |
 |-----------|-----|------|
 | `app.kubernetes.io/managed-by` | `argocd` | GitOpsツールの識別（Kubernetes推奨ラベル） |
-| `goldship.platform/environment` | `production` \| `development` \| `infrastructure` | 環境タイプ |
-| `goldship.platform/tier` | `platform` \| `application` | 責務レイヤー（PE管理 vs AD管理） |
+| `kensan-lab.platform/environment` | `production` \| `development` \| `infrastructure` | 環境タイプ |
+| `kensan-lab.platform/tier` | `platform` \| `application` | 責務レイヤー（PE管理 vs AD管理） |
 
 ### オプショナルラベル（用途に応じて適用）
 
 | ラベルキー | 値（例） | 説明 | 適用対象 |
 |-----------|---------|------|----------|
-| `goldship.platform/component` | `keycloak`, `backstage`, `monitoring`, `service-mesh`, `core` | コンポーネント識別 | プラットフォーム層のみ |
+| `kensan-lab.platform/component` | `keycloak`, `backstage`, `monitoring`, `service-mesh`, `core` | コンポーネント識別 | プラットフォーム層のみ |
 | `istio-injection` | `enabled` | Istio自動サイドカーインジェクション | サービスメッシュ対象Namespace |
 
 ## ラベル値の定義
 
-### `goldship.platform/environment`
+### `kensan-lab.platform/environment`
 
 | 値 | 説明 | 対象Namespace例 |
 |----|------|-----------------|
@@ -36,14 +36,14 @@
 | `production` | 本番環境 | `backstage`, `platform-auth-prod`, `app-prod` |
 | `development` | 開発環境 | `platform-auth-dev`, `app-dev` |
 
-### `goldship.platform/tier`
+### `kensan-lab.platform/tier`
 
 | 値 | 説明 | 管理者 | 対象Namespace例 |
 |----|------|--------|-----------------|
 | `platform` | プラットフォームインフラ層 | Platform Engineer (PE) | `istio-system`, `backstage`, `platform-auth-prod` |
 | `application` | アプリケーション層 | Application Developer (AD) | `app-prod`, `app-dev`, `app-prod-<name>` |
 
-### `goldship.platform/component`
+### `kensan-lab.platform/component`
 
 | 値 | 説明 | 対象Namespace |
 |----|------|--------------|
@@ -65,9 +65,9 @@ metadata:
   name: <namespace-name>
   labels:
     app.kubernetes.io/managed-by: argocd
-    goldship.platform/environment: infrastructure
-    goldship.platform/tier: platform
-    goldship.platform/component: <component-name>
+    kensan-lab.platform/environment: infrastructure
+    kensan-lab.platform/tier: platform
+    kensan-lab.platform/component: <component-name>
     # オプション: Istio使用時
     # istio-injection: enabled
 ```
@@ -81,9 +81,9 @@ metadata:
   name: <namespace-name>
   labels:
     app.kubernetes.io/managed-by: argocd
-    goldship.platform/environment: production|development
-    goldship.platform/tier: platform
-    goldship.platform/component: <component-name>
+    kensan-lab.platform/environment: production|development
+    kensan-lab.platform/tier: platform
+    kensan-lab.platform/component: <component-name>
     istio-injection: enabled
 ```
 
@@ -97,8 +97,8 @@ metadata:
   name: <namespace-name>
   labels:
     app.kubernetes.io/managed-by: argocd
-    goldship.platform/environment: production|development
-    goldship.platform/tier: application
+    kensan-lab.platform/environment: production|development
+    kensan-lab.platform/tier: application
     istio-injection: enabled
 ```
 
@@ -121,7 +121,7 @@ spec:
   - from:
     - namespaceSelector:
         matchLabels:
-          goldship.platform/tier: platform
+          kensan-lab.platform/tier: platform
 ```
 
 ```yaml
@@ -141,8 +141,8 @@ spec:
   - from:
     - namespaceSelector:
         matchLabels:
-          goldship.platform/environment: production
-          goldship.platform/tier: application
+          kensan-lab.platform/environment: production
+          kensan-lab.platform/tier: application
 ```
 
 ### 3. RBAC での活用
@@ -185,7 +185,7 @@ metadata:
 spec:
   namespaceSelector:
     matchLabels:
-      goldship.platform/tier: platform
+      kensan-lab.platform/tier: platform
   selector:
     matchLabels:
       monitoring: enabled
@@ -220,8 +220,8 @@ labels:
 # 変更後:
 labels:
   app.kubernetes.io/managed-by: argocd
-  goldship.platform/environment: development
-  goldship.platform/tier: application
+  kensan-lab.platform/environment: development
+  kensan-lab.platform/tier: application
   istio-injection: enabled
 ```
 
@@ -254,7 +254,7 @@ labels:
 1. **必須ラベルは必ず設定**: `managed-by`, `environment`, `tier`
 2. **componentラベルはプラットフォーム層のみ**: アプリケーション層には不要
 3. **istio-injectionは明示的に設定**: サービスメッシュ対象のNamespaceのみ
-4. **カスタムラベルは最小限に**: 必要な場合は`goldship.platform/`プレフィックスを使用
+4. **カスタムラベルは最小限に**: 必要な場合は`kensan-lab.platform/`プレフィックスを使用
 5. **ラベル変更時はNetworkPolicyを確認**: セレクターが影響を受ける可能性
 
 このラベル設計により、プラットフォーム全体の一貫性、検索性、セキュリティが向上します。

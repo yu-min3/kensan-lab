@@ -4,8 +4,8 @@ metadata:
   name: app-dev
   labels:
     app.kubernetes.io/managed-by: argocd
-    goldship.platform/environment: development
-    goldship.platform/tier: application
+    kensan-lab.platform/environment: development
+    kensan-lab.platform/tier: application
     istio-injection: enabled
     pod-security.kubernetes.io/enforce: baseline
     pod-security.kubernetes.io/warn: restricted

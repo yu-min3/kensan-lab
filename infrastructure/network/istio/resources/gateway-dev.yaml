@@ -18,7 +18,7 @@ spec:
         from: Selector
         selector:
           matchLabels:
-            goldship.platform/environment: development
+            kensan-lab.platform/environment: development
 
   - name: https
     protocol: HTTPS
@@ -29,7 +29,7 @@ spec:
         from: Selector
         selector:
           matchLabels:
-            goldship.platform/environment: development
+            kensan-lab.platform/environment: development
     tls:
       mode: Terminate
       certificateRefs:

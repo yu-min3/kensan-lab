@@ -4,8 +4,8 @@ metadata:
   name: cert-manager
   labels:
     app.kubernetes.io/managed-by: argocd
-    goldship.platform/environment: infrastructure
-    goldship.platform/tier: platform
-    goldship.platform/component: certificate-management
+    kensan-lab.platform/environment: infrastructure
+    kensan-lab.platform/tier: platform
+    kensan-lab.platform/component: certificate-management
     pod-security.kubernetes.io/enforce: baseline
     pod-security.kubernetes.io/warn: restricted

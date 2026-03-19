@@ -3,5 +3,5 @@ kind: Namespace
 metadata:
   name: cloudflare-tunnel
   labels:
-    goldship.platform/component: cloudflare-tunnel
-    goldship.platform/category: network
+    kensan-lab.platform/component: cloudflare-tunnel
+    kensan-lab.platform/category: network
