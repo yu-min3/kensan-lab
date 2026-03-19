@@ -1,12 +1,6 @@
 # Secret Management Guide
 
-This platform uses [Sealed Secrets](https://github.com/bitnami-labs/sealed-secrets) to securely store sensitive information in the Git repository. This guide explains the procedures for creating and encrypting secrets needed by various components.
-
-## Prerequisites
-
-- `kubeseal` CLI is installed.
-- Sealed Secrets controller is deployed to the cluster (`infrastructure/security/sealed-secret/controller.yaml`).
-- `kubectl` can connect to the cluster.
+This platform uses [Sealed Secrets](https://github.com/bitnami-labs/sealed-secrets) to securely store sensitive information in the Git repository.
 
 ## How Sealed Secrets Work
 
@@ -16,46 +10,39 @@ This platform uses [Sealed Secrets](https://github.com/bitnami-labs/sealed-secre
 4. Commit this `SealedSecret` to Git and deploy it with Argo CD.
 5. The Sealed Secrets controller running in the cluster decrypts the `SealedSecret` and creates a regular `Secret` resource.
 
-**Important**: Never commit raw (unencrypted) Secrets to Git. Ensure the `temp/` directory is included in `.gitignore`.
+**Important**: Never commit raw (unencrypted) Secrets to Git.
 
----
+## Prerequisites
 
-## 1. GHCR Image Pull Secret
+- `kubeseal` CLI installed
+- Sealed Secrets controller deployed (`infrastructure/security/sealed-secrets/`)
+- `kubectl` configured to connect to the cluster
 
-Authentication credentials for pulling private container images from GitHub Container Registry (GHCR).
-
-Run the following script. Replace the placeholders (`<github-username>`, `<PAT>`, etc.) with your own information before executing.
-
-```bash
-./scripts/05-create-ghcr-secret.sh
-```
-
-This generates an encrypted `SealedSecret` such as `infrastructure/security/sealed-secret/ghcr-pull-secret-prod.yaml`.
-
----
-
-## 2. Grafana Admin Password
-
-Set the admin password for Grafana included in the Prometheus stack.
-
-Running the following script generates a random password and saves the encrypted `SealedSecret` to `infrastructure/observability/prometheus/grafana-sealed-secret.yaml`.
+## Creating a Sealed Secret
 
 ```bash
-./scripts/06a-create-grafana-secret.sh
+# 1. Create a raw secret (dry-run)
+kubectl create secret generic <secret-name> \
+  --namespace <namespace> \
+  --from-literal=<key>=<value> \
+  --dry-run=client -o yaml > /tmp/secret.yaml
+
+# 2. Encrypt with kubeseal
+kubeseal --format yaml < /tmp/secret.yaml > <output-path>/sealed-secret.yaml
+
+# 3. Clean up the raw secret
+rm /tmp/secret.yaml
 ```
 
----
+## Managed Secrets
 
-## 3. Backstage Secrets
+Sealed Secrets are stored alongside the components that use them:
 
-Set up the PostgreSQL database credentials and GitHub Personal Access Token used by Backstage.
-
-Run the following script. Replace the placeholders (`<strong-password>`, `<github-pat>`) with your own information before executing.
-
-```bash
-./scripts/07b-create-backstage-secrets.sh
-```
-
-This generates the following two encrypted files:
-- `backstage/manifests/base/postgresql-secret.yaml`
-- `backstage/manifests/base/backstage-secret.yaml`
+| Component | Location |
+|-----------|----------|
+| GHCR pull secrets | `infrastructure/environments/<env>/ghcr-pull-secret.yaml` |
+| Grafana | `infrastructure/observability/grafana/resources/` |
+| AlertManager (Slack) | `infrastructure/observability/prometheus/resources/` |
+| Backstage | `backstage/manifests/base/` |
+| Keycloak | `infrastructure/security/keycloak/overlays/` |
+| Cloudflare Tunnel | `infrastructure/network/cloudflare-tunnel/resources/` |

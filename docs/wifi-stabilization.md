@@ -17,9 +17,9 @@ When operating a bare-metal cluster (RPi5 x3) on WiFi only, the following proble
 
 | Node | Static IP | WiFi SSID | Watchdog Ping Target |
 |--------|--------|-----------|-----------------|
-| master | 192.168.0.107/24 | TP-Link_5CF0 | 192.168.0.1 (gateway) |
-| worker1 | 192.168.0.108/24 | TP-Link_5CF0 | 192.168.0.107 (master) |
-| worker2 | 192.168.0.109/24 | TP-Link_5CF0 | 192.168.0.107 (master) |
+| master | 192.168.0.XXX/24 | YOUR_SSID | 192.168.0.1 (gateway) |
+| worker1 | 192.168.0.XXX/24 | YOUR_SSID | 192.168.0.XXX (master) |
+| worker2 | 192.168.0.XXX/24 | YOUR_SSID | 192.168.0.XXX (master) |
 
 ## Countermeasures (4-Part Solution)
 
@@ -96,7 +96,7 @@ network:
       nameservers:
         addresses: [192.168.0.1, 8.8.8.8]
       access-points:
-        "TP-Link_5CF0":
+        "YOUR_SSID":
           auth:
             key-management: "psk"
             password: "<hashed-psk>"
@@ -191,8 +191,8 @@ A batch application script for all nodes is available at `temp/fix-wifi.sh`.
 
 ```bash
 # Apply to each node
-scp temp/fix-wifi.sh yu-min@<host>:~/
-ssh yu-min@<host> "sudo bash ~/fix-wifi.sh <STATIC_IP/CIDR> <PING_TARGET>"
+scp temp/fix-wifi.sh your-user@<host>:~/
+ssh your-user@<host> "sudo bash ~/fix-wifi.sh <STATIC_IP/CIDR> <PING_TARGET>"
 
 # Examples
 # worker2: sudo bash fix-wifi.sh 192.168.0.109/24 192.168.0.107
@@ -222,7 +222,7 @@ journalctl -t wifi-watchdog -f
 ## Troubleshooting
 
 ### Cannot SSH into Node
-1. Try with direct IP: `ssh yu-min@192.168.0.XXX` (mDNS may be temporarily down)
+1. Try with direct IP: `ssh your-user@192.168.0.XXX` (mDNS may be temporarily down)
 2. Physical access and restart (necessary when the watchdog can't recover in time)
 
 ### Connection Lost After netplan apply
