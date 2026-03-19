@@ -1,0 +1,323 @@
+<mxfile host="app.diagrams.net" version="29.6.4">
+  <diagram id="v2-layout" name="Layout v2">
+    <mxGraphModel dx="1400" dy="900" grid="0" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="0" pageScale="1" pageWidth="827" pageHeight="1169" background="#1e1e1e" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <!-- Title -->
+        <mxCell id="title" value="kensan-lab  |  Request Flow &amp; Component Interaction" style="text;align=center;fontColor=#E5E7EB;fontSize=20;fontStyle=1;fontFamily=Inter;" vertex="1" parent="1">
+          <mxGeometry x="250" y="10" width="550" height="30" as="geometry" />
+        </mxCell>
+        <!-- ========== EXTERNAL ========== -->
+        <mxCell id="user" value="👤 User" style="shape=ellipse;whiteSpace=wrap;fillColor=#374151;strokeColor=#6B7280;fontColor=#E5E7EB;fontSize=13;fontStyle=1;fontFamily=Inter;" vertex="1" parent="1">
+          <mxGeometry x="20" y="220" width="90" height="90" as="geometry" />
+        </mxCell>
+        <mxCell id="cf" value="☁️ Cloudflare&#xa;Tunnel" style="rounded=1;whiteSpace=wrap;fillColor=#2A3A5C;strokeColor=#4C8BF5;fontColor=#E5E7EB;fontSize=11;fontFamily=Inter;" vertex="1" parent="1">
+          <mxGeometry x="150" y="200" width="130" height="42" as="geometry" />
+        </mxCell>
+        <mxCell id="cilium_ext" value="Cilium L2 LB" style="rounded=1;whiteSpace=wrap;fillColor=#2A3A5C;strokeColor=#F8C517;fontColor=#E5E7EB;fontSize=11;fontFamily=Inter;" vertex="1" parent="1">
+          <mxGeometry x="157" y="290" width="115" height="38" as="geometry" />
+        </mxCell>
+        <!-- External edges -->
+        <mxCell id="e_user_cf" value="HTTPS" style="edgeStyle=orthogonalEdgeStyle;rounded=1;strokeColor=#4C8BF5;fontColor=#4C8BF5;fontSize=9;fontStyle=1;fontFamily=Inter;exitX=1;exitY=0.35;entryX=0;entryY=0.5;" edge="1" parent="1" source="user" target="cf">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e_user_lan" value="LAN" style="edgeStyle=orthogonalEdgeStyle;rounded=1;strokeColor=#F8C517;fontColor=#F8C517;fontSize=9;fontStyle=1;fontFamily=Inter;exitX=1;exitY=0.7;entryX=0;entryY=0.5;" edge="1" parent="1" source="user" target="cilium_ext">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <!-- ========== KUBERNETES CLUSTER ========== -->
+        <mxCell id="k8s" value="Kubernetes Cluster" style="swimlane;startSize=28;fillColor=#0d1117;strokeColor=#326CE5;fontColor=#326CE5;fontSize=15;fontStyle=1;fontFamily=Inter;rounded=1;swimlaneLine=0;strokeWidth=2;" vertex="1" parent="1">
+          <mxGeometry x="330" y="50" width="830" height="920" as="geometry" />
+        </mxCell>
+        <!-- ===== GATEWAY ZONE (left column) ===== -->
+        <mxCell id="gw_zone" value="Gateway" style="swimlane;startSize=20;fillColor=#111827;strokeColor=#466BB0;fontColor=#7EB8DA;fontSize=10;fontStyle=1;fontFamily=Inter;rounded=1;swimlaneLine=0;" vertex="1" parent="k8s">
+          <mxGeometry x="15" y="38" width="300" height="370" as="geometry" />
+        </mxCell>
+        <mxCell id="cfd_pod" value="Cloudflared Pod" style="rounded=1;whiteSpace=wrap;fillColor=#2A3A5C;strokeColor=#466BB0;fontColor=#E5E7EB;fontSize=12;fontStyle=1;fontFamily=Inter;" vertex="1" parent="gw_zone">
+          <mxGeometry x="15" y="35" width="270" height="45" as="geometry" />
+        </mxCell>
+        <mxCell id="istio_gw" value="Istio&#xa;Gateway" style="rounded=1;whiteSpace=wrap;fillColor=#2A3A5C;strokeColor=#466BB0;fontColor=#E5E7EB;fontSize=12;fontStyle=1;fontFamily=Inter;" vertex="1" parent="gw_zone">
+          <mxGeometry x="15" y="100" width="270" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="cilium_lb" value="Cilium L2 LB&#xa;(LoadBalancer for LAN access)" style="rounded=1;whiteSpace=wrap;fillColor=#2A3A5C;strokeColor=#F8C517;fontColor=#E5E7EB;fontSize=11;fontFamily=Inter;" vertex="1" parent="gw_zone">
+          <mxGeometry x="15" y="170" width="270" height="45" as="geometry" />
+        </mxCell>
+        <!-- Internal edges within Gateway -->
+        <mxCell id="e_cfd_gw" style="edgeStyle=orthogonalEdgeStyle;rounded=1;strokeColor=#4C8BF5;exitX=0.5;exitY=1;entryX=0.5;entryY=0;" edge="1" parent="gw_zone" source="cfd_pod" target="istio_gw">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e_lb_gw" style="edgeStyle=orthogonalEdgeStyle;rounded=1;strokeColor=#F8C517;exitX=0.5;exitY=0;entryX=0.5;entryY=1;" edge="1" parent="gw_zone" source="cilium_lb" target="istio_gw">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <!-- ===== IDP ZONE (right column, upper) ===== -->
+        <mxCell id="idp_zone" value="Internal Developer Platform" style="swimlane;startSize=20;fillColor=#111827;strokeColor=#9BF0E1;fontColor=#9BF0E1;fontSize=10;fontStyle=1;fontFamily=Inter;rounded=1;swimlaneLine=0;" vertex="1" parent="k8s">
+          <mxGeometry x="330" y="38" width="485" height="190" as="geometry" />
+        </mxCell>
+        <mxCell id="backstage" value="" style="rounded=1;fillColor=#1a3a3a;strokeColor=#9BF0E1;container=1;pointerEvents=0;" vertex="1" parent="idp_zone">
+          <mxGeometry x="12" y="26" width="460" height="150" as="geometry" />
+        </mxCell>
+        <mxCell id="bs_title" value="Backstage Developer Portal" style="text;align=left;fontColor=#E5E7EB;fontSize=11;fontStyle=1;fontFamily=Inter;" vertex="1" parent="backstage">
+          <mxGeometry x="10" y="5" width="220" height="18" as="geometry" />
+        </mxCell>
+        <mxCell id="bs_catalog" value="📋 Service Catalog — catalog-info.yaml で全サービスを追跡" style="text;align=left;fontColor=#E5E7EB;fontSize=9;fontFamily=Inter;" vertex="1" parent="backstage">
+          <mxGeometry x="10" y="28" width="370" height="14" as="geometry" />
+        </mxCell>
+        <mxCell id="bs_techdocs" value="📖 TechDocs — MkDocs で技術ドキュメントを集約・閲覧" style="text;align=left;fontColor=#E5E7EB;fontSize=9;fontFamily=Inter;" vertex="1" parent="backstage">
+          <mxGeometry x="10" y="46" width="370" height="14" as="geometry" />
+        </mxCell>
+        <mxCell id="bs_gp_label" value="✨ Golden Path — テンプレートからアプリを scaffold" style="text;align=left;fontColor=#E5E7EB;fontSize=9;fontFamily=Inter;" vertex="1" parent="backstage">
+          <mxGeometry x="10" y="64" width="340" height="14" as="geometry" />
+        </mxCell>
+        <mxCell id="tf" value="🐍 FastAPI" style="rounded=1;whiteSpace=wrap;fillColor=#0f2a2a;strokeColor=#9BF0E1;fontColor=#E5E7EB;fontSize=8;fontFamily=Inter;" vertex="1" parent="backstage">
+          <mxGeometry x="40" y="84" width="75" height="20" as="geometry" />
+        </mxCell>
+        <mxCell id="ts" value="📊 Streamlit" style="rounded=1;whiteSpace=wrap;fillColor=#0f2a2a;strokeColor=#9BF0E1;fontColor=#E5E7EB;fontSize=8;fontFamily=Inter;" vertex="1" parent="backstage">
+          <mxGeometry x="123" y="84" width="78" height="20" as="geometry" />
+        </mxCell>
+        <mxCell id="tm" value="..." style="rounded=1;whiteSpace=wrap;fillColor=#0f2a2a;strokeColor=#9BF0E1;fontColor=#6B7280;fontSize=8;dashed=1;" vertex="1" parent="backstage">
+          <mxGeometry x="209" y="84" width="30" height="20" as="geometry" />
+        </mxCell>
+        <mxCell id="gp_includes" value="Each template ships: app code + catalog-info.yaml + mkdocs.yml" style="text;align=left;fontColor=#6B7280;fontSize=7;fontFamily=Inter;" vertex="1" parent="backstage">
+          <mxGeometry x="10" y="110" width="340" height="14" as="geometry" />
+        </mxCell>
+        <!-- ===== APPLICATIONS ZONE (right column, lower) ===== -->
+        <mxCell id="app_zone" value="Applications" style="swimlane;startSize=20;fillColor=#111827;strokeColor=#34D399;fontColor=#34D399;fontSize=10;fontStyle=1;fontFamily=Inter;rounded=1;swimlaneLine=0;" vertex="1" parent="k8s">
+          <mxGeometry x="330" y="240" width="485" height="168" as="geometry" />
+        </mxCell>
+        <!-- app-prod -->
+        <mxCell id="ns_prod" value="" style="rounded=1;fillColor=#1a3a2a;strokeColor=#34D399;container=1;pointerEvents=0;" vertex="1" parent="app_zone">
+          <mxGeometry x="10" y="28" width="190" height="62" as="geometry" />
+        </mxCell>
+        <mxCell id="ns_prod_t" value="📦 app-prod" style="text;align=left;fontColor=#34D399;fontSize=9;fontStyle=1;fontFamily=Inter;" vertex="1" parent="ns_prod">
+          <mxGeometry x="6" y="3" width="75" height="14" as="geometry" />
+        </mxCell>
+        <mxCell id="pa1" value="app-A" style="rounded=1;whiteSpace=wrap;fillColor=#1F4F3A;strokeColor=#34D399;fontColor=#9CA3AF;fontSize=8;fontFamily=Inter;" vertex="1" parent="ns_prod">
+          <mxGeometry x="8" y="24" width="50" height="26" as="geometry" />
+        </mxCell>
+        <mxCell id="pa2" value="app-B" style="rounded=1;whiteSpace=wrap;fillColor=#1F4F3A;strokeColor=#34D399;fontColor=#9CA3AF;fontSize=8;fontFamily=Inter;" vertex="1" parent="ns_prod">
+          <mxGeometry x="66" y="24" width="50" height="26" as="geometry" />
+        </mxCell>
+        <mxCell id="pa3" value="..." style="rounded=1;whiteSpace=wrap;fillColor=#1F4F3A;strokeColor=#34D399;fontColor=#6B7280;fontSize=9;dashed=1;" vertex="1" parent="ns_prod">
+          <mxGeometry x="124" y="24" width="30" height="26" as="geometry" />
+        </mxCell>
+        <!-- app-dev -->
+        <mxCell id="ns_dev" value="" style="rounded=1;fillColor=#1a3a2a;strokeColor=#34D399;container=1;pointerEvents=0;" vertex="1" parent="app_zone">
+          <mxGeometry x="10" y="98" width="190" height="62" as="geometry" />
+        </mxCell>
+        <mxCell id="ns_dev_t" value="📦 app-dev" style="text;align=left;fontColor=#34D399;fontSize=9;fontStyle=1;fontFamily=Inter;" vertex="1" parent="ns_dev">
+          <mxGeometry x="6" y="3" width="75" height="14" as="geometry" />
+        </mxCell>
+        <mxCell id="da1" value="app-A" style="rounded=1;whiteSpace=wrap;fillColor=#1F4F3A;strokeColor=#34D399;fontColor=#9CA3AF;fontSize=8;fontFamily=Inter;" vertex="1" parent="ns_dev">
+          <mxGeometry x="8" y="24" width="50" height="26" as="geometry" />
+        </mxCell>
+        <mxCell id="da2" value="app-B" style="rounded=1;whiteSpace=wrap;fillColor=#1F4F3A;strokeColor=#34D399;fontColor=#9CA3AF;fontSize=8;fontFamily=Inter;" vertex="1" parent="ns_dev">
+          <mxGeometry x="66" y="24" width="50" height="26" as="geometry" />
+        </mxCell>
+        <mxCell id="da3" value="..." style="rounded=1;whiteSpace=wrap;fillColor=#1F4F3A;strokeColor=#34D399;fontColor=#6B7280;fontSize=9;dashed=1;" vertex="1" parent="ns_dev">
+          <mxGeometry x="124" y="24" width="30" height="26" as="geometry" />
+        </mxCell>
+        <!-- kensan -->
+        <mxCell id="kensan_ns" value="" style="rounded=1;fillColor=#1a2a1a;strokeColor=#34D399;strokeWidth=2;container=1;pointerEvents=0;" vertex="1" parent="app_zone">
+          <mxGeometry x="215" y="28" width="258" height="132" as="geometry" />
+        </mxCell>
+        <mxCell id="kensan_t" value="kensan (dedicated namespace)" style="text;align=center;fontColor=#34D399;fontSize=9;fontStyle=1;fontFamily=Inter;" vertex="1" parent="kensan_ns">
+          <mxGeometry x="5" y="4" width="235" height="14" as="geometry" />
+        </mxCell>
+        <mxCell id="kensan_app" value="🏠 kensan app&#xa;React + Go + Python" style="rounded=1;whiteSpace=wrap;fillColor=#1a3a2a;strokeColor=#34D399;fontColor=#E5E7EB;fontSize=10;fontFamily=Inter;" vertex="1" parent="kensan_ns">
+          <mxGeometry x="10" y="25" width="235" height="36" as="geometry" />
+        </mxCell>
+        <mxCell id="kensan_d" value="Full-stack: DB, Lakehouse, AI Agents&#xa;Independently managed (not via Backstage)" style="text;align=center;fontColor=#6B7280;fontSize=8;fontFamily=Inter;" vertex="1" parent="kensan_ns">
+          <mxGeometry x="10" y="68" width="235" height="24" as="geometry" />
+        </mxCell>
+        <!-- ===== OBSERVABILITY ZONE (full width) ===== -->
+        <mxCell id="obs_zone" value="Observability" style="swimlane;startSize=20;fillColor=#111827;strokeColor=#E6522C;fontColor=#F87171;fontSize=10;fontStyle=1;fontFamily=Inter;rounded=1;swimlaneLine=0;" vertex="1" parent="k8s">
+          <mxGeometry x="15" y="425" width="800" height="170" as="geometry" />
+        </mxCell>
+        <mxCell id="otel" value="OTel&#xa;Collector" style="rounded=1;whiteSpace=wrap;fillColor=#2a1510;strokeColor=#E6522C;fontColor=#E5E7EB;fontSize=11;fontStyle=1;fontFamily=Inter;" vertex="1" parent="obs_zone">
+          <mxGeometry x="15" y="35" width="100" height="42" as="geometry" />
+        </mxCell>
+        <mxCell id="prom" value="Prometheus&#xa;(metrics)" style="rounded=1;whiteSpace=wrap;fillColor=#2a1510;strokeColor=#E6522C;fontColor=#E5E7EB;fontSize=10;fontFamily=Inter;" vertex="1" parent="obs_zone">
+          <mxGeometry x="175" y="28" width="105" height="38" as="geometry" />
+        </mxCell>
+        <mxCell id="loki" value="Loki&#xa;(logs)" style="rounded=1;whiteSpace=wrap;fillColor=#2a1510;strokeColor=#E6522C;fontColor=#E5E7EB;fontSize=10;fontFamily=Inter;" vertex="1" parent="obs_zone">
+          <mxGeometry x="175" y="75" width="105" height="38" as="geometry" />
+        </mxCell>
+        <mxCell id="tempo" value="Tempo&#xa;(traces)" style="rounded=1;whiteSpace=wrap;fillColor=#2a1510;strokeColor=#E6522C;fontColor=#E5E7EB;fontSize=10;fontFamily=Inter;" vertex="1" parent="obs_zone">
+          <mxGeometry x="175" y="122" width="105" height="38" as="geometry" />
+        </mxCell>
+        <mxCell id="grafana" value="📊 Grafana" style="rounded=1;whiteSpace=wrap;fillColor=#2a1510;strokeColor=#F46800;fontColor=#E5E7EB;fontSize=12;fontStyle=1;fontFamily=Inter;" vertex="1" parent="obs_zone">
+          <mxGeometry x="345" y="45" width="115" height="42" as="geometry" />
+        </mxCell>
+        <mxCell id="alertmgr" value="AlertManager" style="rounded=1;whiteSpace=wrap;fillColor=#2a1510;strokeColor=#E6522C;fontColor=#E5E7EB;fontSize=10;fontFamily=Inter;" vertex="1" parent="obs_zone">
+          <mxGeometry x="345" y="110" width="115" height="38" as="geometry" />
+        </mxCell>
+        <!-- OTel fan-out edges -->
+        <mxCell id="e_o_p" style="edgeStyle=orthogonalEdgeStyle;rounded=1;strokeColor=#E6522C;exitX=1;exitY=0.3;entryX=0;entryY=0.5;" edge="1" parent="obs_zone" source="otel" target="prom">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e_o_l" style="edgeStyle=orthogonalEdgeStyle;rounded=1;strokeColor=#E6522C;exitX=1;exitY=0.5;entryX=0;entryY=0.5;" edge="1" parent="obs_zone" source="otel" target="loki">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e_o_t" style="edgeStyle=orthogonalEdgeStyle;rounded=1;strokeColor=#E6522C;exitX=1;exitY=0.7;entryX=0;entryY=0.5;" edge="1" parent="obs_zone" source="otel" target="tempo">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <!-- Backends to Grafana -->
+        <mxCell id="e_p_g" style="edgeStyle=orthogonalEdgeStyle;rounded=1;strokeColor=#F46800;exitX=1;exitY=0.5;entryX=0;entryY=0.3;" edge="1" parent="obs_zone" source="prom" target="grafana">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e_l_g" style="edgeStyle=orthogonalEdgeStyle;rounded=1;strokeColor=#F46800;exitX=1;exitY=0.5;entryX=0;entryY=0.7;" edge="1" parent="obs_zone" source="loki" target="grafana">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="320" y="94" />
+              <mxPoint x="320" y="75" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e_t_g" style="edgeStyle=orthogonalEdgeStyle;rounded=1;strokeColor=#F46800;exitX=1;exitY=0.5;entryX=0;entryY=1;" edge="1" parent="obs_zone" source="tempo" target="grafana">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="310" y="141" />
+              <mxPoint x="310" y="87" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <!-- Prometheus to AlertManager -->
+        <mxCell id="e_p_a" style="edgeStyle=orthogonalEdgeStyle;rounded=1;strokeColor=#E6522C;exitX=0.5;exitY=1;entryX=0.5;entryY=0;" edge="1" parent="obs_zone" source="prom" target="alertmgr">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="228" y="100" />
+              <mxPoint x="403" y="100" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <!-- ===== SECURITY & INTERNAL NETWORK ZONE (full width) ===== -->
+        <mxCell id="secnet_zone" value="Security &amp; Internal Network" style="swimlane;startSize=20;fillColor=#111827;strokeColor=#8B5CF6;fontColor=#B794F4;fontSize=10;fontStyle=1;fontFamily=Inter;rounded=1;swimlaneLine=0;" vertex="1" parent="k8s">
+          <mxGeometry x="15" y="610" width="800" height="110" as="geometry" />
+        </mxCell>
+        <!-- Row 1: Keycloak, NetworkPolicy, Cilium CNI -->
+        <mxCell id="keycloak" value="🔑 Keycloak&#xa;IAM / JWT Auth" style="rounded=1;whiteSpace=wrap;fillColor=#2A3A5C;strokeColor=#8B5CF6;fontColor=#E5E7EB;fontSize=10;fontFamily=Inter;" vertex="1" parent="secnet_zone">
+          <mxGeometry x="15" y="26" width="200" height="35" as="geometry" />
+        </mxCell>
+        <mxCell id="netpol" value="NetworkPolicy&#xa;(Cilium + Istio)" style="rounded=1;whiteSpace=wrap;fillColor=#2A3A5C;strokeColor=#8B5CF6;fontColor=#E5E7EB;fontSize=9;fontFamily=Inter;" vertex="1" parent="secnet_zone">
+          <mxGeometry x="235" y="26" width="200" height="35" as="geometry" />
+        </mxCell>
+        <mxCell id="cilium_cni" value="Cilium CNI&#xa;kube-proxy replacement" style="rounded=1;whiteSpace=wrap;fillColor=#2A3A5C;strokeColor=#F8C517;fontColor=#E5E7EB;fontSize=9;fontFamily=Inter;" vertex="1" parent="secnet_zone">
+          <mxGeometry x="455" y="26" width="200" height="35" as="geometry" />
+        </mxCell>
+        <!-- Row 2: Sealed Secrets, cert-manager, Hubble -->
+        <mxCell id="sealed" value="Sealed Secrets" style="rounded=1;whiteSpace=wrap;fillColor=#2A3A5C;strokeColor=#8B5CF6;fontColor=#E5E7EB;fontSize=9;fontFamily=Inter;" vertex="1" parent="secnet_zone">
+          <mxGeometry x="15" y="72" width="200" height="26" as="geometry" />
+        </mxCell>
+        <mxCell id="certmgr" value="cert-manager + Let&#39;s Encrypt" style="rounded=1;whiteSpace=wrap;fillColor=#2A3A5C;strokeColor=#8B5CF6;fontColor=#E5E7EB;fontSize=9;fontFamily=Inter;" vertex="1" parent="secnet_zone">
+          <mxGeometry x="235" y="72" width="200" height="26" as="geometry" />
+        </mxCell>
+        <mxCell id="hubble" value="Hubble" style="rounded=1;whiteSpace=wrap;fillColor=#2A3A5C;strokeColor=#F8C517;fontColor=#9CA3AF;fontSize=9;fontFamily=Inter;" vertex="1" parent="secnet_zone">
+          <mxGeometry x="455" y="72" width="200" height="26" as="geometry" />
+        </mxCell>
+        <!-- ===== ARGO CD BAR (full width, bottom) ===== -->
+        <mxCell id="argo_accent" value="" style="shape=line;strokeColor=#EF7B4D;strokeWidth=1;dashed=1;" vertex="1" parent="k8s">
+          <mxGeometry x="15" y="735" width="800" height="5" as="geometry" />
+        </mxCell>
+        <mxCell id="argo_bar" value="" style="rounded=1;fillColor=#1a1510;strokeColor=#EF7B4D;strokeWidth=2;container=1;pointerEvents=0;" vertex="1" parent="k8s">
+          <mxGeometry x="15" y="743" width="800" height="55" as="geometry" />
+        </mxCell>
+        <mxCell id="argo_icon" value="⚙️ Argo CD  — GitOps for all zones" style="text;align=left;fontColor=#EF7B4D;fontSize=13;fontStyle=1;fontFamily=Inter;" vertex="1" parent="argo_bar">
+          <mxGeometry x="12" y="5" width="300" height="20" as="geometry" />
+        </mxCell>
+        <mxCell id="argo_plat" value="platform-project → Gateway, Security, Observability, IDP" style="text;align=left;fontColor=#9CA3AF;fontSize=9;fontFamily=Inter;" vertex="1" parent="argo_bar">
+          <mxGeometry x="12" y="28" width="330" height="14" as="geometry" />
+        </mxCell>
+        <mxCell id="argo_app" value="app-project → app-prod, app-dev, kensan" style="text;align=left;fontColor=#9CA3AF;fontSize=9;fontFamily=Inter;" vertex="1" parent="argo_bar">
+          <mxGeometry x="430" y="28" width="280" height="14" as="geometry" />
+        </mxCell>
+        <mxCell id="argo_git" value="📁 Git Repo = Single Source of Truth" style="text;align=right;fontColor=#6B7280;fontSize=9;fontFamily=Inter;" vertex="1" parent="argo_bar">
+          <mxGeometry x="530" y="5" width="250" height="20" as="geometry" />
+        </mxCell>
+        <!-- ===== CROSS-ZONE EDGES ===== -->
+        <!-- External to Gateway: Cloudflare → Cloudflared Pod -->
+        <mxCell id="e_cf_cfd" style="edgeStyle=orthogonalEdgeStyle;rounded=1;strokeColor=#4C8BF5;exitX=1;exitY=0.5;entryX=0;entryY=0.5;" edge="1" parent="1" source="cf" target="cfd_pod">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <!-- External to Gateway: Cilium L2 LB (ext) → Cilium L2 LB (in gateway) -->
+        <mxCell id="e_lan_lb" style="edgeStyle=orthogonalEdgeStyle;rounded=1;strokeColor=#F8C517;exitX=1;exitY=0.5;entryX=0;entryY=0.5;" edge="1" parent="1" source="cilium_ext" target="cilium_lb">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <!-- Istio GW → IDP (route) -->
+        <mxCell id="e_gw_idp" value="route" style="edgeStyle=orthogonalEdgeStyle;rounded=1;strokeColor=#466BB0;fontColor=#7EB8DA;labelBackgroundColor=#1e1e1e;fontSize=9;fontFamily=Inter;exitX=1;exitY=0.3;entryX=0;entryY=0.5;" edge="1" parent="k8s" source="istio_gw" target="idp_zone">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <!-- Istio GW → Applications (route) -->
+        <mxCell id="e_gw_app" value="route" style="edgeStyle=orthogonalEdgeStyle;rounded=1;strokeColor=#466BB0;fontColor=#7EB8DA;labelBackgroundColor=#1e1e1e;fontSize=9;fontFamily=Inter;exitX=1;exitY=0.7;entryX=0;entryY=0.5;" edge="1" parent="k8s" source="istio_gw" target="app_zone">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <!-- Istio GW → Observability (grafana ui, prometheus) -->
+        <mxCell id="e_gw_obs" value="grafana ui&#xa;prometheus" style="edgeStyle=orthogonalEdgeStyle;rounded=1;strokeColor=#466BB0;fontColor=#7EB8DA;labelBackgroundColor=#1e1e1e;fontSize=9;fontFamily=Inter;exitX=0.5;exitY=1;entryX=0.2;entryY=0;" edge="1" parent="k8s" source="gw_zone" target="obs_zone">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <!-- Istio GW → Argo CD (argo ui) -->
+        <mxCell id="e_gw_argo" value="argo ui" style="edgeStyle=orthogonalEdgeStyle;rounded=1;strokeColor=#466BB0;fontColor=#7EB8DA;labelBackgroundColor=#1e1e1e;fontSize=9;fontFamily=Inter;exitX=0.3;exitY=1;entryX=0.15;entryY=0;" edge="1" parent="k8s" source="gw_zone" target="argo_bar">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <!-- Golden Path → Applications (scaffold + track) -->
+        <mxCell id="e_gp_app" value="scaffold&#xa;+ track" style="edgeStyle=orthogonalEdgeStyle;rounded=1;strokeColor=#9BF0E1;fontColor=#9BF0E1;labelBackgroundColor=#1e1e1e;fontSize=8;fontFamily=Inter;dashed=1;exitX=0.3;exitY=1;entryX=0.7;entryY=0;" edge="1" parent="k8s" source="idp_zone" target="app_zone">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <!-- Applications → OTel (log, trace, metrics) -->
+        <mxCell id="e_app_otel" value="log, trace, metrics" style="edgeStyle=orthogonalEdgeStyle;rounded=1;strokeColor=#E6522C;fontColor=#E6522C;labelBackgroundColor=#1e1e1e;fontSize=9;fontFamily=Inter;exitX=0.5;exitY=1;entryX=0.5;entryY=0;" edge="1" parent="k8s" source="app_zone" target="obs_zone">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <!-- Keycloak JWT to Gateway (cross-zone) -->
+        <mxCell id="e_kc_gw" value="JWT" style="edgeStyle=orthogonalEdgeStyle;rounded=1;strokeColor=#8B5CF6;fontColor=#B794F4;labelBackgroundColor=#1e1e1e;fontSize=8;fontFamily=Inter;dashed=1;exitX=0.25;exitY=0;entryX=0.5;entryY=1;" edge="1" parent="k8s" source="secnet_zone" target="gw_zone">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <!-- ========== SLACK (outside cluster, right of Observability) ========== -->
+        <mxCell id="slack" value="💬 Slack" style="rounded=1;whiteSpace=wrap;fillColor=#374151;strokeColor=#6B7280;fontColor=#E5E7EB;fontSize=11;fontFamily=Inter;" vertex="1" parent="1">
+          <mxGeometry x="1200" y="585" width="80" height="32" as="geometry" />
+        </mxCell>
+        <mxCell id="e_a_s" value="alert" style="edgeStyle=orthogonalEdgeStyle;rounded=1;strokeColor=#F87171;fontColor=#F87171;labelBackgroundColor=#1e1e1e;fontSize=9;fontFamily=Inter;" edge="1" parent="1" source="alertmgr" target="slack">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <!-- ========== LEGEND ========== -->
+        <mxCell id="leg_t" value="Legend" style="text;align=left;fontColor=#9CA3AF;fontSize=10;fontStyle=1;fontFamily=Inter;" vertex="1" parent="1">
+          <mxGeometry x="30" y="990" width="50" height="18" as="geometry" />
+        </mxCell>
+        <mxCell id="l1" value="" style="rounded=1;fillColor=none;strokeColor=#34D399;strokeWidth=2;" vertex="1" parent="1">
+          <mxGeometry x="30" y="1012" width="14" height="14" as="geometry" />
+        </mxCell>
+        <mxCell id="l1t" value="Application" style="text;align=left;fontColor=#9CA3AF;fontSize=9;fontFamily=Inter;" vertex="1" parent="1">
+          <mxGeometry x="50" y="1011" width="70" height="16" as="geometry" />
+        </mxCell>
+        <mxCell id="l2" value="" style="rounded=1;fillColor=none;strokeColor=#EF7B4D;strokeWidth=2;" vertex="1" parent="1">
+          <mxGeometry x="130" y="1012" width="14" height="14" as="geometry" />
+        </mxCell>
+        <mxCell id="l2t" value="GitOps" style="text;align=left;fontColor=#9CA3AF;fontSize=9;fontFamily=Inter;" vertex="1" parent="1">
+          <mxGeometry x="150" y="1011" width="50" height="16" as="geometry" />
+        </mxCell>
+        <mxCell id="l3" value="" style="rounded=1;fillColor=none;strokeColor=#8B5CF6;strokeWidth=2;" vertex="1" parent="1">
+          <mxGeometry x="210" y="1012" width="14" height="14" as="geometry" />
+        </mxCell>
+        <mxCell id="l3t" value="Security" style="text;align=left;fontColor=#9CA3AF;fontSize=9;fontFamily=Inter;" vertex="1" parent="1">
+          <mxGeometry x="230" y="1011" width="55" height="16" as="geometry" />
+        </mxCell>
+        <mxCell id="l4" value="" style="rounded=1;fillColor=none;strokeColor=#E6522C;strokeWidth=2;" vertex="1" parent="1">
+          <mxGeometry x="295" y="1012" width="14" height="14" as="geometry" />
+        </mxCell>
+        <mxCell id="l4t" value="Observability" style="text;align=left;fontColor=#9CA3AF;fontSize=9;fontFamily=Inter;" vertex="1" parent="1">
+          <mxGeometry x="315" y="1011" width="80" height="16" as="geometry" />
+        </mxCell>
+        <mxCell id="l5" value="" style="rounded=1;fillColor=none;strokeColor=#9BF0E1;strokeWidth=2;" vertex="1" parent="1">
+          <mxGeometry x="400" y="1012" width="14" height="14" as="geometry" />
+        </mxCell>
+        <mxCell id="l5t" value="IDP" style="text;align=left;fontColor=#9CA3AF;fontSize=9;fontFamily=Inter;" vertex="1" parent="1">
+          <mxGeometry x="420" y="1011" width="30" height="16" as="geometry" />
+        </mxCell>
+        <mxCell id="l6" value="" style="rounded=1;fillColor=none;strokeColor=#466BB0;strokeWidth=2;" vertex="1" parent="1">
+          <mxGeometry x="460" y="1012" width="14" height="14" as="geometry" />
+        </mxCell>
+        <mxCell id="l6t" value="Gateway" style="text;align=left;fontColor=#9CA3AF;fontSize=9;fontFamily=Inter;" vertex="1" parent="1">
+          <mxGeometry x="480" y="1011" width="55" height="16" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>
