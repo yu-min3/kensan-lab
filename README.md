@@ -1,5 +1,7 @@
 <div align="center">
 
+<a href="README.md">English</a> | <a href="README.ja.md">日本語</a>
+
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/assets/kensan-logo-dark.svg" width="120">
   <source media="(prefers-color-scheme: light)" srcset="docs/assets/kensan-logo-light.svg" width="120">
@@ -41,18 +43,58 @@ Most homelab repos use Flux + Talos + minimal networking. This one takes a diffe
 
 ## Tech Stack
 
-| Category | Technology | Purpose |
-|---|---|---|
-| **Orchestration** | Kubernetes (kubeadm) | Bare-metal, no managed K8s |
-| **Container Runtime** | CRI-O | Lightweight OCI runtime |
-| **CNI / Load Balancer** | Cilium | kube-proxy replacement, L2 LoadBalancer |
-| **Service Mesh** | Istio + Gateway API | mTLS, traffic management |
-| **Authentication** | Keycloak | JWT-based auth (prod/dev) |
-| **GitOps** | Argo CD | Helm multi-source Application pattern |
-| **Secrets** | Sealed Secrets | Encrypted secrets in Git |
-| **Certificates** | cert-manager + Let's Encrypt | Automated TLS |
-| **Observability** | Prometheus, Grafana, Loki, Tempo | Metrics, dashboards, logs, traces |
-| **Developer Portal** | Backstage | Self-service templates and catalog |
+<table>
+  <tr>
+    <td><b>Orchestration</b></td>
+    <td><img src="https://img.shields.io/badge/Kubernetes_(kubeadm)-326CE5?style=for-the-badge&logo=kubernetes&logoColor=white" height="28"></td>
+    <td>Bare-metal, no managed K8s</td>
+  </tr>
+  <tr>
+    <td><b>Container Runtime</b></td>
+    <td><img src="https://img.shields.io/badge/CRI--O-1488C6?style=for-the-badge&logoColor=white" height="28"></td>
+    <td>Lightweight OCI runtime</td>
+  </tr>
+  <tr>
+    <td><b>CNI / Load Balancer</b></td>
+    <td><img src="https://img.shields.io/badge/Cilium-F8C517?style=for-the-badge&logo=cilium&logoColor=black" height="28"></td>
+    <td>kube-proxy replacement, L2 LoadBalancer, Hubble</td>
+  </tr>
+  <tr>
+    <td><b>Service Mesh</b></td>
+    <td><img src="https://img.shields.io/badge/Istio-466BB0?style=for-the-badge&logo=istio&logoColor=white" height="28"> <img src="https://img.shields.io/badge/Gateway_API-326CE5?style=for-the-badge&logo=kubernetes&logoColor=white" height="28"></td>
+    <td>mTLS, traffic management, zero trust</td>
+  </tr>
+  <tr>
+    <td><b>Authentication</b></td>
+    <td><img src="https://img.shields.io/badge/Keycloak-4D4D4D?style=for-the-badge&logo=keycloak&logoColor=white" height="28"></td>
+    <td>JWT-based auth, Istio integration</td>
+  </tr>
+  <tr>
+    <td><b>GitOps</b></td>
+    <td><img src="https://img.shields.io/badge/Argo_CD-EF7B4D?style=for-the-badge&logo=argo&logoColor=white" height="28"></td>
+    <td>Helm multi-source Application pattern</td>
+  </tr>
+  <tr>
+    <td><b>Secrets</b></td>
+    <td><img src="https://img.shields.io/badge/Sealed_Secrets-326CE5?style=for-the-badge&logo=kubernetes&logoColor=white" height="28"></td>
+    <td>Encrypted secrets in Git</td>
+  </tr>
+  <tr>
+    <td><b>Certificates</b></td>
+    <td><img src="https://img.shields.io/badge/cert--manager-003A70?style=for-the-badge&logoColor=white" height="28"> <img src="https://img.shields.io/badge/Let's_Encrypt-003A70?style=for-the-badge&logo=letsencrypt&logoColor=white" height="28"></td>
+    <td>Automated TLS</td>
+  </tr>
+  <tr>
+    <td><b>Observability</b></td>
+    <td><img src="https://img.shields.io/badge/Prometheus-E6522C?style=for-the-badge&logo=prometheus&logoColor=white" height="28"> <img src="https://img.shields.io/badge/Grafana-F46800?style=for-the-badge&logo=grafana&logoColor=white" height="28"></td>
+    <td>Metrics, dashboards, logs (Loki), traces (Tempo)</td>
+  </tr>
+  <tr>
+    <td><b>Developer Portal</b></td>
+    <td><img src="https://img.shields.io/badge/Backstage-9BF0E1?style=for-the-badge&logo=backstage&logoColor=black" height="28"></td>
+    <td>Self-service templates and catalog</td>
+  </tr>
+</table>
 
 ## Hardware
 
@@ -79,25 +121,32 @@ Most homelab repos use Flux + Talos + minimal networking. This one takes a diffe
 
 ### Multi-Repository GitOps Strategy
 
-```
-Platform Engineer (PE)                    Application Developer (AD)
-        |                                          |
-        v                                          v
-+------------------+    Argo CD Application   +--------------+
-|  kensan-lab      |<------- CR ------------->|  app-<name>  |
-|  (this repo)     |    auto-created by       |  repository  |
-|                  |    Backstage              |              |
-| infrastructure/  |                          | overlays/    |
-| backstage/       |                          |   dev/       |
-| apps/            |                          |   prod/      |
-+--------+---------+                          +------+-------+
-         |                                          |
-         +------------> Argo CD <-------------------+
-                           |
-                     +-----v-----+
-                     | Kubernetes |
-                     |  Cluster   |
-                     +-----------+
+```mermaid
+graph TB
+    PE["🔧 Platform Engineer"]
+    AD["💻 Application Developer"]
+
+    subgraph repos["Git Repositories"]
+        LAB["<b>kensan-lab</b><br/>(this repo)<br/>infrastructure/ · backstage/ · apps/"]
+        APP["<b>app-&lt;name&gt;</b><br/>repository<br/>overlays/dev · overlays/prod"]
+    end
+
+    subgraph cluster["Kubernetes Cluster"]
+        ARGO["Argo CD"]
+        K8S["Workloads"]
+    end
+
+    PE -->|commit & push| LAB
+    AD -->|commit & push| APP
+    LAB -->|"Backstage creates<br/>Argo CD Application CR"| APP
+    LAB --> ARGO
+    APP --> ARGO
+    ARGO -->|sync| K8S
+
+    style LAB fill:#2d333b,stroke:#EF7B4D,color:#fff
+    style APP fill:#2d333b,stroke:#58a6ff,color:#fff
+    style ARGO fill:#EF7B4D,stroke:#EF7B4D,color:#fff
+    style K8S fill:#326CE5,stroke:#326CE5,color:#fff
 ```
 
 ### Environment Isolation
@@ -164,7 +213,7 @@ See [Configuration Guide](./docs/configuration.md) for details.
 
 | Category | Links |
 |----------|-------|
-| **Getting Started** | [Installation](./docs/installation.md) / [Configuration](./docs/configuration.md) / [Bootstrapping](./docs/bootstrapping/index.md) / [Secret Management](./docs/secret-management/index.md) |
+| **Getting Started** | [Installation](./docs/installation.md) / [Configuration](./docs/configuration.md) / [Bootstrapping](./docs/bootstrapping/index.md) _(in progress)_ / [Secret Management](./docs/secret-management/index.md) |
 | **Architecture** | [Platform Design](./docs/architecture/design.md) / [Repository Structure](./docs/architecture/repository-structure.md) / [Namespace Labels](./docs/namespace-label-design.md) / [ADRs](./docs/adr/) |
 | **Development** | [Kustomize Guidelines](./docs/kustomize-guidelines.md) / [Roadmap](./docs/roadmap.md) |
 | **日本語** | [Japanese documentation (日本語ドキュメント)](./docs/ja/) |
