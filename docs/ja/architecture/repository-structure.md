@@ -41,8 +41,6 @@ kensan-lab/
 │   ├── app-config.kubernetes.yaml # Configuration for Kubernetes production
 │   ├── Makefile               # Build automation
 │   └── yarn.sh                # Yarn wrapper script
-├── scripts/                   # Operational scripts
-│   └── split_crds.py          # Splits CRDs from Helm output
 ├── docs/                      # Documentation
 │   ├── architecture/          # Architecture and design documents
 │   │   ├── design.md
