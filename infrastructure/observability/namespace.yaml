@@ -4,6 +4,6 @@ metadata:
   name: monitoring
   labels:
     app.kubernetes.io/managed-by: argocd
-    goldship.platform/environment: infrastructure
-    goldship.platform/tier: platform
-    goldship.platform/component: observability
+    kensan-lab.platform/environment: infrastructure
+    kensan-lab.platform/tier: platform
+    kensan-lab.platform/component: observability

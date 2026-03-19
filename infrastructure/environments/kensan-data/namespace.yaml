@@ -4,7 +4,7 @@ metadata:
   name: kensan-data
   labels:
     app.kubernetes.io/managed-by: argocd
-    goldship.platform/environment: infrastructure
-    goldship.platform/tier: infrastructure
+    kensan-lab.platform/environment: infrastructure
+    kensan-lab.platform/tier: infrastructure
     pod-security.kubernetes.io/enforce: baseline
     pod-security.kubernetes.io/warn: restricted

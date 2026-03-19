@@ -19,7 +19,7 @@ spec:
         from: Selector
         selector:
           matchLabels:
-            goldship.platform/environment: infrastructure
+            kensan-lab.platform/environment: infrastructure
 
   - name: https
     protocol: HTTPS
@@ -30,7 +30,7 @@ spec:
         from: Selector
         selector:
           matchLabels:
-            goldship.platform/environment: infrastructure
+            kensan-lab.platform/environment: infrastructure
     tls:
       mode: Terminate
       certificateRefs:
