@@ -43,7 +43,6 @@ kensan-lab/
 │   │   └── yarn.sh             # Yarn wrapper script
 ├── docs/                        # Documentation
 │   ├── architecture/            # Architecture and design documents
-│   │   ├── design.md
 │   │   └── repository-structure.md
 │   ├── adr/                     # Architecture Decision Records
 │   ├── bootstrapping/           # Guide to building from scratch
@@ -75,4 +74,4 @@ kensan-lab/
 > See the `README-CRD-SPLIT.md` in each component's directory for details.
 
 ---
-*Note: Information about Backstage templates and the generated application repositories has been moved to `backstage-app/README.md`.*
+*Note: Information about Backstage templates and the generated application repositories has been moved to `backstage/app/README.md`.*
