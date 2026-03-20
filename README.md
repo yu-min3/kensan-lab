@@ -89,7 +89,7 @@ The platform uses Cilium LoadBalancer with L2 announcements for local network ac
 | Device         | Qty | Arch  | RAM   | Role                         |
 | -------------- | --- | ----- | ----- | ---------------------------- |
 | Raspberry Pi 5 | 3   | ARM64 | 8 GB  | Control plane + workers      |
-| Bosgame M4 Neo | 1   | AMD64 | 16 GB | Worker (I/O-heavy workloads) |
+| Bosgame M4 Neo | 1   | AMD64 | 32 GB | Worker (I/O-heavy workloads) |
 
 4 nodes, multi-architecture. Managed by kubeadm with CRI-O runtime.
 
@@ -125,7 +125,7 @@ docs/                             # ADRs, architecture, bootstrapping guides
 | Category            | Links                                                                                                                                                                                                       |
 | ------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **Getting Started** | [Installation](./docs/installation.md) / [Configuration](./docs/configuration.md) / [Bootstrapping](./docs/bootstrapping/index.md) _(in progress)_ / [Secret Management](./docs/secret-management/index.md) |
-| **Architecture**    | [Platform Design](./docs/architecture/design.md) / [Repository Structure](./docs/architecture/repository-structure.md) / [Namespace Labels](./docs/namespace-label-design.md) / [ADRs](./docs/adr/)         |
+| **Architecture**    | [Repository Structure](./docs/architecture/repository-structure.md) / [Namespace Labels](./docs/namespace-label-design.md) / [ADRs](./docs/adr/)                                                           |
 | **Development**     | [Kustomize Guidelines](./docs/kustomize-guidelines.md) / [Roadmap](./docs/roadmap.md)                                                                                                                       |
 | **日本語**          | [Japanese documentation (日本語ドキュメント)](./docs/ja/)                                                                                                                                                   |
 
