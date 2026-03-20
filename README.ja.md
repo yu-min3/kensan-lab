@@ -26,7 +26,7 @@
 
 > これは**リファレンスアーキテクチャ**であり、そのまま使えるテンプレートではありません。Bootstrap 自動化（Ansible + Makefile）は今後公開予定です。学習リソースおよび技術記事の補足資料として公開しています。シークレット、ドメイン、IP レンジは各自の環境に合わせてください。詳細は [Configuration Guide](./docs/configuration.md) を参照。
 
-## なぜこれを作ったのか
+## 目的
 
 [Golden Kubestronaut](https://www.cncf.io/training/kubestronaut/) が全資格の知識を実際に動くシステムに落とし込むために構築したプラットフォームです。
 
@@ -39,10 +39,8 @@
 <div align="center">
 <img src="docs/assets/request-flow.png" alt="プラットフォームアーキテクチャ — リクエストフロー＆コンポーネント連携" width="800">
 <br>
-<sub>トラフィックがプラットフォームをどう流れ、各コンポーネントがどう連携するか</sub>
 </div>
 
-プラットフォームは以下のゾーンに分けて構成されています:
 
 - **Gateway** — Cloudflare Tunnel（インターネット）と Cilium L2 LB（LAN）が、Gateway API を使って Istio Gateway にトラフィックをルーティング
 - **Applications** — Argo CD 経由で prod/dev namespace にデプロイされるワークロード、および kensan アプリ（専用 namespace）
@@ -68,22 +66,22 @@
 
 ## 技術スタック
 
-|                                                             | 名前                                                                                                | 説明                                                      |
-| :---------------------------------------------------------: | --------------------------------------------------------------------------------------------------- | --------------------------------------------------------- |
-|   <img src="docs/assets/logos/kubernetes.svg" width="32">   | [Kubernetes](https://kubernetes.io/)                                                                | コンテナオーケストレーション（kubeadm、ベアメタル）       |
-|     <img src="docs/assets/logos/cilium.svg" width="32">     | [Cilium](https://cilium.io/)                                                                        | eBPF ベースの CNI、kube-proxy 代替、L2 LB、Hubble         |
-|     <img src="docs/assets/logos/istio.svg" width="32">      | [Istio](https://istio.io/)                                                                          | サービスメッシュ — mTLS、Gateway API、トラフィック管理    |
+|                                                             | 名前                                                                                                | 説明                                                                      |
+| :---------------------------------------------------------: | --------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------- |
+|   <img src="docs/assets/logos/kubernetes.svg" width="32">   | [Kubernetes](https://kubernetes.io/)                                                                | コンテナオーケストレーション（kubeadm、ベアメタル）                       |
+|     <img src="docs/assets/logos/cilium.svg" width="32">     | [Cilium](https://cilium.io/)                                                                        | eBPF ベースの CNI、kube-proxy 代替、L2 LB、Hubble                         |
+|     <img src="docs/assets/logos/istio.svg" width="32">      | [Istio](https://istio.io/)                                                                          | サービスメッシュ — mTLS、Gateway API、トラフィック管理                    |
 |      <img src="docs/assets/logos/argo.svg" width="32">      | [Argo CD](https://argoproj.github.io/cd/)                                                           | GitOps 継続的デリバリー（Helm マルチソース、App of Apps、ApplicationSet） |
-|   <img src="docs/assets/logos/backstage.svg" width="32">    | [Backstage](https://backstage.io/)                                                                  | 開発者ポータル — サービスカタログ、TechDocs、テンプレート |
-|    <img src="docs/assets/logos/keycloak.svg" width="32">    | [Keycloak](https://www.keycloak.org/)                                                               | ID・アクセス管理（IAM / SSO）                             |
-|   <img src="docs/assets/logos/prometheus.svg" width="32">   | [Prometheus](https://prometheus.io/)                                                                | メトリクス収集・アラート                                  |
-|    <img src="docs/assets/logos/grafana.svg" width="32">     | [Grafana](https://grafana.com/)                                                                     | オブザーバビリティダッシュボード                          |
-|      <img src="docs/assets/logos/loki.svg" width="32">      | [Loki](https://grafana.com/oss/loki/)                                                               | ログ集約                                                  |
-|     <img src="docs/assets/logos/tempo.svg" width="32">      | [Tempo](https://grafana.com/oss/tempo/)                                                             | 分散トレーシング                                          |
-| <img src="docs/assets/logos/opentelemetry.svg" width="32">  | [OpenTelemetry](https://opentelemetry.io/)                                                          | テレメトリ収集（OTel Collector）                          |
-|  <img src="docs/assets/logos/cert-manager.svg" width="32">  | [cert-manager](https://cert-manager.io/)                                                            | TLS 証明書の自動管理（Let's Encrypt）                     |
-| <img src="docs/assets/logos/sealed-secrets.png" width="32"> | [Sealed Secrets](https://sealed-secrets.netlify.app/)                                               | Git 上で暗号化されたシークレット                          |
-|   <img src="docs/assets/logos/cloudflare.svg" width="32">   | [Cloudflare Tunnel](https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/) | ゼロトラストなインターネット公開                          |
+|   <img src="docs/assets/logos/backstage.svg" width="32">    | [Backstage](https://backstage.io/)                                                                  | 開発者ポータル — サービスカタログ、TechDocs、テンプレート                 |
+|    <img src="docs/assets/logos/keycloak.svg" width="32">    | [Keycloak](https://www.keycloak.org/)                                                               | ID・アクセス管理（IAM / SSO）                                             |
+|   <img src="docs/assets/logos/prometheus.svg" width="32">   | [Prometheus](https://prometheus.io/)                                                                | メトリクス収集・アラート                                                  |
+|    <img src="docs/assets/logos/grafana.svg" width="32">     | [Grafana](https://grafana.com/)                                                                     | オブザーバビリティダッシュボード                                          |
+|      <img src="docs/assets/logos/loki.svg" width="32">      | [Loki](https://grafana.com/oss/loki/)                                                               | ログ集約                                                                  |
+|     <img src="docs/assets/logos/tempo.svg" width="32">      | [Tempo](https://grafana.com/oss/tempo/)                                                             | 分散トレーシング                                                          |
+| <img src="docs/assets/logos/opentelemetry.svg" width="32">  | [OpenTelemetry](https://opentelemetry.io/)                                                          | テレメトリ収集（OTel Collector）                                          |
+|  <img src="docs/assets/logos/cert-manager.svg" width="32">  | [cert-manager](https://cert-manager.io/)                                                            | TLS 証明書の自動管理（Let's Encrypt）                                     |
+| <img src="docs/assets/logos/sealed-secrets.png" width="32"> | [Sealed Secrets](https://sealed-secrets.netlify.app/)                                               | Git 上で暗号化されたシークレット                                          |
+|   <img src="docs/assets/logos/cloudflare.svg" width="32">   | [Cloudflare Tunnel](https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/) | ゼロトラストなインターネット公開                                          |
 
 ## ハードウェア
 
