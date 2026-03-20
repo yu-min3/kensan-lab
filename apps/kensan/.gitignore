@@ -51,7 +51,7 @@ todo.txt
 backend/bin/
 backend/*.exe
 backend/*-service
-!backend/cmd/
+backend/cmd
 
 # Go
 backend/tmp/
