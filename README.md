@@ -125,8 +125,7 @@ docs/                             # ADRs, architecture, bootstrapping guides
 | Category            | Links                                                                                                                                                                                                       |
 | ------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **Getting Started** | [Installation](./docs/installation.md) / [Configuration](./docs/configuration.md) / [Bootstrapping](./docs/bootstrapping/index.md) _(in progress)_ / [Secret Management](./docs/secret-management/index.md) |
-| **Architecture**    | [Repository Structure](./docs/architecture/repository-structure.md) / [Namespace Labels](./docs/namespace-label-design.md) / [ADRs](./docs/adr/)                                                           |
-| **Development**     | [Kustomize Guidelines](./docs/kustomize-guidelines.md) / [Roadmap](./docs/roadmap.md)                                                                                                                       |
+| **Architecture**    | [Namespace Labels](./docs/namespace-label-design.md) / [ADRs](./docs/adr/) / [Kustomize Guidelines](./docs/kustomize-guidelines.md)                                                                        |
 | **日本語**          | [Japanese documentation (日本語ドキュメント)](./docs/ja/)                                                                                                                                                   |
 
 ## Application: kensan
