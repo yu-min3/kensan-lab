@@ -4,6 +4,9 @@ kind: Kustomization
 resources:
 - ../../base
 
+patches:
+- path: affinity-patch.yaml
+
 images:
 - name: ghcr.io/yu-min3/backstage
   newTag: v0.0.6

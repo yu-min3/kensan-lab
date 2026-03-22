@@ -15,7 +15,10 @@ TAG ?= latest
 FULL_IMAGE := $(REGISTRY)/$(IMAGE_NAME):$(TAG)
 
 # Container runtime (podman or docker)
-CONTAINER_RUNTIME ?= podman
+CONTAINER_RUNTIME ?= docker
+
+# Platform for cross-build (e.g., linux/amd64)
+PLATFORM ?= linux/amd64
 
 # Yarn wrapper
 YARN := node .yarn/releases/yarn-4.4.1.cjs
@@ -116,8 +119,8 @@ build: build-backend
 	@echo "Build context: parent directory (to include templates/)"
 	@echo "Note: This may take several minutes and use significant memory"
 	cd .. && $(CONTAINER_RUNTIME) build \
-		--format=docker \
-		-f backstage-app/packages/backend/Dockerfile \
+		--platform $(PLATFORM) \
+		-f app/packages/backend/Dockerfile \
 		-t $(FULL_IMAGE) \
 		.
 
