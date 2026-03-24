@@ -1,0 +1,24 @@
+# GRPCRoute for OTel Collector
+# Exposes OTLP gRPC receiver via Istio Gateway
+# Used by: Claude Code session parser, built-in OTel telemetry
+apiVersion: gateway.networking.k8s.io/v1
+kind: GRPCRoute
+metadata:
+  name: otel-collector-grpc
+  namespace: monitoring
+spec:
+  parentRefs:
+  - group: gateway.networking.k8s.io
+    kind: Gateway
+    name: gateway-platform
+    namespace: istio-system
+    sectionName: https
+  hostnames:
+  - "otel.platform.yu-min3.com"
+  rules:
+  - backendRefs:
+    - group: ''
+      kind: Service
+      name: otel-collector-opentelemetry-collector
+      port: 4317
+      weight: 1
