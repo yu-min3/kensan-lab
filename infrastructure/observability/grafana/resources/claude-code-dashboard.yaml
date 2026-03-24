@@ -5,7 +5,7 @@ metadata:
   namespace: monitoring
   labels:
     grafana_dashboard: "1"
-    grafana_folder: "Claude Code"
+    grafana_folder: "ClaudeCode"
 data:
   claude-code-sessions.json: |
     {
