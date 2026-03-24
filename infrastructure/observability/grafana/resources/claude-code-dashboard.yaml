@@ -1,0 +1,357 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: grafana-claude-code-dashboard
+  namespace: monitoring
+  labels:
+    grafana_dashboard: "1"
+    grafana_folder: "Claude Code"
+data:
+  claude-code-sessions.json: |
+    {
+      "annotations": {
+        "list": []
+      },
+      "description": "Claude Code セッションの OTel トレース可視化",
+      "editable": true,
+      "fiscalYearStartMonth": 0,
+      "graphTooltip": 1,
+      "links": [],
+      "panels": [
+        {
+          "title": "Session Overview",
+          "type": "stat",
+          "gridPos": { "h": 4, "w": 6, "x": 0, "y": 0 },
+          "datasource": { "type": "tempo", "uid": "tempo" },
+          "targets": [
+            {
+              "datasource": { "type": "tempo", "uid": "tempo" },
+              "queryType": "traceqlmetrics",
+              "query": "{ resource.service.name = \"claude-code\" && name = \"session\" } | count() by ()"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  { "color": "blue", "value": null }
+                ]
+              }
+            },
+            "overrides": []
+          },
+          "options": {
+            "reduceOptions": { "calcs": ["lastNotNull"] },
+            "textMode": "auto",
+            "colorMode": "value",
+            "graphMode": "none"
+          }
+        },
+        {
+          "title": "Total Tool Calls",
+          "type": "stat",
+          "gridPos": { "h": 4, "w": 6, "x": 6, "y": 0 },
+          "datasource": { "type": "tempo", "uid": "tempo" },
+          "targets": [
+            {
+              "datasource": { "type": "tempo", "uid": "tempo" },
+              "queryType": "traceqlmetrics",
+              "query": "{ resource.service.name = \"claude-code\" && name =~ \"tool:.*\" } | count() by ()"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  { "color": "green", "value": null }
+                ]
+              }
+            },
+            "overrides": []
+          },
+          "options": {
+            "reduceOptions": { "calcs": ["lastNotNull"] },
+            "textMode": "auto",
+            "colorMode": "value",
+            "graphMode": "none"
+          }
+        },
+        {
+          "title": "Error Rate",
+          "type": "stat",
+          "gridPos": { "h": 4, "w": 6, "x": 12, "y": 0 },
+          "datasource": { "type": "tempo", "uid": "tempo" },
+          "targets": [
+            {
+              "datasource": { "type": "tempo", "uid": "tempo" },
+              "queryType": "traceqlmetrics",
+              "query": "{ resource.service.name = \"claude-code\" && name =~ \"tool:.*\" && status = error } | count() by ()"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  { "color": "green", "value": null },
+                  { "color": "yellow", "value": 5 },
+                  { "color": "red", "value": 15 }
+                ]
+              }
+            },
+            "overrides": []
+          },
+          "options": {
+            "reduceOptions": { "calcs": ["lastNotNull"] },
+            "textMode": "auto",
+            "colorMode": "value",
+            "graphMode": "none"
+          }
+        },
+        {
+          "title": "Avg Session Duration (min)",
+          "type": "stat",
+          "gridPos": { "h": 4, "w": 6, "x": 18, "y": 0 },
+          "datasource": { "type": "tempo", "uid": "tempo" },
+          "targets": [
+            {
+              "datasource": { "type": "tempo", "uid": "tempo" },
+              "queryType": "traceqlmetrics",
+              "query": "{ resource.service.name = \"claude-code\" && name = \"session\" } | avg(duration) by ()"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "ns",
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  { "color": "blue", "value": null }
+                ]
+              }
+            },
+            "overrides": []
+          },
+          "options": {
+            "reduceOptions": { "calcs": ["lastNotNull"] },
+            "textMode": "auto",
+            "colorMode": "value",
+            "graphMode": "none"
+          }
+        },
+        {
+          "title": "Tool Usage by Category",
+          "type": "piechart",
+          "gridPos": { "h": 8, "w": 8, "x": 0, "y": 4 },
+          "datasource": { "type": "tempo", "uid": "tempo" },
+          "targets": [
+            {
+              "datasource": { "type": "tempo", "uid": "tempo" },
+              "queryType": "traceqlmetrics",
+              "query": "{ resource.service.name = \"claude-code\" && name =~ \"tool:.*\" } | count() by (span.tool.category)"
+            }
+          ],
+          "options": {
+            "legend": { "displayMode": "table", "placement": "right", "values": ["value", "percent"] },
+            "pieType": "donut",
+            "reduceOptions": { "calcs": ["lastNotNull"] },
+            "tooltip": { "mode": "single" }
+          }
+        },
+        {
+          "title": "Tool Usage by Name",
+          "type": "barchart",
+          "gridPos": { "h": 8, "w": 8, "x": 8, "y": 4 },
+          "datasource": { "type": "tempo", "uid": "tempo" },
+          "targets": [
+            {
+              "datasource": { "type": "tempo", "uid": "tempo" },
+              "queryType": "traceqlmetrics",
+              "query": "{ resource.service.name = \"claude-code\" && name =~ \"tool:.*\" } | count() by (span.tool.name)"
+            }
+          ],
+          "options": {
+            "orientation": "horizontal",
+            "legend": { "displayMode": "hidden" },
+            "tooltip": { "mode": "single" }
+          },
+          "fieldConfig": {
+            "defaults": {
+              "color": { "mode": "palette-classic" }
+            },
+            "overrides": []
+          }
+        },
+        {
+          "title": "Tool Duration Distribution",
+          "type": "histogram",
+          "gridPos": { "h": 8, "w": 8, "x": 16, "y": 4 },
+          "datasource": { "type": "tempo", "uid": "tempo" },
+          "targets": [
+            {
+              "datasource": { "type": "tempo", "uid": "tempo" },
+              "queryType": "traceqlmetrics",
+              "query": "{ resource.service.name = \"claude-code\" && name =~ \"tool:.*\" } | histogram_over_time(duration) by (span.tool.category)"
+            }
+          ],
+          "options": {
+            "legend": { "displayMode": "list", "placement": "bottom" },
+            "tooltip": { "mode": "single" }
+          }
+        },
+        {
+          "title": "Session Timeline (Trace Search)",
+          "type": "table",
+          "gridPos": { "h": 8, "w": 24, "x": 0, "y": 12 },
+          "datasource": { "type": "tempo", "uid": "tempo" },
+          "targets": [
+            {
+              "datasource": { "type": "tempo", "uid": "tempo" },
+              "queryType": "traceql",
+              "query": "{ resource.service.name = \"claude-code\" && name = \"session\" }",
+              "tableType": "traces",
+              "limit": 20
+            }
+          ],
+          "options": {
+            "showHeader": true,
+            "sortBy": [{ "displayName": "Start time", "desc": true }]
+          }
+        },
+        {
+          "title": "Slowest Tool Calls (Top 20)",
+          "type": "table",
+          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 20 },
+          "datasource": { "type": "tempo", "uid": "tempo" },
+          "targets": [
+            {
+              "datasource": { "type": "tempo", "uid": "tempo" },
+              "queryType": "traceql",
+              "query": "{ resource.service.name = \"claude-code\" && name =~ \"tool:.*\" && duration > 5s }",
+              "tableType": "spans",
+              "limit": 20
+            }
+          ],
+          "options": {
+            "showHeader": true,
+            "sortBy": [{ "displayName": "Duration", "desc": true }]
+          }
+        },
+        {
+          "title": "Error Tool Calls",
+          "type": "table",
+          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 20 },
+          "datasource": { "type": "tempo", "uid": "tempo" },
+          "targets": [
+            {
+              "datasource": { "type": "tempo", "uid": "tempo" },
+              "queryType": "traceql",
+              "query": "{ resource.service.name = \"claude-code\" && name =~ \"tool:.*\" && status = error }",
+              "tableType": "spans",
+              "limit": 20
+            }
+          ],
+          "options": {
+            "showHeader": true,
+            "sortBy": [{ "displayName": "Start time", "desc": true }]
+          }
+        },
+        {
+          "title": "Tokens per Turn (Input vs Output)",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 28 },
+          "datasource": { "type": "tempo", "uid": "tempo" },
+          "targets": [
+            {
+              "datasource": { "type": "tempo", "uid": "tempo" },
+              "queryType": "traceqlmetrics",
+              "query": "{ resource.service.name = \"claude-code\" && name =~ \"turn-.*\" } | avg(span.turn.input_tokens) by ()"
+            },
+            {
+              "datasource": { "type": "tempo", "uid": "tempo" },
+              "queryType": "traceqlmetrics",
+              "query": "{ resource.service.name = \"claude-code\" && name =~ \"turn-.*\" } | avg(span.turn.output_tokens) by ()"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "custom": {
+                "drawStyle": "bars",
+                "fillOpacity": 50,
+                "stacking": { "mode": "none" }
+              }
+            },
+            "overrides": [
+              {
+                "matcher": { "id": "byFrameRefID", "options": "A" },
+                "properties": [
+                  { "id": "displayName", "value": "Input Tokens" },
+                  { "id": "color", "value": { "fixedColor": "blue", "mode": "fixed" } }
+                ]
+              },
+              {
+                "matcher": { "id": "byFrameRefID", "options": "B" },
+                "properties": [
+                  { "id": "displayName", "value": "Output Tokens" },
+                  { "id": "color", "value": { "fixedColor": "orange", "mode": "fixed" } }
+                ]
+              }
+            ]
+          },
+          "options": {
+            "legend": { "displayMode": "list", "placement": "bottom" },
+            "tooltip": { "mode": "single" }
+          }
+        },
+        {
+          "title": "Cache Hit Ratio",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 28 },
+          "datasource": { "type": "tempo", "uid": "tempo" },
+          "targets": [
+            {
+              "datasource": { "type": "tempo", "uid": "tempo" },
+              "queryType": "traceqlmetrics",
+              "query": "{ resource.service.name = \"claude-code\" && name =~ \"turn-.*\" } | avg(span.turn.cache_read_tokens) by ()"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "custom": {
+                "drawStyle": "line",
+                "fillOpacity": 20
+              },
+              "color": { "fixedColor": "green", "mode": "fixed" }
+            },
+            "overrides": []
+          },
+          "options": {
+            "legend": { "displayMode": "list", "placement": "bottom" },
+            "tooltip": { "mode": "single" }
+          }
+        }
+      ],
+      "schemaVersion": 39,
+      "tags": ["claude-code", "otel", "ai-agent"],
+      "templating": {
+        "list": [
+          {
+            "name": "session_id",
+            "type": "textbox",
+            "label": "Session ID",
+            "current": { "text": "", "value": "" }
+          }
+        ]
+      },
+      "time": {
+        "from": "now-7d",
+        "to": "now"
+      },
+      "timepicker": {},
+      "timezone": "Asia/Tokyo",
+      "title": "Claude Code Sessions",
+      "uid": "claude-code-sessions",
+      "version": 1
+    }
