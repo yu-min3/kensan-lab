@@ -20,9 +20,6 @@ tempo:
 
   # Tempo configuration
   structuredConfig:
-    server:
-      http_listen_port: 3100
-
     distributor:
       receivers:
         otlp:
@@ -40,6 +37,23 @@ tempo:
     compactor:
       compaction:
         block_retention: 168h  # 7 days
+
+    metrics_generator:
+      processor:
+        local_blocks:
+          max_live_traces: 10000
+          flush_to_metrics_gen: true
+      storage:
+        path: /var/tempo/metrics
+        remote_write: []
+      traces_storage:
+        path: /var/tempo/traces
+
+    overrides:
+      defaults:
+        metrics_generator:
+          processors:
+            - local_blocks
 
     storage:
       trace:
@@ -65,7 +79,6 @@ persistence:
 # Service configuration
 service:
   type: ClusterIP
-  port: 3100
 
 # Service ports configuration
 serviceMonitor:
