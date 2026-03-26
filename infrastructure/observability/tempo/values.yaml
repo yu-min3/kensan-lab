@@ -20,9 +20,6 @@ tempo:
 
   # Tempo configuration
   structuredConfig:
-    server:
-      http_listen_port: 3100
-
     distributor:
       receivers:
         otlp:
@@ -82,7 +79,6 @@ persistence:
 # Service configuration
 service:
   type: ClusterIP
-  port: 3100
 
 # Service ports configuration
 serviceMonitor:
