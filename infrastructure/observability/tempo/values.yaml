@@ -45,7 +45,6 @@ config: |
     processor:
       local_blocks:
         max_live_traces: 10000
-        flush_to_metrics_gen: true
     storage:
       path: /var/tempo/metrics
       remote_write: []
@@ -69,7 +68,7 @@ config: |
     defaults:
       metrics_generator:
         processors:
-          - local_blocks
+          - local-blocks
 
 # Persistence configuration
 persistence:
