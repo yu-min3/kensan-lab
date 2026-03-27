@@ -12,10 +12,20 @@ tempo:
         fieldRef:
           fieldPath: status.podIP
 
-  # Receivers: OTLP only (chart defaults include Jaeger/OpenCensus — disable them)
+  # Receivers: all bind to Pod IP
+  # Jaeger is included by chart default (Helm deep merge) and cannot be removed
+  # via values alone. Bind all receivers to Pod IP for consistent security posture.
   receivers:
-    jaeger: null
-    opencensus: null
+    jaeger:
+      protocols:
+        grpc:
+          endpoint: "${env:MY_POD_IP}:14250"
+        thrift_binary:
+          endpoint: "${env:MY_POD_IP}:6832"
+        thrift_compact:
+          endpoint: "${env:MY_POD_IP}:6831"
+        thrift_http:
+          endpoint: "${env:MY_POD_IP}:14268"
     otlp:
       protocols:
         grpc:
