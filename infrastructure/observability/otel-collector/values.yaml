@@ -1,38 +1,31 @@
-# Chart config: infrastructure/gitops/argocd/applications/observability/otel-collector/app.yaml
+# Chart: opentelemetry-collector 0.97.1
 
-# Deployment mode: deployment (single instance)
-mode: deployment
-replicaCount: 1
-
-# Image configuration
+# Image: repository is required by this chart, tag follows chart appVersion
 image:
   repository: otel/opentelemetry-collector-contrib
-  tag: "0.93.0"
-  pullPolicy: IfNotPresent
+
+# Deployment mode
+mode: deployment
+replicaCount: 1
 
 # Collector configuration
 config:
   receivers:
-    # OTLP receiver - primary receiver for metrics/traces/logs
+    # MY_POD_IP is auto-injected by the chart via Downward API
     otlp:
       protocols:
         grpc:
-          endpoint: 0.0.0.0:4317
+          endpoint: ${env:MY_POD_IP}:4317
         http:
-          endpoint: 0.0.0.0:4318
+          endpoint: ${env:MY_POD_IP}:4318
 
   processors:
-    # Batch processor for performance optimization
     batch:
       timeout: 10s
       send_batch_size: 1000
-
-    # Memory limiter to prevent OOM
     memory_limiter:
       check_interval: 1s
       limit_mib: 512
-
-    # Resource processor - add cluster metadata
     resource:
       attributes:
         - key: cluster.name
@@ -41,108 +34,73 @@ config:
         - key: deployment.environment
           from_attribute: k8s.namespace.name
           action: upsert
-
-    # Attributes processor - filter sensitive data
     attributes:
       actions:
         - key: http.request.header.authorization
           action: delete
 
   exporters:
-    # Prometheus Remote Write exporter (for metrics)
     prometheusremotewrite:
       endpoint: http://prometheus-kube-prometheus-prometheus.monitoring.svc:9090/api/v1/write
       tls:
         insecure: true
-
-    # OTLP exporter for Tempo (traces)
     otlp/tempo:
       endpoint: tempo.monitoring.svc:4317
       tls:
         insecure: true
-
-    # Loki exporter (logs)
     loki:
       endpoint: http://loki.monitoring.svc:3100/loki/api/v1/push
-
-    # Debug exporter (for development/troubleshooting)
     debug:
       verbosity: detailed
 
-  # Collector extensions
   extensions:
-    # Health check extension (required for liveness/readiness probes)
     health_check:
-      endpoint: 0.0.0.0:13133
+      endpoint: ${env:MY_POD_IP}:13133
 
-  # Data pipelines
   service:
     extensions: [health_check]
     pipelines:
-      # Metrics pipeline
       metrics:
         receivers: [otlp]
         processors: [memory_limiter, batch, resource]
         exporters: [prometheusremotewrite]
-
-      # Traces pipeline
       traces:
         receivers: [otlp]
         processors: [memory_limiter, batch, resource, attributes]
         exporters: [otlp/tempo]
-
-      # Logs pipeline
       logs:
         receivers: [otlp]
         processors: [memory_limiter, batch, resource]
         exporters: [loki]
-
-    # Telemetry configuration (self-monitoring)
     telemetry:
       metrics:
-        address: 0.0.0.0:8888
-
-# Service configuration
-service:
-  type: ClusterIP
-  annotations: {}
+        address: ${env:MY_POD_IP}:8888
 
 # Ports configuration
 ports:
-  # Disable default otlp port (conflicts with otlp-grpc)
   otlp:
     enabled: false
-
-  # OTLP gRPC receiver
   otlp-grpc:
     enabled: true
     containerPort: 4317
     servicePort: 4317
     protocol: TCP
     appProtocol: grpc
-
-  # OTLP HTTP receiver
   otlp-http:
     enabled: true
     containerPort: 4318
     servicePort: 4318
     protocol: TCP
-
-  # Prometheus self-metrics
   metrics:
     enabled: true
     containerPort: 8888
     servicePort: 8888
     protocol: TCP
-
-  # Health check endpoint
   health:
     enabled: true
     containerPort: 13133
     servicePort: 13133
     protocol: TCP
-
-  # Disable other default receivers (not needed)
   jaeger-compact:
     enabled: false
   jaeger-grpc:
@@ -152,7 +110,7 @@ ports:
   zipkin:
     enabled: false
 
-# Resource limits
+# Resources
 resources:
   requests:
     cpu: 200m
@@ -161,27 +119,6 @@ resources:
     cpu: 500m
     memory: 1Gi
 
-# Liveness probe
-livenessProbe:
-  httpGet:
-    port: 13133
-    path: /
-  initialDelaySeconds: 30
-  periodSeconds: 10
-  timeoutSeconds: 5
-  failureThreshold: 3
-
-# Readiness probe
-readinessProbe:
-  httpGet:
-    port: 13133
-    path: /
-  initialDelaySeconds: 10
-  periodSeconds: 5
-  timeoutSeconds: 3
-  successThreshold: 1
-  failureThreshold: 3
-
 # ServiceMonitor for Prometheus Operator
 serviceMonitor:
   enabled: true
@@ -189,7 +126,6 @@ serviceMonitor:
     - port: metrics
       path: /metrics
       interval: 30s
-  # Labels for Prometheus Operator to discover this ServiceMonitor
   extraLabels:
     release: prometheus
 
@@ -198,19 +134,7 @@ podDisruptionBudget:
   enabled: true
   maxUnavailable: 1
 
-# Security context
-securityContext: {}
-
-# Pod annotations
-podAnnotations: {}
-
-# Node selector
-nodeSelector: {}
-
-# Tolerations
-tolerations: []
-
-# Prefer high-performance node (not required - can run on any node)
+# Prefer high-performance node (not required)
 affinity:
   nodeAffinity:
     preferredDuringSchedulingIgnoredDuringExecution:
