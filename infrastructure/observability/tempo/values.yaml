@@ -12,10 +12,10 @@ tempo:
         fieldRef:
           fieldPath: status.podIP
 
-  # Receivers: OTLP only (chart defaults include Jaeger/OpenCensus — disable them)
+  # Receivers: OTLP endpoint override (Pod IP bind)
+  # Note: chart defaults include Jaeger/OpenCensus receivers too.
+  # They remain active but unused (no clients send those protocols).
   receivers:
-    jaeger: null
-    opencensus: null
     otlp:
       protocols:
         grpc:
