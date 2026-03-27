@@ -5,6 +5,10 @@ tempo:
   # Retention: 7 days
   retention: 168h
 
+  # Enable env var expansion in config (dskit: ${VAR} syntax)
+  extraArgs:
+    config.expand-env: "true"
+
   # Pod IP via Downward API (OTel security best practice: bind to specific interface)
   extraEnv:
     - name: MY_POD_IP
@@ -19,19 +23,19 @@ tempo:
     jaeger:
       protocols:
         grpc:
-          endpoint: "${env:MY_POD_IP}:14250"
+          endpoint: "${MY_POD_IP}:14250"
         thrift_binary:
-          endpoint: "${env:MY_POD_IP}:6832"
+          endpoint: "${MY_POD_IP}:6832"
         thrift_compact:
-          endpoint: "${env:MY_POD_IP}:6831"
+          endpoint: "${MY_POD_IP}:6831"
         thrift_http:
-          endpoint: "${env:MY_POD_IP}:14268"
+          endpoint: "${MY_POD_IP}:14268"
     otlp:
       protocols:
         grpc:
-          endpoint: "${env:MY_POD_IP}:4317"
+          endpoint: "${MY_POD_IP}:4317"
         http:
-          endpoint: "${env:MY_POD_IP}:4318"
+          endpoint: "${MY_POD_IP}:4318"
 
   # Metrics generator: required for TraceQL Metrics API
   metricsGenerator:
