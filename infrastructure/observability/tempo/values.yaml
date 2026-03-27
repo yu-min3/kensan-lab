@@ -1,15 +1,40 @@
-# Chart config: infrastructure/gitops/argocd/applications/observability/tempo/app.yaml
+# Chart: grafana-community/tempo 2.0.0 (appVersion: 2.10.1)
+# Repo migrated from grafana/helm-charts → grafana-community/helm-charts (2026-01-30)
 
-# Number of replicas
-replicas: 1
-
-# Tempo image configuration
 tempo:
-  repository: grafana/tempo
-  tag: "2.3.1"
-  pullPolicy: IfNotPresent
+  # Retention: 7 days
+  retention: 168h
 
-  # Resource limits
+  # Pod IP via Downward API (OTel security best practice: bind to specific interface)
+  extraEnv:
+    - name: MY_POD_IP
+      valueFrom:
+        fieldRef:
+          fieldPath: status.podIP
+
+  # Receivers: OTLP only (chart defaults include Jaeger/OpenCensus — disable them)
+  receivers:
+    jaeger: null
+    opencensus: null
+    otlp:
+      protocols:
+        grpc:
+          endpoint: "${env:MY_POD_IP}:4317"
+        http:
+          endpoint: "${env:MY_POD_IP}:4318"
+
+  # Metrics generator: required for TraceQL Metrics API
+  metricsGenerator:
+    enabled: true
+
+  # Processors for metrics generation
+  overrides:
+    defaults:
+      metrics_generator:
+        processors:
+          - local-blocks
+
+  # Resources
   resources:
     requests:
       cpu: 200m
@@ -18,87 +43,12 @@ tempo:
       cpu: 500m
       memory: 1Gi
 
-  # Tempo configuration
-  # Note: tempo chart (single binary) は structuredConfig 非対応。
-  # config テンプレート文字列で直接設定を上書きする。
-
-config: |
-  multitenancy_enabled: false
-  usage_report:
-    reporting_enabled: true
-  compactor:
-    compaction:
-      block_retention: 168h
-  distributor:
-    receivers:
-      otlp:
-        protocols:
-          grpc:
-            endpoint: 0.0.0.0:4317
-          http:
-            endpoint: 0.0.0.0:4318
-  ingester:
-    trace_idle_period: 10s
-    max_block_bytes: 1_000_000
-    max_block_duration: 5m
-  metrics_generator:
-    processor:
-      local_blocks:
-        max_live_traces: 10000
-    storage:
-      path: /var/tempo/metrics
-      remote_write: []
-    traces_storage:
-      path: /var/tempo/traces
-  server:
-    http_listen_port: 3200
-  storage:
-    trace:
-      backend: local
-      local:
-        path: /var/tempo/traces
-      wal:
-        path: /var/tempo/wal
-      pool:
-        max_workers: 100
-        queue_depth: 10000
-  querier: {}
-  query_frontend: {}
-  overrides:
-    defaults:
-      metrics_generator:
-        processors:
-          - local-blocks
-
-# Persistence configuration
+# Persistence
 persistence:
   enabled: true
-  accessModes:
-    - ReadWriteOnce
   size: 10Gi
   storageClassName: local-path
-  # Do not auto-delete PVC when StatefulSet is deleted
   enableStatefulSetAutoDeletePVC: false
-
-# Service configuration
-service:
-  type: ClusterIP
-
-# Service ports configuration
-serviceMonitor:
-  enabled: false
-
-# Pod annotations
-podAnnotations: {}
-
-# Security context
-securityContext: {}
-
-# Node selector
-nodeSelector: {}
-
-# Tolerations
-tolerations: []
 
 # Schedule on high-performance node (NVMe I/O for trace storage)
 affinity:
