@@ -1,8 +1,8 @@
 {
   "name": "grafana",
   "chart": "grafana",
-  "chartRepo": "https://grafana.github.io/helm-charts",
-  "chartVersion": "7.3.0",
+  "chartRepo": "https://grafana-community.github.io/helm-charts",
+  "chartVersion": "11.3.5",
   "namespace": "monitoring",
   "hasResources": "true",
   "createNamespace": "false"
