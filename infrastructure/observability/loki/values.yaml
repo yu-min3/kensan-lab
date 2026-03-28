@@ -1,29 +1,17 @@
-# Chart config: infrastructure/gitops/argocd/applications/observability/loki/app.yaml
+# Chart: grafana-community/loki 9.3.1 (appVersion: 3.6.7)
+# Repo migrated from grafana/helm-charts → grafana-community/helm-charts (2026-03-16)
 
 # Deployment mode: monolithic (single instance)
 deploymentMode: SingleBinary
 
 loki:
-  # Image configuration
-  image:
-    repository: grafana/loki
-    tag: "3.5.7"
-    pullPolicy: IfNotPresent
-
-  # Common configuration
+  # Common configuration for single-node
   commonConfig:
-    path_prefix: /var/loki
     replication_factor: 1
-    ring:
-      kvstore:
-        store: inmemory
 
-  # Storage configuration
+  # Storage: local filesystem
   storage:
     type: filesystem
-    filesystem:
-      chunks_directory: /var/loki/chunks
-      rules_directory: /var/loki/rules
 
   # Schema configuration
   schemaConfig:
@@ -85,46 +73,21 @@ singleBinary:
     storageClass: local-path
     enableStatefulSetAutoDeletePVC: false
 
-  # Liveness and readiness probes
-  livenessProbe:
-    httpGet:
-      path: /ready
-      port: http-metrics
-    initialDelaySeconds: 30
-    periodSeconds: 10
-    timeoutSeconds: 5
-    failureThreshold: 3
-
-  readinessProbe:
-    httpGet:
-      path: /ready
-      port: http-metrics
-    initialDelaySeconds: 30
-    periodSeconds: 10
-    timeoutSeconds: 5
-    successThreshold: 1
-    failureThreshold: 3
-
-# Gateway (disabled - using direct access)
+# Gateway disabled (direct access via ClusterIP)
 gateway:
   enabled: false
 
-# Backend (disabled - using single binary)
+# Disable all other components (SingleBinary mode)
 backend:
   replicas: 0
-
-# Read component (disabled - using single binary)
 read:
   replicas: 0
-
-# Write component (disabled - using single binary)
 write:
   replicas: 0
 
-# Service configuration
-service:
-  type: ClusterIP
-  port: 3100
+# Disable minio (not needed for filesystem)
+minio:
+  enabled: false
 
 # ServiceMonitor for Prometheus Operator
 monitoring:
@@ -134,19 +97,12 @@ monitoring:
       release: prometheus
     interval: 30s
 
-# Test configuration (disabled)
+# Disable unused components
+lokiCanary:
+  enabled: false
 test:
   enabled: false
-
-# Memcached caching (disabled for SingleBinary mode)
 chunksCache:
   enabled: false
-
 resultsCache:
   enabled: false
-
-# Pod annotations
-podAnnotations: {}
-
-# Security context
-securityContext: {}
