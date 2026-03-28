@@ -5,6 +5,9 @@
 deploymentMode: SingleBinary
 
 loki:
+  # Disable multi-tenancy (consistent with Tempo/Prometheus)
+  auth_enabled: false
+
   # Common configuration for single-node
   commonConfig:
     replication_factor: 1
