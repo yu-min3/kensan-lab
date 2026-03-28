@@ -1,17 +1,5 @@
-# Chart config: infrastructure/gitops/argocd/applications/observability/grafana/app.yaml
-#
-# This is an independent Grafana deployment separated from kube-prometheus-stack
-# to serve as a unified visualization layer for the entire Observability stack
-# (Prometheus, Tempo, Loki)
-
-# Image configuration
-image:
-  repository: grafana/grafana
-  tag: "10.2.3"
-  pullPolicy: IfNotPresent
-
-# Replicas
-replicas: 1
+# Chart: grafana-community/grafana 11.3.5 (appVersion: 12.4.2)
+# Repo migrated from grafana/helm-charts → grafana-community/helm-charts (2026-01-30)
 
 # Admin credentials (managed by Sealed Secrets)
 admin:
@@ -19,12 +7,7 @@ admin:
   userKey: admin-user
   passwordKey: admin-password
 
-# Service configuration
-service:
-  type: ClusterIP
-  port: 80
-
-# Resources (optimized for Raspberry Pi)
+# Resources
 resources:
   requests:
     cpu: 100m
@@ -33,7 +16,7 @@ resources:
     cpu: 200m
     memory: 256Mi
 
-# Persistence for dashboards and configuration
+# Persistence
 persistence:
   enabled: true
   type: pvc
@@ -42,14 +25,12 @@ persistence:
 
 # Sidecar configuration for auto-discovery
 sidecar:
-  # Datasources auto-discovery
   datasources:
     enabled: true
     label: grafana_datasource
     labelValue: "1"
     searchNamespace: monitoring
-    defaultDatasourceEnabled: false  # Disable built-in Prometheus datasource (use our custom ones)
-  # Dashboards auto-discovery
+    defaultDatasourceEnabled: false
   dashboards:
     enabled: true
     label: grafana_dashboard
@@ -58,12 +39,6 @@ sidecar:
     folderAnnotation: grafana_folder
     folder: /tmp/dashboards
 
-# Security context
-securityContext:
-  runAsUser: 472
-  runAsGroup: 472
-  fsGroup: 472
-
 # Grafana configuration
 grafana.ini:
   server:
@@ -71,12 +46,9 @@ grafana.ini:
   auth.anonymous:
     enabled: false
 
-# Default settings
+# Timezone
 defaultDashboardsTimezone: Asia/Tokyo
 
 # PodDisruptionBudget
 podDisruptionBudget:
   maxUnavailable: 1
-
-# Pod annotations
-podAnnotations: {}
