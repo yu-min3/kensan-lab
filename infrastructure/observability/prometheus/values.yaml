@@ -55,6 +55,9 @@ prometheus:
             requests:
               storage: 10Gi
 
+    # Enable remote write receiver (OTel Collector → Prometheus)
+    enableRemoteWriteReceiver: true
+
     # Retention settings
     retention: 7d
     retentionSize: "9GB"

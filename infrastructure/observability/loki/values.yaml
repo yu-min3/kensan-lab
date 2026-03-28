@@ -4,6 +4,9 @@
 deploymentMode: SingleBinary
 
 loki:
+  # Disable multi-tenancy (consistent with Tempo/Prometheus)
+  auth_enabled: false
+
   # Image configuration
   image:
     repository: grafana/loki
