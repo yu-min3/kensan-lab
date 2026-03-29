@@ -12,22 +12,24 @@ data:
       "annotations": {
         "list": []
       },
-      "description": "Claude Code セッションの OTel トレース可視化",
+      "description": "Claude Code セッション分析 — コスト・トークン・アクティブ時間を Prometheus メトリクスと Loki ログで可視化",
       "editable": true,
       "fiscalYearStartMonth": 0,
       "graphTooltip": 1,
       "links": [],
       "panels": [
         {
-          "title": "Session Overview",
+          "id": 1,
+          "title": "Sessions Count",
           "type": "stat",
           "gridPos": { "h": 4, "w": 6, "x": 0, "y": 0 },
-          "datasource": { "type": "tempo", "uid": "tempo" },
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
           "targets": [
             {
-              "datasource": { "type": "tempo", "uid": "tempo" },
-              "queryType": "traceqlmetrics",
-              "query": "{ resource.service.name = \"claude-code\" && name = \"session\" } | count() by ()"
+              "datasource": { "type": "prometheus", "uid": "prometheus" },
+              "expr": "sum(increase(claude_code_session_count_total[$__range]))",
+              "legendFormat": "Sessions",
+              "refId": "A"
             }
           ],
           "fieldConfig": {
@@ -49,55 +51,28 @@ data:
           }
         },
         {
-          "title": "Total Tool Calls",
+          "id": 2,
+          "title": "Total Cost (USD)",
           "type": "stat",
           "gridPos": { "h": 4, "w": 6, "x": 6, "y": 0 },
-          "datasource": { "type": "tempo", "uid": "tempo" },
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
           "targets": [
             {
-              "datasource": { "type": "tempo", "uid": "tempo" },
-              "queryType": "traceqlmetrics",
-              "query": "{ resource.service.name = \"claude-code\" && name =~ \"tool:.*\" } | count() by ()"
+              "datasource": { "type": "prometheus", "uid": "prometheus" },
+              "expr": "sum(increase(claude_code_cost_usage_USD_total[$__range]))",
+              "legendFormat": "Cost",
+              "refId": "A"
             }
           ],
           "fieldConfig": {
             "defaults": {
-              "thresholds": {
-                "mode": "absolute",
-                "steps": [
-                  { "color": "green", "value": null }
-                ]
-              }
-            },
-            "overrides": []
-          },
-          "options": {
-            "reduceOptions": { "calcs": ["lastNotNull"] },
-            "textMode": "auto",
-            "colorMode": "value",
-            "graphMode": "none"
-          }
-        },
-        {
-          "title": "Error Rate",
-          "type": "stat",
-          "gridPos": { "h": 4, "w": 6, "x": 12, "y": 0 },
-          "datasource": { "type": "tempo", "uid": "tempo" },
-          "targets": [
-            {
-              "datasource": { "type": "tempo", "uid": "tempo" },
-              "queryType": "traceqlmetrics",
-              "query": "{ resource.service.name = \"claude-code\" && name =~ \"tool:.*\" && status = error } | count() by ()"
-            }
-          ],
-          "fieldConfig": {
-            "defaults": {
+              "unit": "currencyUSD",
               "thresholds": {
                 "mode": "absolute",
                 "steps": [
                   { "color": "green", "value": null },
                   { "color": "yellow", "value": 5 },
-                  { "color": "red", "value": 15 }
+                  { "color": "red", "value": 20 }
                 ]
               }
             },
@@ -111,20 +86,54 @@ data:
           }
         },
         {
-          "title": "Avg Session Duration (min)",
+          "id": 3,
+          "title": "Total Tokens",
           "type": "stat",
-          "gridPos": { "h": 4, "w": 6, "x": 18, "y": 0 },
-          "datasource": { "type": "tempo", "uid": "tempo" },
+          "gridPos": { "h": 4, "w": 6, "x": 12, "y": 0 },
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
           "targets": [
             {
-              "datasource": { "type": "tempo", "uid": "tempo" },
-              "queryType": "traceqlmetrics",
-              "query": "{ resource.service.name = \"claude-code\" && name = \"session\" } | avg(duration) by ()"
+              "datasource": { "type": "prometheus", "uid": "prometheus" },
+              "expr": "sum(increase(claude_code_token_usage_tokens_total[$__range]))",
+              "legendFormat": "Tokens",
+              "refId": "A"
             }
           ],
           "fieldConfig": {
             "defaults": {
-              "unit": "ns",
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  { "color": "purple", "value": null }
+                ]
+              }
+            },
+            "overrides": []
+          },
+          "options": {
+            "reduceOptions": { "calcs": ["lastNotNull"] },
+            "textMode": "auto",
+            "colorMode": "value",
+            "graphMode": "none"
+          }
+        },
+        {
+          "id": 4,
+          "title": "Active Time",
+          "type": "stat",
+          "gridPos": { "h": 4, "w": 6, "x": 18, "y": 0 },
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "targets": [
+            {
+              "datasource": { "type": "prometheus", "uid": "prometheus" },
+              "expr": "sum(increase(claude_code_active_time_seconds_total[$__range]))",
+              "legendFormat": "Active Time",
+              "refId": "A"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "s",
               "thresholds": {
                 "mode": "absolute",
                 "steps": [
@@ -142,17 +151,243 @@ data:
           }
         },
         {
-          "title": "Tool Usage by Category",
-          "type": "piechart",
-          "gridPos": { "h": 8, "w": 8, "x": 0, "y": 4 },
-          "datasource": { "type": "tempo", "uid": "tempo" },
+          "id": 5,
+          "title": "Token Usage Over Time",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 4 },
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
           "targets": [
             {
-              "datasource": { "type": "tempo", "uid": "tempo" },
-              "queryType": "traceqlmetrics",
-              "query": "{ resource.service.name = \"claude-code\" && name =~ \"tool:.*\" } | count() by (span.tool.category)"
+              "datasource": { "type": "prometheus", "uid": "prometheus" },
+              "expr": "sum by (type) (increase(claude_code_token_usage_tokens_total[$__rate_interval]))",
+              "legendFormat": "{{type}}",
+              "refId": "A"
             }
           ],
+          "fieldConfig": {
+            "defaults": {
+              "custom": {
+                "drawStyle": "bars",
+                "fillOpacity": 80,
+                "stacking": { "mode": "normal", "group": "A" },
+                "lineWidth": 0,
+                "pointSize": 5,
+                "showPoints": "never"
+              },
+              "color": { "mode": "palette-classic" }
+            },
+            "overrides": [
+              {
+                "matcher": { "id": "byName", "options": "input" },
+                "properties": [
+                  { "id": "color", "value": { "fixedColor": "blue", "mode": "fixed" } }
+                ]
+              },
+              {
+                "matcher": { "id": "byName", "options": "output" },
+                "properties": [
+                  { "id": "color", "value": { "fixedColor": "orange", "mode": "fixed" } }
+                ]
+              },
+              {
+                "matcher": { "id": "byName", "options": "cacheRead" },
+                "properties": [
+                  { "id": "color", "value": { "fixedColor": "green", "mode": "fixed" } }
+                ]
+              },
+              {
+                "matcher": { "id": "byName", "options": "cacheCreation" },
+                "properties": [
+                  { "id": "color", "value": { "fixedColor": "yellow", "mode": "fixed" } }
+                ]
+              }
+            ]
+          },
+          "options": {
+            "legend": { "displayMode": "list", "placement": "bottom" },
+            "tooltip": { "mode": "multi", "sort": "desc" }
+          }
+        },
+        {
+          "id": 6,
+          "title": "Cost Over Time by Model",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 4 },
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "targets": [
+            {
+              "datasource": { "type": "prometheus", "uid": "prometheus" },
+              "expr": "sum by (model) (increase(claude_code_cost_usage_USD_total[$__rate_interval]))",
+              "legendFormat": "{{model}}",
+              "refId": "A"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "currencyUSD",
+              "custom": {
+                "drawStyle": "line",
+                "fillOpacity": 20,
+                "lineWidth": 2,
+                "pointSize": 5,
+                "showPoints": "auto",
+                "stacking": { "mode": "none" }
+              },
+              "color": { "mode": "palette-classic" }
+            },
+            "overrides": []
+          },
+          "options": {
+            "legend": { "displayMode": "list", "placement": "bottom" },
+            "tooltip": { "mode": "multi", "sort": "desc" }
+          }
+        },
+        {
+          "id": 7,
+          "title": "Cost per Session (Top 10)",
+          "type": "barchart",
+          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 12 },
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "targets": [
+            {
+              "datasource": { "type": "prometheus", "uid": "prometheus" },
+              "expr": "topk(10, sum by (session_id) (claude_code_cost_usage_USD_total))",
+              "legendFormat": "{{session_id}}",
+              "refId": "A",
+              "format": "table",
+              "instant": true
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "currencyUSD",
+              "color": { "mode": "palette-classic" }
+            },
+            "overrides": []
+          },
+          "options": {
+            "orientation": "horizontal",
+            "legend": { "displayMode": "hidden" },
+            "tooltip": { "mode": "single" },
+            "xTickLabelRotation": 0,
+            "showValue": "auto"
+          },
+          "transformations": [
+            {
+              "id": "organize",
+              "options": {
+                "excludeByName": { "Time": true },
+                "renameByName": { "session_id": "Session", "Value": "Cost (USD)" }
+              }
+            }
+          ]
+        },
+        {
+          "id": 8,
+          "title": "Active Time per Session (Top 10)",
+          "type": "barchart",
+          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 12 },
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "targets": [
+            {
+              "datasource": { "type": "prometheus", "uid": "prometheus" },
+              "expr": "topk(10, sum by (session_id) (claude_code_active_time_seconds_total))",
+              "legendFormat": "{{session_id}}",
+              "refId": "A",
+              "format": "table",
+              "instant": true
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "s",
+              "color": { "mode": "palette-classic" }
+            },
+            "overrides": []
+          },
+          "options": {
+            "orientation": "horizontal",
+            "legend": { "displayMode": "hidden" },
+            "tooltip": { "mode": "single" },
+            "xTickLabelRotation": 0,
+            "showValue": "auto"
+          },
+          "transformations": [
+            {
+              "id": "organize",
+              "options": {
+                "excludeByName": { "Time": true },
+                "renameByName": { "session_id": "Session", "Value": "Active Time" }
+              }
+            }
+          ]
+        },
+        {
+          "id": 9,
+          "title": "Lines of Code Over Time",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 8, "x": 0, "y": 20 },
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "targets": [
+            {
+              "datasource": { "type": "prometheus", "uid": "prometheus" },
+              "expr": "sum by (type) (increase(claude_code_lines_of_code_count_total[$__rate_interval]))",
+              "legendFormat": "{{type}}",
+              "refId": "A"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "custom": {
+                "drawStyle": "bars",
+                "fillOpacity": 80,
+                "stacking": { "mode": "normal", "group": "A" },
+                "lineWidth": 0,
+                "pointSize": 5,
+                "showPoints": "never"
+              },
+              "color": { "mode": "palette-classic" }
+            },
+            "overrides": [
+              {
+                "matcher": { "id": "byName", "options": "added" },
+                "properties": [
+                  { "id": "color", "value": { "fixedColor": "green", "mode": "fixed" } }
+                ]
+              },
+              {
+                "matcher": { "id": "byName", "options": "removed" },
+                "properties": [
+                  { "id": "color", "value": { "fixedColor": "red", "mode": "fixed" } }
+                ]
+              }
+            ]
+          },
+          "options": {
+            "legend": { "displayMode": "list", "placement": "bottom" },
+            "tooltip": { "mode": "multi", "sort": "desc" }
+          }
+        },
+        {
+          "id": 10,
+          "title": "Token Distribution by Model",
+          "type": "piechart",
+          "gridPos": { "h": 8, "w": 8, "x": 8, "y": 20 },
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "targets": [
+            {
+              "datasource": { "type": "prometheus", "uid": "prometheus" },
+              "expr": "sum by (model) (increase(claude_code_token_usage_tokens_total[$__range]))",
+              "legendFormat": "{{model}}",
+              "refId": "A"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "color": { "mode": "palette-classic" }
+            },
+            "overrides": []
+          },
           "options": {
             "legend": { "displayMode": "table", "placement": "right", "values": ["value", "percent"] },
             "pieType": "donut",
@@ -161,180 +396,92 @@ data:
           }
         },
         {
-          "title": "Tool Usage by Name",
-          "type": "barchart",
-          "gridPos": { "h": 8, "w": 8, "x": 8, "y": 4 },
-          "datasource": { "type": "tempo", "uid": "tempo" },
-          "targets": [
-            {
-              "datasource": { "type": "tempo", "uid": "tempo" },
-              "queryType": "traceqlmetrics",
-              "query": "{ resource.service.name = \"claude-code\" && name =~ \"tool:.*\" } | count() by (span.tool.name)"
-            }
-          ],
-          "options": {
-            "orientation": "horizontal",
-            "legend": { "displayMode": "hidden" },
-            "tooltip": { "mode": "single" }
-          },
-          "fieldConfig": {
-            "defaults": {
-              "color": { "mode": "palette-classic" }
-            },
-            "overrides": []
-          }
-        },
-        {
-          "title": "Tool Duration Distribution",
-          "type": "histogram",
-          "gridPos": { "h": 8, "w": 8, "x": 16, "y": 4 },
-          "datasource": { "type": "tempo", "uid": "tempo" },
-          "targets": [
-            {
-              "datasource": { "type": "tempo", "uid": "tempo" },
-              "queryType": "traceqlmetrics",
-              "query": "{ resource.service.name = \"claude-code\" && name =~ \"tool:.*\" } | histogram_over_time(duration) by (span.tool.category)"
-            }
-          ],
-          "options": {
-            "legend": { "displayMode": "list", "placement": "bottom" },
-            "tooltip": { "mode": "single" }
-          }
-        },
-        {
-          "title": "Session Timeline (Trace Search)",
-          "type": "table",
-          "gridPos": { "h": 8, "w": 24, "x": 0, "y": 12 },
-          "datasource": { "type": "tempo", "uid": "tempo" },
-          "targets": [
-            {
-              "datasource": { "type": "tempo", "uid": "tempo" },
-              "queryType": "traceql",
-              "query": "{ resource.service.name = \"claude-code\" && name = \"session\" }",
-              "tableType": "traces",
-              "limit": 20
-            }
-          ],
-          "options": {
-            "showHeader": true,
-            "sortBy": [{ "displayName": "Start time", "desc": true }]
-          }
-        },
-        {
-          "title": "Slowest Tool Calls (Top 20)",
-          "type": "table",
-          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 20 },
-          "datasource": { "type": "tempo", "uid": "tempo" },
-          "targets": [
-            {
-              "datasource": { "type": "tempo", "uid": "tempo" },
-              "queryType": "traceql",
-              "query": "{ resource.service.name = \"claude-code\" && name =~ \"tool:.*\" && duration > 5s }",
-              "tableType": "spans",
-              "limit": 20
-            }
-          ],
-          "options": {
-            "showHeader": true,
-            "sortBy": [{ "displayName": "Duration", "desc": true }]
-          }
-        },
-        {
-          "title": "Error Tool Calls",
-          "type": "table",
-          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 20 },
-          "datasource": { "type": "tempo", "uid": "tempo" },
-          "targets": [
-            {
-              "datasource": { "type": "tempo", "uid": "tempo" },
-              "queryType": "traceql",
-              "query": "{ resource.service.name = \"claude-code\" && name =~ \"tool:.*\" && status = error }",
-              "tableType": "spans",
-              "limit": 20
-            }
-          ],
-          "options": {
-            "showHeader": true,
-            "sortBy": [{ "displayName": "Start time", "desc": true }]
-          }
-        },
-        {
-          "title": "Tokens per Turn (Input vs Output)",
-          "type": "timeseries",
-          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 28 },
-          "datasource": { "type": "tempo", "uid": "tempo" },
-          "targets": [
-            {
-              "datasource": { "type": "tempo", "uid": "tempo" },
-              "queryType": "traceqlmetrics",
-              "query": "{ resource.service.name = \"claude-code\" && name =~ \"turn-.*\" } | avg(span.turn.input_tokens) by ()"
-            },
-            {
-              "datasource": { "type": "tempo", "uid": "tempo" },
-              "queryType": "traceqlmetrics",
-              "query": "{ resource.service.name = \"claude-code\" && name =~ \"turn-.*\" } | avg(span.turn.output_tokens) by ()"
-            }
-          ],
-          "fieldConfig": {
-            "defaults": {
-              "custom": {
-                "drawStyle": "bars",
-                "fillOpacity": 50,
-                "stacking": { "mode": "none" }
-              }
-            },
-            "overrides": [
-              {
-                "matcher": { "id": "byFrameRefID", "options": "A" },
-                "properties": [
-                  { "id": "displayName", "value": "Input Tokens" },
-                  { "id": "color", "value": { "fixedColor": "blue", "mode": "fixed" } }
-                ]
-              },
-              {
-                "matcher": { "id": "byFrameRefID", "options": "B" },
-                "properties": [
-                  { "id": "displayName", "value": "Output Tokens" },
-                  { "id": "color", "value": { "fixedColor": "orange", "mode": "fixed" } }
-                ]
-              }
-            ]
-          },
-          "options": {
-            "legend": { "displayMode": "list", "placement": "bottom" },
-            "tooltip": { "mode": "single" }
-          }
-        },
-        {
+          "id": 11,
           "title": "Cache Hit Ratio",
-          "type": "timeseries",
-          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 28 },
-          "datasource": { "type": "tempo", "uid": "tempo" },
+          "type": "gauge",
+          "gridPos": { "h": 8, "w": 8, "x": 16, "y": 20 },
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
           "targets": [
             {
-              "datasource": { "type": "tempo", "uid": "tempo" },
-              "queryType": "traceqlmetrics",
-              "query": "{ resource.service.name = \"claude-code\" && name =~ \"turn-.*\" } | avg(span.turn.cache_read_tokens) by ()"
+              "datasource": { "type": "prometheus", "uid": "prometheus" },
+              "expr": "sum(increase(claude_code_token_usage_tokens_total{type=\"cacheRead\"}[$__range])) / (sum(increase(claude_code_token_usage_tokens_total{type=\"input\"}[$__range])) + sum(increase(claude_code_token_usage_tokens_total{type=\"cacheRead\"}[$__range])))",
+              "legendFormat": "Cache Hit Ratio",
+              "refId": "A"
             }
           ],
           "fieldConfig": {
             "defaults": {
-              "custom": {
-                "drawStyle": "line",
-                "fillOpacity": 20
-              },
-              "color": { "fixedColor": "green", "mode": "fixed" }
+              "unit": "percentunit",
+              "min": 0,
+              "max": 1,
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  { "color": "red", "value": null },
+                  { "color": "yellow", "value": 0.3 },
+                  { "color": "green", "value": 0.6 }
+                ]
+              }
             },
             "overrides": []
           },
           "options": {
-            "legend": { "displayMode": "list", "placement": "bottom" },
-            "tooltip": { "mode": "single" }
+            "reduceOptions": { "calcs": ["lastNotNull"] },
+            "showThresholdLabels": false,
+            "showThresholdMarkers": true
+          }
+        },
+        {
+          "id": 12,
+          "title": "API Errors",
+          "type": "logs",
+          "gridPos": { "h": 10, "w": 12, "x": 0, "y": 28 },
+          "datasource": { "type": "loki", "uid": "loki" },
+          "targets": [
+            {
+              "datasource": { "type": "loki", "uid": "loki" },
+              "expr": "{service_name=\"claude-code\"} |= \"api_error\"",
+              "refId": "A"
+            }
+          ],
+          "options": {
+            "showTime": true,
+            "showLabels": false,
+            "showCommonLabels": false,
+            "wrapLogMessage": true,
+            "prettifyLogMessage": false,
+            "enableLogDetails": true,
+            "sortOrder": "Descending",
+            "dedupStrategy": "none"
+          }
+        },
+        {
+          "id": 13,
+          "title": "Recent Events",
+          "type": "logs",
+          "gridPos": { "h": 10, "w": 12, "x": 12, "y": 28 },
+          "datasource": { "type": "loki", "uid": "loki" },
+          "targets": [
+            {
+              "datasource": { "type": "loki", "uid": "loki" },
+              "expr": "{service_name=\"claude-code\"}",
+              "refId": "A"
+            }
+          ],
+          "options": {
+            "showTime": true,
+            "showLabels": false,
+            "showCommonLabels": false,
+            "wrapLogMessage": true,
+            "prettifyLogMessage": false,
+            "enableLogDetails": true,
+            "sortOrder": "Descending",
+            "dedupStrategy": "none"
           }
         }
       ],
       "schemaVersion": 39,
-      "tags": ["claude-code", "otel", "ai-agent"],
+      "tags": ["claude-code", "otel"],
       "templating": {
         "list": [
           {
@@ -346,7 +493,7 @@ data:
         ]
       },
       "time": {
-        "from": "now-7d",
+        "from": "now-24h",
         "to": "now"
       },
       "timepicker": {},
