@@ -11,6 +11,7 @@ spec:
     namespace: istio-system
   hostnames:
   - "prometheus.platform.yu-min3.com"
+  - "prometheus.yu-mins.com"
   rules:
   - matches:
     - path:

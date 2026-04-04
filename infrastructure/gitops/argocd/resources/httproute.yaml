@@ -11,6 +11,7 @@ spec:
     namespace: istio-system
   hostnames:
   - "argocd.platform.yu-min3.com"
+  - "argocd.yu-mins.com"
   rules:
   - matches:
     - path:
