@@ -11,6 +11,7 @@ spec:
     namespace: istio-system
   hostnames:
   - "backstage.platform.yu-min3.com"
+  - "backstage.yu-mins.com"
   rules:
   - matches:
     - path:

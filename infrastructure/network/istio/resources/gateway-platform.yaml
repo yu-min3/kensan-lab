@@ -37,6 +37,15 @@ spec:
       - group: ""
         kind: Secret
         name: wildcard-platform-tls
+
+  # Cloudflare Tunnel経由 (yu-mins.com) - TLSはCloudflare Edgeで終端済み
+  - name: http-tunnel
+    protocol: HTTP
+    port: 80
+    hostname: "*.yu-mins.com"
+    allowedRoutes:
+      namespaces:
+        from: All
 ---
 # LoadBalancer Service for Platform Gateway
 apiVersion: v1
