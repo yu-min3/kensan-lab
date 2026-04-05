@@ -40,6 +40,11 @@ spec:
             secretKeyRef:
               name: backstage-secret
               key: GITHUB_TOKEN
+        - name: BACKEND_SECRET
+          valueFrom:
+            secretKeyRef:
+              name: backstage-secret
+              key: BACKEND_SECRET
         resources:
           requests:
             memory: "256Mi"
