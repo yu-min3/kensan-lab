@@ -10,9 +10,12 @@ spec:
 
   sourceRepos:
   - "https://github.com/yu-min3/kensan-lab"
+  - "https://github.com/yu-min3/*"
 
   destinations:
   - namespace: kensan-dev
+    server: "https://kubernetes.default.svc"
+  - namespace: app-dev
     server: "https://kubernetes.default.svc"
 
   # No cluster-scoped resources allowed for application developers

@@ -225,6 +225,6 @@ spec:
       - title: 🔀 Platform Config PR
         url: ${{ steps['create-argocd-apps'].output.remoteUrl }}
       - title: 🚀 Argo CD App (Dev)
-        url: http://192.168.0.240/applications/app-dev-${{ parameters.name }}
+        url: https://argocd.platform.yu-min3.com/applications/app-dev-${{ parameters.name }}
       - title: 🚀 Argo CD App (Prod)
-        url: http://192.168.0.240/applications/app-prod-${{ parameters.name }}
+        url: https://argocd.platform.yu-min3.com/applications/app-prod-${{ parameters.name }}
