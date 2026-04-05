@@ -11,8 +11,7 @@ backend:
     port: 7007
     host: 0.0.0.0
   auth:
-    keys:
-      - secret: ${BACKEND_SECRET}
+    dangerouslyDisableDefaultAuthPolicy: true
   cors:
     origin: https://backstage.platform.yu-min3.com
     methods: [GET, HEAD, PATCH, POST, PUT, DELETE]
