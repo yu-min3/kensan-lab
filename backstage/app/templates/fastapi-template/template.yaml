@@ -133,7 +133,7 @@ spec:
         description: ${{ parameters.description }}
         repoUrl: ${{ parameters.repoUrl }}
         defaultBranch: main
-        repoVisibility: private
+        repoVisibility: public
         deleteBranchOnMerge: true
         gitCommitMessage: 'Initial commit from Backstage template'
 
