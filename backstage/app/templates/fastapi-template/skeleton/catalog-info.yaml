@@ -11,16 +11,16 @@ metadata:
     - fastapi
     - python
   links:
-    - url: https://${{ values.name }}-dev.yu-min3.com/docs
+    - url: https://${{ values.name }}-dev.app.yu-min3.com/docs
       title: API Docs (Dev)
       icon: web
-    - url: https://${{ values.name }}.yu-min3.com/docs
+    - url: https://${{ values.name }}.app.yu-min3.com/docs
       title: API Docs (Prod)
       icon: web
-    - url: https://argocd.yu-min3.com/applications/app-dev-${{ values.name }}
+    - url: https://argocd.platform.yu-min3.com/applications/app-dev-${{ values.name }}
       title: Argo CD (Dev)
       icon: dashboard
-    - url: https://argocd.yu-min3.com/applications/app-prod-${{ values.name }}
+    - url: https://argocd.platform.yu-min3.com/applications/app-prod-${{ values.name }}
       title: Argo CD (Prod)
       icon: dashboard
 spec:
