@@ -7,6 +7,10 @@ admin:
   userKey: admin-user
   passwordKey: admin-password
 
+# Disable init-chown-data (fsGroup handles ownership)
+initChownData:
+  enabled: false
+
 # Resources
 resources:
   requests:
