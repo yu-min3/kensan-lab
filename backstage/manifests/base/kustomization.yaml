@@ -5,10 +5,10 @@ resources:
 - namespace.yaml
 - ghcr-pull-secret.yaml
 - serviceaccount.yaml
-- postgresql-secret.yaml
+- postgresql-external-secret.yaml
 - postgresql-statefulset.yaml
 - postgresql-service.yaml
-- backstage-secret.yaml
+- backstage-external-secret.yaml
 - backstage-deployment.yaml
 - backstage-service.yaml
 - httproute.yaml
