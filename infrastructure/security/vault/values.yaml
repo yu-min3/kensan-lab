@@ -64,6 +64,18 @@ server:
 
         storage "raft" {
           path = "/vault/data"
+          # 各 Pod が起動時に他の peer に自動 join するため必須。
+          # これが無いと vault-0 が単独で initialize した後 vault-1/2 が
+          # Sealed のまま cluster に join できない (PR #228 までで漏れ)。
+          retry_join {
+            leader_api_addr = "http://vault-0.vault-internal:8200"
+          }
+          retry_join {
+            leader_api_addr = "http://vault-1.vault-internal:8200"
+          }
+          retry_join {
+            leader_api_addr = "http://vault-2.vault-internal:8200"
+          }
         }
 
         # AWS KMS auto-unseal
