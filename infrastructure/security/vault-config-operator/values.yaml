@@ -2,7 +2,7 @@
 # Version: 0.8.48 (2026-04-19 release, latest stable)
 # Vault Config Operator (redhat-cop): Vault 設定を CRD で管理
 #
-# Reference: kensan-workspace/projects/kensan-lab/secrets-phase1-design.md (Stage 1, Pattern A')
+# Reference: docs/bootstrapping/12-vault-stage1.md (Stage 1 完了後に作成予定)
 # - Pattern A' 採用: Bootstrap TF (使い捨て) で auth methods enable / OIDC / VCO 用 K8s role 作成
 # - 永続的な per-app policy / KV mount / DB role 等は VCO の CRD で管理 (ArgoCD sync)
 #

@@ -2,11 +2,10 @@
 # Version: 2.4.1 (2025-04-28 release, latest stable)
 # External Secrets Operator: Vault → K8s Secret bridge
 #
-# Reference: kensan-workspace/projects/kensan-lab/secrets-phase1-design.md (Stage 1)
+# Reference: docs/bootstrapping/12-vault-stage1.md (Stage 1 完了後に作成予定)
 # - ClusterSecretStore で Vault と接続 (resources/cluster-secret-store.yaml)
 # - K8s auth method で operator が Vault に認証
 # - Phase 1 で Grafana admin pw が最初の ExternalSecret 対象 (Stage 2)
-# - 詳細手順は Stage 1 完了後に docs/bootstrapping/12-vault-stage1.md にまとめる
 
 # CRD インストール (chart に含める、別 release に分けない)
 installCRDs: true

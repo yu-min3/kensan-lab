@@ -2,7 +2,7 @@
 # Version: 0.32.0 (2026-01-14 release, latest stable as of 2026-05)
 # Vault HA Helm chart with AWS KMS auto-unseal
 #
-# Reference: kensan-workspace/projects/kensan-lab/secrets-phase1-design.md (Stage 1)
+# Reference: docs/bootstrapping/12-vault-stage1.md (Stage 1 完了後に作成予定)
 # - 3 replicas, anti-affinity required (各ノード分散)
 # - Storage: longhorn-single (replica=1, Vault Raft が冗長を担う)
 # - AWS KMS auto-unseal (alias/vault-unseal-kensan, ap-northeast-1)
