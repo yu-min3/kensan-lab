@@ -72,6 +72,31 @@ spec:
           port: 8200
 
 ---
+## Allow ingress/egress to istio-system (kensan-lab 共通パターン: allow-istio)
+## sidecar → istiod xDS (15012/15014) 接続のため必須。port 全許可は kensan-lab
+## の既存ベストプラクティス (cf. infrastructure/security/keycloak/base/network-policy.yaml)
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-istio
+  namespace: vault-config-operator
+spec:
+  podSelector: {}
+  policyTypes:
+    - Ingress
+    - Egress
+  egress:
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: istio-system
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: istio-system
+
+---
 ## Allow Prometheus scraping from monitoring namespace
 ## VCO の metrics は kube-rbac-proxy 経由 (8443) で expose されるのが kubebuilder 標準
 apiVersion: networking.k8s.io/v1
