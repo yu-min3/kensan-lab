@@ -2,11 +2,15 @@
 
 ## ステータス
 
-採用済み (Accepted)
+採用済み (Accepted) — Phase 2 の実装手段は ADR-005 で部分的に置換
 
 ## 日付
 
 2025-11-08
+
+## 更新履歴
+
+- **2026-05-03**: Phase 2「OAuth2 Proxy による Gateway 一括認証」の実装手段を [ADR-005: Istio native oauth2 + Keycloak による Phase 1 認証実装](005-istio-native-oauth2.md) で置換。Istio 1.27 の native `oauth2` extension provider が利用可能になり、別 Pod として OAuth2 Proxy を運用する必要が無くなったため。本 ADR の段階的アプローチ（Phase 1〜3）と Phase 3 の多層認可は引き続き有効。
 
 ## コンテキスト
 
