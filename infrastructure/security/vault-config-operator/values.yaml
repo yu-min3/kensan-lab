@@ -29,6 +29,12 @@
 #   作られず、operator pod が FailedMount で詰まる。
 enableCertManager: true
 
+# VCO operator → Vault 接続先 (intra-cluster Service)
+# K8s auth method 経由で認証するので Service 直接で OK (OIDC issuer matching の制約がない)
+env:
+  - name: VAULT_ADDR
+    value: "http://vault.vault.svc.cluster.local:8200"
+
 # === Operator (Controller Manager) ===
 controllerManager:
   replicas: 1   # Phase 1 シングル
