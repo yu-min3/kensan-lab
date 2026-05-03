@@ -44,6 +44,9 @@ spec:
   # Sealed Secrets
   - group: "bitnami.com"
     kind: SealedSecret
+  # External Secrets (Vault → K8s Secret bridge)
+  - group: "external-secrets.io"
+    kind: ExternalSecret
   # Istio Security
   - group: "security.istio.io"
     kind: AuthorizationPolicy
