@@ -34,14 +34,23 @@ Deployment order is controlled by Argo CD sync-waves.
 | -- | Cilium CNI | `applications/network/cilium/app.yaml` |
 | -3 | Istio namespace + Gateways | `applications/network/istio-resources/app.yaml` |
 | -2 | Istio Base CRDs | `applications/network/istio-base/app.yaml` |
+| -2 | Istio CNI | `applications/network/istio-cni/app.yaml` |
 | -1 | Istiod | `applications/network/istiod/app.yaml` |
 | 0 | cert-manager | `applications/security/cert-manager/app.yaml` |
+| -- | Sealed Secrets | `applications/security/sealed-secrets/app.yaml` |
+| 2 | Keycloak (prod / dev) | `applications/security/keycloak/overlays/{prod,dev}/app.yaml` |
+| 5 | Vault HA (KMS auto-unseal) | `applications/security/vault/app.yaml` |
+| 6 | External Secrets Operator | `applications/security/external-secrets/app.yaml` |
+| 7 | Vault Config Operator | `applications/security/vault-config-operator/app.yaml` |
 | -- | Prometheus | `applications/observability/prometheus/app.yaml` |
 | -- | Grafana | `applications/observability/grafana/app.yaml` |
 | -- | Loki | `applications/observability/loki/app.yaml` |
 | -- | Tempo | `applications/observability/tempo/app.yaml` |
 | -- | OTel Collector | `applications/observability/otel-collector/app.yaml` |
 | -- | Argo CD (self-managed) | `applications/gitops/argocd/app.yaml` |
+
+**Note**: Vault stack (waves 5-7) requires a one-time manual Bootstrap step after deployment.
+See [`bootstrap/vault/README.md`](../../bootstrap/vault/README.md) for details.
 
 ---
 

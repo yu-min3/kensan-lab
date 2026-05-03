@@ -80,6 +80,35 @@ state を持たないので **永続的な Vault 設定**は VCO + ArgoCD に任
 
 詳細な設計判断の経緯は `docs/bootstrapping/12-vault-stage1.md`（Stage 1 完了後に作成予定）に集約する。
 
+## Stage 1 全体フロー
+
+```mermaid
+flowchart TB
+    A["ArgoCD wave -3〜2:<br/>Cilium / Istio / cert-manager /<br/>Sealed Secrets / Keycloak<br/>(既存)"]
+    B["ArgoCD wave 5:<br/>Vault HA Helm chart<br/>(infrastructure/security/vault/)"]
+    C["ArgoCD wave 6:<br/>External Secrets Operator<br/>(infrastructure/security/external-secrets/)"]
+    D["ArgoCD wave 7:<br/>Vault Config Operator<br/>(infrastructure/security/vault-config-operator/)"]
+    E["**手動: vault operator init**<br/>Recovery Keys を 1Password へ<br/>root token 控える"]
+    F["**手動: terraform apply**<br/>(このディレクトリ)<br/>auth methods + OIDC + roles +<br/>policies + KV mount + audit"]
+    G["**手動: state 破棄 + root token revoke**"]
+    H["✓ Stage 1 完了<br/>VCO/ESO が自動認証開始<br/>Stage 2 で Grafana admin pw 移行へ"]
+
+    A --> B --> C --> D --> E --> F --> G --> H
+
+    style B fill:#ffe8b3,stroke:#d97706
+    style C fill:#ffe8b3,stroke:#d97706
+    style D fill:#ffe8b3,stroke:#d97706
+    style E fill:#ffd0d0,stroke:#dc2626
+    style F fill:#ffd0d0,stroke:#dc2626
+    style G fill:#ffd0d0,stroke:#dc2626
+    style H fill:#d0f0d0,stroke:#16a34a
+```
+
+オレンジ = ArgoCD 自動 sync、赤 = 人間が 1 回だけ手動実行。
+
+ArgoCD は **deploy 順序を保証**するが、Vault の **内部状態 (auth methods / policies 等)** までは触れない。
+そのため wave 7 までの sync 完了後、手動で `vault operator init` と `terraform apply` を実行する必要がある (鶏卵問題への解、上記参照)。
+
 ## 前提条件 (順番に確認)
 
 1. **Vault HA cluster up**: `infrastructure/security/vault/` が ArgoCD で sync 済み、3 pod が `Running`
