@@ -1,0 +1,44 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: vault-config-operator
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "7"  # Vault (5) + ESO (6) の後
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: platform-project
+
+  sources:
+    - repoURL: https://redhat-cop.github.io/vault-config-operator
+      chart: vault-config-operator
+      targetRevision: 0.8.48
+      helm:
+        releaseName: vault-config-operator
+        valueFiles:
+          - $values/infrastructure/security/vault-config-operator/values.yaml
+    - repoURL: https://github.com/yu-min3/kensan-lab
+      targetRevision: HEAD
+      ref: values
+    - repoURL: https://github.com/yu-min3/kensan-lab
+      targetRevision: HEAD
+      path: infrastructure/security/vault-config-operator/resources
+
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: vault-config-operator
+
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true
+    retry:
+      limit: 5
+      backoff:
+        duration: 5s
+        factor: 2
+        maxDuration: 3m
