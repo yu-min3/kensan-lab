@@ -1,0 +1,9 @@
+# Pattern A' (TF 使い捨て): state も tfvars も commit しない
+.terraform/
+.terraform.lock.hcl
+*.tfstate
+*.tfstate.*
+*.tfplan
+terraform.tfvars
+*.auto.tfvars
+crash.log
