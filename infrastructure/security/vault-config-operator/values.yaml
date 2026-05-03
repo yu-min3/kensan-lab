@@ -22,6 +22,13 @@
 # 実際 deploy 前に最新 chart のデフォルトを確認:
 #   helm show values vault-config-operator/vault-config-operator --version 0.8.48
 
+# CA injection: vanilla K8s では cert-manager 経由必須。
+# default (false) は OpenShift の service-ca operator 想定で、deploy された
+# Webhook config に service.beta.openshift.io/inject-cabundle アノテーションだけ付く
+# → kensan-lab には service-ca が無いため webhook/metrics の TLS Secret が永久に
+#   作られず、operator pod が FailedMount で詰まる。
+enableCertManager: true
+
 # === Operator (Controller Manager) ===
 controllerManager:
   replicas: 1   # Phase 1 シングル
