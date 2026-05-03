@@ -25,9 +25,12 @@ resource "vault_policy" "vco_admin" {
     path "sys/mounts"    { capabilities = ["read", "list"] }
     path "sys/mounts/*"  { capabilities = ["create", "read", "update", "delete", "list", "sudo"] }
 
-    # Policies
+    # Policies (new API)
     path "sys/policies/acl"      { capabilities = ["read", "list"] }
     path "sys/policies/acl/*"    { capabilities = ["create", "read", "update", "delete", "list"] }
+    # Policies (legacy API — VCO's Policy CRD uses /sys/policy/{name})
+    path "sys/policy"            { capabilities = ["read", "list"] }
+    path "sys/policy/*"          { capabilities = ["create", "read", "update", "delete", "list"] }
 
     # Identity
     path "identity/*"  { capabilities = ["create", "read", "update", "delete", "list"] }

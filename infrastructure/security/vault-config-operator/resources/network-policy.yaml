@@ -116,3 +116,28 @@ spec:
       ports:
         - protocol: TCP
           port: 8443
+
+---
+## Allow ingress from kube-apiserver to webhook server (validating/mutating)
+## VCO の webhook は Service vault-config-operator-webhook-service:443 → pod:9443
+## kube-apiserver が CRD apply 時に webhook を呼ぶため Cilium identity-based selector で許可
+##
+## 注意: kensan-lab の環境では kube-apiserver からの webhook 呼び出しが
+## Cilium identity "remote-node" として識別される (kubeadm + Cilium kube-proxy
+## replacement の特性。kube-apiserver host が pod CIDR 経由で source 判定される)。
+## そのため kube-apiserver と remote-node 両方を許可する。
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: allow-apiserver-webhook-ingress
+  namespace: vault-config-operator
+spec:
+  endpointSelector: {}
+  ingress:
+    - fromEntities:
+        - kube-apiserver
+        - remote-node
+      toPorts:
+        - ports:
+            - port: "9443"
+              protocol: TCP

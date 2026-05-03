@@ -1,7 +1,8 @@
 # Chart: grafana-community/grafana 11.3.5 (appVersion: 12.4.2)
 # Repo migrated from grafana/helm-charts → grafana-community/helm-charts (2026-01-30)
 
-# Admin credentials (managed by Sealed Secrets)
+# Admin credentials (managed by External Secrets Operator → Vault KV)
+# secret は resources/external-secret.yaml で生成される
 admin:
   existingSecret: grafana-admin-secret
   userKey: admin-user
