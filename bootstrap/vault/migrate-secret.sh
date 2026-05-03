@@ -104,9 +104,11 @@ echo "    OK"
 # === Vault 到達確認 ===
 echo ""
 echo "==> Vault health check at $VAULT_ADDR"
+# standbyok=true: HA cluster で Istio LB が standby pod に振っても 200 を返させる
+# (Vault default は standby pod だと 429。curl -f が落ちる)
 if ! curl -sf --max-time 10 \
     -H "X-Vault-Token: $VAULT_TOKEN" \
-    "$VAULT_ADDR/v1/sys/health" > /dev/null; then
+    "$VAULT_ADDR/v1/sys/health?standbyok=true" > /dev/null; then
   echo "ERROR: Vault に届かない or token 無効"
   echo "  /etc/hosts と TLS cert を確認してね"
   unset VAULT_TOKEN
