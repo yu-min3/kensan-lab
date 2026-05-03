@@ -4,7 +4,7 @@
 #
 # Reference: docs/bootstrapping/12-vault-stage1.md (Stage 1 完了後に作成予定)
 # - 3 replicas, anti-affinity required (各ノード分散)
-# - Storage: longhorn-single (replica=1, Vault Raft が冗長を担う)
+# - Storage: local-path 暫定 (Longhorn 未導入のため。Longhorn 導入後 longhorn-single に切替)
 # - AWS KMS auto-unseal (alias/vault-unseal-kensan, ap-northeast-1)
 # - ESO 路線のため injector は disabled
 # - audit device は bootstrap TF (Step e) で enable する
@@ -82,18 +82,22 @@ server:
         }
 
   # Raft data 用 PVC
+  # TODO(longhorn): Longhorn 導入後 storageClass を longhorn-single に戻す。
+  # local-path は node-local なので PVC は作成ノードに張り付く (移動 = data 喪失)。
+  # vault-0/1/2 は anti-affinity で別ノードに張り付く前提なので HA は形式上成立する。
   dataStorage:
     enabled: true
     size: 10Gi
-    storageClass: longhorn-single
+    storageClass: local-path
     accessMode: ReadWriteOnce
 
   # Audit log 用 PVC (audit device #1: file)
   # audit device の enable は bootstrap TF で行う (vault audit enable file path=/vault/audit/audit.log)
+  # TODO(longhorn): 同上、Longhorn 導入後 longhorn-single に切替
   auditStorage:
     enabled: true
     size: 10Gi
-    storageClass: longhorn-single
+    storageClass: local-path
     accessMode: ReadWriteOnce
     mountPath: /vault/audit
 
