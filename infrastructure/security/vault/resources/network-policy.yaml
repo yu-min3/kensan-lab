@@ -93,50 +93,32 @@ spec:
           port: 443
 
 ---
-## Allow egress to Istio Gateway (Keycloak OIDC を auth.platform.yu-min3.com 経由で reach)
-## Vault の OIDC issuer URL は public FQDN になるため、DNS は LB IP (192.168.0.242)
-## に解決され istio-system の gateway pod 経由でルーティングされる。
-## namespaceSelector で istio-system を identity-based に許可することで、
-## ipBlock ハードコードを回避。
+## Allow ingress/egress to istio-system (kensan-lab 共通パターン: allow-istio)
+## - egress: sidecar → istiod xDS (15012/15014) 必須。Gateway 経由の外部 reach
+##   (Keycloak OIDC を auth.platform.yu-min3.com 経由で叩く) も含む
+## - ingress: Gateway pod から Vault UI/API (8200) への中継
+## port を絞らず ns 全 port 許可で書くのが kensan-lab 既存ベストプラクティス
+## (cf. infrastructure/security/keycloak/base/network-policy.yaml の allow-istio)
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
-  name: allow-istio-gateway-egress
+  name: allow-istio
   namespace: vault
 spec:
   podSelector: {}
   policyTypes:
+    - Ingress
     - Egress
   egress:
     - to:
         - namespaceSelector:
             matchLabels:
               kubernetes.io/metadata.name: istio-system
-      ports:
-        - protocol: TCP
-          port: 443
-        - protocol: TCP
-          port: 80
-
----
-## Allow ingress from istio-system (Gateway → Vault UI/API)
-apiVersion: networking.k8s.io/v1
-kind: NetworkPolicy
-metadata:
-  name: allow-istio-gateway-ingress
-  namespace: vault
-spec:
-  podSelector: {}
-  policyTypes:
-    - Ingress
   ingress:
     - from:
         - namespaceSelector:
             matchLabels:
               kubernetes.io/metadata.name: istio-system
-      ports:
-        - protocol: TCP
-          port: 8200
 
 ---
 ## Allow Prometheus scraping from monitoring namespace
