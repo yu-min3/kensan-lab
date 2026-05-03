@@ -1,0 +1,59 @@
+# Chart config: infrastructure/gitops/argocd/applications/security/vault-config-operator/app.yaml
+# Version: 0.8.48 (2026-04-19 release, latest stable)
+# Vault Config Operator (redhat-cop): Vault 設定を CRD で管理
+#
+# Reference: docs/bootstrapping/12-vault-stage1.md (Stage 1 完了後に作成予定)
+# - Pattern A' 採用: Bootstrap TF (使い捨て) で auth methods enable / OIDC / VCO 用 K8s role 作成
+# - 永続的な per-app policy / KV mount / DB role 等は VCO の CRD で管理 (ArgoCD sync)
+#
+# 提供する CRD:
+# - VaultPolicy           HCL policy 管理
+# - SecretEngineMount     secret engine 有効化 (kv, pki, database)
+# - KubernetesAuthEngineRole  K8s auth method の role 管理
+# - DatabaseSecretEngineConfig/Role  動的 DB creds (Stage 5)
+# - PKISecretEngineConfig (Vault PKI 不採用なので Stage 1 では使わない)
+# - その他多数 (auth methods / identity / quota / oidc 等)
+#
+# 認証経路: VCO operator pod が K8s SA JWT で Vault に認証
+#   → Bootstrap TF が事前に Vault role "vault-config-operator" を作成
+#   → SA "vault-config-operator/default" に bind、admin policy 付与
+#
+# 注意: chart values 構造は kubebuilder ベース operator の標準パターンを想定。
+# 実際 deploy 前に最新 chart のデフォルトを確認:
+#   helm show values vault-config-operator/vault-config-operator --version 0.8.48
+
+# === Operator (Controller Manager) ===
+controllerManager:
+  replicas: 1   # Phase 1 シングル
+  manager:
+    resources:
+      requests:
+        memory: 128Mi
+        cpu: 50m
+      limits:
+        memory: 256Mi
+        cpu: 250m
+  # kube-rbac-proxy sidecar (kubebuilder 標準、metrics 認可用)
+  kubeRbacProxy:
+    resources:
+      requests:
+        memory: 32Mi
+        cpu: 10m
+      limits:
+        memory: 64Mi
+        cpu: 50m
+
+# Prometheus ServiceMonitor (kube-prometheus-stack pickup)
+metricsService:
+  enabled: true
+serviceMonitor:
+  enabled: true
+  additionalLabels:
+    release: prometheus
+
+# ServiceAccount: Vault の K8s auth role と bind するため固定名で create
+# Bootstrap TF の vault_kubernetes_auth_backend_role.vault_config_operator が
+# bound_service_account_names を "default" に、namespaces を "vault-config-operator" に設定
+serviceAccount:
+  create: true
+  name: default

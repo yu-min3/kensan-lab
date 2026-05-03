@@ -1,0 +1,68 @@
+# Chart config: infrastructure/gitops/argocd/applications/security/external-secrets/app.yaml
+# Version: 2.4.1 (2025-04-28 release, latest stable)
+# External Secrets Operator: Vault → K8s Secret bridge
+#
+# Reference: docs/bootstrapping/12-vault-stage1.md (Stage 1 完了後に作成予定)
+# - ClusterSecretStore で Vault と接続 (resources/cluster-secret-store.yaml)
+# - K8s auth method で operator が Vault に認証
+# - Phase 1 で Grafana admin pw が最初の ExternalSecret 対象 (Stage 2)
+
+# CRD インストール (chart に含める、別 release に分けない)
+installCRDs: true
+
+# === Operator (Controller) ===
+replicaCount: 1   # Phase 1 シングル、安定後に 2 へ
+serviceAccount:
+  create: true
+  name: external-secrets
+
+# Prometheus metrics (kube-prometheus-stack pickup)
+serviceMonitor:
+  enabled: true
+  additionalLabels:
+    release: prometheus  # kensan-lab の kube-prometheus-stack release 名
+
+# 控えめなリソース要求 (Pi5/m4neo)
+resources:
+  requests:
+    memory: 128Mi
+    cpu: 50m
+  limits:
+    memory: 256Mi
+    cpu: 250m
+
+# === Webhook (ValidatingWebhookConfiguration) ===
+webhook:
+  replicaCount: 1
+  serviceAccount:
+    create: true
+    name: external-secrets-webhook
+  resources:
+    requests:
+      memory: 64Mi
+      cpu: 25m
+    limits:
+      memory: 128Mi
+      cpu: 100m
+  serviceMonitor:
+    enabled: true
+    additionalLabels:
+      release: prometheus
+
+# === Cert Controller (Webhook TLS 自動管理) ===
+certController:
+  replicaCount: 1
+  serviceAccount:
+    create: true
+    name: external-secrets-cert-controller
+  resources:
+    requests:
+      memory: 64Mi
+      cpu: 25m
+    limits:
+      memory: 128Mi
+      cpu: 100m
+  serviceMonitor:
+    enabled: true
+    additionalLabels:
+      release: prometheus

@@ -2,11 +2,15 @@
 
 ## Status
 
-Accepted
+Accepted - The Phase 2 implementation method is partially replaced by ADR-005
 
 ## Date
 
 2025-11-08
+
+## Change History
+
+- **2026-05-03**: The implementation method for Phase 2 ("Gateway-level authentication via OAuth2 Proxy") is replaced by [ADR-005: Phase 1 Authentication via Istio Native oauth2 + Keycloak](005-istio-native-oauth2.md). Istio 1.27's native `oauth2` extension provider became available, eliminating the need to operate OAuth2 Proxy as a separate Pod. The phased approach (Phase 1-3) and Phase 3 multi-layer authorization in this ADR remain valid.
 
 ## Context
 

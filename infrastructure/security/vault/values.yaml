@@ -1,0 +1,158 @@
+# Chart config: infrastructure/gitops/argocd/applications/security/vault/app.yaml
+# Version: 0.32.0 (2026-01-14 release, latest stable as of 2026-05)
+# Vault HA Helm chart with AWS KMS auto-unseal
+#
+# Reference: docs/bootstrapping/12-vault-stage1.md (Stage 1 完了後に作成予定)
+# - 3 replicas, anti-affinity required (各ノード分散)
+# - Storage: longhorn-single (replica=1, Vault Raft が冗長を担う)
+# - AWS KMS auto-unseal (alias/vault-unseal-kensan, ap-northeast-1)
+# - ESO 路線のため injector は disabled
+# - audit device は bootstrap TF (Step e) で enable する
+#
+# 事前手動セットアップ (kubeseal で resources/aws-kms-credentials-sealed.yaml を生成):
+#   1) AWS で IAM user 作成、KMS Encrypt/Decrypt のみ許可、access key 取得
+#   2) cat <<EOF > temp/vault-aws-kms-credentials-raw.yaml
+#      apiVersion: v1
+#      kind: Secret
+#      metadata:
+#        name: vault-aws-kms-credentials
+#        namespace: vault
+#      type: Opaque
+#      stringData:
+#        aws_access_key_id: "<ACCESS_KEY>"
+#        aws_secret_access_key: "<SECRET_KEY>"
+#      EOF
+#   3) kubeseal --format=yaml < temp/vault-aws-kms-credentials-raw.yaml \
+#        > infrastructure/security/vault/resources/aws-kms-credentials-sealed.yaml
+#   4) commit (raw は git-ignored、sealed のみ commit)
+
+global:
+  enabled: true
+  # Phase 1: Vault TLS 無効 (Istio mTLS でカバー、cluster 内通信のみ)
+  # Phase 2 以降で TLS 有効化を再検討
+  tlsDisable: true
+
+# Vault Agent Injector は使わない (ESO で K8s Secret に bridge する設計)
+injector:
+  enabled: false
+
+server:
+  enabled: true
+
+  # multi-arch image (arm64 + amd64 で動く)
+  image:
+    repository: hashicorp/vault
+    tag: ""  # chart default を使用
+
+  ha:
+    enabled: true
+    replicas: 3
+    raft:
+      enabled: true
+      setNodeId: true
+      # 注意: `config` は HCL 文字列で chart デフォルトを完全置換する (merge 不可)
+      # chart デフォルトの ui/listener/storage/service_registration を含めた上で
+      # seal/telemetry を追加。chart upgrade 時はこの string を見直す必要あり
+      config: |
+        ui = true
+
+        listener "tcp" {
+          tls_disable     = 1
+          address         = "[::]:8200"
+          cluster_address = "[::]:8201"
+        }
+
+        storage "raft" {
+          path = "/vault/data"
+        }
+
+        # AWS KMS auto-unseal
+        # 認証情報は extraSecretEnvironmentVars 経由 (env: AWS_ACCESS_KEY_ID/SECRET_ACCESS_KEY)
+        seal "awskms" {
+          region     = "ap-northeast-1"
+          kms_key_id = "alias/vault-unseal-kensan"
+        }
+
+        service_registration "kubernetes" {}
+
+        # Prometheus metrics (ServiceMonitor で scrape される)
+        telemetry {
+          prometheus_retention_time = "30s"
+          disable_hostname          = true
+        }
+
+  # Raft data 用 PVC
+  dataStorage:
+    enabled: true
+    size: 10Gi
+    storageClass: longhorn-single
+    accessMode: ReadWriteOnce
+
+  # Audit log 用 PVC (audit device #1: file)
+  # audit device の enable は bootstrap TF で行う (vault audit enable file path=/vault/audit/audit.log)
+  auditStorage:
+    enabled: true
+    size: 10Gi
+    storageClass: longhorn-single
+    accessMode: ReadWriteOnce
+    mountPath: /vault/audit
+
+  # 各 Pod を別ノードに配置 (HA quorum 維持の前提)
+  # map syntax で書くと Helm の deep merge 対象になる (string `|` だと完全置換のみ)
+  affinity:
+    podAntiAffinity:
+      requiredDuringSchedulingIgnoredDuringExecution:
+        - labelSelector:
+            matchLabels:
+              app.kubernetes.io/name: vault
+              component: server
+          topologyKey: kubernetes.io/hostname
+
+  # PodDisruptionBudget: drain 時に quorum を死守 (3 中 2 必須)
+  podDisruptionBudget:
+    enabled: true
+    minAvailable: 2
+
+  # AWS KMS 認証情報を Pod env に注入
+  # 参照する Secret は Step b で SealedSecret として作成 (vault-aws-kms-credentials)
+  extraSecretEnvironmentVars:
+    - envName: AWS_ACCESS_KEY_ID
+      secretName: vault-aws-kms-credentials
+      secretKey: aws_access_key_id
+    - envName: AWS_SECRET_ACCESS_KEY
+      secretName: vault-aws-kms-credentials
+      secretKey: aws_secret_access_key
+
+  # ServiceAccount: K8s auth method の TokenReviewer に使われる
+  serviceAccount:
+    create: true
+    name: vault
+
+  # Pi5 / Bosgame の容量に対して控えめなリソース要求
+  resources:
+    requests:
+      memory: 256Mi
+      cpu: 100m
+    limits:
+      memory: 512Mi
+      cpu: 500m
+
+  service:
+    enabled: true
+    type: ClusterIP
+    port: 8200
+
+# UI 有効 (HTTPRoute は resources/httproute.yaml で外部公開、Step b)
+ui:
+  enabled: true
+  serviceType: ClusterIP
+
+# Prometheus ServiceMonitor (kube-prometheus-stack が pickup)
+serverTelemetry:
+  serviceMonitor:
+    enabled: true
+    selectors:
+      release: prometheus  # kube-prometheus-stack の release 名に合わせる必要あり
+  # alert rules は別途 prometheus 側 (resources/) で定義する想定
+  prometheusRules:
+    enabled: false

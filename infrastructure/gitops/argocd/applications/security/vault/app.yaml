@@ -1,0 +1,44 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: vault
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "5"  # Deploy after sealed-secrets, cert-manager (KMS creds は SealedSecret 経由)
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: platform-project
+
+  sources:
+    - repoURL: https://helm.releases.hashicorp.com
+      chart: vault
+      targetRevision: 0.32.0
+      helm:
+        releaseName: vault
+        valueFiles:
+          - $values/infrastructure/security/vault/values.yaml
+    - repoURL: https://github.com/yu-min3/kensan-lab
+      targetRevision: HEAD
+      ref: values
+    - repoURL: https://github.com/yu-min3/kensan-lab
+      targetRevision: HEAD
+      path: infrastructure/security/vault/resources
+
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: vault
+
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true
+    retry:
+      limit: 5
+      backoff:
+        duration: 5s
+        factor: 2
+        maxDuration: 3m
