@@ -28,6 +28,7 @@ resource "vault_audit" "file" {
 # Audit device #2: stdout (container log として Promtail で捕捉、Loki へ)
 # 1 個目が write 失敗しても Vault 全停止しないように冗長化
 resource "vault_audit" "stdout" {
+  path        = "stdout"
   type        = "file"
   description = "File audit device #2 (backup, stdout)"
   options = {
