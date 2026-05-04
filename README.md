@@ -82,7 +82,31 @@ The platform uses Cilium LoadBalancer with L2 announcements for local network ac
 | <img src="docs/assets/logos/opentelemetry.svg" width="32">  | [OpenTelemetry](https://opentelemetry.io/)                                                          | Telemetry collection (OTel Collector)                                       |
 |  <img src="docs/assets/logos/cert-manager.svg" width="32">  | [cert-manager](https://cert-manager.io/)                                                            | Automated TLS certificates (Let's Encrypt)                                  |
 | <img src="docs/assets/logos/sealed-secrets.png" width="32"> | [Sealed Secrets](https://sealed-secrets.netlify.app/)                                               | Encrypted secrets in Git                                                    |
-|   <img src="docs/assets/logos/cloudflare.svg" width="32">   | [Cloudflare Tunnel](https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/) | Zero Trust internet exposure                                                |
+|                                                             | [Longhorn](https://longhorn.io/)                                                                    | Distributed block storage with S3-compatible backup (CNCF Incubating)       |
+|   <img src="docs/assets/logos/cloudflare.svg" width="32">   | [Cloudflare Tunnel / R2](https://www.cloudflare.com/developer-platform/products/r2/)                | Zero Trust internet exposure (Tunnel) + off-site backup target (R2)         |
+
+## Storage
+
+Two StorageClasses serve different durability needs:
+
+- **`local-path`** (default) — node-local hostPath. Used for ephemeral, regenerable workloads (Argo CD / Backstage metadata, caches). PVs are pinned to the node where they were created.
+- **`longhorn`** — distributed block storage with replication and S3-compatible backup. Scheduled on `hardware-class=high-performance` nodes only (currently the M4 Neo, the only one with NVMe). Phase 1 runs at `replica=1` (no HA, the validation phase). Phase 3 (after additional SSDs) will expand to 3 nodes with `replica=3`.
+
+Backups go to **Cloudflare R2** through the S3-compatible API. Egress is free, which makes monthly restore-validation drills cheap (~$2/mo even at projected production volume).
+
+```mermaid
+flowchart LR
+    app[Stateful Pod]
+    app -- "PVC<br/>longhorn" --> lh
+    app -- "PVC<br/>local-path" --> lp[("local-path<br/>per-node<br/>hostPath")]
+    subgraph m4neo["m4neo (AMD64, NVMe)"]
+      lh["Longhorn Manager"] --- data[("/opt/longhorn<br/>data path")]
+    end
+    lh -. "Snapshot &<br/>Backup" .-> r2[("Cloudflare R2<br/>egress: $0")]
+    r2 -. "Restore" .-> lh
+```
+
+See [`infrastructure/storage/README.md`](./infrastructure/storage/README.md) for the full layout, phase plan, and runbook references.
 
 ## Hardware
 
