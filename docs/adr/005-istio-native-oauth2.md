@@ -2,9 +2,13 @@
 
 ## Status
 
-Accepted
+**Re-evaluation Required (2026-05-05)** — superseded in part by [ADR-010](010-istio-native-oauth2-absent.md).
 
-This ADR replaces the OAuth2 Proxy approach assumed for Phase 2 in ADR-002 with Istio's native `oauth2` extension provider. The phased approach (Phase 1-3) and Phase 3 multi-layer authorization in ADR-002 remain valid.
+This ADR's *premise* — that "Istio 1.27 has shipped a stable Gateway API + native `oauth2` extension provider" — is incorrect. The `MeshConfig.ExtensionProvider` proto in Istio 1.27 (and master) does not include any OAuth2/OIDC provider type; the available `oneof` cases are `envoy_ext_authz_http`, `envoy_ext_authz_grpc`, telemetry providers, log providers, and `sds`. See ADR-010 for the verification, the option matrix (Path A: oauth2-proxy via ext_authz / Path B: EnvoyFilter wrapping `envoy.filters.http.oauth2` / Path C: per-service OIDC), and the recommended path.
+
+The phased approach (Phase 1-3), the two-stage authorization architecture, and the Phase 3 multi-layer authorization plan in this ADR all remain valid; only the **mechanism** for the Gateway-level OIDC handshake needs re-selection.
+
+Originally accepted on 2026-05-03; re-evaluation triggered on 2026-05-05 during implementation prep.
 
 ## Date
 
