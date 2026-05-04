@@ -2,9 +2,19 @@
 
 ## Status
 
-**Proposed** — pending Yu's decision among Paths A / B / C below.
+**Decided: Path A — oauth2-proxy via `envoy_ext_authz_http`** (2026-05-05).
 
-This ADR supersedes the **architectural premise** of ADR-005, which assumed Istio 1.27 had a "native `oauth2` extension provider". That premise turns out to be incorrect. The phased approach and two-stage authorization model in ADR-005 remain valid; only the implementation mechanism for Gateway-level OIDC needs re-selection.
+This ADR supersedes the **architectural premise** of ADR-005, which assumed Istio 1.27 had a "native `oauth2` extension provider". That premise turned out to be incorrect. The phased approach and two-stage authorization model in ADR-005 remain valid; only the implementation mechanism for Gateway-level OIDC was re-selected.
+
+### Decision rationale (after additional review on 2026-05-05)
+
+Initial draft of this ADR also considered a "Path D" (per-service OIDC for OIDC-native apps + oauth2-proxy only for non-OIDC apps such as Hubble / Prometheus / Longhorn / Alertmanager). After comparing concrete SSO behavior, single-logout, audit centralization, and operational cost of adding new apps, **Path A (unified oauth2-proxy fronting all platform UIs) wins on every axis except failure-mode resilience**, which is mitigated by running oauth2-proxy with `replicaCount: 2` + `PodDisruptionBudget`. Path D's "per-service OIDC for some apps" was rejected as middle-of-the-road complexity without a clear operational payoff.
+
+CLI access paths (`vault login -method=oidc`, `argocd login --sso`) remain on per-service OIDC clients because they cannot route through oauth2-proxy. oauth2-proxy's `--skip-jwt-bearer-tokens` lets pre-authenticated Bearer tokens pass through unchanged, so CLI flows coexist with browser flows under Path A.
+
+Path B (`EnvoyFilter` wrapping `envoy.filters.http.oauth2`) was rejected because the Envoy filter is officially "currently under active development" — not a stable surface for a homelab framed as an Enterprise Platform Engineering reference.
+
+Path C (per-service OIDC for everything) was rejected because non-OIDC apps (Hubble / Prometheus / Longhorn / Alertmanager) have no native auth, leaving them either LAN-only or behind ad-hoc basic auth.
 
 ## Date
 

@@ -2,9 +2,19 @@
 
 ## ステータス
 
-**Proposed** — Yu の Path A / B / C 選択待ち。
+**決定済み: Path A — oauth2-proxy + `envoy_ext_authz_http`** (2026-05-05)。
 
-本 ADR は ADR-005 の**アーキテクチャ前提**を置換する。ADR-005 が想定した「Istio 1.27 native `oauth2` extension provider」は実在しない。段階的アプローチと二段階認可モデル自体は ADR-005 のまま有効、Gateway 層 OIDC のメカニズムのみ再選定が必要。
+本 ADR は ADR-005 の**アーキテクチャ前提**を置換した。ADR-005 が想定した「Istio 1.27 native `oauth2` extension provider」は実在しない。段階的アプローチと二段階認可モデル自体は ADR-005 のまま有効、Gateway 層 OIDC のメカニズムのみ再選定した。
+
+### 決定根拠（2026-05-05 追加検討）
+
+初版起票時には Path D (OIDC native アプリは per-service OIDC、Hubble/Prometheus/Longhorn/Alertmanager 等の OIDC 非対応アプリのみ oauth2-proxy で守る hybrid) も併記していたが、SSO 体験 / single-logout / 監査一元化 / 新アプリ追加時の運用コストを比較した結果、**failure-mode resilience を除く全軸で Path A (oauth2-proxy 一本) が優位**と判断。failure resilience は `replicaCount: 2` + `PodDisruptionBudget` で軽減可能。
+
+CLI 経路 (`vault login -method=oidc` / `argocd login --sso`) は oauth2-proxy を通れないため per-service OIDC client を維持する。oauth2-proxy の `--skip-jwt-bearer-tokens` で事前認証済み Bearer token は素通り扱いになるため、browser 経路と CLI 経路が Path A 配下で共存する。
+
+Path B (`EnvoyFilter` で `envoy.filters.http.oauth2`) は Envoy filter が公式に "currently under active development" と明記されており、Enterprise Platform Engineering reference を標榜する homelab には不適と判断。
+
+Path C (per-service OIDC のみ) は OIDC 非対応アプリ (Hubble/Prometheus/Longhorn/Alertmanager) を LAN-only か ad-hoc basic auth で守ることになり、SSO 統合の看板に反するため不採用。
 
 ## 日付
 
