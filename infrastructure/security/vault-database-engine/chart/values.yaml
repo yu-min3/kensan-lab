@@ -30,9 +30,10 @@ namePrefix: "postgres-"
 
 ## --- Vault KV admin cred 規約 (PE 完全管理、AD には見えない) ---
 ##   convention: <kvAdminPathPrefix>/<name> with keys (username, password)
-##   VCO は user-facing path を渡すと内部で KV v2 の "data/" を自動挿入する。
-##   ここに "data/" を含めると VCO が "data.data.username" を読んで nil panic する。
-kvAdminPathPrefix: "secret/db-admin"
+##   KV v1 mount を使う必要がある: VCO #229 (vaultClient.Logical().Read で KV v2 nested
+##   data 構造を扱えず "interface conversion: nil to string" panic) の workaround。
+##   bootstrap/vault/ + temp/setup-vault-kv1-admin.sh で kv1/ mount + cred 配置済み。
+kvAdminPathPrefix: "kv1/db-admin"
 
 ## ============================================================================
 ## ESO consumer-side (app ns 側に生成される)
