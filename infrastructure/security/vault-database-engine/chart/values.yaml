@@ -1,0 +1,76 @@
+## ============================================================================
+## PE 規約 (デフォルト値)。各 values file は必要分だけ override する。
+## ============================================================================
+
+## --- Vault 接続先 / mount 設定 (Vault-side, VCO 用) ---
+vaultNamespace: vault
+vaultMountPath: database
+vcoAuthRole: vault-config-operator
+pluginName: postgresql-database-plugin
+
+## --- TTL (Vault Database engine が払い出す動的 user の lease 期間) ---
+ttl: "24h"
+maxTtl: "72h"
+
+## --- Postgres 接続規約 ---
+##   host が省略された場合: <releaseName>.<ns>.svc.cluster.local
+releaseName: postgresql
+port: 5432
+
+## --- Vault role 命名規約 ---
+##   ApplicationSet が helm.parameters で `name` を inject する想定
+##   filename basename → "postgres-<basename>"
+namePrefix: "postgres-"
+
+## --- Vault KV admin cred 規約 (PE 完全管理、AD には見えない) ---
+##   convention: <kvAdminPathPrefix>/<name> with keys (username, password)
+kvAdminPathPrefix: "secret/data/db-admin"
+
+## ============================================================================
+## ESO consumer-side (app ns 側に生成される)
+## ============================================================================
+
+## --- VaultDynamicSecret generator が使う Vault provider 設定 ---
+##   既存 ClusterSecretStore vault-backend と同じ auth (ESO operator SA 経由)
+vaultProvider:
+  server: http://vault.vault.svc.cluster.local:8200
+  auth:
+    kubernetes:
+      mountPath: kubernetes
+      role: external-secrets
+      serviceAccountRef:
+        name: external-secrets
+        namespace: external-secrets
+
+## --- ESO ExternalSecret refresh 周期 ---
+##   TTL (24h) の半分程度を目安に short-lived cred を都度更新
+esoRefreshInterval: "12h"
+
+## --- 生成される K8s Secret の キー名 mapping ---
+##   Vault Database engine が返す native フィールド名 (username, password) を
+##   app が期待する env 名にリネームして K8s Secret に書き出す。
+##   default: POSTGRES_USER / POSTGRES_PASSWORD (Bitnami chart 標準)
+keyMapping:
+  user: POSTGRES_USER
+  password: POSTGRES_PASSWORD
+
+## ============================================================================
+## 各 values file で override 可能なフィールド (詳細は README 参照):
+##   ns                    (必須) deploy 先 K8s namespace
+##   rootOwner             (任意) Bitnami app user 名 (default = name basename)
+##   dbName                (任意) DB 名 (default = rootOwner)
+##   host                  (任意) Postgres FQDN
+##   releaseName           (任意) Bitnami release 名 (default = "postgresql")
+##   name                  (任意) Vault role 名 (通常 AppSet inject)
+##   ttl, maxTtl           (任意) Vault TTL
+##   targetSecretName      (任意) 生成 K8s Secret 名 (default = "<name>-cred")
+##   keyMapping.{user,password}  (任意) Secret 内の env キー名
+##   esoRefreshInterval    (任意) ESO refresh 周期
+## ============================================================================
+
+ns: ""
+name: ""
+host: ""
+rootOwner: ""
+dbName: ""
+targetSecretName: ""

@@ -1,0 +1,31 @@
+apiVersion: redhatcop.redhat.io/v1alpha1
+kind: DatabaseSecretEngineRole
+metadata:
+  name: {{ include "vdbe.name" . }}
+  namespace: {{ .Values.vaultNamespace }}
+spec:
+  authentication:
+    path: kubernetes
+    role: {{ .Values.vcoAuthRole }}
+  path: {{ .Values.vaultMountPath }}
+  dBName: {{ include "vdbe.name" . }}
+  defaultTTL: {{ .Values.ttl | quote }}
+  maxTTL: {{ .Values.maxTtl | quote }}
+  creationStatements:
+    - |
+      CREATE ROLE "{{`{{name}}`}}" WITH LOGIN PASSWORD '{{`{{password}}`}}' VALID UNTIL '{{`{{expiration}}`}}' INHERIT;
+      GRANT ALL PRIVILEGES ON DATABASE "{{ include "vdbe.dbName" . }}" TO "{{`{{name}}`}}";
+      GRANT ALL PRIVILEGES ON SCHEMA public TO "{{`{{name}}`}}";
+      GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA public TO "{{`{{name}}`}}";
+      GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public TO "{{`{{name}}`}}";
+      ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON TABLES TO "{{`{{name}}`}}";
+      ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON SEQUENCES TO "{{`{{name}}`}}";
+  revocationStatements:
+    - |
+      REASSIGN OWNED BY "{{`{{name}}`}}" TO "{{ include "vdbe.rootOwner" . }}";
+      DROP OWNED BY "{{`{{name}}`}}";
+      REVOKE ALL PRIVILEGES ON ALL TABLES IN SCHEMA public FROM "{{`{{name}}`}}";
+      REVOKE ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public FROM "{{`{{name}}`}}";
+      REVOKE ALL PRIVILEGES ON SCHEMA public FROM "{{`{{name}}`}}";
+      REVOKE ALL PRIVILEGES ON DATABASE "{{ include "vdbe.dbName" . }}" FROM "{{`{{name}}`}}";
+      DROP ROLE IF EXISTS "{{`{{name}}`}}";

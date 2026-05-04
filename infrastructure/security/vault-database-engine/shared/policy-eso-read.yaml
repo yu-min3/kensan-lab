@@ -1,0 +1,32 @@
+## Vault policy `eso-read` (External Secrets Operator が読む権限を集約)
+## bootstrap chain (TF) では admin / vco-admin だけが必要、eso-read は VCO 起動後に
+## ここで CR として作る。policies.tf からは削除済み。
+apiVersion: redhatcop.redhat.io/v1alpha1
+kind: Policy
+metadata:
+  name: eso-read
+  namespace: vault
+spec:
+  authentication:
+    path: kubernetes
+    role: vault-config-operator
+  policy: |
+    # KV v2 read (data path)
+    path "secret/data/*" {
+      capabilities = ["read", "list"]
+    }
+    # KV v2 metadata read (バージョン情報取得)
+    path "secret/metadata/*" {
+      capabilities = ["read", "list"]
+    }
+    # Database secret engine: 動的 cred 払い出し
+    path "database/creds/*" {
+      capabilities = ["read"]
+    }
+    # token renew (lease 維持)
+    path "auth/token/renew-self" {
+      capabilities = ["update"]
+    }
+    path "auth/token/lookup-self" {
+      capabilities = ["read"]
+    }

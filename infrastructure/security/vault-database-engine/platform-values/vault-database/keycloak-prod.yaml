@@ -1,0 +1,4 @@
+## Keycloak prod Postgres (platform-auth-prod/postgresql)
+## Bitnami app user は "keycloak"、basename "keycloak-prod" と異なるため override
+ns: platform-auth-prod
+rootOwner: keycloak

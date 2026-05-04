@@ -1,0 +1,63 @@
+## vault-database-engine の per-instance ArgoCD app 自動生成
+##
+## convention: <owner-dir>/platform-values/vault-database/<instance>.yaml にファイル置く
+## ⇒ AppSet が ** recursive glob で自動 discover、name を path から inject
+##
+## 将来 AD が apps/<name>/platform-values/vault-database/<inst>.yaml に置いても
+## AppSet 編集ゼロで pickup される。multi-repo 対応する場合は scmProvider generator を merge で追加。
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: vault-database-engine-instances
+  namespace: argocd
+spec:
+  goTemplate: true
+  goTemplateOptions: ["missingkey=error"]
+  generators:
+    - git:
+        repoURL: https://github.com/yu-min3/kensan-lab
+        revision: HEAD
+        files:
+          - path: "**/platform-values/vault-database/*.yaml"
+  template:
+    metadata:
+      ## name = "postgres-<filename-basename>" (filename 拡張子を除いたもの)
+      name: 'vault-db-{{ trimSuffix ".yaml" .path.filename }}'
+      namespace: argocd
+      annotations:
+        argocd.argoproj.io/sync-wave: "9"  # vault-database-engine-shared (8) の後
+      finalizers:
+        - resources-finalizer.argocd.argoproj.io
+    spec:
+      project: platform-project
+      sources:
+        - repoURL: https://github.com/yu-min3/kensan-lab
+          targetRevision: main
+          path: infrastructure/security/vault-database-engine/chart
+          helm:
+            releaseName: 'postgres-{{ trimSuffix ".yaml" .path.filename }}'
+            ## name は path から自動 inject (AD は values file に書かない)
+            parameters:
+              - name: name
+                value: 'postgres-{{ trimSuffix ".yaml" .path.filename }}'
+            valueFiles:
+              - $values/{{ .path.path }}/{{ .path.filename }}
+        - repoURL: https://github.com/yu-min3/kensan-lab
+          targetRevision: main
+          ref: values
+      destination:
+        server: https://kubernetes.default.svc
+        namespace: vault
+      syncPolicy:
+        automated:
+          prune: true
+          selfHeal: true
+        syncOptions:
+          - CreateNamespace=false
+          - ServerSideApply=true
+        retry:
+          limit: 5
+          backoff:
+            duration: 5s
+            factor: 2
+            maxDuration: 3m

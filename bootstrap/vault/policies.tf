@@ -47,27 +47,9 @@ resource "vault_policy" "vco_admin" {
   EOT
 }
 
-# eso-read: External Secrets Operator が secret/data/* を read するための policy
-resource "vault_policy" "eso_read" {
-  name   = "eso-read"
-  policy = <<-EOT
-    # KV v2 read (data path)
-    path "secret/data/*" {
-      capabilities = ["read", "list"]
-    }
-    # KV v2 metadata read (バージョン情報取得)
-    path "secret/metadata/*" {
-      capabilities = ["read", "list"]
-    }
-    # token renew (lease 維持)
-    path "auth/token/renew-self" {
-      capabilities = ["update"]
-    }
-    path "auth/token/lookup-self" {
-      capabilities = ["read"]
-    }
-  EOT
-}
+# eso-read policy is managed by Vault Config Operator (VCO) via Policy CR
+# (infrastructure/security/vault-config-operator/resources/database-engine/policy-eso-read.yaml).
+# Bootstrap chain で必要な policy は admin / vco-admin のみ。eso-read は VCO 起動後に作成される。
 
 # platform-dev: 将来の dev チーム用 placeholder。Phase 1 では readonly 程度に絞る
 resource "vault_policy" "platform_dev" {

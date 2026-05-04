@@ -1,0 +1,12 @@
+## Vault Database secret engine の mount 有効化 (capability の bootstrap)
+apiVersion: redhatcop.redhat.io/v1alpha1
+kind: SecretEngineMount
+metadata:
+  name: database
+  namespace: vault
+spec:
+  authentication:
+    path: kubernetes
+    role: vault-config-operator
+  type: database
+  path: ""  # mount は "database/" (metadata.name から決定)

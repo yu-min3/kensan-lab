@@ -1,0 +1,3 @@
+## Keycloak dev Postgres (platform-auth-dev/postgresql)
+ns: platform-auth-dev
+rootOwner: keycloak

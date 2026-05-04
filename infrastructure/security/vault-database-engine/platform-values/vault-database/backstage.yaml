@@ -1,0 +1,4 @@
+## Backstage Postgres
+## name は AppSet が path から inject (postgres-backstage)
+## rootOwner / dbName / host は default (basename = "backstage" と一致するため override 不要)
+ns: backstage
