@@ -1,0 +1,42 @@
+# RequestAuthentication for gateway-platform
+#
+# Path-independent — same resource regardless of how the OIDC redirect is
+# done (Path A oauth2-proxy / Path B EnvoyFilter / Path C per-service).
+# Applies to all three because all three rely on Istio to verify the
+# bearer JWT once it has been obtained.
+#
+# Behavior:
+# - If a request reaches the Gateway WITH a Bearer JWT, Istio validates
+#   it against the JWKS endpoint and exposes claims under
+#   `request.auth.claims[*]` for AuthorizationPolicy evaluation.
+# - If a request arrives WITHOUT a JWT, RequestAuthentication does NOT
+#   reject it — it just leaves `request.auth.claims` empty. The
+#   AuthorizationPolicy is what decides allow/deny.
+# - `forwardOriginalToken: true` keeps the original Authorization header
+#   on the request to the upstream pod, so apps can decode the JWT for
+#   their own fine-grained authorization (admin button toggling, etc.).
+#
+# Apply order: AFTER the path-specific OIDC redirect mechanism is in
+# place. This resource alone does not produce JWTs; it only validates
+# them.
+apiVersion: security.istio.io/v1
+kind: RequestAuthentication
+metadata:
+  name: keycloak-jwt-platform
+  namespace: istio-system
+spec:
+  targetRef:
+    group: gateway.networking.k8s.io
+    kind: Gateway
+    name: gateway-platform
+  jwtRules:
+    - issuer: "https://auth.platform.yu-min3.com/realms/kensan"
+      jwksUri: "https://auth.platform.yu-min3.com/realms/kensan/protocol/openid-connect/certs"
+      forwardOriginalToken: true
+      # audiences: filtering can be added per-Path:
+      #   Path A: audiences: ["istio-gateway-platform"]
+      #     (the oauth2-proxy client_id; oauth2-proxy mints JWTs with this aud)
+      #   Path B: audiences: ["istio-gateway-platform"]
+      #     (Envoy oauth2 filter passes through Keycloak's id_token aud)
+      #   Path C: omit — each service has its own client/audience
+      # Without `audiences`, any JWT signed by the Keycloak realm is accepted.

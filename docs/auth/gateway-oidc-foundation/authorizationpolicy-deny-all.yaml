@@ -1,0 +1,44 @@
+# Default-deny base for gateway-platform
+#
+# Applied LAST in the activation order — only after the ALLOW policy
+# already covers every host currently routed to gateway-platform.
+# Applying this first creates a lockout window.
+#
+# Rationale (see foundation README §"Why deny-all must come after ALLOW"):
+# Istio AuthZ already implies default-deny once any ALLOW policy targets
+# the workload — this resource is a clarity / belt-and-suspenders
+# measure. Optional but recommended.
+#
+# CRITICAL: The OIDC IdP host (auth.platform.yu-min3.com) MUST NOT be
+# gated by this policy. If it is, the login flow cannot complete. There
+# are two ways to handle this:
+#
+#   Option 1 (preferred): the auth host is on a *different* Gateway
+#     (e.g., a dedicated gateway-auth) that this policy does not target.
+#     Currently auth.platform is routed via gateway-platform, so this is
+#     not the case.
+#
+#   Option 2: this deny-all policy explicitly carves out the auth host.
+#     Implemented below via a `to.operation.notHosts` carve-out is NOT
+#     supported in Istio AuthorizationPolicy `rules: []` (deny-all has
+#     no rules). Therefore use option 3.
+#
+#   Option 3 (used here): replace `rules: []` with one rule that DENIES
+#     all hosts EXCEPT the auth host, AND switch action to DENY. Or:
+#     keep this file as deny-all but add a separate ALLOW policy that
+#     ALWAYS-allows the auth host with no claim requirement. The ALLOW
+#     policy approach is simpler and is implemented in
+#     `authorizationpolicy-allow.yaml`.
+apiVersion: security.istio.io/v1
+kind: AuthorizationPolicy
+metadata:
+  name: gateway-platform-deny-all
+  namespace: istio-system
+spec:
+  targetRef:
+    group: gateway.networking.k8s.io
+    kind: Gateway
+    name: gateway-platform
+  # No rules = deny all (Istio's default-deny semantics).
+  # The companion `gateway-platform-allow` policy provides explicit ALLOW
+  # for each host that should be reachable.

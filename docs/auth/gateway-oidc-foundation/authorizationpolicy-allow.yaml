@@ -1,0 +1,98 @@
+# Explicit ALLOW per host × group for gateway-platform
+#
+# Applied BEFORE the deny-all policy.
+#
+# Coverage matrix — every host currently routed to gateway-platform must
+# have an entry here, otherwise that host returns 403 once enforcement
+# is on.
+#
+# `auth.platform.yu-min3.com` is allowed unconditionally (no claim
+# requirement) because it is the IdP itself; gating it would prevent
+# login.
+#
+# Note on the `request.auth.claims[groups]` syntax:
+# - The Keycloak groups protocol mapper (`oidc-group-membership-mapper`)
+#   in the kensan realm emits a `groups` claim in id_token / access_token
+#   with `full.path=false` (group name only, not `/path`).
+# - Istio's `request.auth.claims[groups]` reads the JSON array. Multiple
+#   `values:` items match if ANY of them appears in the array.
+apiVersion: security.istio.io/v1
+kind: AuthorizationPolicy
+metadata:
+  name: gateway-platform-allow
+  namespace: istio-system
+spec:
+  targetRef:
+    group: gateway.networking.k8s.io
+    kind: Gateway
+    name: gateway-platform
+  action: ALLOW
+  rules:
+    # IdP itself — no auth required
+    - to:
+        - operation:
+            hosts: ["auth.platform.yu-min3.com"]
+
+    # Argo CD — admin only
+    - to:
+        - operation:
+            hosts: ["argocd.platform.yu-min3.com"]
+      when:
+        - key: request.auth.claims[groups]
+          values: ["platform-admin"]
+
+    # Grafana — admin + dev (read access)
+    - to:
+        - operation:
+            hosts: ["grafana.platform.yu-min3.com"]
+      when:
+        - key: request.auth.claims[groups]
+          values: ["platform-admin", "platform-dev"]
+
+    # Backstage — admin + dev (developer portal)
+    - to:
+        - operation:
+            hosts: ["backstage.platform.yu-min3.com"]
+      when:
+        - key: request.auth.claims[groups]
+          values: ["platform-admin", "platform-dev"]
+
+    # Vault — admin only (break-glass via Vault userpass remains
+    # available even if OIDC is down)
+    - to:
+        - operation:
+            hosts: ["vault.platform.yu-min3.com"]
+      when:
+        - key: request.auth.claims[groups]
+          values: ["platform-admin"]
+
+    # Prometheus — admin only
+    - to:
+        - operation:
+            hosts: ["prometheus.platform.yu-min3.com"]
+      when:
+        - key: request.auth.claims[groups]
+          values: ["platform-admin"]
+
+    # Hubble — admin only
+    - to:
+        - operation:
+            hosts: ["hubble.platform.yu-min3.com"]
+      when:
+        - key: request.auth.claims[groups]
+          values: ["platform-admin"]
+
+    # Longhorn UI — admin only
+    - to:
+        - operation:
+            hosts: ["longhorn.platform.yu-min3.com"]
+      when:
+        - key: request.auth.claims[groups]
+          values: ["platform-admin"]
+
+    # Path A only: oauth2-proxy callback path bypass (handled by the
+    # CUSTOM-action policy in path-a-authorizationpolicy-custom.yaml,
+    # not here). For Path B, the EnvoyFilter handles its own callback.
+
+    # CRITICAL: when adding a new HTTPRoute on gateway-platform, an entry
+    # MUST be added here, otherwise that host will return 403.
