@@ -1,16 +1,9 @@
-## ADR-009 後続: default-deny-all / allow-dns / allow-prometheus-scrape は
-## CCNP (default-deny-for-mesh-ns / allow-dns-for-mesh-ns /
-## allow-prometheus-scrape-for-mesh-ns) に集約済み
-
----
-## ADR-009: allow-istio は CCNP allow-istio-for-mesh-ns に集約済み
-
----
 ## Allow intra-namespace communication (Keycloak ↔ PostgreSQL)
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
   name: allow-intra-namespace
+  namespace: platform-auth-prod
 spec:
   podSelector: {}
   policyTypes:
