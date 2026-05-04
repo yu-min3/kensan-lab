@@ -2,9 +2,13 @@
 
 ## ステータス
 
-採用済み (Accepted)
+**前提見直し中 (Re-evaluation Required, 2026-05-05)** — [ADR-010](010-istio-native-oauth2-absent.md) で部分的に置換。
 
-ADR-002 で Phase 2 の Gateway 一括認証として想定されていた OAuth2 Proxy 方式を、本 ADR で Istio native `oauth2` extension provider に置き換える。ADR-002 の段階的アプローチ（Phase 1〜3）と Phase 3 の多層認可は引き続き有効。
+本 ADR の前提「Istio 1.27 が安定版の native `oauth2` extension provider を供給」は誤り。Istio 1.27（および master）の `MeshConfig.ExtensionProvider` proto に OAuth2 / OIDC provider type は存在せず、`oneof` の選択肢は `envoy_ext_authz_http` / `envoy_ext_authz_grpc` / 各種テレメトリ・ログ系 / `sds` のみ。ADR-010 で検証ログ、選択肢マトリクス（Path A: oauth2-proxy + ext_authz / Path B: EnvoyFilter で `envoy.filters.http.oauth2` / Path C: per-service OIDC）、推奨パスを文書化。
+
+段階的アプローチ（Phase 1-3）、二段階認可アーキテクチャ、Phase 3 多層認可の方針はすべて引き続き有効。Gateway 層 OIDC ハンドシェイクの**メカニズム**のみ再選定が必要。
+
+当初採用は 2026-05-03、再評価トリガーは 2026-05-05（実装準備中の検証で判明）。
 
 ## 日付
 
