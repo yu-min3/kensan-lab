@@ -10,6 +10,13 @@ longhornManager:
     hardware-class: high-performance
   priorityClass: system-cluster-critical
 
+# Helm pre-upgrade Job hook を無効化。ArgoCD は Helm の pre-install/pre-upgrade を
+# 同じ PreSync として扱うため、初回 install でも Job が走り、SA 未作成で失敗する
+# (chicken-and-egg)。kensan-lab では upgrade は ArgoCD 経由なので chart 内チェッカー
+# 不要。バージョン互換は targetRevision の手動 bump で担保。
+preUpgradeChecker:
+  jobEnabled: false
+
 longhornUI:
   replicas: 1
   nodeSelector:
