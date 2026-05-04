@@ -1,0 +1,6 @@
+## kensan project app DB (kensan-data/postgresql)
+## name = postgres-kensan-app (AppSet inject)
+## host = postgresql.kensan-data.svc.cluster.local (default 通り)
+## rootOwner / dbName: Bitnami の app user は "kensan" なので default ("kensan-app") から override
+ns: kensan-data
+rootOwner: kensan

@@ -1,0 +1,9 @@
+apiVersion: v2
+name: vault-database-engine
+description: |
+  Vault Config Operator (VCO) ベースの Postgres dynamic credentials 設定。
+  1 instance 分の DatabaseSecretEngineConfig + DatabaseSecretEngineRole を render する。
+  共通の mount / Vault policy は同階層の shared/ で別管理。
+type: application
+version: 0.1.0
+appVersion: "1.0"

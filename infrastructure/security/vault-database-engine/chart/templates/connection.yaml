@@ -1,0 +1,21 @@
+apiVersion: redhatcop.redhat.io/v1alpha1
+kind: DatabaseSecretEngineConfig
+metadata:
+  name: {{ include "vdbe.name" . }}
+  namespace: {{ .Values.vaultNamespace }}
+spec:
+  authentication:
+    path: kubernetes
+    role: {{ .Values.vcoAuthRole }}
+  path: {{ .Values.vaultMountPath }}
+  pluginName: {{ .Values.pluginName }}
+  allowedRoles:
+    - {{ include "vdbe.name" . }}
+  connectionURL: "postgresql://{{`{{username}}`}}:{{`{{password}}`}}@{{ include "vdbe.host" . }}:{{ .Values.port }}/{{ include "vdbe.dbName" . }}?sslmode=disable"
+  rootCredentials:
+    vaultSecret:
+      path: {{ include "vdbe.kvAdminPath" . }}
+    usernameKey: username
+    passwordKey: password
+  rootPasswordRotation:
+    enable: false

@@ -1,0 +1,33 @@
+## vault-database-engine の bootstrap (capability の前提となる mount + policy)
+## per-instance の connection / role は同階層の applicationset-instances.yaml で管理
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: vault-database-engine-shared
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "8"  # vault-config-operator (sync-wave 7) の後
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: platform-project
+  source:
+    repoURL: https://github.com/yu-min3/kensan-lab
+    targetRevision: main
+    path: infrastructure/security/vault-database-engine/shared
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: vault
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=false
+      - ServerSideApply=true
+    retry:
+      limit: 5
+      backoff:
+        duration: 5s
+        factor: 2
+        maxDuration: 3m
