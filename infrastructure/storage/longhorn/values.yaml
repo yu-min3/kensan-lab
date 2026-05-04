@@ -1,0 +1,55 @@
+# Chart config: infrastructure/gitops/argocd/applications/storage/longhorn/app.yaml
+# Phase 1: m4neo only, replica=1, /opt/longhorn (root 同居)
+# Reference: projects/kensan-lab/storage-plan.md §4 Phase 1
+
+# m4neo only: pi5 群 (master/worker1/worker2) は microSD/USB のみで Longhorn 不適。
+# hardware-class=high-performance は m4neo にのみ付与されている (kubernetes-cluster.md)。
+
+longhornManager:
+  nodeSelector:
+    hardware-class: high-performance
+  priorityClass: system-cluster-critical
+
+longhornUI:
+  replicas: 1
+  nodeSelector:
+    hardware-class: high-performance
+
+longhornDriver:
+  nodeSelector:
+    hardware-class: high-performance
+
+defaultSettings:
+  # システム管理コンポーネント (instance-manager, share-manager, CSI plugin) も m4neo に限定
+  # フォーマットは "key:value" (Longhorn 独自構文、k8s nodeSelector とは異なる)
+  systemManagedComponentsNodeSelector: "hardware-class:high-performance"
+
+  # Phase 1: replica=1 (HA なし)。Phase 3 で 3 に上げる
+  defaultReplicaCount: 1
+
+  # Phase 1: root 同居。Phase 3 で /mnt/longhorn (専用 SSD) に切替
+  defaultDataPath: /opt/longhorn
+
+  # ディスク枯渇ガード: root 同居なので保守的に
+  storageOverProvisioningPercentage: 50
+  storageMinimalAvailablePercentage: 25
+
+  # Drain ポリシー: 最後のレプリカ保護 (Phase 3 で効く)
+  nodeDrainPolicy: block-if-contains-last-replica
+
+  # Pi5 環境向けリソース制御 (Phase 3 で全ノード参加時に効く、Phase 1 でも害なし)
+  guaranteedInstanceManagerCPU: 12
+  guaranteedReplicaManagerCPU: 12
+
+# StorageClass: longhorn (Phase 1 = replica=1)
+persistence:
+  defaultClass: false                # default は既存の local-path 維持
+  defaultClassReplicaCount: 1
+  reclaimPolicy: Retain              # 誤削除対策
+  defaultDataLocality: best-effort
+
+# Phase 1: UI Ingress 無効化 (port-forward でアクセス)
+#   kubectl port-forward -n longhorn-system svc/longhorn-frontend 8080:80
+# Phase 2+ で Istio Gateway + HTTPRoute + Keycloak ext-authz を resources/ に追加予定
+ingress:
+  enabled: false
