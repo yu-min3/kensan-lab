@@ -1,7 +1,7 @@
 ## Vault Database Secret Engine
 
 Postgres instance に対する **動的 user (TTL 付き短命 cred)** 払い出し基盤。
-1 instance ぶんで **Vault 側 (config + role) と app 側 (ESO ExternalSecret + VaultDynamicSecret) の 4 リソース** を 1 chart で render する。
+1 instance ぶんで **Vault 側 (config + role + auth role) と app 側 (SA + ExternalSecret + VaultDynamicSecret) の 6 リソース** を 1 chart で render する。
 app Pod は K8s Secret 経由で短命 cred を読み、ESO が TTL 切れ前に refresh して Secret を更新する。
 
 ## 構成
@@ -13,10 +13,12 @@ infrastructure/security/vault-database-engine/
 │   ├── values.yaml                       # PE 規約のデフォルト値 (TTL / Vault path 規約 / ESO provider 等)
 │   └── templates/
 │       ├── _helpers.tpl                  # smart default + override の derive logic
-│       ├── connection.yaml               # DatabaseSecretEngineConfig  (Vault-side, vault ns)
-│       ├── role.yaml                     # DatabaseSecretEngineRole    (Vault-side, vault ns)
-│       ├── eso-vault-dynamic-secret.yaml # VaultDynamicSecret (generator) (app ns)
-│       └── eso-external-secret.yaml      # ExternalSecret              (app ns)
+│       ├── connection.yaml               # DatabaseSecretEngineConfig    (Vault-side, vault ns)
+│       ├── role.yaml                     # DatabaseSecretEngineRole      (Vault-side, vault ns)
+│       ├── vault-auth-role.yaml          # KubernetesAuthEngineRole      (Vault-side, vault ns)
+│       ├── eso-sa.yaml                   # ServiceAccount vault-db-<basename>  (app ns)
+│       ├── eso-vault-dynamic-secret.yaml # VaultDynamicSecret (generator)      (app ns)
+│       └── eso-external-secret.yaml      # ExternalSecret                       (app ns)
 ├── shared/                               # capability bootstrap (1 度だけ)
 │   ├── mount.yaml                        # SecretEngineMount (database/)
 │   └── policy-eso-read.yaml              # ESO 用 Vault policy (database/creds/* read)
@@ -124,10 +126,21 @@ Bitnami PostgreSQL chart `auth.enablePostgresUser: false` (default) では `POST
 本 PR の merge 前に、旧 path (Stage 3/3.5 で投入された static admin cred) からこの path に admin cred を複製する一度きりの migration を実施済み (script は実行後に削除、git 履歴参照)。
 旧 path は app の既存 ExternalSecret consumer がまだ読んでいるため残置。Pod env 切り替え (Phase 5c) 完了後に旧 path も削除する。
 
-### ESO consumer-side の auth model
+### ESO consumer-side の auth model (per-instance SA)
 
-VaultDynamicSecret が Vault に問い合わせる際の auth は、既存 ClusterSecretStore `vault-backend` と同じ **ESO operator central** を流用 (`external-secrets` ns の `external-secrets` SA → kubernetes auth role `external-secrets`)。
-app ns ごとに SA や Vault role を増やさない (= app 側に Vault auth の関心を持ち込まない) 設計。Vault policy `eso-read` (本 chart `shared/policy-eso-read.yaml`) が `database/creds/*` の read 権を持つので、5 instance 分の dynamic cred すべてを 1 SA で fetch 可能。
+VaultDynamicSecret は **namespace-scoped CR** で `serviceAccountRef.namespace` フィールドが無視される (CRD spec: "Ignored if referent is not cluster-scoped")。
+そのため ESO operator central SA (`external-secrets/external-secrets`) は app ns から流用できない。
+
+代わりに per-instance で SA + Vault auth role を作る:
+
+| リソース | 場所 | 名前 | 役割 |
+|---|---|---|---|
+| ServiceAccount | app ns | `vault-db-<basename>` | VaultDynamicSecret の auth |
+| KubernetesAuthEngineRole | vault ns | `vault-db-<basename>` | 上記 SA を bind、policy `eso-read` を付与 |
+
+policy 自体は共有 `eso-read` (本 chart `shared/policy-eso-read.yaml`) を流用。`database/creds/*` 全体に read 権があるので、必要なら将来 per-instance policy に絞る余地あり。
+
+これらは chart が自動 render するので、AD values file は変更不要 (1 instance 増やすたびに SA/Vault role が同名規約で生成される)。
 
 ### `eso-read` policy の管理場所
 

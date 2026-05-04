@@ -31,16 +31,13 @@ kvAdminPathPrefix: "secret/data/db-admin"
 ## ============================================================================
 
 ## --- VaultDynamicSecret generator が使う Vault provider 設定 ---
-##   既存 ClusterSecretStore vault-backend と同じ auth (ESO operator SA 経由)
+##   server だけ。auth は per-instance で derive される (vault-db-<basename>):
+##     - SA: app ns に本 chart が作成 (eso-sa.yaml)
+##     - Vault role: vault ns に本 chart が作成 (vault-auth-role.yaml)、policy: eso-read
+##   VaultDynamicSecret は namespace-scoped で serviceAccountRef.namespace が無視されるため、
+##   ESO operator central SA (external-secrets/external-secrets) は流用できない
 vaultProvider:
   server: http://vault.vault.svc.cluster.local:8200
-  auth:
-    kubernetes:
-      mountPath: kubernetes
-      role: external-secrets
-      serviceAccountRef:
-        name: external-secrets
-        namespace: external-secrets
 
 ## --- ESO ExternalSecret refresh 周期 ---
 ##   TTL (24h) の半分程度を目安に short-lived cred を都度更新
