@@ -1,0 +1,23 @@
+## NetworkPolicy: Vault が動的 user 払い出しのため app ns の PostgreSQL に egress 出せるようにする
+## vault ns に default-deny egress があるため、PostgreSQL pod (app=<releaseName>) に対する
+## port 5432 egress を per-instance で穴開けする。
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-vault-egress-to-{{ include "vdbe.name" . }}
+  namespace: {{ .Values.vaultNamespace }}
+spec:
+  podSelector: {}
+  policyTypes:
+    - Egress
+  egress:
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: {{ .Values.ns }}
+          podSelector:
+            matchLabels:
+              app: {{ .Values.releaseName }}
+      ports:
+        - port: 5432
+          protocol: TCP
