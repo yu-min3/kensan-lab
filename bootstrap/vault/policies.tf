@@ -41,6 +41,7 @@ resource "vault_policy" "vco_admin" {
     # Secret data manage (KV, PKI, Database etc.)
     path "secret/*"     { capabilities = ["create", "read", "update", "delete", "list"] }
     path "kubernetes/*" { capabilities = ["create", "read", "update", "delete", "list"] }
+    path "database/*"   { capabilities = ["create", "read", "update", "delete", "list"] }
 
     # Audit (status read のみ、enable は bootstrap 範囲)
     path "sys/audit"  { capabilities = ["read", "list"] }

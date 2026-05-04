@@ -5,8 +5,14 @@
 ## --- Vault 接続先 / mount 設定 (Vault-side, VCO 用) ---
 vaultNamespace: vault
 vaultMountPath: database
-vcoAuthRole: vault-config-operator
 pluginName: postgresql-database-plugin
+
+## --- VCO が Vault に login する際の auth 設定 (CR 内 authentication block) ---
+##   VCO は CR の spec.authentication に基づき、CR と同じ ns の SA で TokenRequest を
+##   発行して Vault に login する。本 chart の VCO CR はすべて vault ns に置く方針なので
+##   SA は vault:default 固定。Vault role 側 (bootstrap/vault/auth.tf) でも
+##   bound_SA_namespaces=["vault"], bound_SA_names=["default"] に揃えてある。
+vcoAuthRole: vault-config-operator
 
 ## --- TTL (Vault Database engine が払い出す動的 user の lease 期間) ---
 ttl: "24h"
@@ -24,7 +30,9 @@ namePrefix: "postgres-"
 
 ## --- Vault KV admin cred 規約 (PE 完全管理、AD には見えない) ---
 ##   convention: <kvAdminPathPrefix>/<name> with keys (username, password)
-kvAdminPathPrefix: "secret/data/db-admin"
+##   VCO は user-facing path を渡すと内部で KV v2 の "data/" を自動挿入する。
+##   ここに "data/" を含めると VCO が "data.data.username" を読んで nil panic する。
+kvAdminPathPrefix: "secret/db-admin"
 
 ## ============================================================================
 ## ESO consumer-side (app ns 側に生成される)

@@ -5,8 +5,7 @@ metadata:
   namespace: {{ .Values.vaultNamespace }}
 spec:
   authentication:
-    path: kubernetes
-    role: {{ .Values.vcoAuthRole }}
+    {{- include "vdbe.vcoAuth" . | nindent 4 }}
   path: {{ .Values.vaultMountPath }}
   dBName: {{ include "vdbe.name" . }}
   defaultTTL: {{ .Values.ttl | quote }}
