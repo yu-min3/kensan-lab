@@ -41,6 +41,16 @@ defaultSettings:
   guaranteedInstanceManagerCPU: 12
   guaranteedReplicaManagerCPU: 12
 
+  # ▼ Backup target: Cloudflare R2 (storage-plan.md §4 / §5.10)
+  # region は "auto" 固定 (R2 はデフォルト endpoint で AWS 風 region 概念なし)
+  # credential secret は infrastructure/storage/longhorn/resources/r2-credential-sealed.yaml
+  # に SealedSecret として配置 (Phase 1 のみ、Stage 3 で ESO + Vault KV に移行予定)
+  backupTarget: s3://kensan-lab-longhorn-backup@auto/
+  backupTargetCredentialSecret: longhorn-r2-backup
+  backupstorePollInterval: 300
+  backupConcurrentLimit: 2
+  restoreConcurrentLimit: 2
+
 # StorageClass: longhorn (Phase 1 = replica=1)
 persistence:
   defaultClass: false                # default は既存の local-path 維持
