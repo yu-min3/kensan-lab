@@ -10,7 +10,7 @@ Argo CD で同期される全 platform component の Git source。
 | `network/` | CNI (Cilium), Service Mesh (Istio), Gateway API, Cloudflare Tunnel, NetworkPolicy |
 | `observability/` | Prometheus, Grafana, Loki, Tempo, OTel Collector |
 | `security/` | cert-manager, Sealed Secrets, Vault, Vault Config Operator, External Secrets, Keycloak |
-| `storage/` | local-path-provisioner |
+| `storage/` | local-path-provisioner (ノード固定 PV), Longhorn (分散ブロック + Cloudflare R2 backup) |
 | `environments/` | 複数 component が同居する shared namespace の bootstrap (app-dev, app-prod, kensan-{data,dev,prod}, system-infra) |
 
 ## コンポーネントのレイアウト規則

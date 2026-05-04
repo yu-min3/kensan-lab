@@ -81,7 +81,31 @@
 | <img src="docs/assets/logos/opentelemetry.svg" width="32">  | [OpenTelemetry](https://opentelemetry.io/)                                                          | テレメトリ収集（OTel Collector）                                          |
 |  <img src="docs/assets/logos/cert-manager.svg" width="32">  | [cert-manager](https://cert-manager.io/)                                                            | TLS 証明書の自動管理（Let's Encrypt）                                     |
 | <img src="docs/assets/logos/sealed-secrets.png" width="32"> | [Sealed Secrets](https://sealed-secrets.netlify.app/)                                               | Git 上で暗号化されたシークレット                                          |
-|   <img src="docs/assets/logos/cloudflare.svg" width="32">   | [Cloudflare Tunnel](https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/) | ゼロトラストなインターネット公開                                          |
+|                                                             | [Longhorn](https://longhorn.io/)                                                                    | S3 互換バックアップ機能を持つ分散ブロックストレージ（CNCF Incubating）    |
+|   <img src="docs/assets/logos/cloudflare.svg" width="32">   | [Cloudflare Tunnel / R2](https://www.cloudflare.com/developer-platform/products/r2/)                | ゼロトラストなインターネット公開（Tunnel）+ オフサイトバックアップ先（R2）|
+
+## ストレージ
+
+耐久性の異なる 2 つの StorageClass を使い分ける:
+
+- **`local-path`**（デフォルト）— ノードローカルな hostPath。再生成可能な ephemeral ワークロード（Argo CD / Backstage のメタデータ、キャッシュ等）に使う。PV は作成されたノードに固定される。
+- **`longhorn`** — レプリケーションと S3 互換バックアップを持つ分散ブロックストレージ。`hardware-class=high-performance` のノードのみで稼働（現状は NVMe を持つ M4 Neo のみ）。Phase 1 は `replica=1`（HA なし、検証フェーズ）。SSD 追加後の Phase 3 で 3 ノード `replica=3` に拡張。
+
+バックアップは S3 互換 API 経由で **Cloudflare R2** に置く。Egress 無料なので、月次リストア検証ドリルが安く回せる（本番想定容量でも月 $2 程度）。
+
+```mermaid
+flowchart LR
+    app[Stateful Pod]
+    app -- "PVC<br/>longhorn" --> lh
+    app -- "PVC<br/>local-path" --> lp[("local-path<br/>ノード固定<br/>hostPath")]
+    subgraph m4neo["m4neo (AMD64, NVMe)"]
+      lh["Longhorn Manager"] --- data[("/opt/longhorn<br/>データパス")]
+    end
+    lh -. "スナップショット<br/>+ バックアップ" .-> r2[("Cloudflare R2<br/>egress: $0")]
+    r2 -. "リストア" .-> lh
+```
+
+詳細なレイアウト・フェーズ計画・runbook 参照先は [`infrastructure/storage/README.md`](./infrastructure/storage/README.md) を参照。
 
 ## ハードウェア
 
