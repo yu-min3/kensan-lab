@@ -14,6 +14,7 @@ metadata:
   name: snapshot-daily
   namespace: longhorn-system
 spec:
+  name: snapshot-daily    # Longhorn v1.7+ では spec.name 必須 (metadata.name と同値)
   cron: "0 17 * * *"      # 17:00 UTC = 02:00 JST (翌日)
   task: snapshot          # ローカル snapshot のみ、R2 へは送らない
   groups: [default]
@@ -26,6 +27,7 @@ metadata:
   name: backup-weekly
   namespace: longhorn-system
 spec:
+  name: backup-weekly
   cron: "0 18 * * 6"      # 18:00 UTC Saturday = 03:00 JST Sunday
   task: backup            # snapshot を取って R2 に push
   groups: [default]
@@ -38,6 +40,7 @@ metadata:
   name: backup-monthly
   namespace: longhorn-system
 spec:
+  name: backup-monthly
   cron: "0 19 1 * *"      # 19:00 UTC on day 1 = 04:00 JST on day 2 (~1日ずれ許容)
   task: backup
   groups: [default]
