@@ -93,32 +93,7 @@ spec:
           port: 443
 
 ---
-## Allow ingress/egress to istio-system (kensan-lab 共通パターン: allow-istio)
-## - egress: sidecar → istiod xDS (15012/15014) 必須。Gateway 経由の外部 reach
-##   (Keycloak OIDC を auth.platform.yu-min3.com 経由で叩く) も含む
-## - ingress: Gateway pod から Vault UI/API (8200) への中継
-## port を絞らず ns 全 port 許可で書くのが kensan-lab 既存ベストプラクティス
-## (cf. infrastructure/security/keycloak/base/network-policy.yaml の allow-istio)
-apiVersion: networking.k8s.io/v1
-kind: NetworkPolicy
-metadata:
-  name: allow-istio
-  namespace: vault
-spec:
-  podSelector: {}
-  policyTypes:
-    - Ingress
-    - Egress
-  egress:
-    - to:
-        - namespaceSelector:
-            matchLabels:
-              kubernetes.io/metadata.name: istio-system
-  ingress:
-    - from:
-        - namespaceSelector:
-            matchLabels:
-              kubernetes.io/metadata.name: istio-system
+## ADR-009: allow-istio は CCNP allow-istio-for-mesh-ns に集約済み
 
 ---
 ## Allow ingress from Vault clients (ESO / VCO) for API access on 8200
