@@ -14,6 +14,10 @@ configs:
   params:
     # Run without TLS - Istio Gateway handles TLS termination
     server.insecure: true
+    # ServerSideDiff: K8s API server に diff を計算させて field manager 情報を尊重する。
+    # K8s API / admission webhook が注入するデフォルト値 (StatefulSet の dnsPolicy,
+    # HTTPRoute backendRefs[].kind, ESO の deletionPolicy 等) を drift と誤検知しない。
+    controller.diff.server.side: "true"
   cm:
     # ESO admission webhook がデフォルト値 (deletionPolicy/conversionStrategy 等) を
     # 注入するため、ArgoCD の drift 検知が常に OutOfSync になる。
