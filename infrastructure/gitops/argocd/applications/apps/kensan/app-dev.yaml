@@ -9,7 +9,7 @@ spec:
   project: app-project-dev
   source:
     repoURL: https://github.com/yu-min3/kensan-lab
-    targetRevision: HEAD
+    targetRevision: main
     path: apps/kensan/manifests/overlays/dev
   destination:
     server: https://kubernetes.default.svc

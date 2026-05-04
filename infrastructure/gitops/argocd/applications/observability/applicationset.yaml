@@ -31,7 +31,7 @@ spec:
             valueFiles:
               - '$values/infrastructure/observability/{{ .name }}/values.yaml'
         - repoURL: https://github.com/yu-min3/kensan-lab
-          targetRevision: HEAD
+          targetRevision: main
           ref: values
       destination:
         server: https://kubernetes.default.svc
@@ -61,9 +61,9 @@ spec:
             valueFiles:
               - '$values/infrastructure/observability/{{ .name }}/values.yaml'
         - repoURL: https://github.com/yu-min3/kensan-lab
-          targetRevision: HEAD
+          targetRevision: main
           ref: values
         - repoURL: https://github.com/yu-min3/kensan-lab
-          targetRevision: HEAD
+          targetRevision: main
           path: infrastructure/observability/{{ .name }}/resources
     {{- end }}

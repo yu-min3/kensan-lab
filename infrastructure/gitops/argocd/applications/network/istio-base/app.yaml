@@ -19,7 +19,7 @@ spec:
         valueFiles:
           - $values/infrastructure/network/istio/base/values.yaml
     - repoURL: https://github.com/yu-min3/kensan-lab
-      targetRevision: HEAD
+      targetRevision: main
       ref: values
 
   destination:
