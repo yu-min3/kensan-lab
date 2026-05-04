@@ -1,0 +1,54 @@
+# Path A — meshConfig.extensionProviders snippet
+#
+# Append this under `meshConfig:` in
+# infrastructure/network/istio/istiod/values.yaml. The istiod chart
+# merges it into the cluster-wide istio ConfigMap.
+#
+# After committing and ArgoCD sync, verify:
+#   kubectl -n istio-system get cm istio -o yaml | yq '.data.mesh' | yq '.extensionProviders'
+#
+# References:
+# - https://istio.io/latest/docs/tasks/security/authorization/authz-custom/
+# - https://istio.io/latest/docs/reference/config/istio.mesh.v1alpha1/#MeshConfig-ExtensionProvider
+meshConfig:
+  extensionProviders:
+    - name: oauth2-proxy
+      envoyExtAuthzHttp:
+        # oauth2-proxy Service in auth-system namespace (Path A follow-up PR
+        # creates this).
+        service: oauth2-proxy.auth-system.svc.cluster.local
+        port: 4180
+        # Path that oauth2-proxy uses to verify auth state.
+        pathPrefix: /oauth2/auth
+        # If oauth2-proxy decides "no session yet", it returns 401 with a
+        # `Location` header pointing to /oauth2/start. Istio relays that
+        # 302 to the browser.
+        includeRequestHeadersInCheck:
+          - cookie
+          - authorization
+          - x-forwarded-uri
+          - x-forwarded-host
+          - x-forwarded-proto
+        # On 200 from oauth2-proxy, copy these headers from oauth2-proxy's
+        # response onto the upstream request — apps can read who the user
+        # is without parsing the JWT themselves.
+        headersToUpstreamOnAllow:
+          - authorization                # Bearer JWT (forwarded for fine authz)
+          - x-auth-request-user
+          - x-auth-request-email
+          - x-auth-request-groups
+          - x-auth-request-access-token
+        # On non-200 from oauth2-proxy, allow these headers to flow back
+        # to the browser (for the OIDC redirect to work).
+        headersToDownstreamOnDeny:
+          - content-type
+          - set-cookie
+          - location
+        # Network resilience — if oauth2-proxy is itself unreachable, fail
+        # CLOSED (deny). This is the secure default. The "fail open" alt
+        # would let traffic through during oauth2-proxy outages, which
+        # defeats the point of gating.
+        failOpen: false
+        # 200ms timeout — oauth2-proxy response should be sub-100ms in
+        # the same cluster.
+        timeout: 0.2s

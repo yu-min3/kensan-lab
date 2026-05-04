@@ -1,0 +1,130 @@
+# Path A — oauth2-proxy Helm chart values draft
+#
+# This file is a STARTING POINT for a follow-up PR that adds
+# `infrastructure/security/oauth2-proxy/` as a Helm multi-source
+# Application. Do not commit this directly to a synced path until the
+# follow-up PR is reviewed.
+#
+# Chart: https://github.com/oauth2-proxy/manifests
+#   helm chart: oauth2-proxy/oauth2-proxy (current stable)
+#
+# Architecture:
+# - oauth2-proxy is deployed in `auth-system` namespace
+# - 2 replicas + PodDisruptionBudget for redundancy
+# - Reads OIDC config from Secret synced via ExternalSecret from Vault
+#   (`secret/platform-auth/istio-gateway/platform`)
+# - Exposes Service `oauth2-proxy:4180` consumed by Istio's
+#   envoyExtAuthzHttp provider
+# - Exposes hostname `oauth2-proxy.platform.yu-min3.com` for browser
+#   redirects (HTTPRoute attaches to gateway-platform)
+
+replicaCount: 2
+
+# Resource budget — oauth2-proxy is small (~15MB RSS idle, scales with
+# session count). 100m CPU / 64Mi RAM is comfortable for a homelab.
+resources:
+  requests:
+    cpu: 50m
+    memory: 64Mi
+  limits:
+    cpu: 200m
+    memory: 128Mi
+
+# AMD64-only (ARM64 image is published but matches m4neo for Postgres
+# colocation; not a hard requirement).
+nodeSelector:
+  kubernetes.io/arch: amd64
+
+# PodDisruptionBudget so cordon/drain doesn't take both replicas at once
+podDisruptionBudget:
+  enabled: true
+  minAvailable: 1
+
+# OIDC provider — Keycloak realm `kensan`
+config:
+  configFile: |-
+    # https://oauth2-proxy.github.io/oauth2-proxy/configuration/overview
+    provider = "keycloak-oidc"
+    oidc_issuer_url = "https://auth.platform.yu-min3.com/realms/kensan"
+
+    # client_id / client_secret / cookie_secret are loaded from env via
+    # the ExternalSecret-managed Secret (see path-a-externalsecret.yaml).
+
+    # Tells oauth2-proxy what hosts on gateway-platform should be gated.
+    # The "*.platform.yu-min3.com" cookie domain ensures one login
+    # session covers all platform UIs.
+    cookie_domains = [".platform.yu-min3.com"]
+    cookie_samesite = "lax"
+    cookie_secure = true
+    cookie_httponly = true
+    # 10h session — covers a workday without re-login. Refresh handled
+    # below.
+    cookie_expire = "10h"
+    cookie_refresh = "1h"
+
+    # Whitelist hosts allowed to be redirected to after login. Stops
+    # open-redirect abuse.
+    whitelist_domains = [".platform.yu-min3.com"]
+
+    # The proxy itself is only reached via Istio (when the browser
+    # follows the 302 to /oauth2/start). Path matchers below must align
+    # with envoyExtAuthzHttp.pathPrefix in the meshConfig.
+    proxy_prefix = "/oauth2"
+
+    # Group-based access control happens in Istio AuthorizationPolicy,
+    # not here. We just verify the user logged in successfully.
+    email_domains = ["*"]
+
+    # Pass these headers to upstream so Istio can ALLOW based on them
+    # AND so apps can read user info.
+    pass_access_token = true
+    pass_authorization_header = true
+    set_authorization_header = true
+    set_xauthrequest = true
+
+    # OIDC scope — "groups" is custom-mapped at Keycloak realm level
+    # (see ensure_oidc_client in bootstrap/keycloak/setup.sh).
+    scope = "openid email profile groups"
+
+    # Skip the "sign in with Keycloak" intermediate page (the only IdP
+    # is Keycloak; an extra click is friction with no benefit).
+    skip_provider_button = true
+
+    # Reverse proxy mode — Istio sets X-Forwarded-* headers we trust.
+    reverse_proxy = true
+    real_client_ip_header = "X-Forwarded-For"
+
+# Reads client_id / client_secret / cookie_secret from a Secret
+# (managed by ExternalSecret).
+extraEnv:
+  - name: OAUTH2_PROXY_CLIENT_ID
+    valueFrom:
+      secretKeyRef:
+        name: oauth2-proxy-secret
+        key: client_id
+  - name: OAUTH2_PROXY_CLIENT_SECRET
+    valueFrom:
+      secretKeyRef:
+        name: oauth2-proxy-secret
+        key: client_secret
+  - name: OAUTH2_PROXY_COOKIE_SECRET
+    valueFrom:
+      secretKeyRef:
+        name: oauth2-proxy-secret
+        key: cookie_secret
+
+# Service for Istio ext_authz to call. ClusterIP is enough (mesh-internal).
+service:
+  type: ClusterIP
+  portNumber: 4180
+
+# Disable chart's built-in Ingress; we use Gateway API HTTPRoute under
+# resources/.
+ingress:
+  enabled: false
+
+# Health checks
+livenessProbe:
+  enabled: true
+readinessProbe:
+  enabled: true

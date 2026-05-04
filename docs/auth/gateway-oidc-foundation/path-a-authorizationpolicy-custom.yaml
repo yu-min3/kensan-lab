@@ -1,0 +1,49 @@
+# Path A — CUSTOM-action AuthorizationPolicy invoking ext_authz
+#
+# This is the policy that ACTUALLY hooks oauth2-proxy into the
+# gateway-platform request flow. Without it, the
+# envoy_ext_authz_http extensionProvider in meshConfig is registered
+# but never invoked.
+#
+# Action semantics:
+# - action: CUSTOM with `provider.name: oauth2-proxy` — every matched
+#   request is dispatched to oauth2-proxy via ext_authz
+# - oauth2-proxy returns 200 (allow) or 401 + Location (redirect to
+#   Keycloak) or 403 (denied)
+# - Istio relays the response per envoyExtAuthzHttp's headersToDownstream
+#   config (see path-a-meshconfig-snippet.yaml)
+#
+# Apply order:
+# 1. ext_authz provider in meshConfig (Step A4)
+# 2. oauth2-proxy is reachable (Step A3)
+# 3. RequestAuthentication (Step A5)
+# 4. ALLOW policy (Step A6)
+# 5. THIS POLICY (Step A7)
+# 6. (optional) deny-all (Step A8)
+apiVersion: security.istio.io/v1
+kind: AuthorizationPolicy
+metadata:
+  name: gateway-platform-oauth2
+  namespace: istio-system
+spec:
+  targetRef:
+    group: gateway.networking.k8s.io
+    kind: Gateway
+    name: gateway-platform
+  action: CUSTOM
+  provider:
+    name: oauth2-proxy
+  rules:
+    # Apply to every request EXCEPT:
+    #   - the IdP host itself (auth.platform.yu-min3.com) — must remain
+    #     reachable for the OIDC redirect to land
+    #   - the oauth2-proxy proxy_prefix path (/oauth2/*) — let
+    #     oauth2-proxy serve its own /oauth2/start, /oauth2/callback,
+    #     /oauth2/auth endpoints without infinite-recursing through
+    #     ext_authz
+    - to:
+        - operation:
+            notHosts:
+              - "auth.platform.yu-min3.com"
+            notPaths:
+              - "/oauth2/*"
