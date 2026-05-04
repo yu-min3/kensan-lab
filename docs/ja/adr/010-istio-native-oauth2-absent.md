@@ -1,0 +1,109 @@
+# ADR-010: Istio native oauth2 provider 不在の発見と Path 再選定
+
+## ステータス
+
+**Proposed** — Yu の Path A / B / C 選択待ち。
+
+本 ADR は ADR-005 の**アーキテクチャ前提**を置換する。ADR-005 が想定した「Istio 1.27 native `oauth2` extension provider」は実在しない。段階的アプローチと二段階認可モデル自体は ADR-005 のまま有効、Gateway 層 OIDC のメカニズムのみ再選定が必要。
+
+## 日付
+
+2026-05-05
+
+## コンテキスト
+
+ADR-005（2026-05-03）は Gateway 層 OIDC を「Istio native `oauth2` extension provider」で実装すると決定した。OAuth2 Proxy 案を退けた理由として「Istio 1.27 が stable な native `oauth2` ext provider を供給」「Pod 追加なし」を挙げていた。
+
+### 検証（2026-05-05）
+
+実装着手にあたり Istio API repo の proto 定義を直接確認した:
+
+```bash
+curl -s https://raw.githubusercontent.com/istio/api/release-1.27/mesh/v1alpha1/config.proto \
+  | grep -E "Provider [a-z]+ = [0-9]+;"
+```
+
+`MeshConfig.ExtensionProvider` の `oneof provider` で利用可能な type:
+
+| field | 用途 |
+|---|---|
+| `envoy_ext_authz_http` | HTTP service による外部認可 (oauth2-proxy 等) |
+| `envoy_ext_authz_grpc` | gRPC service による外部認可 |
+| `zipkin` / `datadog` / `stackdriver` / `skywalking` / `opentelemetry` | tracing |
+| `prometheus` | metrics |
+| `envoy_file_access_log` / `envoy_http_als` / `envoy_tcp_als` | access log |
+| `sds` | Secret Discovery Service |
+
+**`oauth2` / `oidc` / `envoy_oauth2` 相当の type は存在しない**。`master`、`release-1.28`、`release-1.26` ブランチも同様。Istio 公式 reference docs (`istio.io/latest/docs/reference/config/istio.mesh.v1alpha1/`) も同じ集合。
+
+### 「native oauth2」と取り違えられた可能性
+
+おそらく以下のいずれかと混同:
+
+1. **Envoy の `envoy.filters.http.oauth2` HTTP filter** — Envoy 本体に存在、`EnvoyFilter` CRD 経由で Istio に挿入可能。`MeshConfig.ExtensionProvider` ではない。Envoy docs では「currently under active development」と明記、OIDC discovery URL 非対応（auth/token endpoint を hardcode 必要）。
+2. **`RequestAuthentication` + `AuthorizationPolicy`** — GA かつ stable だが、JWT *検証* と認可のみ。OIDC redirect / cookie flow を駆動する機能はない。JWT を持たない user を Keycloak に redirect することはこれらだけではできない。
+
+いずれも OAuth2 Proxy の drop-in 代替にならない。
+
+## 検討した Path
+
+### Path A: oauth2-proxy + `envoy_ext_authz_http` （推奨）
+
+oauth2-proxy を `auth-system` ns に置き、Istio `MeshConfig.ExtensionProvider` の `envoy_ext_authz_http` で接続。`AuthorizationPolicy` の `action: CUSTOM` で gateway-platform にバインド。OIDC redirect / cookie / refresh は oauth2-proxy が処理、Istio はゲートのみ。
+
+- ✅ Istio docs が公式に文書化したパターン (External Authorization task)
+- ✅ oauth2-proxy は K8s ecosystem 標準 (homelab references も大半が採用)
+- ✅ OIDC discovery URL 対応、refresh token 安定、CSRF 対策内蔵
+- ✅ `envoy_ext_authz_http` は GA proto
+- ✅ "Enterprise Platform Engineering reference" の文脈では production-realistic な oauth2-proxy が合う
+- ⚠️ Pod 1 個追加 (replica 2 + PDB で軽減)
+- ⚠️ "Istio 内で auth 完結" 思想を裏切る
+
+### Path B: `EnvoyFilter` で `envoy.filters.http.oauth2`
+
+Istio の escape hatch (`EnvoyFilter`) で gateway-platform の listener に Envoy native oauth2 filter を挿入。Pod 追加なし。
+
+- ✅ ADR-005 の「Istio 内で auth 完結」に近い
+- ✅ refresh token / single logout 対応
+- ❌ Envoy oauth2 filter が "currently under active development" と明記
+- ❌ OIDC discovery 非対応 (Keycloak hostname 変更で drift)
+- ❌ EnvoyFilter は Istio 最も brittle な API（minor upgrade で割れる事例多数）
+- ❌ CSRF 対策別途必要、HTTPS 必須
+
+### Path C: per-service OIDC
+
+Gateway 層 OIDC 諦め。各 service の native OIDC（ArgoCD / Grafana / Backstage / Vault）に分散。Hubble / Prometheus / Longhorn UI は basic auth or LAN-only NetworkPolicy。
+
+- ✅ 実装ゼロ、現状維持
+- ✅ ADR-002 Phase 1 のまま
+- ❌ SSO 体験が分散 (re-login per service)
+- ❌ default-deny の fail-secure 利益なし
+- ❌ 「Istio + Keycloak で SSO 完結」という homelab 差別化が消える
+
+## 決定（保留）
+
+**推奨: Path A**。理由:
+- Path B の Envoy filter stability disclaimer (`under active development`) は production-aligned setup には実害リスク
+- Path A の "Pod 追加" コストは Helm chart 1 個 + ns 1 個。homelab 文脈では小さい
+- Path C は ADR-002/005 の SSO 統合方針を放棄
+- ADR-005 が "Pod 追加なし" を要件ではなく結果（positive consequence）として書いていた点を考慮すると、根本要件（per-service OIDC を毎回実装しない統合 SSO）は Path A で完全に満たせる
+
+**Yu の決定が、本 PR の path 別 YAML を Gateway にバインドする前に必要**。
+
+## 本 PR の実装範囲
+
+本 PR は path-independent な scaffolding のみ commit する:
+
+1. `bootstrap/keycloak/setup.sh` を OIDC client 関数化 (refactor)。`istio-gateway-platform` client の追加スタンザは Path 別にコメントアウトで併記。Yu が Path 確定後に該当ブロックを uncomment して再実行。
+2. `RequestAuthentication` / `AuthorizationPolicy` 雛形 YAML を `docs/auth/gateway-oidc-foundation/` に配置 — どの ArgoCD Application source にも含まれない、純然たる reference。Path 確定後に同期 path に `git mv` する。
+3. ADR-010 (本書) と ADR-005 status 更新。
+
+ランタイム挙動の変更はゼロ。
+
+## 参照
+
+- ADR-002, ADR-005, [foundation README](../../auth/gateway-oidc-foundation/README.md)
+- [Istio API repo (release-1.27): config.proto](https://github.com/istio/api/blob/release-1.27/mesh/v1alpha1/config.proto)
+- [Envoy: HTTP OAuth2 filter](https://www.envoyproxy.io/docs/envoy/latest/configuration/http/http_filters/oauth2_filter)
+- [Istio: External Authorization](https://istio.io/latest/docs/tasks/security/authorization/authz-custom/)
+- [oauth2-proxy: Istio integration](https://oauth2-proxy.github.io/oauth2-proxy/configuration/integration#configuring-for-use-with-the-istio-ingress-gateway)
