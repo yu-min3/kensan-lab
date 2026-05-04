@@ -14,3 +14,14 @@ configs:
   params:
     # Run without TLS - Istio Gateway handles TLS termination
     server.insecure: true
+  cm:
+    # ESO admission webhook がデフォルト値 (deletionPolicy/conversionStrategy 等) を
+    # 注入するため、ArgoCD の drift 検知が常に OutOfSync になる。
+    # これらは webhook 管轄なので git に書かなくていい。drift 検知から除外する。
+    resource.customizations.ignoreDifferences.external-secrets.io_ExternalSecret: |
+      jqPathExpressions:
+        - .spec.target.deletionPolicy
+        - .spec.data[].remoteRef.conversionStrategy
+        - .spec.data[].remoteRef.decodingStrategy
+        - .spec.data[].remoteRef.metadataPolicy
+        - .spec.data[].remoteRef.nullBytePolicy
