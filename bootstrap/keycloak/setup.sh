@@ -173,53 +173,120 @@ else
   echo "    user joined to '$ADMIN_GROUP'"
 fi
 
-# === OIDC Client 作成 ===
+# === OIDC Client 共通関数 ===
+# 引数: <client_id> <name> <description> <redirect_uris_json> <web_origins_json> <post_logout_uri>
+# 戻り値: stdout に client UUID を 1 行で出力。
+# 副作用: 存在しなければ作成し groups protocol mapper を付ける。冪等。
+ensure_oidc_client() {
+  local cid="$1"
+  local cname="$2"
+  local cdesc="$3"
+  local redirect_uris_json="$4"
+  local web_origins_json="$5"
+  local post_logout_uri="$6"
+
+  echo "" >&2
+  echo "==> Ensuring OIDC client '$cid' in realm '$REALM'..." >&2
+  local uuid
+  uuid=$(kcadm get clients -r "$REALM" --query "clientId=$cid" --fields id 2>/dev/null \
+    | jq -r '.[0].id // empty' || true)
+
+  if [ -n "$uuid" ] && [ "$uuid" != "null" ]; then
+    echo "    client '$cid' already exists (id: $uuid), skip create" >&2
+  else
+    kcadm create clients -r "$REALM" \
+      -s "clientId=$cid" \
+      -s "name=$cname" \
+      -s "description=$cdesc" \
+      -s enabled=true \
+      -s protocol=openid-connect \
+      -s publicClient=false \
+      -s standardFlowEnabled=true \
+      -s directAccessGrantsEnabled=false \
+      -s "redirectUris=$redirect_uris_json" \
+      -s "webOrigins=$web_origins_json" \
+      -s "attributes.\"post.logout.redirect.uris\"=$post_logout_uri" > /dev/null
+    uuid=$(kcadm get clients -r "$REALM" --query "clientId=$cid" --fields id \
+      | jq -r '.[0].id')
+    echo "    client '$cid' created (id: $uuid)" >&2
+
+    echo "==> Adding 'groups' protocol mapper to '$cid'..." >&2
+    kcadm create "clients/$uuid/protocol-mappers/models" -r "$REALM" \
+      -s name=groups \
+      -s protocol=openid-connect \
+      -s protocolMapper=oidc-group-membership-mapper \
+      -s 'config."claim.name"=groups' \
+      -s 'config."full.path"=false' \
+      -s 'config."id.token.claim"=true' \
+      -s 'config."access.token.claim"=true' \
+      -s 'config."userinfo.token.claim"=true' > /dev/null
+    echo "    groups mapper added" >&2
+  fi
+
+  echo "$uuid"
+}
+
+# === Vault OIDC client ===
+VAULT_REDIRECT_URIS=$(jq -nc \
+  --arg vault_cb "https://$VAULT_HOSTNAME/ui/vault/auth/oidc/oidc/callback" \
+  --arg cli_cb "http://localhost:8250/oidc/callback" \
+  '[$vault_cb, $cli_cb]')
+VAULT_WEB_ORIGINS=$(jq -nc --arg origin "https://$VAULT_HOSTNAME" '[$origin]')
+
+CLIENT_UUID=$(ensure_oidc_client \
+  "$CLIENT_ID" \
+  "Vault OIDC" \
+  "Vault HA OIDC auth method (Stage 1)" \
+  "$VAULT_REDIRECT_URIS" \
+  "$VAULT_WEB_ORIGINS" \
+  "https://$VAULT_HOSTNAME")
+
+# === Istio Gateway OIDC client (Phase 1) ===
+# Path 選択 (ADR-010) が確定するまで作成しない。
+# Yu が Path A/B/C を選んだら以下のいずれかを uncomment して再実行。
+# このスクリプトは冪等なので、再実行すれば vault と user の処理は skip される。
+#
+# --- Path A: oauth2-proxy 経由 (推奨) ---
+# OAUTH2_PROXY_HOST="oauth2-proxy.platform.yu-min3.com"  # 別 PR で deploy する hostname
+# GATEWAY_REDIRECT_URIS=$(jq -nc \
+#   --arg cb "https://$OAUTH2_PROXY_HOST/oauth2/callback" \
+#   '[$cb]')
+# GATEWAY_WEB_ORIGINS=$(jq -nc --arg origin "https://$OAUTH2_PROXY_HOST" '[$origin]')
+# ensure_oidc_client \
+#   "istio-gateway-platform" \
+#   "Istio Gateway Platform OIDC" \
+#   "Phase 1 Gateway-level OIDC for *.platform.yu-min3.com (Path A: oauth2-proxy)" \
+#   "$GATEWAY_REDIRECT_URIS" \
+#   "$GATEWAY_WEB_ORIGINS" \
+#   "https://$OAUTH2_PROXY_HOST" > /dev/null
+#
+# --- Path B: EnvoyFilter wrapping envoy.filters.http.oauth2 (per-host redirect) ---
+# GATEWAY_REDIRECT_URIS=$(jq -nc \
+#   '["https://argocd.platform.yu-min3.com/oauth2/callback",
+#     "https://grafana.platform.yu-min3.com/oauth2/callback",
+#     "https://backstage.platform.yu-min3.com/oauth2/callback",
+#     "https://vault.platform.yu-min3.com/oauth2/callback",
+#     "https://prometheus.platform.yu-min3.com/oauth2/callback",
+#     "https://hubble.platform.yu-min3.com/oauth2/callback",
+#     "https://longhorn.platform.yu-min3.com/oauth2/callback"]')
+# GATEWAY_WEB_ORIGINS=$(jq -nc '["https://argocd.platform.yu-min3.com", "https://grafana.platform.yu-min3.com", "https://backstage.platform.yu-min3.com"]')
+# ensure_oidc_client \
+#   "istio-gateway-platform" \
+#   "Istio Gateway Platform OIDC" \
+#   "Phase 1 Gateway-level OIDC for *.platform.yu-min3.com (Path B: EnvoyFilter)" \
+#   "$GATEWAY_REDIRECT_URIS" \
+#   "$GATEWAY_WEB_ORIGINS" \
+#   "https://argocd.platform.yu-min3.com" > /dev/null
+#
+# --- Path C: 各 service の native OIDC ---
+# Per-service なので istio-gateway-platform client は作らない。
+# argocd / grafana / backstage / vault それぞれに個別 client を作る。
+# Phase C 採用時はこのスクリプトに以下を追加:
+#   ensure_oidc_client "argocd" ... ; ensure_oidc_client "grafana" ... ; ...
+
+# === Vault client_secret 取得 ===
 echo ""
-echo "==> Ensuring OIDC client '$CLIENT_ID' in realm '$REALM'..."
-CLIENT_UUID=$(kcadm get clients -r "$REALM" --query "clientId=$CLIENT_ID" --fields id 2>/dev/null \
-  | jq -r '.[0].id // empty' || true)
-
-if [ -n "$CLIENT_UUID" ] && [ "$CLIENT_UUID" != "null" ]; then
-  echo "    client '$CLIENT_ID' already exists (id: $CLIENT_UUID), skip create"
-else
-  REDIRECT_URIS=$(jq -nc \
-    --arg vault_cb "https://$VAULT_HOSTNAME/ui/vault/auth/oidc/oidc/callback" \
-    --arg cli_cb "http://localhost:8250/oidc/callback" \
-    '[$vault_cb, $cli_cb]')
-  WEB_ORIGINS=$(jq -nc --arg origin "https://$VAULT_HOSTNAME" '[$origin]')
-
-  kcadm create clients -r "$REALM" \
-    -s "clientId=$CLIENT_ID" \
-    -s "name=Vault OIDC" \
-    -s "description=Vault HA OIDC auth method (Stage 1)" \
-    -s enabled=true \
-    -s protocol=openid-connect \
-    -s publicClient=false \
-    -s standardFlowEnabled=true \
-    -s directAccessGrantsEnabled=false \
-    -s "redirectUris=$REDIRECT_URIS" \
-    -s "webOrigins=$WEB_ORIGINS" \
-    -s "attributes.\"post.logout.redirect.uris\"=https://$VAULT_HOSTNAME" > /dev/null
-  CLIENT_UUID=$(kcadm get clients -r "$REALM" --query "clientId=$CLIENT_ID" --fields id \
-    | jq -r '.[0].id')
-  echo "    client '$CLIENT_ID' created (id: $CLIENT_UUID)"
-
-  echo "==> Adding 'groups' protocol mapper..."
-  kcadm create "clients/$CLIENT_UUID/protocol-mappers/models" -r "$REALM" \
-    -s name=groups \
-    -s protocol=openid-connect \
-    -s protocolMapper=oidc-group-membership-mapper \
-    -s 'config."claim.name"=groups' \
-    -s 'config."full.path"=false' \
-    -s 'config."id.token.claim"=true' \
-    -s 'config."access.token.claim"=true' \
-    -s 'config."userinfo.token.claim"=true' > /dev/null
-  echo "    groups mapper added"
-fi
-
-# === client_secret 取得 ===
-echo ""
-echo "==> Fetching client_secret..."
+echo "==> Fetching Vault client_secret..."
 CLIENT_SECRET=$(kcadm get "clients/$CLIENT_UUID/client-secret" -r "$REALM" 2>/dev/null \
   | jq -r '.value')
 if [ -z "$CLIENT_SECRET" ] || [ "$CLIENT_SECRET" = "null" ]; then
