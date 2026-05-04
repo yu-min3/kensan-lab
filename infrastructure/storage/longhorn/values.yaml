@@ -68,11 +68,13 @@ persistence:
   # 全 longhorn-SC volume を recurring-jobs.yaml の "default" group に自動加入させる。
   # → snapshot-daily / backup-weekly / backup-monthly が自動適用される。
   # アプリ側で「backup する/しない」の意識不要 (storage-plan §5.10.4)
+  #
+  # Note: jobList は **JSON 文字列** で渡す。chart v1.7.2 のテンプレートは
+  # `'{{ .Values...jobList }}'` と素直に文字列化するだけで toJson しないため、
+  # 構造化 YAML を渡すと Go の `[map[k:v]]` 形式になり Longhorn parser が読めない。
   recurringJobSelector:
     enable: true
-    jobList:
-      - name: default
-        isGroup: true
+    jobList: '[{"name":"default","isGroup":true}]'
 
 # Phase 1: UI Ingress 無効化 (port-forward でアクセス)
 #   kubectl port-forward -n longhorn-system svc/longhorn-frontend 8080:80
