@@ -1,0 +1,45 @@
+# Longhorn RecurringJob: storage-plan.md §5.10.4 に基づく定期 snapshot/backup。
+#
+# 対象 Volume: spec.groups: [default] に属する Volume。
+# Volume が "default" group に属するかは、StorageClass parameters の
+# recurringJobSelector で決まる (values.yaml で設定済み)。
+# つまり storageClassName=longhorn の PVC から作られた Volume は自動加入する。
+#
+# Note: Longhorn の cron は cluster manager の timezone で評価される (UTC default)。
+# コメントの JST 表記は UTC + 9 換算。実装時刻ずらしたければ cron を直接編集。
+---
+apiVersion: longhorn.io/v1beta2
+kind: RecurringJob
+metadata:
+  name: snapshot-daily
+  namespace: longhorn-system
+spec:
+  cron: "0 17 * * *"      # 17:00 UTC = 02:00 JST (翌日)
+  task: snapshot          # ローカル snapshot のみ、R2 へは送らない
+  groups: [default]
+  retain: 14              # 14 日分
+  concurrency: 2
+---
+apiVersion: longhorn.io/v1beta2
+kind: RecurringJob
+metadata:
+  name: backup-weekly
+  namespace: longhorn-system
+spec:
+  cron: "0 18 * * 6"      # 18:00 UTC Saturday = 03:00 JST Sunday
+  task: backup            # snapshot を取って R2 に push
+  groups: [default]
+  retain: 8               # 8 週分
+  concurrency: 1          # Pi5 帯域節約
+---
+apiVersion: longhorn.io/v1beta2
+kind: RecurringJob
+metadata:
+  name: backup-monthly
+  namespace: longhorn-system
+spec:
+  cron: "0 19 1 * *"      # 19:00 UTC on day 1 = 04:00 JST on day 2 (~1日ずれ許容)
+  task: backup
+  groups: [default]
+  retain: 12              # 12 ヶ月分
+  concurrency: 1

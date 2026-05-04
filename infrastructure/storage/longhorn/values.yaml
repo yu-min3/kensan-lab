@@ -65,6 +65,14 @@ persistence:
   defaultClassReplicaCount: 1
   reclaimPolicy: Retain              # 誤削除対策
   defaultDataLocality: best-effort
+  # 全 longhorn-SC volume を recurring-jobs.yaml の "default" group に自動加入させる。
+  # → snapshot-daily / backup-weekly / backup-monthly が自動適用される。
+  # アプリ側で「backup する/しない」の意識不要 (storage-plan §5.10.4)
+  recurringJobSelector:
+    enable: true
+    jobList:
+      - name: default
+        isGroup: true
 
 # Phase 1: UI Ingress 無効化 (port-forward でアクセス)
 #   kubectl port-forward -n longhorn-system svc/longhorn-frontend 8080:80
