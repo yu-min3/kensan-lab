@@ -335,6 +335,86 @@ Created by: bootstrap/keycloak/setup.sh"
   save_bw "$BW_USER_ITEM" "$USER_NAME" "$USER_PW" "$USER_NOTES"
 fi
 
+# === Vault KV 投入 (oauth2-proxy 用) ===
+# vault CLI + 有効 token があれば自動投入。なければ手動手順を案内。
+# KV path: secret/platform-auth/istio-gateway/platform
+# 投入 keys: client-id / client-secret / cookie-secret
+# 既存値があればそれを尊重 (再実行で session を破壊しない)。
+GATEWAY_VAULT_PATH="platform-auth/istio-gateway/platform"   # mount 'secret/' は CLI で省略可
+GATEWAY_KV_FULLPATH="secret/$GATEWAY_VAULT_PATH"
+
+vault_populate_gateway_kv() {
+  echo ""
+  echo "==> Populating Vault KV: $GATEWAY_KV_FULLPATH"
+
+  # 既存 KV 取得 (失敗しても気にしない)
+  local existing_keys=""
+  local existing_cookie=""
+  if vault kv get -format=json "$GATEWAY_VAULT_PATH" >/dev/null 2>&1; then
+    existing_keys=$(vault kv get -format=json "$GATEWAY_VAULT_PATH" \
+      | jq -r '.data.data | keys | join(",")')
+    existing_cookie=$(vault kv get -format=json "$GATEWAY_VAULT_PATH" \
+      | jq -r '.data.data["cookie-secret"] // empty')
+    echo "    既存 KV あり (keys: $existing_keys)"
+  else
+    echo "    KV path 未存在、新規作成"
+  fi
+
+  # cookie-secret は既存があれば流用 (rotate したい場合は事前に kv delete する)
+  local cookie
+  if [ -n "$existing_cookie" ]; then
+    cookie="$existing_cookie"
+    echo "    cookie-secret: 既存値を流用"
+  else
+    cookie=$(openssl rand -base64 32 | tr -d '\n')
+    echo "    cookie-secret: 新規生成"
+  fi
+
+  vault kv put "$GATEWAY_VAULT_PATH" \
+    client-id=istio-gateway-platform \
+    client-secret="$GATEWAY_CLIENT_SECRET" \
+    cookie-secret="$cookie" > /dev/null
+  echo "    populated OK"
+
+  echo ""
+  echo "    確認 (keys のみ):"
+  vault kv get -format=json "$GATEWAY_VAULT_PATH" | jq -r '.data.data | keys | "      " + (. | tostring)'
+}
+
+print_gateway_vault_manual() {
+  cat <<MSG
+
+==> Vault 自動投入をスキップ ($1)。手動投入手順:
+
+    # 0. 必要なら Vault に login
+    export VAULT_ADDR=https://vault.platform.yu-min3.com
+    vault login -method=oidc
+
+    # 1. 各 secret 用意
+    COOKIE=\$(openssl rand -base64 32 | tr -d '\\n')
+    CSEC=\$(bw get item kensan-lab/keycloak/oidc-client-istio-gateway-platform | jq -r .login.password)
+
+    # 2. Vault に投入
+    vault kv put $GATEWAY_VAULT_PATH \\
+      client-id=istio-gateway-platform \\
+      client-secret="\$CSEC" \\
+      cookie-secret="\$COOKIE"
+
+    # 3. 確認
+    vault kv get -format=json $GATEWAY_VAULT_PATH | jq '.data.data | keys'
+MSG
+}
+
+if ! command -v vault &>/dev/null; then
+  print_gateway_vault_manual "vault CLI なし"
+elif [ -z "${VAULT_ADDR:-}" ]; then
+  print_gateway_vault_manual "VAULT_ADDR 未設定"
+elif ! vault token lookup &>/dev/null; then
+  print_gateway_vault_manual "vault token 無効"
+else
+  vault_populate_gateway_kv
+fi
+
 # === 出力 ===
 echo ""
 echo "==> Done."
@@ -343,7 +423,7 @@ echo "==> 確認:"
 echo "    OIDC discovery: https://auth.platform.yu-min3.com/realms/$REALM/.well-known/openid-configuration"
 echo "    bw get item \"$BW_CLIENT_ITEM\" | jq '{name, login: {username: .login.username}}'"
 echo ""
-echo "==> 次のステップ (Vault Stage 1):"
+echo "==> 次のステップ (Vault Stage 1, 未実施なら):"
 echo "    1. vault operator init (manual)"
 echo "    2. root token + Recovery Keys を Bitwarden に保存"
 echo "    3. bootstrap/vault/ で terraform.tfvars に下記を書く:"
@@ -352,12 +432,10 @@ echo "       keycloak_oidc_client_id     = \"$CLIENT_ID\""
 echo "       keycloak_oidc_client_secret = \"<bw get item $BW_CLIENT_ITEM | jq -r .login.password>\""
 echo "    4. cd bootstrap/vault && terraform init && terraform apply"
 echo ""
-echo "==> 次のステップ (Gateway OIDC / oauth2-proxy):"
-echo "    1. cookie_secret を生成: COOKIE=\$(openssl rand -base64 32 | tr -d '\\n')"
-echo "    2. Vault に投入:"
-echo "       vault kv put secret/platform-auth/istio-gateway/platform \\"
-echo "         client-id=istio-gateway-platform \\"
-echo "         client-secret=\$(bw get item kensan-lab/keycloak/oidc-client-istio-gateway-platform | jq -r .login.password) \\"
-echo "         cookie-secret=\"\$COOKIE\""
-echo "    3. ArgoCD で oauth2-proxy Application を sync (auto sync 有効なら自動)"
-echo "    4. ExternalSecret 経由で auth-system/oauth2-proxy-secret 作成確認"
+echo "==> 次のステップ (Gateway OIDC / oauth2-proxy, このスクリプト以後):"
+echo "    1. PR #269 を ready-for-review → merge"
+echo "    2. ArgoCD で oauth2-proxy Application が sync 完了するか確認"
+echo "       kubectl -n argocd get application oauth2-proxy"
+echo "       kubectl -n auth-system get pods -l app=oauth2-proxy"
+echo "    3. provider 登録確認:"
+echo "       kubectl -n istio-system get cm istio -o yaml | yq '.data.mesh' | yq '.extensionProviders'"
