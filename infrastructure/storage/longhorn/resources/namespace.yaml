@@ -3,6 +3,12 @@ kind: Namespace
 metadata:
   name: longhorn-system
   labels:
+    app.kubernetes.io/managed-by: argocd
+    kensan-lab.platform/environment: infrastructure  # gateway-platform の allowedRoutes selector
+    kensan-lab.platform/tier: platform
+    kensan-lab.platform/component: storage
     # Longhorn は privileged 相当のコンポーネント (CSI plugin, instance-manager) を含む
     pod-security.kubernetes.io/enforce: privileged
     pod-security.kubernetes.io/warn: privileged
+    # istio-injection は付けない: Longhorn の gRPC sync 通信に sidecar を挟むと
+    # 副作用が読み切れない (公式 issue でも mTLS 透過の挙動が版次第)。Phase 3+α で評価。
