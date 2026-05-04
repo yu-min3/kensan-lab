@@ -1,0 +1,34 @@
+## CoreDNS ConfigMap (Corefile) の GitOps 管理。
+## kubeadm 由来の Deployment/SA/ClusterRole 等は触らないため prune: false 必須。
+## ServerSideApply=true で kubeadm 初期作成の ConfigMap から tracking-id を奪取する。
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: coredns
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "-3"  # cluster DNS は network-policy(-4) の後、他より早めに sync
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: platform-project
+  source:
+    repoURL: https://github.com/yu-min3/kensan-lab
+    targetRevision: main
+    path: infrastructure/network/coredns
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: kube-system
+  syncPolicy:
+    automated:
+      prune: false  # kubeadm 由来の他リソース誤削除を防ぐ
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=false
+      - ServerSideApply=true
+    retry:
+      limit: 5
+      backoff:
+        duration: 5s
+        factor: 2
+        maxDuration: 3m
