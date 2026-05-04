@@ -1,0 +1,37 @@
+## ADR-009 後続: per-ns `default-deny-all` NetworkPolicy を CCNP に集約
+##
+## istio-injection: enabled ラベルが付いた全 ns に対して default-deny
+## (ingress + egress 両方) を効かせる。
+##
+## Cilium のセマンティクス:
+##   - endpointSelector で endpoint を select した CCNP が存在すると、
+##     その方向 (ingress/egress) は default-deny に切り替わる
+##   - `reserved:none` は何にも match しない special label。
+##     fromEndpoints / toEndpoints で使うと「何も allow しない」rule になり、
+##     endpoint を select しつつ default-deny を発動させられる
+##
+## このポリシーと別の allow CCNP / NP は additive に動く:
+##   - default-deny-for-mesh-ns (このCCNP) → ingress/egress 全 deny
+##   - allow-istio-for-mesh-ns / allow-dns-for-mesh-ns / 等 → 各方向を解禁
+##
+## 既存の per-ns default-deny-all NP は別 PR で削除する。
+##
+## 対象外 (istio-injection 無しなので per-ns NP のまま):
+##   - kensan-data / cert-manager / cloudflare-tunnel
+apiVersion: cilium.io/v2
+kind: CiliumClusterwideNetworkPolicy
+metadata:
+  name: default-deny-for-mesh-ns
+spec:
+  description: "Default-deny ingress and egress for all namespaces with istio-injection=enabled"
+  endpointSelector:
+    matchLabels:
+      k8s:io.cilium.k8s.namespace.labels.istio-injection: enabled
+  ingress:
+    - fromEndpoints:
+        - matchLabels:
+            "reserved:none": ""
+  egress:
+    - toEndpoints:
+        - matchLabels:
+            "reserved:none": ""

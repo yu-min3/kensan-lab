@@ -1,44 +1,9 @@
-## ADR-009 で CCNP `allow-istio-for-mesh-ns` を導入した結果、
-## istio-injection: enabled ラベルを持つ全 ns が Cilium 的に
-## "explicit allow only" モードに切り替わる。app-prod は元々 NP ゼロ
-## (= 全許可) だったので、CCNP 適用後 DNS 等が解決できなくなった。
-## 他の istio-injected ns (vault, kensan-prod 等) と同じ形の base NP を入れる。
+## ADR-009 後続: default-deny-all / allow-dns / allow-prometheus-scrape は
+## CCNP (default-deny-for-mesh-ns / allow-dns-for-mesh-ns /
+## allow-prometheus-scrape-for-mesh-ns) に集約済み。
+## ここに残すのは allow-intra-namespace だけ
+## (CCNP では "same ns as me" を綺麗に表現できないので per-ns)。
 
-## Default deny all ingress and egress
-apiVersion: networking.k8s.io/v1
-kind: NetworkPolicy
-metadata:
-  name: default-deny-all
-  namespace: app-prod
-spec:
-  podSelector: {}
-  policyTypes:
-    - Ingress
-    - Egress
-
----
-## Allow DNS resolution to kube-system
-apiVersion: networking.k8s.io/v1
-kind: NetworkPolicy
-metadata:
-  name: allow-dns
-  namespace: app-prod
-spec:
-  podSelector: {}
-  policyTypes:
-    - Egress
-  egress:
-    - to:
-        - namespaceSelector:
-            matchLabels:
-              kubernetes.io/metadata.name: kube-system
-      ports:
-        - protocol: UDP
-          port: 53
-        - protocol: TCP
-          port: 53
-
----
 ## Allow intra-namespace communication (Service-to-Service)
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
@@ -56,20 +21,3 @@ spec:
   egress:
     - to:
         - podSelector: {}
-
----
-## Allow Prometheus scraping from monitoring namespace
-apiVersion: networking.k8s.io/v1
-kind: NetworkPolicy
-metadata:
-  name: allow-prometheus-scrape
-  namespace: app-prod
-spec:
-  podSelector: {}
-  policyTypes:
-    - Ingress
-  ingress:
-    - from:
-        - namespaceSelector:
-            matchLabels:
-              kubernetes.io/metadata.name: monitoring
