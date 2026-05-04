@@ -91,29 +91,9 @@ spec:
           port: 8200
 
 ---
-## Allow ingress/egress to istio-system (kensan-lab 共通パターン: allow-istio)
-## sidecar → istiod xDS (15012/15014) 接続のため必須。port 全許可は kensan-lab
-## の既存ベストプラクティス (cf. infrastructure/security/keycloak/base/network-policy.yaml)
-apiVersion: networking.k8s.io/v1
-kind: NetworkPolicy
-metadata:
-  name: allow-istio
-  namespace: external-secrets
-spec:
-  podSelector: {}
-  policyTypes:
-    - Ingress
-    - Egress
-  egress:
-    - to:
-        - namespaceSelector:
-            matchLabels:
-              kubernetes.io/metadata.name: istio-system
-  ingress:
-    - from:
-        - namespaceSelector:
-            matchLabels:
-              kubernetes.io/metadata.name: istio-system
+## ADR-009: allow-istio は CiliumClusterwideNetworkPolicy `allow-istio-for-mesh-ns` に移行
+## (infrastructure/network/istio/resources/clusterwide-allow-istio.yaml)
+## istio-injection: enabled ラベルで自動カバー、ここは per-ns で書かない
 
 ---
 ## Allow webhook ingress from API server (ValidatingWebhookConfiguration)
