@@ -1,0 +1,25 @@
+## Cluster-wide ingress: vault-database-engine 管理対象 ns の pod に対し、
+## vault ns からの TCP/5432 接続を許可。
+##
+## 対象 ns は label "kensan-lab.platform/vault-managed-postgres=true" を opt-in で付与する。
+## chart 側 (values.yaml) は触らず、app ns 側 namespace.yaml で 1 行加える運用。
+##
+## per-instance NP (instance × 2 NP) を 1 cluster-wide policy に集約することで、
+## VCO 管理 instance が増えても NP 数は不変。
+apiVersion: cilium.io/v2
+kind: CiliumClusterwideNetworkPolicy
+metadata:
+  name: vault-database-engine-postgres-ingress
+spec:
+  description: Allow vault ns → managed Postgres TCP/5432 (vault-database-engine)
+  endpointSelector:
+    matchLabels:
+      k8s:io.cilium.k8s.namespace.labels.kensan-lab.platform/vault-managed-postgres: "true"
+  ingress:
+    - fromEndpoints:
+        - matchLabels:
+            k8s:io.kubernetes.pod.namespace: vault
+      toPorts:
+        - ports:
+            - port: "5432"
+              protocol: TCP

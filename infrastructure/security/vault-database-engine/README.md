@@ -21,7 +21,9 @@ infrastructure/security/vault-database-engine/
 │       └── eso-external-secret.yaml      # ExternalSecret                       (app ns)
 ├── shared/                               # capability bootstrap (1 度だけ)
 │   ├── mount.yaml                        # SecretEngineMount (database/)
-│   └── policy-eso-read.yaml              # ESO 用 Vault policy (database/creds/* read)
+│   ├── policy-eso-read.yaml              # ESO 用 Vault policy (database/creds/* read)
+│   ├── ccnp-postgres-ingress.yaml        # CCNP: managed ns Postgres ← vault TCP/5432 (cluster-wide)
+│   └── cnp-vault-egress.yaml             # CNP: vault → managed ns Postgres TCP/5432 (vault ns)
 └── platform-values/
     └── vault-database/                   # capability convention dir
         ├── backstage.yaml                # 1 instance、AD が触る (override 必要分のみ書く)
@@ -69,12 +71,24 @@ PE が chart の `values.yaml` で **convention based デフォルト** を埋�
 
 ## 1 instance 追加方法 (AD 視点)
 
-values file を 1 個書くだけ。最小構成:
+(1) values file を 1 個書く + (2) deploy 先 ns に label を 1 個付ける、の 2 ステップ。
 
 ```yaml
-# 配置例: <owner-dir>/platform-values/vault-database/<instance>.yaml
+# (1) <owner-dir>/platform-values/vault-database/<instance>.yaml
 ns: my-app
 ```
+
+```yaml
+# (2) app 側 namespace.yaml (per-app-ns 移行後は app の repo 配下)
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: my-app
+  labels:
+    kensan-lab.platform/vault-managed-postgres: "true"  # ← Vault → Postgres TCP/5432 を許可
+```
+
+ns label は cluster-wide CCNP/CNP (`shared/`) が opt-in で拾うため必須。これを付けないと VCO は Postgres に接続できず動的 user 払い出しが fail する。
 
 これだけで以下が自動的に成立:
 - Vault role 名 = `postgres-<instance>` (filename から)
