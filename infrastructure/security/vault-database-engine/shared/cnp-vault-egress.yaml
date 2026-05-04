@@ -1,0 +1,20 @@
+## vault ns 全 pod の egress を、vault-managed-postgres ns 配下に対する TCP/5432 だけ許可する。
+## 上の ccnp-postgres-ingress と対になる方向制御。
+##
+## 動的 user 払い出し時に Vault が直接 Postgres に SQL を打つため必要。
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: vault-egress-to-managed-postgres
+  namespace: vault
+spec:
+  description: Allow vault pods → managed Postgres TCP/5432 (vault-database-engine)
+  endpointSelector: {}
+  egress:
+    - toEndpoints:
+        - matchLabels:
+            k8s:io.cilium.k8s.namespace.labels.kensan-lab.platform/vault-managed-postgres: "true"
+      toPorts:
+        - ports:
+            - port: "5432"
+              protocol: TCP

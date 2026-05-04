@@ -6,5 +6,6 @@ metadata:
     app.kubernetes.io/managed-by: argocd
     kensan-lab.platform/environment: infrastructure
     kensan-lab.platform/tier: infrastructure
+    kensan-lab.platform/vault-managed-postgres: "true"
     pod-security.kubernetes.io/enforce: baseline
     pod-security.kubernetes.io/warn: restricted
