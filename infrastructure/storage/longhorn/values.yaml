@@ -81,3 +81,12 @@ persistence:
 # Phase 2+ で Istio Gateway + HTTPRoute + Keycloak ext-authz を resources/ に追加予定
 ingress:
   enabled: false
+
+# 既存 Prometheus (kube-prometheus-stack、ns=monitoring) に scrape させる。
+# longhorn-backend Service の :9500 から longhorn_disk_usage,
+# longhorn_volume_actual_size, longhorn_backup_state 等が取れる (storage-plan §5.9)。
+# Prometheus 側は serviceMonitorNamespaceSelector: {} で全 ns を見るので、
+# longhorn-system 内の ServiceMonitor もそのまま拾われる。
+metrics:
+  serviceMonitor:
+    enabled: true
