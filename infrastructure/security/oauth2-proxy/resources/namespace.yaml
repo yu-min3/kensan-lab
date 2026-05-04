@@ -1,0 +1,16 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: auth-system
+  labels:
+    app.kubernetes.io/managed-by: argocd
+    # gateway-platform.allowedRoutes selector match (Istio Gateway listener が
+    # この label を持つ ns からの HTTPRoute だけ accept する)
+    kensan-lab.platform/environment: infrastructure
+    kensan-lab.platform/tier: platform
+    kensan-lab.platform/component: gateway-auth
+    # PSA: oauth2-proxy は通常 Pod (privileged 不要)
+    pod-security.kubernetes.io/enforce: baseline
+    pod-security.kubernetes.io/warn: restricted
+    # mesh 内通信 (Istio → oauth2-proxy → Keycloak) は mTLS で保護
+    istio-injection: enabled

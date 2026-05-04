@@ -1,0 +1,46 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: oauth2-proxy
+  namespace: argocd
+  annotations:
+    # Vault (5) と external-secrets-operator が動いた後でないと
+    # ExternalSecret 解決できないため wave 6
+    argocd.argoproj.io/sync-wave: "6"
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: platform-project
+
+  sources:
+    - repoURL: https://oauth2-proxy.github.io/manifests
+      chart: oauth2-proxy
+      targetRevision: 10.4.3
+      helm:
+        releaseName: oauth2-proxy
+        valueFiles:
+          - $values/infrastructure/security/oauth2-proxy/values.yaml
+    - repoURL: https://github.com/yu-min3/kensan-lab
+      targetRevision: main
+      ref: values
+    - repoURL: https://github.com/yu-min3/kensan-lab
+      targetRevision: main
+      path: infrastructure/security/oauth2-proxy/resources
+
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: auth-system
+
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=false  # resources/namespace.yaml で作成
+      - ServerSideApply=true
+    retry:
+      limit: 5
+      backoff:
+        duration: 5s
+        factor: 2
+        maxDuration: 3m
