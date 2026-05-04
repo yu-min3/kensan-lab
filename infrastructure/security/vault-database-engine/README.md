@@ -118,25 +118,11 @@ Bitnami PostgreSQL chart `auth.enablePostgresUser: false` (default) では `POST
 
 将来 app 側を動的 user に切替終わった段階で、これら app user の SUPERUSER 権限剥奪 (= app は短命の制限付き user で接続、人間 admin のみ super) に再設計する余地あり。
 
-### Vault KV admin cred の convention path 化 (一度だけの migration)
+### Vault KV admin cred の convention path
 
-旧 path (Stage 3/3.5 で投入された static admin cred) は app の ESO ExternalSecret consumer が読んでるため残置。
-新 convention path `secret/data/db-admin/<name>` (keys: `username` / `password`) を **追加で** 投入する一度限りの migration 必要。
-
-migration script: `bootstrap/vault/migrate-db-admin.sh`
-
-実行手順:
-```bash
-# Vault に root token で auth (詳細は bootstrap/vault/README.md)
-kubectl -n vault port-forward svc/vault-active 8200:8200 &
-export VAULT_ADDR=http://127.0.0.1:8200
-export VAULT_TOKEN=<root token from Bitwarden>
-
-# migration 実行 (idempotent)
-./bootstrap/vault/migrate-db-admin.sh
-```
-
-実行後、5 instance 分の admin cred が `secret/db-admin/<name>` に新規 path で複製される。app が dynamic cred に切り替わったら (= Pod env 切り替え PR が merge されたら)、旧 path (`secret/<app>/postgresql` 等) を整理する。
+新 convention path: `secret/data/db-admin/<name>` (keys: `username` / `password`)。
+本 PR の merge 前に、旧 path (Stage 3/3.5 で投入された static admin cred) からこの path に admin cred を複製する一度きりの migration を実施済み (script は実行後に削除、git 履歴参照)。
+旧 path は app の既存 ExternalSecret consumer がまだ読んでいるため残置。Pod env 切り替え (Phase 5c) 完了後に旧 path も削除する。
 
 ### ESO consumer-side の auth model
 
