@@ -1,0 +1,30 @@
+## ADR-009: per-ns `allow-istio` NetworkPolicy を CCNP に集約
+##
+## istio-injection: enabled ラベルが付いた全 ns に対して istio-system との
+## 双方向通信を許可する。ports 全許可は kensan-lab の確立パターン
+## (sidecar が istiod xDS / mTLS / external auth 等多 port 使うため絞らない)。
+##
+## このポリシーは per-ns の default-deny-all と additive に動く:
+##   - default-deny-all (各 ns) → 全 deny
+##   - allow-istio-for-mesh-ns (このCCNP) → istio-system との通信を解禁
+##
+## 既存の per-ns allow-istio NP は残置 (additive なので競合しない)。
+## ADR-009 の medium-term plan に従い、本 CCNP の動作確認後、別 PR で
+## 各 ns の allow-istio NP を削除する。
+apiVersion: cilium.io/v2
+kind: CiliumClusterwideNetworkPolicy
+metadata:
+  name: allow-istio-for-mesh-ns
+spec:
+  description: "All namespaces with istio-injection=enabled may freely talk to istio-system"
+  endpointSelector:
+    matchLabels:
+      k8s:io.cilium.k8s.namespace.labels.istio-injection: enabled
+  ingress:
+    - fromEndpoints:
+        - matchLabels:
+            k8s:io.kubernetes.pod.namespace: istio-system
+  egress:
+    - toEndpoints:
+        - matchLabels:
+            k8s:io.kubernetes.pod.namespace: istio-system
