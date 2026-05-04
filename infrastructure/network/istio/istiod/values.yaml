@@ -16,3 +16,40 @@ pilot:
     PILOT_ENABLE_GATEWAY_API: "true"
     PILOT_ENABLE_GATEWAY_API_STATUS: "true"
     PILOT_ENABLE_GATEWAY_API_DEPLOYMENT_CONTROLLER: "true"
+
+# meshConfig: ADR-010 Path A 採択により oauth2-proxy を ext_authz provider
+# として登録する。AuthorizationPolicy (action: CUSTOM, provider.name: oauth2-proxy)
+# で gateway-platform にバインドされて初めて invoke される。
+# このエントリだけでは何も動作変更なし (provider 登録のみ)。
+meshConfig:
+  extensionProviders:
+    - name: oauth2-proxy
+      envoyExtAuthzHttp:
+        # oauth2-proxy Service in auth-system namespace
+        service: oauth2-proxy.auth-system.svc.cluster.local
+        port: 4180
+        # ext_authz が呼びにいくパス。oauth2-proxy が "session 有効?" を返す。
+        pathPrefix: /oauth2/auth
+        # 失敗時に閉じる (oauth2-proxy 落ちたら deny)。secure default。
+        failOpen: false
+        # オーバヘッド最小化 (intra-cluster な service-to-service)
+        timeout: 0.2s
+        # request 認証判断のために必要なヘッダ
+        includeRequestHeadersInCheck:
+          - cookie
+          - authorization
+          - x-forwarded-uri
+          - x-forwarded-host
+          - x-forwarded-proto
+        # 認可後 (200) に upstream pod へ追加するヘッダ。アプリ側 fine 認可で使う。
+        headersToUpstreamOnAllow:
+          - authorization                # Bearer JWT (forwardOriginalToken と併用)
+          - x-auth-request-user
+          - x-auth-request-email
+          - x-auth-request-groups
+          - x-auth-request-access-token
+        # 拒否時 (302/401) に browser へ流すヘッダ。OIDC redirect 成立に必須。
+        headersToDownstreamOnDeny:
+          - content-type
+          - set-cookie
+          - location
