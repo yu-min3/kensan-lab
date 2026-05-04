@@ -1,0 +1,97 @@
+# Path B — EnvoyFilter wrapping envoy.filters.http.oauth2
+#
+# ⚠️ Caveats (from ADR-010):
+# - The Envoy oauth2 filter is "currently under active development"
+#   per Envoy docs. NOT a stable API surface.
+# - EnvoyFilter is Istio's escape hatch — known to break across Istio
+#   minor upgrades (filter chain ordering, proto changes).
+# - No OIDC discovery URL — authorization_endpoint and token_endpoint
+#   must be hardcoded. If Keycloak hostname changes, this drifts.
+# - No CSRF protection in the filter itself (a separate Envoy filter
+#   would be needed).
+#
+# Reference: https://www.envoyproxy.io/docs/envoy/latest/configuration/http/http_filters/oauth2_filter
+apiVersion: networking.istio.io/v1
+kind: EnvoyFilter
+metadata:
+  name: gateway-platform-oauth2
+  namespace: istio-system
+spec:
+  # Apply to gateway-platform pods only
+  workloadSelector:
+    labels:
+      gateway.networking.k8s.io/gateway-name: gateway-platform
+  configPatches:
+    - applyTo: HTTP_FILTER
+      match:
+        context: GATEWAY
+        listener:
+          filterChain:
+            filter:
+              name: envoy.filters.network.http_connection_manager
+              subFilter:
+                # Insert oauth2 BEFORE the JWT auth filter so the JWT
+                # check sees the bearer token oauth2 just minted.
+                name: envoy.filters.http.jwt_authn
+      patch:
+        operation: INSERT_BEFORE
+        value:
+          name: envoy.filters.http.oauth2
+          typed_config:
+            "@type": type.googleapis.com/envoy.extensions.filters.http.oauth2.v3.OAuth2
+            config:
+              authorization_endpoint: "https://auth.platform.yu-min3.com/realms/kensan/protocol/openid-connect/auth"
+              token_endpoint:
+                cluster: outbound|443||auth.platform.yu-min3.com
+                uri: "https://auth.platform.yu-min3.com/realms/kensan/protocol/openid-connect/token"
+                timeout: 5s
+              # Per-host redirect URI — Envoy substitutes %REQ(:authority)%
+              # at runtime so each host gets its own callback. The OIDC
+              # client must list every host's /oauth2/callback in
+              # redirectUris (see Path B section in setup.sh).
+              redirect_uri: "https://%REQ(:authority)%/oauth2/callback"
+              redirect_path_matcher:
+                path:
+                  exact: /oauth2/callback
+              signout_path:
+                path:
+                  exact: /oauth2/signout
+              credentials:
+                client_id: istio-gateway-platform
+                # Loaded from Secret via Envoy SDS — the Secret is
+                # populated by ExternalSecret (path-b-externalsecret.yaml)
+                token_secret:
+                  name: oauth2-token-secret
+                  sds_config:
+                    api_config_source:
+                      api_type: GRPC
+                      transport_api_version: V3
+                      grpc_services:
+                        - envoy_grpc:
+                            cluster_name: sds-grpc
+                hmac_secret:
+                  name: oauth2-hmac-secret
+                  sds_config:
+                    api_config_source:
+                      api_type: GRPC
+                      transport_api_version: V3
+                      grpc_services:
+                        - envoy_grpc:
+                            cluster_name: sds-grpc
+              forward_bearer_token: true
+              use_refresh_token: true
+              # 10h session
+              default_expires_in: 36000s
+              # Auth scopes — must include "groups" for the realm-level
+              # group mapper output.
+              auth_scopes:
+                - openid
+                - email
+                - profile
+                - groups
+              # Hosts the filter applies to. The IdP host is excluded
+              # via pass_through_matcher to avoid recursive redirect.
+              pass_through_matcher:
+                - name: ":authority"
+                  string_match:
+                    exact: "auth.platform.yu-min3.com"
