@@ -7,5 +7,9 @@ metadata:
     kensan-lab.platform/environment: infrastructure
     kensan-lab.platform/tier: platform
     kensan-lab.platform/component: observability
-    pod-security.kubernetes.io/enforce: baseline
-    pod-security.kubernetes.io/warn: restricted
+    ## PSA labels intentionally not enforced:
+    ## kube-prometheus-stack の node-exporter は hostNetwork/hostPID/hostPath/hostPort を
+    ## 要求するため "baseline" と非互換。monitoring は platform 系 ns で AD tenant ns ではない
+    ## ので enforce 対象外で OK。
+    ## TODO(kyverno): Kyverno 統合後に ClusterPolicy で baseline 強制 + 既知 workload
+    ##   (node-exporter / vault 等) を per-workload exempt する形で復活させる
