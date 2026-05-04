@@ -1,0 +1,46 @@
+## CoreDNS Corefile
+##
+## kubeadm が初期作成する ConfigMap (kube-system/coredns) を ArgoCD で takeover し、
+## 変更履歴を Git で管理する。Deployment / SA / ClusterRole 等の他リソースは kubeadm 管理のまま
+## (ArgoCD app は prune: false で誤削除を防ぐ)。
+##
+## kubeadm upgrade 時に Corefile が re-render される可能性あり。selfHeal: true で即時 revert
+## されるが、新版で内容に有意義な変更があった場合は手動で merge する。
+##
+## hosts plugin: cluster 内 Pod に対して特定 public FQDN → cluster LB IP の resolve を提供。
+## 現状は Keycloak の OIDC discovery URL (Vault / ArgoCD / Grafana / Backstage 等) で必要。
+## 同じ FQDN を維持することで JWT iss claim 整合を保ちつつ、cluster-local の経路で解決させる。
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: coredns
+  namespace: kube-system
+data:
+  Corefile: |
+    .:53 {
+        errors
+        health {
+           lameduck 5s
+        }
+        ready
+        hosts {
+            192.168.0.242 auth.platform.yu-min3.com
+            fallthrough
+        }
+        kubernetes cluster.local in-addr.arpa ip6.arpa {
+           pods insecure
+           fallthrough in-addr.arpa ip6.arpa
+           ttl 30
+        }
+        prometheus :9153
+        forward . /etc/resolv.conf {
+           max_concurrent 1000
+        }
+        cache 30 {
+           disable success cluster.local
+           disable denial cluster.local
+        }
+        loop
+        reload
+        loadbalance
+    }
