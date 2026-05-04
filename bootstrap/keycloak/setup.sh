@@ -241,48 +241,23 @@ CLIENT_UUID=$(ensure_oidc_client \
   "$VAULT_WEB_ORIGINS" \
   "https://$VAULT_HOSTNAME")
 
-# === Istio Gateway OIDC client (Phase 1) ===
-# Path 選択 (ADR-010) が確定するまで作成しない。
-# Yu が Path A/B/C を選んだら以下のいずれかを uncomment して再実行。
-# このスクリプトは冪等なので、再実行すれば vault と user の処理は skip される。
-#
-# --- Path A: oauth2-proxy 経由 (推奨) ---
-# OAUTH2_PROXY_HOST="oauth2-proxy.platform.yu-min3.com"  # 別 PR で deploy する hostname
-# GATEWAY_REDIRECT_URIS=$(jq -nc \
-#   --arg cb "https://$OAUTH2_PROXY_HOST/oauth2/callback" \
-#   '[$cb]')
-# GATEWAY_WEB_ORIGINS=$(jq -nc --arg origin "https://$OAUTH2_PROXY_HOST" '[$origin]')
-# ensure_oidc_client \
-#   "istio-gateway-platform" \
-#   "Istio Gateway Platform OIDC" \
-#   "Phase 1 Gateway-level OIDC for *.platform.yu-min3.com (Path A: oauth2-proxy)" \
-#   "$GATEWAY_REDIRECT_URIS" \
-#   "$GATEWAY_WEB_ORIGINS" \
-#   "https://$OAUTH2_PROXY_HOST" > /dev/null
-#
-# --- Path B: EnvoyFilter wrapping envoy.filters.http.oauth2 (per-host redirect) ---
-# GATEWAY_REDIRECT_URIS=$(jq -nc \
-#   '["https://argocd.platform.yu-min3.com/oauth2/callback",
-#     "https://grafana.platform.yu-min3.com/oauth2/callback",
-#     "https://backstage.platform.yu-min3.com/oauth2/callback",
-#     "https://vault.platform.yu-min3.com/oauth2/callback",
-#     "https://prometheus.platform.yu-min3.com/oauth2/callback",
-#     "https://hubble.platform.yu-min3.com/oauth2/callback",
-#     "https://longhorn.platform.yu-min3.com/oauth2/callback"]')
-# GATEWAY_WEB_ORIGINS=$(jq -nc '["https://argocd.platform.yu-min3.com", "https://grafana.platform.yu-min3.com", "https://backstage.platform.yu-min3.com"]')
-# ensure_oidc_client \
-#   "istio-gateway-platform" \
-#   "Istio Gateway Platform OIDC" \
-#   "Phase 1 Gateway-level OIDC for *.platform.yu-min3.com (Path B: EnvoyFilter)" \
-#   "$GATEWAY_REDIRECT_URIS" \
-#   "$GATEWAY_WEB_ORIGINS" \
-#   "https://argocd.platform.yu-min3.com" > /dev/null
-#
-# --- Path C: 各 service の native OIDC ---
-# Per-service なので istio-gateway-platform client は作らない。
-# argocd / grafana / backstage / vault それぞれに個別 client を作る。
-# Phase C 採用時はこのスクリプトに以下を追加:
-#   ensure_oidc_client "argocd" ... ; ensure_oidc_client "grafana" ... ; ...
+# === Istio Gateway OIDC client (Phase 1) — ADR-010 で Path A 採択 ===
+# oauth2-proxy 経由で gateway-platform 配下の全 host を保護する。
+# redirectUris は oauth2-proxy 自身の callback URL 1 本のみ
+# (cookie domain .platform.yu-min3.com で全 host SSO 化、各 host への
+# 個別 redirectUris 登録は不要)。
+OAUTH2_PROXY_HOST="oauth2-proxy.platform.yu-min3.com"
+GATEWAY_REDIRECT_URIS=$(jq -nc \
+  --arg cb "https://$OAUTH2_PROXY_HOST/oauth2/callback" \
+  '[$cb]')
+GATEWAY_WEB_ORIGINS=$(jq -nc --arg origin "https://$OAUTH2_PROXY_HOST" '[$origin]')
+GATEWAY_CLIENT_UUID=$(ensure_oidc_client \
+  "istio-gateway-platform" \
+  "Istio Gateway Platform OIDC" \
+  "Phase 1 Gateway-level OIDC for *.platform.yu-min3.com (oauth2-proxy)" \
+  "$GATEWAY_REDIRECT_URIS" \
+  "$GATEWAY_WEB_ORIGINS" \
+  "https://$OAUTH2_PROXY_HOST")
 
 # === Vault client_secret 取得 ===
 echo ""
@@ -331,6 +306,25 @@ DiscoveryURL: https://auth.platform.yu-min3.com/realms/$REALM
 Created by: bootstrap/keycloak/setup.sh"
 save_bw "$BW_CLIENT_ITEM" "$CLIENT_ID" "$CLIENT_SECRET" "$CLIENT_NOTES"
 
+# === Istio Gateway client_secret 取得 + Bitwarden 保存 ===
+echo ""
+echo "==> Fetching istio-gateway-platform client_secret..."
+GATEWAY_CLIENT_SECRET=$(kcadm get "clients/$GATEWAY_CLIENT_UUID/client-secret" -r "$REALM" 2>/dev/null \
+  | jq -r '.value')
+if [ -z "$GATEWAY_CLIENT_SECRET" ] || [ "$GATEWAY_CLIENT_SECRET" = "null" ]; then
+  echo "ERROR: istio-gateway-platform client_secret が取れない"; exit 1
+fi
+echo "    gateway client_secret 取得 OK (${GATEWAY_CLIENT_SECRET:0:8}...)"
+
+GATEWAY_NOTES="Istio Gateway Platform OIDC client (Phase 1 Gateway-level auth).
+Realm: $REALM
+ClientID: istio-gateway-platform
+DiscoveryURL: https://auth.platform.yu-min3.com/realms/$REALM
+Used by: oauth2-proxy in auth-system namespace
+Created by: bootstrap/keycloak/setup.sh"
+save_bw "kensan-lab/keycloak/oidc-client-istio-gateway-platform" \
+  "istio-gateway-platform" "$GATEWAY_CLIENT_SECRET" "$GATEWAY_NOTES"
+
 if [ -n "${USER_PW:-}" ]; then
   USER_NOTES="Keycloak user for kensan realm.
 Realm: $REALM
@@ -357,3 +351,13 @@ echo "       keycloak_oidc_discovery_url = \"https://auth.platform.yu-min3.com/r
 echo "       keycloak_oidc_client_id     = \"$CLIENT_ID\""
 echo "       keycloak_oidc_client_secret = \"<bw get item $BW_CLIENT_ITEM | jq -r .login.password>\""
 echo "    4. cd bootstrap/vault && terraform init && terraform apply"
+echo ""
+echo "==> 次のステップ (Gateway OIDC / oauth2-proxy):"
+echo "    1. cookie_secret を生成: COOKIE=\$(openssl rand -base64 32 | tr -d '\\n')"
+echo "    2. Vault に投入:"
+echo "       vault kv put secret/platform-auth/istio-gateway/platform \\"
+echo "         client-id=istio-gateway-platform \\"
+echo "         client-secret=\$(bw get item kensan-lab/keycloak/oidc-client-istio-gateway-platform | jq -r .login.password) \\"
+echo "         cookie-secret=\"\$COOKIE\""
+echo "    3. ArgoCD で oauth2-proxy Application を sync (auto sync 有効なら自動)"
+echo "    4. ExternalSecret 経由で auth-system/oauth2-proxy-secret 作成確認"
