@@ -77,11 +77,16 @@ resource "vault_jwt_auth_backend_role" "platform_dev" {
 # =============================================================================
 
 # vault-config-operator が VCO admin policy を取得するための role
+# VCO は CR の spec.authentication.serviceAccount に基づいて TokenRequest API で
+# 短命 token を発行し Vault に login する。SA は CR と同じ K8s ns から取られる。
+# 本リポジトリは VCO CR (Policy / SecretEngineMount / DatabaseSecretEngineConfig 等)
+# を vault ns に置く方針なので、bound SA は vault:default に揃える。
+# VCO Pod 自身 (controller-manager:vault-config-operator) は Vault に直接 login しない。
 resource "vault_kubernetes_auth_backend_role" "vault_config_operator" {
   backend                          = vault_auth_backend.kubernetes.path
   role_name                        = "vault-config-operator"
   bound_service_account_names      = ["default"]
-  bound_service_account_namespaces = ["vault-config-operator"]
+  bound_service_account_namespaces = ["vault"]
   token_policies                   = [vault_policy.vco_admin.name]
   token_ttl                        = 3600  # 1h
   token_max_ttl                    = 86400 # 24h

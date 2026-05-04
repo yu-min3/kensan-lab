@@ -80,3 +80,13 @@ app ns 側 SA と vault ns 側 KubernetesAuthEngineRole の両方で同名を使
 {{- define "vdbe.saName" -}}
 {{- printf "vault-db-%s" (include "vdbe.basename" .) -}}
 {{- end -}}
+
+{{/*
+vcoAuth: VCO が Vault に login する際の認証 block
+本 chart が render する VCO CR (DatabaseSecretEngineConfig 等) すべてが共通で使う。
+spec.authentication.serviceAccount は省略 = CR と同じ ns の "default" SA が使われる。
+*/}}
+{{- define "vdbe.vcoAuth" -}}
+path: kubernetes
+role: {{ .Values.vcoAuthRole }}
+{{- end -}}

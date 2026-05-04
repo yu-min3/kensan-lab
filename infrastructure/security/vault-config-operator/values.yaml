@@ -64,9 +64,7 @@ serviceMonitor:
   additionalLabels:
     release: prometheus
 
-# ServiceAccount: Vault の K8s auth role と bind するため固定名で create
-# Bootstrap TF の vault_kubernetes_auth_backend_role.vault_config_operator が
-# bound_service_account_names を "default" に、namespaces を "vault-config-operator" に設定
-serviceAccount:
-  create: true
-  name: default
+# ServiceAccount: chart は serviceAccount.name 値を honor せず、Pod は固定で
+# "controller-manager" SA で起動される (chart hardcode、values 上書き不可)。
+# ただし VCO Pod 自身は Vault に login しない設計 — Vault auth は CR の
+# spec.authentication 経由で per-CR の SA (本 repo では vault:default) を使う。
