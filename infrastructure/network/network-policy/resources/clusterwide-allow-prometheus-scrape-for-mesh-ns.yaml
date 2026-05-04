@@ -1,0 +1,29 @@
+## ADR-009 後続: per-ns `allow-prometheus-scrape` NetworkPolicy を CCNP に集約
+##
+## istio-injection: enabled ラベルが付いた全 ns の pod に対して、
+## monitoring ns (Prometheus) からの ingress を全 port 許可する。
+## ports 全許可は per-ns NP の挙動と同等 (Prometheus は workload ごとに
+## 異なる metrics port を scrape するため絞らない: 8080 / 9090 / 9100 /
+## 15020 envoy stats / etc.)。
+##
+## 元々 allow-istio-for-mesh-ns 導入で各 ns が Cilium 的に
+## "explicit allow only" モードに切り替わったため、各 ns に
+## allow-prometheus-scrape NP を個別に置いていた。これを CCNP に集約する。
+##
+## 既存の per-ns allow-prometheus-scrape NP は別 PR で削除する。
+##
+## 対象外 (istio-injection 無しなので per-ns NP のまま):
+##   - kensan-data / cert-manager / cloudflare-tunnel
+apiVersion: cilium.io/v2
+kind: CiliumClusterwideNetworkPolicy
+metadata:
+  name: allow-prometheus-scrape-for-mesh-ns
+spec:
+  description: "All namespaces with istio-injection=enabled may be scraped by Prometheus in monitoring ns"
+  endpointSelector:
+    matchLabels:
+      k8s:io.cilium.k8s.namespace.labels.istio-injection: enabled
+  ingress:
+    - fromEndpoints:
+        - matchLabels:
+            k8s:io.kubernetes.pod.namespace: monitoring

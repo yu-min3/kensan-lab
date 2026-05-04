@@ -1,36 +1,6 @@
-## Default deny all ingress and egress
-apiVersion: networking.k8s.io/v1
-kind: NetworkPolicy
-metadata:
-  name: default-deny-all
-  namespace: vault
-spec:
-  podSelector: {}
-  policyTypes:
-    - Ingress
-    - Egress
-
----
-## Allow DNS resolution (kube-system)
-apiVersion: networking.k8s.io/v1
-kind: NetworkPolicy
-metadata:
-  name: allow-dns
-  namespace: vault
-spec:
-  podSelector: {}
-  policyTypes:
-    - Egress
-  egress:
-    - to:
-        - namespaceSelector:
-            matchLabels:
-              kubernetes.io/metadata.name: kube-system
-      ports:
-        - protocol: UDP
-          port: 53
-        - protocol: TCP
-          port: 53
+## ADR-009 後続: default-deny-all / allow-dns / allow-prometheus-scrape は
+## CCNP (default-deny-for-mesh-ns / allow-dns-for-mesh-ns /
+## allow-prometheus-scrape-for-mesh-ns) に集約済み
 
 ---
 ## Allow intra-namespace communication (Raft peer 通信は port 8201、API は 8200)
@@ -115,26 +85,6 @@ spec:
         - namespaceSelector:
             matchLabels:
               kubernetes.io/metadata.name: vault-config-operator
-      ports:
-        - protocol: TCP
-          port: 8200
-
----
-## Allow Prometheus scraping from monitoring namespace
-apiVersion: networking.k8s.io/v1
-kind: NetworkPolicy
-metadata:
-  name: allow-prometheus-scrape
-  namespace: vault
-spec:
-  podSelector: {}
-  policyTypes:
-    - Ingress
-  ingress:
-    - from:
-        - namespaceSelector:
-            matchLabels:
-              kubernetes.io/metadata.name: monitoring
       ports:
         - protocol: TCP
           port: 8200
