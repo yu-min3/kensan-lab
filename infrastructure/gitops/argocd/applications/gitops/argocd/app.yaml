@@ -17,10 +17,10 @@ spec:
         valueFiles:
           - $values/infrastructure/gitops/argocd/values.yaml
     - repoURL: https://github.com/yu-min3/kensan-lab
-      targetRevision: HEAD
+      targetRevision: main
       ref: values
     - repoURL: https://github.com/yu-min3/kensan-lab
-      targetRevision: HEAD
+      targetRevision: main
       path: infrastructure/gitops/argocd/resources
 
   destination:

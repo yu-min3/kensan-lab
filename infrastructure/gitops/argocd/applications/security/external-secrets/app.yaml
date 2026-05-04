@@ -19,10 +19,10 @@ spec:
         valueFiles:
           - $values/infrastructure/security/external-secrets/values.yaml
     - repoURL: https://github.com/yu-min3/kensan-lab
-      targetRevision: HEAD
+      targetRevision: main
       ref: values
     - repoURL: https://github.com/yu-min3/kensan-lab
-      targetRevision: HEAD
+      targetRevision: main
       path: infrastructure/security/external-secrets/resources
 
   destination:

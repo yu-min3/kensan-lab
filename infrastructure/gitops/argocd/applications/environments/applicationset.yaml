@@ -22,7 +22,7 @@ spec:
       project: platform-project
       source:
         repoURL: https://github.com/yu-min3/kensan-lab
-        targetRevision: HEAD
+        targetRevision: main
         path: 'infrastructure/environments/{{ .dirName }}'
         directory:
           exclude: 'config.json'

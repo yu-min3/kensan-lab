@@ -10,7 +10,7 @@ spec:
 
   source:
     repoURL: https://github.com/yu-min3/kensan-lab
-    targetRevision: HEAD
+    targetRevision: main
     path: infrastructure/network/cloudflare-tunnel/resources
 
   destination:
