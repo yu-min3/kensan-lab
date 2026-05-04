@@ -11,7 +11,7 @@
 #   would be needed).
 #
 # Reference: https://www.envoyproxy.io/docs/envoy/latest/configuration/http/http_filters/oauth2_filter
-apiVersion: networking.istio.io/v1
+apiVersion: networking.istio.io/v1alpha3
 kind: EnvoyFilter
 metadata:
   name: gateway-platform-oauth2
