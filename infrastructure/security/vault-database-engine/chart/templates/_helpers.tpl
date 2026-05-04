@@ -71,3 +71,12 @@ default = "<name>-cred" (e.g., postgres-backstage-cred)
 {{- define "vdbe.targetSecretName" -}}
 {{- .Values.targetSecretName | default (printf "%s-cred" (include "vdbe.name" .)) -}}
 {{- end -}}
+
+{{/*
+saName: ESO が Vault auth に使う SA 名 (= Vault kubernetes auth role 名)
+完全 convention 化: vault-db-<basename>
+app ns 側 SA と vault ns 側 KubernetesAuthEngineRole の両方で同名を使う
+*/}}
+{{- define "vdbe.saName" -}}
+{{- printf "vault-db-%s" (include "vdbe.basename" .) -}}
+{{- end -}}

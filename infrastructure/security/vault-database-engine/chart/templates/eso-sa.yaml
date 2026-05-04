@@ -1,0 +1,9 @@
+## ESO 用 ServiceAccount (app ns 側)
+## VaultDynamicSecret は namespace-scoped CR で serviceAccountRef.namespace が無視されるため、
+## SA は VaultDynamicSecret と同じ ns (= app ns) に置く必要がある。
+## Vault kubernetes auth role (vault-auth-role.yaml) がこの SA を bound して短命 token を発行する。
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: {{ include "vdbe.saName" . }}
+  namespace: {{ .Values.ns }}

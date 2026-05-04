@@ -1,0 +1,22 @@
+## Vault Kubernetes Auth Role (vault ns、VCO 管理)
+## app ns 側 SA (vault-db-<basename>) を Vault に bind し、
+## eso-read policy (database/creds/* read) を付与する。
+## VaultDynamicSecret はこの role 名を spec.provider.auth.kubernetes.role で指定する。
+apiVersion: redhatcop.redhat.io/v1alpha1
+kind: KubernetesAuthEngineRole
+metadata:
+  name: {{ include "vdbe.saName" . }}
+  namespace: {{ .Values.vaultNamespace }}
+spec:
+  authentication:
+    path: kubernetes
+    role: {{ .Values.vcoAuthRole }}
+  path: kubernetes
+  name: {{ include "vdbe.saName" . }}
+  policies:
+    - eso-read
+  targetServiceAccounts:
+    - {{ include "vdbe.saName" . }}
+  targetNamespaces:
+    targetNamespaces:
+      - {{ .Values.ns }}
