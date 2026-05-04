@@ -7,8 +7,8 @@ resources:
 - namespace.yaml
 - ../../base
 - httproute.yaml
-- postgresql-sealed-secret.yaml
-- keycloak-sealed-secret.yaml
+- postgresql-external-secret.yaml
+- keycloak-external-secret.yaml
 
 patches:
 - path: keycloak-patch.yaml
