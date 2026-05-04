@@ -1,0 +1,35 @@
+## kube-system namespace の label/PSA 管理専用 app (旧 system-infra app の後継)
+## sync-wave -4: 旧 system-infra app からの ownership transfer のため、ApplicationSet の
+## kensan tenants reconcile 前に先 sync させて ServerSideApply で tracking-id を上書きする
+## (#246/#247 と同じパターン)
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: kube-system
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "-4"
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: platform-project
+  source:
+    repoURL: https://github.com/yu-min3/kensan-lab
+    targetRevision: main
+    path: infrastructure/kube-system
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: kube-system
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=false
+      - ServerSideApply=true
+    retry:
+      limit: 5
+      backoff:
+        duration: 5s
+        factor: 2
+        maxDuration: 3m

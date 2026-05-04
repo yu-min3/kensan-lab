@@ -7,3 +7,5 @@ metadata:
     kensan-lab.platform/environment: infrastructure
     kensan-lab.platform/tier: platform
     kensan-lab.platform/component: observability
+    pod-security.kubernetes.io/enforce: baseline
+    pod-security.kubernetes.io/warn: restricted
