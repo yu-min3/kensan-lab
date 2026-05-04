@@ -29,3 +29,12 @@ configs:
         - .spec.data[].remoteRef.decodingStrategy
         - .spec.data[].remoteRef.metadataPolicy
         - .spec.data[].remoteRef.nullBytePolicy
+    # 全 resource 共通で ignore: helm chart / kubeseal が template に出力する
+    # `creationTimestamp: null` や K8s API が server 側で書く `.status` 系。
+    # ServerSideDiff だけだと拾いきれない drift をここで畳む。
+    resource.customizations.ignoreDifferences.all: |
+      jqPathExpressions:
+        - .metadata.creationTimestamp
+        - .spec.template.metadata.creationTimestamp
+        - .spec.volumeClaimTemplates[]?.metadata.creationTimestamp
+        - .status
