@@ -76,6 +76,11 @@ config:
     oidc_issuer_url                = "https://auth.platform.yu-min3.com/realms/kensan"
     insecure_oidc_allow_unverified_email = false
 
+    # Email domain — chart の `emailDomains` 値は configFile を渡したとき
+    # 無視される (configFile が優先) ため、ここに直接書く必要がある。
+    # group 認可は Istio AuthorizationPolicy 側でやるので "*" で受ける。
+    email_domains                  = ["*"]
+
     # Cookie 設定 — .platform.yu-min3.com 全 host で 1 session 共有 (SSO の核)
     cookie_domains                 = [".platform.yu-min3.com"]
     cookie_samesite                = "lax"

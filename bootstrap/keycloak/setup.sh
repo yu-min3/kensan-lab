@@ -365,8 +365,12 @@ vault_populate_gateway_kv() {
     cookie="$existing_cookie"
     echo "    cookie-secret: 既存値を流用"
   else
-    cookie=$(openssl rand -base64 32 | tr -d '\n')
-    echo "    cookie-secret: 新規生成"
+    # oauth2-proxy は AES key として 16/24/32 byte を要求。先に URL-safe base64
+    # decode を試み、長さ一致したら raw bytes として使う動作のため、URL-safe
+    # アルファベット (-_) で出力する必要がある。標準アルファベット (+/) だと
+    # decode 失敗 → 入力文字列 (44 byte) が raw 扱いされ AES key 長違反で起動失敗。
+    cookie=$(openssl rand -base64 32 | tr '+/' '-_' | tr -d '=' | tr -d '\n')
+    echo "    cookie-secret: 新規生成 (URL-safe base64)"
   fi
 
   vault kv put "$GATEWAY_VAULT_PATH" \
@@ -390,7 +394,7 @@ print_gateway_vault_manual() {
     vault login -method=oidc
 
     # 1. 各 secret 用意
-    COOKIE=\$(openssl rand -base64 32 | tr -d '\\n')
+    COOKIE=\$(openssl rand -base64 32 | tr '+/' '-_' | tr -d '=' | tr -d '\\n')   # URL-safe
     CSEC=\$(bw get item kensan-lab/keycloak/oidc-client-istio-gateway-platform | jq -r .login.password)
 
     # 2. Vault に投入
