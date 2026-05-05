@@ -51,7 +51,11 @@ todo.txt
 backend/bin/
 backend/*.exe
 backend/*-service
-backend/cmd
+# 旧ルール `backend/cmd` は backend/cmd/ ディレクトリ全体を巻き込んでしまうため
+# (例: cmd/encrypt-users-name/) より限定的なパターンに置き換え。binary の場所は
+# backend/bin/ 経由運用なのでこの行は実質不要だが、安全のため明示。
+/backend/cmd/*.bin
+/backend/cmd/*.exe
 
 # Go
 backend/tmp/
