@@ -1,0 +1,58 @@
+# gateway-platform 配下の host を 3 カテゴリに分けて ALLOW する単一 policy。
+# 本 policy が gateway-platform に bound されると、ここで列挙されてない host は
+# 暗黙 deny される (Istio AuthorizationPolicy の挙動)。新 host 追加時は
+# 該当 rule の hosts: に追記する。
+#
+# Category 1 (bypass): app 自身の auth に委ねる。Vault は Vault token、ArgoCD は
+# 自前 JWT、Keycloak は自分自身、oauth2-proxy は callback path のため認証不要。
+# この rule は claim 検査なし → JWT が無くても通る。CLI も通る。
+#
+# Category 2 (admin + dev): 普段使いの UI 群。Keycloak group が
+# platform-admin / platform-dev のどちらかなら通る。
+#
+# Category 3 (admin only): 強い権限が必要な UI。platform-admin のみ通る。
+apiVersion: security.istio.io/v1
+kind: AuthorizationPolicy
+metadata:
+  name: gateway-platform-allow
+  namespace: istio-system
+spec:
+  targetRef:
+    group: gateway.networking.k8s.io
+    kind: Gateway
+    name: gateway-platform
+  action: ALLOW
+  rules:
+    # === Category 1: app-native auth (gateway は素通し) ===
+    - to:
+        - operation:
+            hosts:
+              - auth.platform.yu-min3.com
+              - auth-dev.platform.yu-min3.com
+              - oauth2-proxy.platform.yu-min3.com
+              - vault.platform.yu-min3.com
+              - argocd.platform.yu-min3.com
+
+    # === Category 2: oauth2-proxy 強制 + admin or dev ===
+    - to:
+        - operation:
+            hosts:
+              - backstage.platform.yu-min3.com
+              - grafana.platform.yu-min3.com
+              - prometheus.platform.yu-min3.com
+      when:
+        - key: request.auth.claims[groups]
+          values:
+            - platform-admin
+            - platform-dev
+
+    # === Category 3: oauth2-proxy 強制 + admin only ===
+    - to:
+        - operation:
+            hosts:
+              - hubble.platform.yu-min3.com
+              - longhorn.platform.yu-min3.com
+      when:
+        - key: request.auth.claims[groups]
+          values:
+            - platform-admin
