@@ -128,13 +128,14 @@ Keep gateway-level Authorization at host/IP level (or none). Each service does i
 
 ## Implementation in This PR
 
-This PR commits only **path-independent** scaffolding:
+After Path A was selected, this PR delivers the **deploy-layer** only:
 
-1. Keycloak `setup.sh` extended with a parameterized OIDC client function. The `istio-gateway-platform` client is added but with `redirectUris` left as a placeholder (`__TBD_BY_PATH__`) so the client cannot complete a redirect until Yu picks a path and amends.
-2. `RequestAuthentication` and `AuthorizationPolicy` template YAML in `infrastructure/network/istio/oidc-foundation/` — but **NOT included in any ArgoCD `Application` source path**. They are reference scaffolding that must be moved into a synced location (or pointed to by a new Application CR) once the path is chosen.
-3. ADR-010 (this file) and ADR-005 status update.
+1. `bootstrap/keycloak/setup.sh` extended with a parameterized OIDC client function and an active `istio-gateway-platform` client whose `redirectUris=[https://oauth2-proxy.platform.yu-min3.com/oauth2/callback]`. Vault KV population (`secret/platform-auth/istio-gateway/platform`) is bundled into the same script.
+2. `meshConfig.extensionProviders` entry registering oauth2-proxy as `envoy_ext_authz_http` in `infrastructure/network/istio/istiod/values.yaml`.
+3. oauth2-proxy Helm multi-source app under `infrastructure/security/oauth2-proxy/` (replicaCount 2 + PDB, ExternalSecret backed by the Vault KV path above).
+4. ADR-010 (this file) status updated to Decided: Path A. ADR-005 marked Re-evaluation Required.
 
-Nothing in this PR causes runtime behavior change.
+`RequestAuthentication` and the three-tier `AuthorizationPolicy` set (deny-all + ALLOW + CUSTOM) are intentionally deferred to follow-up PRs. Because no AuthZ policy binds the provider in this PR, runtime behavior is unchanged.
 
 ## Consequences
 

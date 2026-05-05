@@ -102,17 +102,18 @@ Gateway 層 OIDC 諦め。各 service の native OIDC（ArgoCD / Grafana / Backs
 
 ## 本 PR の実装範囲
 
-本 PR は path-independent な scaffolding のみ commit する:
+ADR-010 採択後の本 PR (Path A: oauth2-proxy via envoy_ext_authz_http) は以下を含む:
 
-1. `bootstrap/keycloak/setup.sh` を OIDC client 関数化 (refactor)。`istio-gateway-platform` client の追加スタンザは Path 別にコメントアウトで併記。Yu が Path 確定後に該当ブロックを uncomment して再実行。
-2. `RequestAuthentication` / `AuthorizationPolicy` 雛形 YAML を `docs/auth/gateway-oidc-foundation/` に配置 — どの ArgoCD Application source にも含まれない、純然たる reference。Path 確定後に同期 path に `git mv` する。
-3. ADR-010 (本書) と ADR-005 status 更新。
+1. `bootstrap/keycloak/setup.sh` を OIDC client 関数化 + `istio-gateway-platform` client 作成を Path A 仕様で activate (`redirectUris=[https://oauth2-proxy.platform.yu-min3.com/oauth2/callback]`)。Vault KV 投入も同 script に bundle。
+2. `infrastructure/network/istio/istiod/values.yaml` の `meshConfig.extensionProviders` に oauth2-proxy entry を登録。
+3. `infrastructure/security/oauth2-proxy/` に Helm multi-source app (replicaCount 2 + PDB、ExternalSecret 経由 Vault KV)。
+4. ADR-010 (本書) status を Decided: Path A に更新、ADR-005 を Re-evaluation Required に更新。
 
-ランタイム挙動の変更はゼロ。
+`RequestAuthentication` / `AuthorizationPolicy` (deny-all + ALLOW + CUSTOM) は後続 PR で投入。本 PR では provider 登録 + deploy のみで、AuthZ binding がない以上ランタイム挙動の変更はゼロ。
 
 ## 参照
 
-- ADR-002, ADR-005, [foundation README](../../auth/gateway-oidc-foundation/README.md)
+- ADR-002, ADR-005
 - [Istio API repo (release-1.27): config.proto](https://github.com/istio/api/blob/release-1.27/mesh/v1alpha1/config.proto)
 - [Envoy: HTTP OAuth2 filter](https://www.envoyproxy.io/docs/envoy/latest/configuration/http/http_filters/oauth2_filter)
 - [Istio: External Authorization](https://istio.io/latest/docs/tasks/security/authorization/authz-custom/)
