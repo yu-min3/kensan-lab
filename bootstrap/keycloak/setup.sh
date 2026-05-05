@@ -192,7 +192,7 @@ ensure_oidc_client() {
     | jq -r '.[0].id // empty' || true)
 
   if [ -n "$uuid" ] && [ "$uuid" != "null" ]; then
-    echo "    client '$cid' already exists (id: $uuid), skip create" >&2
+    echo "    client '$cid' already exists (id: $uuid)" >&2
   else
     kcadm create clients -r "$REALM" \
       -s "clientId=$cid" \
@@ -223,6 +223,14 @@ ensure_oidc_client() {
     echo "    groups mapper added" >&2
   fi
 
+  # script を SSoT として、redirectUris / webOrigins / post-logout を毎回 update。
+  # Keycloak UI で手動編集した内容は上書きされる (script が正)。
+  echo "    syncing redirectUris / webOrigins / post-logout (script is SSoT)" >&2
+  kcadm update "clients/$uuid" -r "$REALM" \
+    -s "redirectUris=$redirect_uris_json" \
+    -s "webOrigins=$web_origins_json" \
+    -s "attributes.\"post.logout.redirect.uris\"=$post_logout_uri" > /dev/null
+
   echo "$uuid"
 }
 
@@ -241,23 +249,32 @@ CLIENT_UUID=$(ensure_oidc_client \
   "$VAULT_WEB_ORIGINS" \
   "https://$VAULT_HOSTNAME")
 
-# === Istio Gateway OIDC client (Phase 1) — ADR-010 で Path A 採択 ===
-# oauth2-proxy 経由で gateway-platform 配下の全 host を保護する。
-# redirectUris は oauth2-proxy 自身の callback URL 1 本のみ
-# (cookie domain .platform.yu-min3.com で全 host SSO 化、各 host への
-# 個別 redirectUris 登録は不要)。
-OAUTH2_PROXY_HOST="oauth2-proxy.platform.yu-min3.com"
-GATEWAY_REDIRECT_URIS=$(jq -nc \
-  --arg cb "https://$OAUTH2_PROXY_HOST/oauth2/callback" \
-  '[$cb]')
-GATEWAY_WEB_ORIGINS=$(jq -nc --arg origin "https://$OAUTH2_PROXY_HOST" '[$origin]')
+# === Istio Gateway OIDC client (Phase 2) — ADR-010 Path A + AuthZ binding ===
+# oauth2-proxy が Keycloak へ redirect する際の redirect_uri は、
+# request 元 host の `/oauth2/callback` になる (cookie_domain で
+# .platform.yu-min3.com 横断で session 共有しつつ、callback は host ごと)。
+# したがって全 protected host を Keycloak に登録する必要がある。
+# 新 protected host を追加するときは `GATEWAY_PROTECTED_HOSTS` に追記して
+# script を再実行する (ensure_oidc_client が既存 client を update する)。
+GATEWAY_PROTECTED_HOSTS=(
+  backstage.platform.yu-min3.com
+  grafana.platform.yu-min3.com
+  prometheus.platform.yu-min3.com
+  hubble.platform.yu-min3.com
+  longhorn.platform.yu-min3.com
+)
+GATEWAY_REDIRECT_URIS=$(printf '%s\n' "${GATEWAY_PROTECTED_HOSTS[@]}" \
+  | jq -Rnc '[inputs | "https://\(.)/oauth2/callback"]')
+GATEWAY_WEB_ORIGINS=$(printf '%s\n' "${GATEWAY_PROTECTED_HOSTS[@]}" \
+  | jq -Rnc '[inputs | "https://\(.)"]')
+# post-logout は "+" で redirectUris を継承する Keycloak 特殊記法
 GATEWAY_CLIENT_UUID=$(ensure_oidc_client \
   "istio-gateway-platform" \
   "Istio Gateway Platform OIDC" \
-  "Phase 1 Gateway-level OIDC for *.platform.yu-min3.com (oauth2-proxy)" \
+  "Gateway-level OIDC for *.platform.yu-min3.com (oauth2-proxy ext_authz)" \
   "$GATEWAY_REDIRECT_URIS" \
   "$GATEWAY_WEB_ORIGINS" \
-  "https://$OAUTH2_PROXY_HOST")
+  "+")
 
 # === Vault client_secret 取得 ===
 echo ""
