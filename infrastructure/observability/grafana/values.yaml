@@ -51,6 +51,18 @@ grafana.ini:
   auth.anonymous:
     enabled: false
 
+  # auth.proxy mode: oauth2-proxy が gateway 段で OIDC 認証済みの場合に、
+  # Grafana は X-Auth-Request-User header を信頼してそのユーザとして扱う。
+  # これがないと oauth2-proxy が forward する Authorization: Bearer <Keycloak JWT>
+  # を Grafana が API key として解釈し "API key is invalid" で 403 を返す。
+  auth.proxy:
+    enabled: true
+    header_name: X-Auth-Request-User
+    header_property: username
+    auto_sign_up: true
+    headers: "Email:X-Auth-Request-Email Groups:X-Auth-Request-Groups"
+    enable_login_token: true
+
 # Timezone
 defaultDashboardsTimezone: Asia/Tokyo
 
