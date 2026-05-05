@@ -1,6 +1,6 @@
 # Secret Management
 
-このプラットフォームでは 3 つの方式で Secret を管理する。用途に応じて使い分ける。
+このプラットフォームでは 4 つの方式で Secret / 暗号鍵を管理する。用途に応じて使い分ける。
 
 ## 方式と使い分け
 
@@ -8,11 +8,13 @@
 |------|------|--------|-----------------|
 | **Vault dynamic (VDBE)** | Postgres app 接続 cred | TTL 24h / 12h rotation | Vault Database engine が動的生成 |
 | **Vault static (ESO)** | DB root cred / API key / 管理者 pw / 各種トークン | Vault に新値を書けば最大 1h で配布 | Vault KV v2 |
+| **Vault Transit** | DB に保存する PII の暗号鍵 (kensan `users.name`) | 手動 rotate (`vault write -f transit/keys/.../rotate`)、新規 encrypt は最新版で実行 | Vault Transit engine (鍵自体が Vault 内、ciphertext のみ DB) |
 | **SealedSecret** | Vault 自身の起動依存 / 内部 PKI / image pull token | 手動 (低頻度) | Git repo |
 
 ### 方針
 - 漏洩時の blast radius を最小化したい **Postgres app 接続 cred** → Vault dynamic
 - ローテが必要だが頻度低く、Vault が前提として動いていれば取得できる secret → Vault static (ESO)
+- **DB カラムに保存する PII (氏名など)** → Vault Transit (鍵をアプリ Pod / DB に降ろさない envelope 暗号化、Stage 6)
 - Vault 自身 / cert-manager / Cilium PKI など **Vault に依存できない低レイヤ** → SealedSecret
 
 ## Inventory
@@ -44,6 +46,27 @@
 | monitoring | grafana-admin | Grafana admin | Grafana UI |
 | platform-auth-{prod,dev} | keycloak-secret | KEYCLOAK_ADMIN_PASSWORD | Keycloak admin (KC_DB_* は dynamic 移行で削除済) |
 | platform-auth-{prod,dev} | postgresql-secret | POSTGRES_USER/PASSWORD/DB | Keycloak Postgres boot + VCO root |
+
+### Vault Transit (Stage 6, アプリ側で encrypt/decrypt API を直叩き)
+
+K8s Secret として配布する形式ではなく、アプリ Pod が Vault に **K8s SA auth で login → Transit API 直叩き** で encrypt / decrypt する。鍵自体は Vault 内に常駐し、Pod / DB のどこにも降りない。
+
+| ns | 鍵名 / mount | 用途 | アプリ |
+|---|---|---|---|
+| vault | `transit/keys/users-name` (aes256-gcm96) | kensan `users.name` カラム encryption + HMAC | kensan user-service (kensan-{prod,dev}) |
+
+設計詳細: [`infrastructure/security/vault-transit-engine/README.md`](https://github.com/yu-min3/kensan-lab/tree/main/infrastructure/security/vault-transit-engine)
+
+| 項目 | 値 |
+|---|---|
+| Auth role | `kensan-users-transit` (kubernetes auth method) |
+| bind 先 SA | `kensan-{prod,dev}/user-service` |
+| Policy | `kensan-users-transit` (transit/{encrypt,decrypt,hmac,rewrap}/users-name のみ) |
+| Token TTL | 30 min (アプリ側 renew loop で延長、max 1h) |
+| Key 作成 | `infrastructure/security/vault-transit-engine/temp/setup-transit-keys.sh` を 1 度だけ手動実行 |
+| Rotation | `vault write -f transit/keys/users-name/rotate` → アプリ側で `transit/rewrap` 経由で旧 ciphertext を更新 |
+
+VCO は TransitSecretEngine 系 CR を持たないため、mount + policy + auth role は GitOps、key 作成だけ手動 (1 度きり) のハイブリッド構成。
 
 ### SealedSecret (Vault に依存しない静的、ローテ頻度低)
 
@@ -124,3 +147,4 @@ EOF
 - Vault: [`infrastructure/security/vault/`](https://github.com/yu-min3/kensan-lab/tree/main/infrastructure/security/vault)
 - Vault Config Operator: [`infrastructure/security/vault-config-operator/`](https://github.com/yu-min3/kensan-lab/tree/main/infrastructure/security/vault-config-operator)
 - Vault Database engine + ESO 統合: [`infrastructure/security/vault-database-engine/`](https://github.com/yu-min3/kensan-lab/tree/main/infrastructure/security/vault-database-engine)
+- Vault Transit engine (Stage 6): [`infrastructure/security/vault-transit-engine/`](https://github.com/yu-min3/kensan-lab/tree/main/infrastructure/security/vault-transit-engine)
