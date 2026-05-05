@@ -10,6 +10,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/kensan/backend/services/user/internal"
 	sharedErrors "github.com/kensan/backend/shared/errors"
+	"github.com/kensan/backend/shared/vault"
 )
 
 var (
@@ -21,29 +22,40 @@ var (
 // Ensure PostgresRepository implements Repository interface
 var _ Repository = (*PostgresRepository)(nil)
 
-// PostgresRepository handles user data persistence with PostgreSQL
+// PostgresRepository handles user data persistence with PostgreSQL.
+//
+// users.name は Vault Transit で暗号化して name_enc (BYTEA, ciphertext) に保存し、
+// 検索性のため HMAC を name_hash (BYTEA) に保存する (Stage 6, Phase 1: 完全一致のみ)。
+// Service / Handler 層からは透過 — 既存 User.Name フィールドにアクセスするだけで
+// 自動的に encrypt/decrypt される。
 type PostgresRepository struct {
-	pool *pgxpool.Pool
+	pool      *pgxpool.Pool
+	encryptor vault.Encryptor
 }
 
-// NewPostgresRepository creates a new PostgreSQL user repository
-func NewPostgresRepository(pool *pgxpool.Pool) *PostgresRepository {
-	return &PostgresRepository{pool: pool}
+// NewPostgresRepository creates a new PostgreSQL user repository.
+//
+// encryptor で users.name の encrypt/decrypt/HMAC を行う。Vault が無い環境では
+// vault.NoOpEncryptor{} を渡せば passthrough で動く (dev のみ、prod では必ず
+// 本物の vault.Client を渡すこと)。
+func NewPostgresRepository(pool *pgxpool.Pool, encryptor vault.Encryptor) *PostgresRepository {
+	return &PostgresRepository{pool: pool, encryptor: encryptor}
 }
 
 // GetByID retrieves a user by ID
 func (r *PostgresRepository) GetByID(ctx context.Context, id string) (*user.User, error) {
 	query := `
-		SELECT id, email, name, password_hash, created_at, updated_at
+		SELECT id, email, name_enc, password_hash, created_at, updated_at
 		FROM users
 		WHERE id = $1
 	`
 
 	var u user.User
+	var nameEnc []byte
 	err := r.pool.QueryRow(ctx, query, id).Scan(
 		&u.ID,
 		&u.Email,
-		&u.Name,
+		&nameEnc,
 		&u.Password,
 		&u.CreatedAt,
 		&u.UpdatedAt,
@@ -55,22 +67,26 @@ func (r *PostgresRepository) GetByID(ctx context.Context, id string) (*user.User
 		return nil, err
 	}
 
+	if err := r.decryptName(ctx, nameEnc, &u); err != nil {
+		return nil, err
+	}
 	return &u, nil
 }
 
 // GetByEmail retrieves a user by email
 func (r *PostgresRepository) GetByEmail(ctx context.Context, email string) (*user.User, error) {
 	query := `
-		SELECT id, email, name, password_hash, created_at, updated_at
+		SELECT id, email, name_enc, password_hash, created_at, updated_at
 		FROM users
 		WHERE email = $1
 	`
 
 	var u user.User
+	var nameEnc []byte
 	err := r.pool.QueryRow(ctx, query, email).Scan(
 		&u.ID,
 		&u.Email,
-		&u.Name,
+		&nameEnc,
 		&u.Password,
 		&u.CreatedAt,
 		&u.UpdatedAt,
@@ -82,6 +98,9 @@ func (r *PostgresRepository) GetByEmail(ctx context.Context, email string) (*use
 		return nil, err
 	}
 
+	if err := r.decryptName(ctx, nameEnc, &u); err != nil {
+		return nil, err
+	}
 	return &u, nil
 }
 
@@ -96,15 +115,21 @@ func (r *PostgresRepository) Create(ctx context.Context, u *user.User) error {
 	u.CreatedAt = now
 	u.UpdatedAt = now
 
+	nameEnc, nameHash, err := r.encryptName(ctx, u.Name)
+	if err != nil {
+		return err
+	}
+
 	query := `
-		INSERT INTO users (id, email, name, password_hash, created_at, updated_at)
-		VALUES ($1, $2, $3, $4, $5, $6)
+		INSERT INTO users (id, email, name_enc, name_hash, password_hash, created_at, updated_at)
+		VALUES ($1, $2, $3, $4, $5, $6, $7)
 	`
 
-	_, err := r.pool.Exec(ctx, query,
+	_, err = r.pool.Exec(ctx, query,
 		u.ID,
 		u.Email,
-		u.Name,
+		nameEnc,
+		nameHash,
 		u.Password,
 		u.CreatedAt,
 		u.UpdatedAt,
@@ -125,16 +150,22 @@ func (r *PostgresRepository) Create(ctx context.Context, u *user.User) error {
 func (r *PostgresRepository) Update(ctx context.Context, u *user.User) error {
 	u.UpdatedAt = time.Now()
 
+	nameEnc, nameHash, err := r.encryptName(ctx, u.Name)
+	if err != nil {
+		return err
+	}
+
 	query := `
 		UPDATE users
-		SET email = $2, name = $3, password_hash = $4, updated_at = $5
+		SET email = $2, name_enc = $3, name_hash = $4, password_hash = $5, updated_at = $6
 		WHERE id = $1
 	`
 
 	result, err := r.pool.Exec(ctx, query,
 		u.ID,
 		u.Email,
-		u.Name,
+		nameEnc,
+		nameHash,
 		u.Password,
 		u.UpdatedAt,
 	)
@@ -146,6 +177,39 @@ func (r *PostgresRepository) Update(ctx context.Context, u *user.User) error {
 		return ErrUserNotFound
 	}
 
+	return nil
+}
+
+// encryptName encrypts u.Name with Vault Transit and computes its HMAC.
+// Returns ciphertext bytes (BYTEA) and HMAC bytes (BYTEA) ready for SQL.
+//
+// users.name is required (CHECK NOT NULL upstream), so empty plaintext is an
+// invariant violation — but to keep this layer defensive we surface the error
+// from the encryptor (NoOpEncryptor / *Client both reject empty input).
+func (r *PostgresRepository) encryptName(ctx context.Context, name string) (enc, hmac []byte, err error) {
+	ct, err := r.encryptor.Encrypt(ctx, []byte(name))
+	if err != nil {
+		return nil, nil, err
+	}
+	hm, err := r.encryptor.HMAC(ctx, []byte(name))
+	if err != nil {
+		return nil, nil, err
+	}
+	return []byte(ct), []byte(hm), nil
+}
+
+// decryptName decrypts the BYTEA column into u.Name. nil/empty bytea is treated
+// as empty name (legitimate transitional state during migration backfill).
+func (r *PostgresRepository) decryptName(ctx context.Context, enc []byte, u *user.User) error {
+	if len(enc) == 0 {
+		u.Name = ""
+		return nil
+	}
+	pt, err := r.encryptor.Decrypt(ctx, string(enc))
+	if err != nil {
+		return err
+	}
+	u.Name = string(pt)
 	return nil
 }
 
