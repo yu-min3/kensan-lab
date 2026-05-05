@@ -113,10 +113,12 @@ config:
     real_client_ip_header          = "X-Forwarded-For"
 
     # ext_authz mode の upstream 必須: 認証成功時 oauth2-proxy が upstream へ
-    # forward しようとして無いと 404 を返す。static://202 で「認証成功 = 202
-    # Accepted を返してそのまま終了」させる。Istio ext_authz が 202 を見て
-    # request を実 upstream (Grafana 等) に流す。
-    upstreams                      = ["static://202"]
+    # forward しようとして無いと 404 を返す。static://200 で「認証成功 = 200
+    # OK を返してそのまま終了」させる。
+    # 重要: Istio ext_authz は HTTP 200 のみ「allow」と認識する仕様 (202 だと
+    # deny 扱いで oauth2-proxy の static response body "Authenticated" が
+    # client に返ってしまう)。oauth2-proxy upstream docs の標準例も 200。
+    upstreams                      = ["static://200"]
 
     # IdP 1 種類だけなので "Sign in with Keycloak" ボタン省略
     skip_provider_button           = true
