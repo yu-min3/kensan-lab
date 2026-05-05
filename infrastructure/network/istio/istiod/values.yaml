@@ -42,8 +42,11 @@ meshConfig:
           - x-forwarded-host
           - x-forwarded-proto
         # 認可後 (200) に upstream pod へ追加するヘッダ。アプリ側 fine 認可で使う。
+        # 注: `authorization` は **意図的に外してある**。Grafana 等の upstream が
+        # Keycloak JWT を「自分の API key じゃない」として 403 を返す問題を回避。
+        # Istio の RequestAuthentication は x-auth-request-access-token から JWT
+        # を読む設定にしてあり、upstream には Authorization を渡さない方針。
         headersToUpstreamOnAllow:
-          - authorization                # Bearer JWT (forwardOriginalToken と併用)
           - x-auth-request-user
           - x-auth-request-email
           - x-auth-request-groups

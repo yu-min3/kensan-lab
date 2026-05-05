@@ -1,18 +1,17 @@
-# gateway-platform に到達した HTTP request の Authorization: Bearer JWT を
-# Keycloak realm "kensan" の JWKS で検証する。
+# gateway-platform に到達した HTTP request の JWT を Keycloak realm "kensan"
+# の JWKS で検証する。
 #
 # 動作:
-# - oauth2-proxy が UI 経路で id_token を Authorization header に詰めて upstream へ
-#   forward する (set_authorization_header = true)。本 RA がそれを検証して
+# - oauth2-proxy が ext_authz check 通過後 X-Auth-Request-Access-Token header
+#   に access_token (JWT) を入れて upstream に渡す。本 RA がこれを検証して
 #   request.auth.claims を populate → AuthorizationPolicy ALLOW の `when` 句で
 #   groups claim を判定できるようになる。
+# - 標準の Authorization: Bearer header は **使わない** 設計。upstream app
+#   (Grafana の API key 解釈など) を誤って trigger するのを避けるため、
+#   oauth2-proxy 側で set_authorization_header=false にしてある。
 # - JWT が無い request (Vault CLI の X-Vault-Token、ArgoCD CLI の独自 JWT 等) は
 #   request.auth.claims が空のまま素通り。bypass host (vault/argocd 等) は
 #   ALLOW policy 側で claim 不要 rule で許可する。
-#
-# forwardOriginalToken: true → upstream (Grafana 等) に Authorization header を
-# そのまま渡す。受け側アプリは header trust モード (Grafana auth.proxy 等) で
-# X-Auth-Request-User と組み合わせて identity を確定できる。
 apiVersion: security.istio.io/v1
 kind: RequestAuthentication
 metadata:
@@ -26,4 +25,10 @@ spec:
   jwtRules:
     - issuer: "https://auth.platform.yu-min3.com/realms/kensan"
       jwksUri: "https://auth.platform.yu-min3.com/realms/kensan/protocol/openid-connect/certs"
+      # 標準の Authorization Bearer ではなく、oauth2-proxy が set_xauthrequest=true
+      # で付与する X-Auth-Request-Access-Token header から JWT を読む。
+      # prefix を空文字に: header 値全体 = JWT (Bearer prefix なし)
+      fromHeaders:
+        - name: X-Auth-Request-Access-Token
+          prefix: ""
       forwardOriginalToken: true

@@ -103,9 +103,14 @@ config:
     scope                          = "openid email profile"
 
     # upstream に渡すヘッダ
+    # Authorization Bearer は **送らない** — upstream app (Grafana 等) が独自
+    # token と誤解釈して 403 を返す事象を回避するため。
+    # JWT 検証は Istio RequestAuthentication が X-Auth-Request-Access-Token
+    # header から行う (header_name: X-Auth-Request-Access-Token, prefix: "")。
+    # X-Auth-Request-* はこの後 set_xauthrequest=true で付与される。
     pass_access_token              = true
-    pass_authorization_header      = true
-    set_authorization_header       = true
+    pass_authorization_header      = false
+    set_authorization_header       = false
     set_xauthrequest               = true
 
     # Reverse proxy mode — Istio が X-Forwarded-* を埋める
