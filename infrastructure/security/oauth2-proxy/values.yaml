@@ -95,8 +95,12 @@ config:
     # ext_authz と config 整合 (meshConfig.extensionProviders[].pathPrefix)
     proxy_prefix                   = "/oauth2"
 
-    # OIDC scope — Keycloak realm-level または client-level groups mapper の出力を読む
-    scope                          = "openid email profile groups"
+    # OIDC scope — `groups` は scope ではなく claim 名なので scope パラメータには
+    # 含めない (含めると Keycloak が `Invalid scopes: groups` で reject)。
+    # groups claim は istio-gateway-platform client に直付けした
+    # oidc-group-membership-mapper が id.token.claim=true で id_token に
+    # 自動で乗せる。scope なしでも取得可能。
+    scope                          = "openid email profile"
 
     # upstream に渡すヘッダ
     pass_access_token              = true
