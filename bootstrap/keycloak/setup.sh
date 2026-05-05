@@ -258,11 +258,12 @@ CLIENT_UUID=$(ensure_oidc_client \
 # script を再実行する (ensure_oidc_client が既存 client を update する)。
 GATEWAY_PROTECTED_HOSTS=(
   backstage.platform.yu-min3.com
-  grafana.platform.yu-min3.com
   prometheus.platform.yu-min3.com
   hubble.platform.yu-min3.com
   longhorn.platform.yu-min3.com
 )
+# Grafana は auth.generic_oauth で Keycloak 直結 (Path B)。Authorization Bearer
+# 解釈の衝突を避けるため gateway-platform は bypass、別 client で OIDC する。
 GATEWAY_REDIRECT_URIS=$(printf '%s\n' "${GATEWAY_PROTECTED_HOSTS[@]}" \
   | jq -Rnc '[inputs | "https://\(.)/oauth2/callback"]')
 GATEWAY_WEB_ORIGINS=$(printf '%s\n' "${GATEWAY_PROTECTED_HOSTS[@]}" \
@@ -275,6 +276,25 @@ GATEWAY_CLIENT_UUID=$(ensure_oidc_client \
   "$GATEWAY_REDIRECT_URIS" \
   "$GATEWAY_WEB_ORIGINS" \
   "+")
+
+# === Grafana OIDC client (Path B — Grafana 自前 OIDC) ===
+# Grafana auth.generic_oauth で直接 Keycloak と connect するための専用 client。
+# gateway-platform 経由で Authorization Bearer を Grafana に渡すと内部 API key
+# として誤解釈されて 403 になる問題を避けるため、Grafana は AuthorizationPolicy
+# Category 1 で bypass し、自前 client で OIDC させる。
+# redirect_uri: Grafana の generic_oauth handler の固定 path /login/generic_oauth
+GRAFANA_HOSTNAME="grafana.platform.yu-min3.com"
+GRAFANA_REDIRECT_URIS=$(jq -nc \
+  --arg cb "https://$GRAFANA_HOSTNAME/login/generic_oauth" \
+  '[$cb]')
+GRAFANA_WEB_ORIGINS=$(jq -nc --arg origin "https://$GRAFANA_HOSTNAME" '[$origin]')
+GRAFANA_CLIENT_UUID=$(ensure_oidc_client \
+  "grafana" \
+  "Grafana OIDC" \
+  "Grafana auth.generic_oauth (Path B — gateway-platform bypass)" \
+  "$GRAFANA_REDIRECT_URIS" \
+  "$GRAFANA_WEB_ORIGINS" \
+  "https://$GRAFANA_HOSTNAME/login")
 
 # === Vault client_secret 取得 ===
 echo ""
@@ -342,6 +362,25 @@ Created by: bootstrap/keycloak/setup.sh"
 save_bw "kensan-lab/keycloak/oidc-client-istio-gateway-platform" \
   "istio-gateway-platform" "$GATEWAY_CLIENT_SECRET" "$GATEWAY_NOTES"
 
+# === Grafana client_secret 取得 + Bitwarden 保存 ===
+echo ""
+echo "==> Fetching grafana client_secret..."
+GRAFANA_CLIENT_SECRET=$(kcadm get "clients/$GRAFANA_CLIENT_UUID/client-secret" -r "$REALM" 2>/dev/null \
+  | jq -r '.value')
+if [ -z "$GRAFANA_CLIENT_SECRET" ] || [ "$GRAFANA_CLIENT_SECRET" = "null" ]; then
+  echo "ERROR: grafana client_secret が取れない"; exit 1
+fi
+echo "    grafana client_secret 取得 OK (${GRAFANA_CLIENT_SECRET:0:8}...)"
+
+GRAFANA_NOTES="Grafana OIDC client (Path B — gateway bypass + Grafana 自前 generic_oauth).
+Realm: $REALM
+ClientID: grafana
+DiscoveryURL: https://auth.platform.yu-min3.com/realms/$REALM
+Used by: Grafana in monitoring namespace (auth.generic_oauth)
+Created by: bootstrap/keycloak/setup.sh"
+save_bw "kensan-lab/keycloak/oidc-client-grafana" \
+  "grafana" "$GRAFANA_CLIENT_SECRET" "$GRAFANA_NOTES"
+
 if [ -n "${USER_PW:-}" ]; then
   USER_NOTES="Keycloak user for kensan realm.
 Realm: $REALM
@@ -401,6 +440,31 @@ vault_populate_gateway_kv() {
   vault kv get -format=json "$GATEWAY_VAULT_PATH" | jq -r '.data.data | keys | "      " + (. | tostring)'
 }
 
+# === Vault KV 投入 (Grafana auth.generic_oauth 用) ===
+# KV path: secret/observability/grafana/oidc
+# 投入 keys: client-id / client-secret
+# ESO の external-secrets policy が secret/data/* read 可能なので追加 policy 不要。
+GRAFANA_OIDC_VAULT_PATH="secret/observability/grafana/oidc"
+
+vault_populate_grafana_oidc_kv() {
+  echo ""
+  echo "==> Populating Vault KV: $GRAFANA_OIDC_VAULT_PATH"
+
+  if vault kv get -format=json "$GRAFANA_OIDC_VAULT_PATH" >/dev/null 2>&1; then
+    local existing_keys
+    existing_keys=$(vault kv get -format=json "$GRAFANA_OIDC_VAULT_PATH" \
+      | jq -r '.data.data | keys | join(",")')
+    echo "    既存 KV あり (keys: $existing_keys) — 上書き"
+  else
+    echo "    KV path 未存在、新規作成"
+  fi
+
+  vault kv put "$GRAFANA_OIDC_VAULT_PATH" \
+    client-id=grafana \
+    client-secret="$GRAFANA_CLIENT_SECRET" > /dev/null
+  echo "    populated OK"
+}
+
 print_gateway_vault_manual() {
   cat <<MSG
 
@@ -413,15 +477,22 @@ print_gateway_vault_manual() {
     # 1. 各 secret 用意
     COOKIE=\$(openssl rand -base64 32 | tr '+/' '-_' | tr -d '=' | tr -d '\\n')   # URL-safe
     CSEC=\$(bw get item kensan-lab/keycloak/oidc-client-istio-gateway-platform | jq -r .login.password)
+    GSEC=\$(bw get item kensan-lab/keycloak/oidc-client-grafana | jq -r .login.password)
 
-    # 2. Vault に投入
+    # 2. Vault に投入 (Gateway oauth2-proxy 用)
     vault kv put $GATEWAY_VAULT_PATH \\
       client-id=istio-gateway-platform \\
       client-secret="\$CSEC" \\
       cookie-secret="\$COOKIE"
 
+    # 2'. Vault に投入 (Grafana 自前 OIDC 用)
+    vault kv put $GRAFANA_OIDC_VAULT_PATH \\
+      client-id=grafana \\
+      client-secret="\$GSEC"
+
     # 3. 確認
     vault kv get -format=json $GATEWAY_VAULT_PATH | jq '.data.data | keys'
+    vault kv get -format=json $GRAFANA_OIDC_VAULT_PATH | jq '.data.data | keys'
 MSG
 }
 
@@ -433,6 +504,7 @@ elif ! vault token lookup &>/dev/null; then
   print_gateway_vault_manual "vault token 無効"
 else
   vault_populate_gateway_kv
+  vault_populate_grafana_oidc_kv
 fi
 
 # === 出力 ===

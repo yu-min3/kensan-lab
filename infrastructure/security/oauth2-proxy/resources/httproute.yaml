@@ -22,7 +22,6 @@ spec:
       namespace: istio-system
   hostnames:
     - "backstage.platform.yu-min3.com"
-    - "grafana.platform.yu-min3.com"
     - "prometheus.platform.yu-min3.com"
     - "hubble.platform.yu-min3.com"
     - "longhorn.platform.yu-min3.com"
