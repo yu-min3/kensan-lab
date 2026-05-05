@@ -17,8 +17,18 @@ spec:
             type: PathPrefix
             value: /
       backendRefs:
+        # vault Service (3 pod LB) ではなく vault-active を向ける。
+        # Vault HA は active 1 / standby 2 の構造で、write は active のみが処理可能。
+        # vault Service だと standby に当たった request は内部 cluster RPC で active に
+        # forward されるが、OIDC のような multi-step flow (auth_url POST → Keycloak →
+        # callback) で同じ active に着地する保証がなく、standby に振られた callback が
+        # active 側で発行された OAuth state を見つけられず "Expired or missing OAuth state"
+        # で失敗する。
+        # vault-active Service は label selector が Vault が leader 取得時に動的に
+        # セットする vault-active=true label を見るため、leader 変動に追従して常に
+        # 唯一の active を指す (failover 時は数秒の空白を経て新 leader に切り替わる)。
         - group: ""
           kind: Service
-          name: vault
+          name: vault-active
           port: 8200
           weight: 1
