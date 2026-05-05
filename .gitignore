@@ -22,3 +22,8 @@ my_docs/*
 # Archived / deprecated
 archive/*
 mcp-server-kubernetes/*
+
+# MkDocs build output
+site/
+.cache/
+.venv*/

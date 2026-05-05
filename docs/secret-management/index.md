@@ -115,12 +115,12 @@ EOF
 
 1. `infrastructure/security/vault-database-engine/platform-values/vault-database/<name>.yaml` を作成 (`ns`, `rootOwner`, `keyMapping` 等を override)
 2. ApplicationSet が拾って `DatabaseSecretEngineRole` (Vault) + `ExternalSecret` (K8s) を自動生成
-3. 詳細: [`infrastructure/security/vault-database-engine/README.md`](../../infrastructure/security/vault-database-engine/README.md)
+3. 詳細: [`infrastructure/security/vault-database-engine/README.md`](https://github.com/yu-min3/kensan-lab/blob/main/infrastructure/security/vault-database-engine/README.md)
 
 ## 関連ドキュメント
 
-- Sealed Secrets controller: [`infrastructure/security/sealed-secrets/`](../../infrastructure/security/sealed-secrets/)
-- External Secrets Operator: [`infrastructure/security/external-secrets/`](../../infrastructure/security/external-secrets/)
-- Vault: [`infrastructure/security/vault/`](../../infrastructure/security/vault/)
-- Vault Config Operator: [`infrastructure/security/vault-config-operator/`](../../infrastructure/security/vault-config-operator/)
-- Vault Database engine + ESO 統合: [`infrastructure/security/vault-database-engine/`](../../infrastructure/security/vault-database-engine/)
+- Sealed Secrets controller: [`infrastructure/security/sealed-secrets/`](https://github.com/yu-min3/kensan-lab/tree/main/infrastructure/security/sealed-secrets)
+- External Secrets Operator: [`infrastructure/security/external-secrets/`](https://github.com/yu-min3/kensan-lab/tree/main/infrastructure/security/external-secrets)
+- Vault: [`infrastructure/security/vault/`](https://github.com/yu-min3/kensan-lab/tree/main/infrastructure/security/vault)
+- Vault Config Operator: [`infrastructure/security/vault-config-operator/`](https://github.com/yu-min3/kensan-lab/tree/main/infrastructure/security/vault-config-operator)
+- Vault Database engine + ESO 統合: [`infrastructure/security/vault-database-engine/`](https://github.com/yu-min3/kensan-lab/tree/main/infrastructure/security/vault-database-engine)

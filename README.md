@@ -24,7 +24,7 @@
 
 A bare-metal Kubernetes homelab built with technologies typical of enterprise platform engineering — Argo CD for GitOps, Istio for service mesh, Backstage for developer self-service, and observability with Prometheus, Grafana, Loki, and Tempo. All running on Raspberry Pis and a mini PC.
 
-> This is a **reference architecture**, not a turnkey solution. A bootstrap automation (Ansible + Makefile) is planned for future release. Published as a learning resource and companion to the author's technical articles. Adapt secrets, domains, and IP ranges for your environment. See [Configuration Guide](./docs/configuration.md).
+> This is a **reference architecture**, not a turnkey solution. A bootstrap automation (Ansible + Makefile) is planned for future release. Published as a learning resource and companion to the author's technical articles. Adapt secrets, domains, and IP ranges for your environment. See [Configuration Guide](./docs/getting-started/configuration.md).
 
 ## Why This Exists
 
@@ -124,8 +124,9 @@ docs/                             # ADRs, architecture, bootstrapping guides
 
 | Category            | Links                                                                                                                                                                                                       |
 | ------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Getting Started** | [Installation](./docs/installation.md) / [Configuration](./docs/configuration.md) / [Bootstrapping](./docs/bootstrapping/index.md) _(in progress)_ / [Secret Management](./docs/secret-management/index.md) |
-| **Architecture**    | [Namespace Labels](./docs/namespace-label-design.md) / [ADRs](./docs/adr/) / [Kustomize Guidelines](./docs/kustomize-guidelines.md)                                                                        |
+| **Docs site**       | **[https://yu-min3.github.io/kensan-lab/](https://yu-min3.github.io/kensan-lab/)** — full documentation site |
+| **Getting Started** | [Installation](./docs/getting-started/installation.md) / [Configuration](./docs/getting-started/configuration.md) / [Bootstrapping](./docs/bootstrapping/index.md) _(in progress)_ / [Secret Management](./docs/secret-management/index.md) |
+| **Architecture**    | [Namespace Labels](./docs/concepts/namespace-label-design.md) / [ADRs](./docs/adr/) / [Kustomize Guidelines](./docs/concepts/kustomize-guidelines.md)                                                                        |
 | **日本語**          | [Japanese documentation (日本語ドキュメント)](./docs/ja/)                                                                                                                                                   |
 
 ## Application: kensan
