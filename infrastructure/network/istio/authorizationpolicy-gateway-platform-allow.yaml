@@ -1,11 +1,15 @@
-# gateway-platform 配下の host を 3 カテゴリに分けて ALLOW する単一 policy。
+# gateway-platform 配下の host を 4 カテゴリに分けて ALLOW する単一 policy。
 # 本 policy が gateway-platform に bound されると、ここで列挙されてない host は
 # 暗黙 deny される (Istio AuthorizationPolicy の挙動)。新 host 追加時は
 # 該当 rule の hosts: に追記する。
 #
-# Category 1 (bypass): app 自身の auth に委ねる。Vault は Vault token、ArgoCD は
-# 自前 JWT、Keycloak は自分自身、oauth2-proxy は callback path のため認証不要。
-# この rule は claim 検査なし → JWT が無くても通る。CLI も通る。
+# Category 0 (OIDC flow path): protected host の `/oauth2/*` path は OIDC flow
+# (login / callback / sign_out) を oauth2-proxy 自身が処理するため AuthZ を
+# skip する。HTTPRoute (auth-system/oauth2-proxy-route) で /oauth2 prefix を
+# oauth2-proxy backend に直送する設定とセット。
+#
+# Category 1 (app-native auth bypass): app 自身の auth に委ねる host。Vault は
+# Vault token、ArgoCD は自前 JWT、Keycloak は自分自身。claim 検査なし → CLI も通る。
 #
 # Category 2 (admin + dev): 普段使いの UI 群。Keycloak group が
 # platform-admin / platform-dev のどちらかなら通る。
@@ -23,13 +27,21 @@ spec:
     name: gateway-platform
   action: ALLOW
   rules:
+    # === Category 0: /oauth2/* path は OIDC flow 専用、claim 不要で通す ===
+    # oauth2-proxy が外部 redirect_uri を whitelist_domains で検証し、
+    # state parameter で CSRF 防御するため、AuthZ skip でセキュリティ問題なし。
+    - to:
+        - operation:
+            paths:
+              - /oauth2
+              - /oauth2/*
+
     # === Category 1: app-native auth (gateway は素通し) ===
     - to:
         - operation:
             hosts:
               - auth.platform.yu-min3.com
               - auth-dev.platform.yu-min3.com
-              - oauth2-proxy.platform.yu-min3.com
               - vault.platform.yu-min3.com
               - argocd.platform.yu-min3.com
 

@@ -1,7 +1,14 @@
-# oauth2-proxy が browser からの OIDC redirect (/oauth2/start /oauth2/callback)
-# を受けるための公開 host。
-# *.platform.yu-min3.com の wildcard cert (gateway-platform listener に bind)
-# でカバーされる。
+# 各 protected host で `/oauth2/*` path を oauth2-proxy に直送する HTTPRoute。
+#
+# Path A 設計の中核: ext_authz check は cookie 検証のみで callback 処理は
+# できないため、OIDC flow の各 path (auth_url / callback / sign_in /
+# sign_out) は HTTPRoute level で oauth2-proxy へ直接 backendRef する。
+#
+# Istio AuthorizationPolicy 側で /oauth2/* を CUSTOM notPaths に入れ、
+# ALLOW では claim 検査なしで通すことで、ext_authz と claim 検査を skip
+# して oauth2-proxy が code 交換 / cookie set できるようにする。
+#
+# 新 protected host を追加する場合は hostnames: に host を追記。
 apiVersion: gateway.networking.k8s.io/v1
 kind: HTTPRoute
 metadata:
@@ -14,12 +21,16 @@ spec:
       name: gateway-platform
       namespace: istio-system
   hostnames:
-    - "oauth2-proxy.platform.yu-min3.com"
+    - "backstage.platform.yu-min3.com"
+    - "grafana.platform.yu-min3.com"
+    - "prometheus.platform.yu-min3.com"
+    - "hubble.platform.yu-min3.com"
+    - "longhorn.platform.yu-min3.com"
   rules:
     - matches:
         - path:
             type: PathPrefix
-            value: /
+            value: /oauth2
       backendRefs:
         - group: ""
           kind: Service

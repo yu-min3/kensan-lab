@@ -1,16 +1,22 @@
 # Category 2 + 3 の host にだけ oauth2-proxy ext_authz を強制する CUSTOM policy。
-# bypass host (Category 1: vault / argocd / auth / oauth2-proxy) はここに含めない
-# ことで gateway 層では透過させる (= app native auth が担当)。
+# bypass host (Category 1: vault / argocd / auth) はここに含めないことで
+# gateway 層では透過させる (= app native auth が担当)。
+#
+# notPaths で /oauth2/* を除外: OIDC flow 自体 (callback / sign_out / 等)
+# は oauth2-proxy が直接処理する path。ext_authz check に通すと callback の
+# code 交換が出来ず redirect ループする (auth check と callback 処理は別)。
+# HTTPRoute (auth-system/oauth2-proxy-route) で /oauth2 prefix を
+# oauth2-proxy backend に直送する設定とセット。
 #
 # 動作:
-# 1. 対象 host への request 着弾
+# 1. 対象 host への non-/oauth2 request 着弾
 # 2. Istio が oauth2-proxy.auth-system.svc:4180 を叩く (meshConfig.extensionProviders 経由)
 # 3. cookie 有効 → oauth2-proxy が 200 OK + Authorization: Bearer <id_token> を付与
 #    cookie 無 → oauth2-proxy が 302 で Keycloak へ redirect
 # 4. ALLOW policy の `when claims[groups]` で再度 group 確認
 #
 # 失敗時挙動: oauth2-proxy 側で failOpen: false なので、oauth2-proxy が落ちると
-# 対象 host は 503 になる。Category 1 (bypass) 側は影響しない。
+# 対象 host (の /oauth2/* 以外) は 503 になる。Category 1 (bypass) 側は影響しない。
 apiVersion: security.istio.io/v1
 kind: AuthorizationPolicy
 metadata:
@@ -33,3 +39,6 @@ spec:
               - prometheus.platform.yu-min3.com
               - hubble.platform.yu-min3.com
               - longhorn.platform.yu-min3.com
+            notPaths:
+              - /oauth2
+              - /oauth2/*
