@@ -1,0 +1,28 @@
+# oauth2-proxy が browser からの OIDC redirect (/oauth2/start /oauth2/callback)
+# を受けるための公開 host。
+# *.platform.yu-min3.com の wildcard cert (gateway-platform listener に bind)
+# でカバーされる。
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: oauth2-proxy-route
+  namespace: auth-system
+spec:
+  parentRefs:
+    - group: gateway.networking.k8s.io
+      kind: Gateway
+      name: gateway-platform
+      namespace: istio-system
+  hostnames:
+    - "oauth2-proxy.platform.yu-min3.com"
+  rules:
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /
+      backendRefs:
+        - group: ""
+          kind: Service
+          name: oauth2-proxy
+          port: 4180
+          weight: 1

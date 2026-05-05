@@ -173,53 +173,95 @@ else
   echo "    user joined to '$ADMIN_GROUP'"
 fi
 
-# === OIDC Client 作成 ===
+# === OIDC Client 共通関数 ===
+# 引数: <client_id> <name> <description> <redirect_uris_json> <web_origins_json> <post_logout_uri>
+# 戻り値: stdout に client UUID を 1 行で出力。
+# 副作用: 存在しなければ作成し groups protocol mapper を付ける。冪等。
+ensure_oidc_client() {
+  local cid="$1"
+  local cname="$2"
+  local cdesc="$3"
+  local redirect_uris_json="$4"
+  local web_origins_json="$5"
+  local post_logout_uri="$6"
+
+  echo "" >&2
+  echo "==> Ensuring OIDC client '$cid' in realm '$REALM'..." >&2
+  local uuid
+  uuid=$(kcadm get clients -r "$REALM" --query "clientId=$cid" --fields id 2>/dev/null \
+    | jq -r '.[0].id // empty' || true)
+
+  if [ -n "$uuid" ] && [ "$uuid" != "null" ]; then
+    echo "    client '$cid' already exists (id: $uuid), skip create" >&2
+  else
+    kcadm create clients -r "$REALM" \
+      -s "clientId=$cid" \
+      -s "name=$cname" \
+      -s "description=$cdesc" \
+      -s enabled=true \
+      -s protocol=openid-connect \
+      -s publicClient=false \
+      -s standardFlowEnabled=true \
+      -s directAccessGrantsEnabled=false \
+      -s "redirectUris=$redirect_uris_json" \
+      -s "webOrigins=$web_origins_json" \
+      -s "attributes.\"post.logout.redirect.uris\"=$post_logout_uri" > /dev/null
+    uuid=$(kcadm get clients -r "$REALM" --query "clientId=$cid" --fields id \
+      | jq -r '.[0].id')
+    echo "    client '$cid' created (id: $uuid)" >&2
+
+    echo "==> Adding 'groups' protocol mapper to '$cid'..." >&2
+    kcadm create "clients/$uuid/protocol-mappers/models" -r "$REALM" \
+      -s name=groups \
+      -s protocol=openid-connect \
+      -s protocolMapper=oidc-group-membership-mapper \
+      -s 'config."claim.name"=groups' \
+      -s 'config."full.path"=false' \
+      -s 'config."id.token.claim"=true' \
+      -s 'config."access.token.claim"=true' \
+      -s 'config."userinfo.token.claim"=true' > /dev/null
+    echo "    groups mapper added" >&2
+  fi
+
+  echo "$uuid"
+}
+
+# === Vault OIDC client ===
+VAULT_REDIRECT_URIS=$(jq -nc \
+  --arg vault_cb "https://$VAULT_HOSTNAME/ui/vault/auth/oidc/oidc/callback" \
+  --arg cli_cb "http://localhost:8250/oidc/callback" \
+  '[$vault_cb, $cli_cb]')
+VAULT_WEB_ORIGINS=$(jq -nc --arg origin "https://$VAULT_HOSTNAME" '[$origin]')
+
+CLIENT_UUID=$(ensure_oidc_client \
+  "$CLIENT_ID" \
+  "Vault OIDC" \
+  "Vault HA OIDC auth method (Stage 1)" \
+  "$VAULT_REDIRECT_URIS" \
+  "$VAULT_WEB_ORIGINS" \
+  "https://$VAULT_HOSTNAME")
+
+# === Istio Gateway OIDC client (Phase 1) — ADR-010 で Path A 採択 ===
+# oauth2-proxy 経由で gateway-platform 配下の全 host を保護する。
+# redirectUris は oauth2-proxy 自身の callback URL 1 本のみ
+# (cookie domain .platform.yu-min3.com で全 host SSO 化、各 host への
+# 個別 redirectUris 登録は不要)。
+OAUTH2_PROXY_HOST="oauth2-proxy.platform.yu-min3.com"
+GATEWAY_REDIRECT_URIS=$(jq -nc \
+  --arg cb "https://$OAUTH2_PROXY_HOST/oauth2/callback" \
+  '[$cb]')
+GATEWAY_WEB_ORIGINS=$(jq -nc --arg origin "https://$OAUTH2_PROXY_HOST" '[$origin]')
+GATEWAY_CLIENT_UUID=$(ensure_oidc_client \
+  "istio-gateway-platform" \
+  "Istio Gateway Platform OIDC" \
+  "Phase 1 Gateway-level OIDC for *.platform.yu-min3.com (oauth2-proxy)" \
+  "$GATEWAY_REDIRECT_URIS" \
+  "$GATEWAY_WEB_ORIGINS" \
+  "https://$OAUTH2_PROXY_HOST")
+
+# === Vault client_secret 取得 ===
 echo ""
-echo "==> Ensuring OIDC client '$CLIENT_ID' in realm '$REALM'..."
-CLIENT_UUID=$(kcadm get clients -r "$REALM" --query "clientId=$CLIENT_ID" --fields id 2>/dev/null \
-  | jq -r '.[0].id // empty' || true)
-
-if [ -n "$CLIENT_UUID" ] && [ "$CLIENT_UUID" != "null" ]; then
-  echo "    client '$CLIENT_ID' already exists (id: $CLIENT_UUID), skip create"
-else
-  REDIRECT_URIS=$(jq -nc \
-    --arg vault_cb "https://$VAULT_HOSTNAME/ui/vault/auth/oidc/oidc/callback" \
-    --arg cli_cb "http://localhost:8250/oidc/callback" \
-    '[$vault_cb, $cli_cb]')
-  WEB_ORIGINS=$(jq -nc --arg origin "https://$VAULT_HOSTNAME" '[$origin]')
-
-  kcadm create clients -r "$REALM" \
-    -s "clientId=$CLIENT_ID" \
-    -s "name=Vault OIDC" \
-    -s "description=Vault HA OIDC auth method (Stage 1)" \
-    -s enabled=true \
-    -s protocol=openid-connect \
-    -s publicClient=false \
-    -s standardFlowEnabled=true \
-    -s directAccessGrantsEnabled=false \
-    -s "redirectUris=$REDIRECT_URIS" \
-    -s "webOrigins=$WEB_ORIGINS" \
-    -s "attributes.\"post.logout.redirect.uris\"=https://$VAULT_HOSTNAME" > /dev/null
-  CLIENT_UUID=$(kcadm get clients -r "$REALM" --query "clientId=$CLIENT_ID" --fields id \
-    | jq -r '.[0].id')
-  echo "    client '$CLIENT_ID' created (id: $CLIENT_UUID)"
-
-  echo "==> Adding 'groups' protocol mapper..."
-  kcadm create "clients/$CLIENT_UUID/protocol-mappers/models" -r "$REALM" \
-    -s name=groups \
-    -s protocol=openid-connect \
-    -s protocolMapper=oidc-group-membership-mapper \
-    -s 'config."claim.name"=groups' \
-    -s 'config."full.path"=false' \
-    -s 'config."id.token.claim"=true' \
-    -s 'config."access.token.claim"=true' \
-    -s 'config."userinfo.token.claim"=true' > /dev/null
-  echo "    groups mapper added"
-fi
-
-# === client_secret 取得 ===
-echo ""
-echo "==> Fetching client_secret..."
+echo "==> Fetching Vault client_secret..."
 CLIENT_SECRET=$(kcadm get "clients/$CLIENT_UUID/client-secret" -r "$REALM" 2>/dev/null \
   | jq -r '.value')
 if [ -z "$CLIENT_SECRET" ] || [ "$CLIENT_SECRET" = "null" ]; then
@@ -264,6 +306,25 @@ DiscoveryURL: https://auth.platform.yu-min3.com/realms/$REALM
 Created by: bootstrap/keycloak/setup.sh"
 save_bw "$BW_CLIENT_ITEM" "$CLIENT_ID" "$CLIENT_SECRET" "$CLIENT_NOTES"
 
+# === Istio Gateway client_secret 取得 + Bitwarden 保存 ===
+echo ""
+echo "==> Fetching istio-gateway-platform client_secret..."
+GATEWAY_CLIENT_SECRET=$(kcadm get "clients/$GATEWAY_CLIENT_UUID/client-secret" -r "$REALM" 2>/dev/null \
+  | jq -r '.value')
+if [ -z "$GATEWAY_CLIENT_SECRET" ] || [ "$GATEWAY_CLIENT_SECRET" = "null" ]; then
+  echo "ERROR: istio-gateway-platform client_secret が取れない"; exit 1
+fi
+echo "    gateway client_secret 取得 OK (${GATEWAY_CLIENT_SECRET:0:8}...)"
+
+GATEWAY_NOTES="Istio Gateway Platform OIDC client (Phase 1 Gateway-level auth).
+Realm: $REALM
+ClientID: istio-gateway-platform
+DiscoveryURL: https://auth.platform.yu-min3.com/realms/$REALM
+Used by: oauth2-proxy in auth-system namespace
+Created by: bootstrap/keycloak/setup.sh"
+save_bw "kensan-lab/keycloak/oidc-client-istio-gateway-platform" \
+  "istio-gateway-platform" "$GATEWAY_CLIENT_SECRET" "$GATEWAY_NOTES"
+
 if [ -n "${USER_PW:-}" ]; then
   USER_NOTES="Keycloak user for kensan realm.
 Realm: $REALM
@@ -274,6 +335,85 @@ Created by: bootstrap/keycloak/setup.sh"
   save_bw "$BW_USER_ITEM" "$USER_NAME" "$USER_PW" "$USER_NOTES"
 fi
 
+# === Vault KV 投入 (oauth2-proxy 用) ===
+# vault CLI + 有効 token があれば自動投入。なければ手動手順を案内。
+# KV path: secret/platform-auth/istio-gateway/platform
+# 投入 keys: client-id / client-secret / cookie-secret
+# 既存値があればそれを尊重 (再実行で session を破壊しない)。
+GATEWAY_VAULT_PATH="secret/platform-auth/istio-gateway/platform"   # KV v2 は mount prefix 必須
+
+vault_populate_gateway_kv() {
+  echo ""
+  echo "==> Populating Vault KV: $GATEWAY_VAULT_PATH"
+
+  # 既存 KV 取得 (失敗しても気にしない)
+  local existing_keys=""
+  local existing_cookie=""
+  if vault kv get -format=json "$GATEWAY_VAULT_PATH" >/dev/null 2>&1; then
+    existing_keys=$(vault kv get -format=json "$GATEWAY_VAULT_PATH" \
+      | jq -r '.data.data | keys | join(",")')
+    existing_cookie=$(vault kv get -format=json "$GATEWAY_VAULT_PATH" \
+      | jq -r '.data.data["cookie-secret"] // empty')
+    echo "    既存 KV あり (keys: $existing_keys)"
+  else
+    echo "    KV path 未存在、新規作成"
+  fi
+
+  # cookie-secret は既存があれば流用 (rotate したい場合は事前に kv delete する)
+  local cookie
+  if [ -n "$existing_cookie" ]; then
+    cookie="$existing_cookie"
+    echo "    cookie-secret: 既存値を流用"
+  else
+    cookie=$(openssl rand -base64 32 | tr -d '\n')
+    echo "    cookie-secret: 新規生成"
+  fi
+
+  vault kv put "$GATEWAY_VAULT_PATH" \
+    client-id=istio-gateway-platform \
+    client-secret="$GATEWAY_CLIENT_SECRET" \
+    cookie-secret="$cookie" > /dev/null
+  echo "    populated OK"
+
+  echo ""
+  echo "    確認 (keys のみ):"
+  vault kv get -format=json "$GATEWAY_VAULT_PATH" | jq -r '.data.data | keys | "      " + (. | tostring)'
+}
+
+print_gateway_vault_manual() {
+  cat <<MSG
+
+==> Vault 自動投入をスキップ ($1)。手動投入手順:
+
+    # 0. 必要なら Vault に login
+    export VAULT_ADDR=https://vault.platform.yu-min3.com
+    vault login -method=oidc
+
+    # 1. 各 secret 用意
+    COOKIE=\$(openssl rand -base64 32 | tr -d '\\n')
+    CSEC=\$(bw get item kensan-lab/keycloak/oidc-client-istio-gateway-platform | jq -r .login.password)
+
+    # 2. Vault に投入
+    vault kv put $GATEWAY_VAULT_PATH \\
+      client-id=istio-gateway-platform \\
+      client-secret="\$CSEC" \\
+      cookie-secret="\$COOKIE"
+
+    # 3. 確認
+    vault kv get -format=json $GATEWAY_VAULT_PATH | jq '.data.data | keys'
+MSG
+}
+
+if ! command -v vault &>/dev/null; then
+  print_gateway_vault_manual "vault CLI なし"
+elif [ -z "${VAULT_ADDR:-}" ]; then
+  print_gateway_vault_manual "VAULT_ADDR 未設定"
+elif ! vault token lookup &>/dev/null; then
+  print_gateway_vault_manual "vault token 無効"
+else
+  vault_populate_gateway_kv
+fi
+
 # === 出力 ===
 echo ""
 echo "==> Done."
@@ -282,7 +422,7 @@ echo "==> 確認:"
 echo "    OIDC discovery: https://auth.platform.yu-min3.com/realms/$REALM/.well-known/openid-configuration"
 echo "    bw get item \"$BW_CLIENT_ITEM\" | jq '{name, login: {username: .login.username}}'"
 echo ""
-echo "==> 次のステップ (Vault Stage 1):"
+echo "==> 次のステップ (Vault Stage 1, 未実施なら):"
 echo "    1. vault operator init (manual)"
 echo "    2. root token + Recovery Keys を Bitwarden に保存"
 echo "    3. bootstrap/vault/ で terraform.tfvars に下記を書く:"
@@ -290,3 +430,11 @@ echo "       keycloak_oidc_discovery_url = \"https://auth.platform.yu-min3.com/r
 echo "       keycloak_oidc_client_id     = \"$CLIENT_ID\""
 echo "       keycloak_oidc_client_secret = \"<bw get item $BW_CLIENT_ITEM | jq -r .login.password>\""
 echo "    4. cd bootstrap/vault && terraform init && terraform apply"
+echo ""
+echo "==> 次のステップ (Gateway OIDC / oauth2-proxy, このスクリプト以後):"
+echo "    1. PR #269 を ready-for-review → merge"
+echo "    2. ArgoCD で oauth2-proxy Application が sync 完了するか確認"
+echo "       kubectl -n argocd get application oauth2-proxy"
+echo "       kubectl -n auth-system get pods -l app=oauth2-proxy"
+echo "    3. provider 登録確認:"
+echo "       kubectl -n istio-system get cm istio -o yaml | yq '.data.mesh' | yq '.extensionProviders'"

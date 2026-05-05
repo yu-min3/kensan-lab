@@ -1,0 +1,137 @@
+# Chart config: infrastructure/gitops/argocd/applications/security/oauth2-proxy/app.yaml
+# Chart: oauth2-proxy/oauth2-proxy 10.4.3 (appVersion 7.15.2)
+# Reference: ADR-010 (Path A 採択)
+#
+# Role: Gateway-level OIDC authentication front for *.platform.yu-min3.com.
+# Istio's gateway-platform invokes this service via ext_authz (registered as
+# meshConfig.extensionProviders[oauth2-proxy] in istiod values.yaml).
+#
+# 失敗時挙動: Istio 側 failOpen: false なので、本 deployment が落ちると
+# gateway-platform 配下の保護対象 host (Hubble/Prom/Longhorn/Grafana 等)
+# は 503 を返す。replica 2 + PDB で軽減。
+
+replicaCount: 2
+
+image:
+  repository: quay.io/oauth2-proxy/oauth2-proxy
+  tag: v7.15.2  # chart appVersion と一致
+
+# AMD64 限定 (m4neo に固定。Pi5 群は OIDC redirect の負荷分散には不向き)
+nodeSelector:
+  kubernetes.io/arch: amd64
+
+# Pod Disruption Budget — drain で全 replica が同時に落ちないように
+podDisruptionBudget:
+  enabled: true
+  minAvailable: 1
+
+# Resource budget — oauth2-proxy は軽量 (idle ~15MB RSS)
+resources:
+  requests:
+    cpu: 50m
+    memory: 64Mi
+  limits:
+    cpu: 200m
+    memory: 128Mi
+
+# session affinity 不要 — cookie に session 情報が入ってる (cookie store)
+# Redis は homelab スケールでは不要 (carpenike 等は使ってるが advanced 用途向け)
+
+# Pod-level security: Pod Security Admission baseline 互換
+securityContext:
+  runAsNonRoot: true
+  runAsUser: 2000
+  runAsGroup: 2000
+  fsGroup: 2000
+containerSecurityContext:
+  allowPrivilegeEscalation: false
+  capabilities:
+    drop: [ALL]
+  readOnlyRootFilesystem: true
+
+# OIDC config — client_id / client_secret / cookie_secret は existingSecret から
+# 読む (Vault → ExternalSecret → auth-system/oauth2-proxy-secret)
+config:
+  existingSecret: oauth2-proxy-secret  # ExternalSecret 作成 (resources/externalsecret.yaml)
+
+  # Required Secret keys: client-id / client-secret / cookie-secret (chart 既定)
+  requiredSecretKeys:
+    - client-id
+    - client-secret
+    - cookie-secret
+
+  # 全 email domain 受け入れ (group 認可は Istio AuthorizationPolicy 側で行う)
+  emailDomains: ["*"]
+
+  # OIDC + cookie + session の主設定。configFile は inline 文字列で渡す。
+  # alphaConfig は使わない (legacy config の方が refresh / cookie オプション充実)。
+  configFile: |-
+    # OIDC Provider — Keycloak realm "kensan"
+    provider                       = "keycloak-oidc"
+    oidc_issuer_url                = "https://auth.platform.yu-min3.com/realms/kensan"
+    insecure_oidc_allow_unverified_email = false
+
+    # Cookie 設定 — .platform.yu-min3.com 全 host で 1 session 共有 (SSO の核)
+    cookie_domains                 = [".platform.yu-min3.com"]
+    cookie_samesite                = "lax"
+    cookie_secure                  = true
+    cookie_httponly                = true
+    cookie_expire                  = "10h"           # workday 想定
+    cookie_refresh                 = "1h"            # 1h 毎に id_token refresh
+
+    # Open-redirect 防止 — login 後の戻り先を *.platform.yu-min3.com に限定
+    whitelist_domains              = [".platform.yu-min3.com"]
+
+    # ext_authz と config 整合 (meshConfig.extensionProviders[].pathPrefix)
+    proxy_prefix                   = "/oauth2"
+
+    # OIDC scope — Keycloak realm-level または client-level groups mapper の出力を読む
+    scope                          = "openid email profile groups"
+
+    # upstream に渡すヘッダ
+    pass_access_token              = true
+    pass_authorization_header      = true
+    set_authorization_header       = true
+    set_xauthrequest               = true
+
+    # Reverse proxy mode — Istio が X-Forwarded-* を埋める
+    reverse_proxy                  = true
+    real_client_ip_header          = "X-Forwarded-For"
+
+    # IdP 1 種類だけなので "Sign in with Keycloak" ボタン省略
+    skip_provider_button           = true
+
+    # Bearer token を持ち込んだリクエスト (CLI 等) は素通り — 二重認証回避
+    skip_jwt_bearer_tokens         = true
+    extra_jwt_issuers              = ["https://auth.platform.yu-min3.com/realms/kensan=istio-gateway-platform"]
+
+    # Health check endpoint (livenessProbe / readinessProbe 用)
+    ping_path                      = "/ping"
+    metrics_address                = "0.0.0.0:44180"
+
+# Service: ClusterIP のみ (mesh-internal で Istio から呼ばれる)
+service:
+  type: ClusterIP
+  portNumber: 4180
+
+# 公開は Istio Gateway 経由 (resources/httproute.yaml)。chart 内蔵 Ingress 無効化。
+ingress:
+  enabled: false
+
+# Health checks (chart デフォルトのまま使えるが明示)
+livenessProbe:
+  enabled: true
+readinessProbe:
+  enabled: true
+
+# Metrics (Prometheus が拾う前提)
+metrics:
+  enabled: true
+  port: 44180
+  servicePort: 44180
+
+# ServiceMonitor — kube-prometheus-stack で auto-discover
+serviceMonitor:
+  enabled: true
+  namespace: auth-system
+  interval: 30s
