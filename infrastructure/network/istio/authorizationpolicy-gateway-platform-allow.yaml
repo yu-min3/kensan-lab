@@ -37,6 +37,11 @@ spec:
               - /oauth2/*
 
     # === Category 1: app-native auth (gateway は素通し) ===
+    # Grafana は auth.generic_oauth で Keycloak 直結 → app native 扱い。
+    # Authorization Bearer header (oauth2-proxy が付与する) を Grafana が
+    # 自分の API key として誤解釈し 403 を返す問題を回避するため、
+    # gateway 段では ext_authz を skip し、Grafana 自身の OIDC handler
+    # (/login/generic_oauth) に login させる。
     - to:
         - operation:
             hosts:
@@ -44,13 +49,13 @@ spec:
               - auth-dev.platform.yu-min3.com
               - vault.platform.yu-min3.com
               - argocd.platform.yu-min3.com
+              - grafana.platform.yu-min3.com
 
     # === Category 2: oauth2-proxy 強制 + admin or dev ===
     - to:
         - operation:
             hosts:
               - backstage.platform.yu-min3.com
-              - grafana.platform.yu-min3.com
               - prometheus.platform.yu-min3.com
       when:
         - key: request.auth.claims[groups]
