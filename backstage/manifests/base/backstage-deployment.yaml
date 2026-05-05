@@ -25,17 +25,15 @@ spec:
           value: postgresql
         - name: POSTGRES_PORT
           value: "5432"
-        ## Vault dynamic cred (TTL 24h, ESO refreshInterval=12h)
-        ## Postgres pod 自身の boot 用 admin cred (postgresql-secret) はそのまま残す (postgresql-statefulset.yaml)
         - name: POSTGRES_USER
           valueFrom:
             secretKeyRef:
-              name: postgres-backstage-cred
+              name: postgresql-secret
               key: POSTGRES_USER
         - name: POSTGRES_PASSWORD
           valueFrom:
             secretKeyRef:
-              name: postgres-backstage-cred
+              name: postgresql-secret
               key: POSTGRES_PASSWORD
         - name: GITHUB_TOKEN
           valueFrom:
