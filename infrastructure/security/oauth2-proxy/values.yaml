@@ -38,7 +38,10 @@ resources:
 # Redis は homelab スケールでは不要 (carpenike 等は使ってるが advanced 用途向け)
 
 # Pod-level security: Pod Security Admission baseline 互換
-securityContext:
+# chart の top-level `securityContext:` は container 側にマップされる (chart values 仕様)。
+# fsGroup は pod-level 専用フィールドなので podSecurityContext に置く必要がある。
+# runAs* もここに集約: pod から container へ cascade される。
+podSecurityContext:
   runAsNonRoot: true
   runAsUser: 2000
   runAsGroup: 2000
