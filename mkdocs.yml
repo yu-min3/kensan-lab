@@ -1,0 +1,140 @@
+site_name: kensan-lab
+site_description: Enterprise-grade Kubernetes on bare-metal — a reference architecture for platform engineering.
+site_url: https://yu-min3.github.io/kensan-lab/
+repo_url: https://github.com/yu-min3/kensan-lab
+repo_name: yu-min3/kensan-lab
+edit_uri: edit/main/docs/
+copyright: Copyright &copy; yu-min3
+
+docs_dir: docs
+
+exclude_docs: |
+  ja/
+  bootstrapping/manifests/
+  bootstrapping/scripts/
+
+validation:
+  nav:
+    omitted_files: warn
+    not_found: warn
+    absolute_links: warn
+  links:
+    not_found: warn
+    anchors: warn
+    absolute_links: ignore
+    unrecognized_links: ignore
+
+theme:
+  name: material
+  language: en
+  logo: assets/kensan-logo-dark.svg
+  favicon: assets/kensan-logo-dark.svg
+  font:
+    text: Inter
+    code: JetBrains Mono
+  palette:
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: indigo
+      accent: indigo
+      toggle:
+        icon: material/weather-night
+        name: Switch to dark mode
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: indigo
+      accent: indigo
+      toggle:
+        icon: material/weather-sunny
+        name: Switch to light mode
+  features:
+    - navigation.instant
+    - navigation.tracking
+    - navigation.sections
+    - navigation.indexes
+    - navigation.top
+    - navigation.footer
+    - toc.follow
+    - search.suggest
+    - search.highlight
+    - content.code.copy
+    - content.action.edit
+    - content.tabs.link
+
+plugins:
+  - search
+  - git-revision-date-localized:
+      enable_creation_date: true
+      type: timeago
+      fallback_to_build_date: true
+
+markdown_extensions:
+  - admonition
+  - attr_list
+  - md_in_html
+  - footnotes
+  - tables
+  - toc:
+      permalink: true
+  - pymdownx.details
+  - pymdownx.highlight:
+      anchor_linenums: true
+      line_spans: __span
+      pygments_lang_class: true
+  - pymdownx.inlinehilite
+  - pymdownx.snippets
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
+  - pymdownx.tabbed:
+      alternate_style: true
+  - pymdownx.tasklist:
+      custom_checkbox: true
+  - pymdownx.emoji:
+      emoji_index: !!python/name:material.extensions.emoji.twemoji
+      emoji_generator: !!python/name:material.extensions.emoji.to_svg
+
+extra:
+  social:
+    - icon: fontawesome/brands/github
+      link: https://github.com/yu-min3/kensan-lab
+    - icon: fontawesome/brands/dev
+      link: https://dev.to/
+  generator: false
+
+nav:
+  - Home: index.md
+  - Getting Started:
+      - Installation: getting-started/installation.md
+      - Configuration: getting-started/configuration.md
+      - Bootstrapping:
+          - Overview: bootstrapping/index.md
+          - Add worker node (M4 Neo): bootstrapping/add-worker-node-m4neo.md
+          - Grafana independent setup: bootstrapping/11-grafana-independent.md
+  - Concepts:
+      - Kustomize Guidelines: concepts/kustomize-guidelines.md
+      - Namespace Label Design: concepts/namespace-label-design.md
+      - Network Policy: concepts/network-policy-guide.md
+  - Operations:
+      - Secret Management: secret-management/index.md
+      - Runbooks:
+          - Longhorn Restore Test: runbooks/longhorn-restore-test.md
+      - Guides:
+          - WiFi Stabilization: guides/wifi-stabilization.md
+  - Architecture Decisions:
+      - Overview: adr/index.md
+      - 001 — TLS Termination Pattern: adr/001-tls-termination-pattern.md
+      - 002 — Authentication & Authorization: adr/002-authentication-authorization-architecture.md
+      - 003 — ApplicationSet Migration: adr/003-applicationset-migration-strategy.md
+      - 004 — Network Policy Design: adr/004-network-policy-design.md
+      - 005 — Istio Native OAuth2: adr/005-istio-native-oauth2.md
+      - 006 — Namespace Naming: adr/006-namespace-naming.md
+      - 007 — No Vault PKI: adr/007-no-vault-pki.md
+      - 008 — Keycloak DB Credentials: adr/008-keycloak-db-credentials.md
+      - 009 — Shared Allow-Istio NetworkPolicy: adr/009-shared-allow-istio-network-policy.md
+      - 010 — Istio Native OAuth2 (Absent): adr/010-istio-native-oauth2-absent.md
+  - Incidents:
+      - 2026-03-02 system-infra Sync Blocked: incidents/2026-03-02-system-infra-sync-blocked.md
+  - Articles: articles.md

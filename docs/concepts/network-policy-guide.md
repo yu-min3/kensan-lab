@@ -3,7 +3,7 @@
 ## 設計概要
 
 本クラスタでは **default-deny + allow** パターンで NetworkPolicy を運用する。
-設計の詳細は [ADR-004](adr/004-network-policy-design.md) を参照。
+設計の詳細は [ADR-004](../adr/004-network-policy-design.md) を参照。
 
 ## Namespace 分類
 

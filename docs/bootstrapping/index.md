@@ -50,7 +50,7 @@ Deployment order is controlled by Argo CD sync-waves.
 | -- | Argo CD (self-managed) | `applications/gitops/argocd/app.yaml` |
 
 **Note**: Vault stack (waves 5-7) requires a one-time manual Bootstrap step after deployment.
-See [`bootstrap/vault/README.md`](../../bootstrap/vault/README.md) for details.
+See [`bootstrap/vault/README.md`](https://github.com/yu-min3/kensan-lab/blob/main/bootstrap/vault/README.md) for details.
 
 ---
 
