@@ -40,9 +40,24 @@ server:
   enabled: true
 
   # multi-arch image (arm64 + amd64 で動く)
+  #
+  # tag に空文字 ("") を渡すと chart 0.32.0 の template 内で
+  # `default "latest"` が発動して image: hashicorp/vault:latest が render される。
+  # その結果 2026-04-14 に Vault 2.0.0 が `:latest` に publish されたタイミングで
+  # 全 pod が 2.0 に silent upgrade されてしまった (PR #271 で発覚)。
+  #
+  # 本来は `tag` 行を削除して chart default (0.32.0 では server.image.tag = 1.21.2)
+  # に従わせるのが原則だが、Vault は major 跨ぎ downgrade を公式サポートしないため
+  # 2.0 → 1.21 の戻しは raft snapshot / storage format 互換性で事故るリスクあり。
+  #
+  # 暫定対応: 現に動いている 2.0.0 を明示 pin。
+  # 解除条件: chart 0.33+ がリリースされて server.image.tag default が 2.x line に
+  # 追従した時点で、本 tag 行を削除して chart default に従う運用に戻す。
+  # (chart 0.32.0 は 2026-01-14 リリース、Vault 2.0.0 は 2026-04-14 GA、
+  #  まだ 2.0 を公式サポートする chart は出ていない)
   image:
     repository: hashicorp/vault
-    tag: ""  # chart default を使用
+    tag: "2.0.0"
 
   ha:
     enabled: true
