@@ -13,7 +13,9 @@
 replicaCount: 2
 
 image:
-  repository: quay.io/oauth2-proxy/oauth2-proxy
+  # chart は image.registry (default: quay.io) を repository に prepend するため、
+  # ここで `quay.io/...` と書くと `quay.io/quay.io/...` の double prefix になる。
+  repository: oauth2-proxy/oauth2-proxy
   tag: v7.15.2  # chart appVersion と一致
 
 # AMD64 限定 (m4neo に固定。Pi5 群は OIDC redirect の負荷分散には不向き)
