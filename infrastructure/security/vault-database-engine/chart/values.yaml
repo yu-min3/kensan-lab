@@ -56,9 +56,11 @@ esoRefreshInterval: "12h"
 ##   Vault Database engine が返す native フィールド名 (username, password) を
 ##   app が期待する env 名にリネームして K8s Secret に書き出す。
 ##   default: POSTGRES_USER / POSTGRES_PASSWORD (Bitnami chart 標準)
+##   connectionUrl: 非空なら追加 key として URL 文字列を書き出す (Dagster 等向け)
 keyMapping:
   user: POSTGRES_USER
   password: POSTGRES_PASSWORD
+  connectionUrl: ""
 
 ## ============================================================================
 ## 各 values file で override 可能なフィールド (詳細は README 参照):

@@ -20,10 +20,11 @@ spec:
         env:
         - name: DAGSTER_HOME
           value: /app
+        ## Vault dynamic cred (rotation 12h、connectionUrl key で URL 形式提供)
         - name: DAGSTER_PG_URL
           valueFrom:
             secretKeyRef:
-              name: kensan-lakehouse-credentials
+              name: postgres-kensan-dagster-cred
               key: DAGSTER_PG_URL
         envFrom:
         - configMapRef:

@@ -1,4 +1,11 @@
 ## Keycloak prod Postgres (platform-auth-prod/postgresql)
 ## Bitnami app user は "keycloak"、basename "keycloak-prod" と異なるため override
+## keyMapping: Keycloak が要求する KC_DB_USERNAME / KC_DB_PASSWORD に合わせる
+## targetSecretName: prod/dev で同名にして、base keycloak-deployment.yaml の
+## envFrom 1 行で両環境とも参照可能にする
 ns: platform-auth-prod
 rootOwner: keycloak
+targetSecretName: keycloak-postgres-cred
+keyMapping:
+  user: KC_DB_USERNAME
+  password: KC_DB_PASSWORD
