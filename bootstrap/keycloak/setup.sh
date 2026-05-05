@@ -340,12 +340,11 @@ fi
 # KV path: secret/platform-auth/istio-gateway/platform
 # 投入 keys: client-id / client-secret / cookie-secret
 # 既存値があればそれを尊重 (再実行で session を破壊しない)。
-GATEWAY_VAULT_PATH="platform-auth/istio-gateway/platform"   # mount 'secret/' は CLI で省略可
-GATEWAY_KV_FULLPATH="secret/$GATEWAY_VAULT_PATH"
+GATEWAY_VAULT_PATH="secret/platform-auth/istio-gateway/platform"   # KV v2 は mount prefix 必須
 
 vault_populate_gateway_kv() {
   echo ""
-  echo "==> Populating Vault KV: $GATEWAY_KV_FULLPATH"
+  echo "==> Populating Vault KV: $GATEWAY_VAULT_PATH"
 
   # 既存 KV 取得 (失敗しても気にしない)
   local existing_keys=""
