@@ -5,6 +5,9 @@
 ns: kensan-data
 releaseName: dagster-postgres
 rootOwner: dagster
+## Dagster は DAGSTER_PG_URL (postgresql://user:pass@host/db) 形式で env を要求するため
+## 追加 key として URL 文字列も Secret に出す
 keyMapping:
   user: DAGSTER_PG_USER
   password: DAGSTER_PG_PASSWORD
+  connectionUrl: DAGSTER_PG_URL

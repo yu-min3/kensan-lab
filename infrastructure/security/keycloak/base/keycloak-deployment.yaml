@@ -22,6 +22,10 @@ spec:
             name: keycloak-env-config
         - secretRef:
             name: keycloak-secret
+        ## Vault dynamic cred (KC_DB_USERNAME / KC_DB_PASSWORD で上書き、rotation 12h)
+        ## prod/dev で同名 Secret (overlay 側 vault-database values で targetSecretName 指定)
+        - secretRef:
+            name: keycloak-postgres-cred
         ports:
         - name: http
           containerPort: 8080
