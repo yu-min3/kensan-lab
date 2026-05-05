@@ -1,0 +1,35 @@
+## vault-transit-engine の bootstrap (Stage 6 capability の前提となる mount + policy + auth role)
+##
+## VCO は TransitSecretEngine CR を持たないため、key 自体は本 Application 範囲外。
+## key (transit/keys/users-name) は capability の temp/setup-transit-keys.sh で 1 度だけ Yu が作成する。
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: vault-transit-engine-shared
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "8"  # vault-config-operator (sync-wave 7) の後
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: platform-project
+  source:
+    repoURL: https://github.com/yu-min3/kensan-lab
+    targetRevision: main
+    path: infrastructure/security/vault-transit-engine/shared
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: vault
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=false
+      - ServerSideApply=true
+    retry:
+      limit: 5
+      backoff:
+        duration: 5s
+        factor: 2
+        maxDuration: 3m
