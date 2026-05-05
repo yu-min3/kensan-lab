@@ -1,0 +1,35 @@
+# Category 2 + 3 の host にだけ oauth2-proxy ext_authz を強制する CUSTOM policy。
+# bypass host (Category 1: vault / argocd / auth / oauth2-proxy) はここに含めない
+# ことで gateway 層では透過させる (= app native auth が担当)。
+#
+# 動作:
+# 1. 対象 host への request 着弾
+# 2. Istio が oauth2-proxy.auth-system.svc:4180 を叩く (meshConfig.extensionProviders 経由)
+# 3. cookie 有効 → oauth2-proxy が 200 OK + Authorization: Bearer <id_token> を付与
+#    cookie 無 → oauth2-proxy が 302 で Keycloak へ redirect
+# 4. ALLOW policy の `when claims[groups]` で再度 group 確認
+#
+# 失敗時挙動: oauth2-proxy 側で failOpen: false なので、oauth2-proxy が落ちると
+# 対象 host は 503 になる。Category 1 (bypass) 側は影響しない。
+apiVersion: security.istio.io/v1
+kind: AuthorizationPolicy
+metadata:
+  name: gateway-platform-oauth2-authz
+  namespace: istio-system
+spec:
+  targetRef:
+    group: gateway.networking.k8s.io
+    kind: Gateway
+    name: gateway-platform
+  action: CUSTOM
+  provider:
+    name: oauth2-proxy   # meshConfig.extensionProviders[name] と一致
+  rules:
+    - to:
+        - operation:
+            hosts:
+              - backstage.platform.yu-min3.com
+              - grafana.platform.yu-min3.com
+              - prometheus.platform.yu-min3.com
+              - hubble.platform.yu-min3.com
+              - longhorn.platform.yu-min3.com
