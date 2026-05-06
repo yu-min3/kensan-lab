@@ -19,6 +19,33 @@ configs:
     # HTTPRoute backendRefs[].kind, ESO の deletionPolicy 等) を drift と誤検知しない。
     controller.diff.server.side: "true"
   cm:
+    # 公開 URL (OIDC redirect_uri 構築や server.url で使われる)
+    url: "https://argocd.platform.yu-min3.com"
+
+    # === Keycloak OIDC 統合 (Path B — Vault / Grafana と同じ "app native auth") ===
+    # Dex を経由しない直接統合 (Vault / Grafana と同 pattern):
+    # - Keycloak realm "kensan" の `argocd` client を bootstrap/keycloak/setup.sh が作成
+    # - client_secret は Vault KV (secret/security/argocd/oidc) → ESO で argocd-oidc-secret 生成
+    # - argocd-cm が `$argocd-oidc-secret:client-secret` 構文で読む
+    # - role mapping は configs.rbac.policy.csv 側で platform-admin / platform-dev → role:admin / role:readonly
+    #
+    # requestedScopes に `groups` を **含めない**: Keycloak で groups は scope じゃなく
+    # claim 名なので、scope に入れると "Invalid scopes: groups" で reject される。
+    # client に直付けした oidc-group-membership-mapper が id_token に groups を乗せる。
+    # ArgoCD は requestedIDTokenClaims で groups を essential 指定して受け取る。
+    oidc.config: |
+      name: Keycloak
+      issuer: https://auth.platform.yu-min3.com/realms/kensan
+      clientID: argocd
+      clientSecret: $argocd-oidc-secret:client-secret
+      requestedScopes:
+        - openid
+        - profile
+        - email
+      requestedIDTokenClaims:
+        groups:
+          essential: true
+
     # ESO admission webhook がデフォルト値 (deletionPolicy/conversionStrategy 等) を
     # 注入するため、ArgoCD の drift 検知が常に OutOfSync になる。
     # これらは webhook 管轄なので git に書かなくていい。drift 検知から除外する。
@@ -38,3 +65,13 @@ configs:
         - .spec.template.metadata.creationTimestamp
         - .spec.volumeClaimTemplates[]?.metadata.creationTimestamp
         - .status
+
+  # === RBAC (Keycloak group → ArgoCD role mapping) ===
+  rbac:
+    # platform-admin は ArgoCD admin、platform-dev は read-only。
+    # 既存 admin user (`admin.enabled: true` 既定) は break-glass として残す。
+    policy.csv: |
+      g, platform-admin, role:admin
+      g, platform-dev, role:readonly
+    # JWT の groups claim を rbac evaluation で使うように指定
+    scopes: '[groups]'
