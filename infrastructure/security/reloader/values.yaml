@@ -1,0 +1,90 @@
+# Chart config: infrastructure/gitops/argocd/applications/security/reloader/app.yaml
+# Chart: stakater/reloader 2.2.11 (appVersion v1.4.16)
+# Reference: inbox/vso-vs-eso-reloader.md (採用判断)
+#
+# Role: ESO で更新された Secret/ConfigMap を watch し、annotation が付いた
+# 消費 Deployment / StatefulSet を rolling restart する。
+#
+# 採用パターン (selective search/match — Stakater 公式 ESO recipe 準拠):
+# - Secret 側: reloader.stakater.com/match: "true"
+#   (ExternalSecret の target.template.metadata.annotations 経由で injected)
+# - Workload 側: reloader.stakater.com/search: "true"
+# 両方 annotated だった時のみ rolling restart trigger (誤爆防止)。
+#
+# `reloader.stakater.com/auto: "true"` は使わない: workload が参照する
+# 全 Secret/CM が watch 対象になり、static cred や config 変更でも restart
+# が走ってしまうため。本 homelab では rotate 系 (Vault dynamic cred) のみ
+# が trigger になるよう search/match に統一する。
+
+reloader:
+  # 全 namespace を watch (ESO で各 ns に Secret が散らばってる)
+  watchGlobally: true
+  # opt-in only: 全 workload を auto reload する mode は OFF
+  autoReloadAll: false
+  # rolling restart の方式:
+  # - default: spec.template.metadata.annotations を patch (envFrom 互換)
+  # - env-vars: STAKATER_<name>_VERSION env を加える (per-secret)
+  # - annotations: hash を annotation に出すだけ (restart は別途)
+  # 我々は envFrom だが default で OK (annotation patch が template を変え rolling 走る)。
+  reloadStrategy: default
+
+  # 起動時にも一度 reload するか (default false)。Pod 起動時は元々最新 cred を
+  # 引いてるので、reloadOnCreate=false のままで問題なし。
+  reloadOnCreate: false
+
+  # ログ
+  logLevel: info
+
+  # HA は不要 (homelab)。Reloader は idempotent なので 1 replica で十分。
+  enableHA: false
+
+  # Job/CronJob は restart 対象外 (再実行されると意図せぬ副作用が出るため)
+  ignoreJobs: true
+  ignoreCronJobs: true
+
+  deployment:
+    # AMD64 controller: m4neo に集約
+    nodeSelector:
+      kubernetes.io/arch: amd64
+
+    replicas: 1
+    revisionHistoryLimit: 2
+
+    resources:
+      requests:
+        cpu: 10m
+        memory: 64Mi
+      limits:
+        cpu: 100m
+        memory: 128Mi
+
+    # Pod-level security: PSA baseline 互換
+    securityContext:
+      runAsNonRoot: true
+      runAsUser: 65534
+      runAsGroup: 65534
+      seccompProfile:
+        type: RuntimeDefault
+
+    # Container-level security
+    containerSecurityContext:
+      allowPrivilegeEscalation: false
+      capabilities:
+        drop: [ALL]
+      readOnlyRootFilesystem: true
+
+  rbac:
+    enabled: true
+
+  serviceAccount:
+    create: true
+
+  # Prometheus: kube-prometheus-stack が discovery する PodMonitor を使う
+  # (ServiceMonitor は chart 内で deprecated 予告、PodMonitor 推奨)
+  podMonitor:
+    enabled: true
+    # PodMonitor を monitoring ns に置くと kube-prometheus-stack の
+    # `release: prometheus` selector に拾われる。
+    namespace: monitoring
+    labels:
+      release: prometheus
