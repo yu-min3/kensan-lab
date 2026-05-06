@@ -1,12 +1,11 @@
 # Environments
 
-Application 用の共有 namespace (`app-dev`, `app-prod`) の bootstrap を置く。
+Application 用の共有 namespace (`app-prod`) の bootstrap を置く。
 **per-app ns 化が完了したら廃止予定**。
 
 ## Application Environments
 
-- `app-dev` — 開発環境共有 ns
-- `app-prod` — 本番環境共有 ns
+- `app-prod` — Backstage scaffolded app の共有 ns
 
 ## 過去の構成 (移行済み)
 
