@@ -25,7 +25,7 @@ argument-hint:
    | Certificate | Secret | Used By |
    |------------|--------|---------|
    | wildcard-platform | wildcard-platform-tls | gateway-platform |
-   | wildcard-apps | wildcard-apps-tls | gateway-prod, gateway-dev |
+   | wildcard-apps | wildcard-apps-tls | gateway-prod |
 
 4. **Check for expiring certificates**:
    - Flag any cert expiring within 30 days
