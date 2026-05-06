@@ -296,6 +296,25 @@ GRAFANA_CLIENT_UUID=$(ensure_oidc_client \
   "$GRAFANA_WEB_ORIGINS" \
   "https://$GRAFANA_HOSTNAME/login")
 
+# === ArgoCD OIDC client (Path B — ArgoCD 自前 OIDC) ===
+# ArgoCD は argocd-cm の oidc.config で直接 Keycloak と connect する。
+# Vault / ArgoCD は Category 1 (bypass) で扱い、app native auth に任せる方針通り。
+# redirect_uri: ArgoCD の OIDC callback path /auth/callback (UI), /pkce/verify (CLI)
+ARGOCD_HOSTNAME="argocd.platform.yu-min3.com"
+ARGOCD_REDIRECT_URIS=$(jq -nc \
+  --arg ui_cb "https://$ARGOCD_HOSTNAME/auth/callback" \
+  --arg cli_cb "http://localhost:8085/auth/callback" \
+  --arg pkce_cb "https://$ARGOCD_HOSTNAME/pkce/verify" \
+  '[$ui_cb, $cli_cb, $pkce_cb]')
+ARGOCD_WEB_ORIGINS=$(jq -nc --arg origin "https://$ARGOCD_HOSTNAME" '[$origin]')
+ARGOCD_CLIENT_UUID=$(ensure_oidc_client \
+  "argocd" \
+  "ArgoCD OIDC" \
+  "ArgoCD argocd-cm.oidc.config (Path B — gateway-platform bypass)" \
+  "$ARGOCD_REDIRECT_URIS" \
+  "$ARGOCD_WEB_ORIGINS" \
+  "https://$ARGOCD_HOSTNAME")
+
 # === Vault client_secret 取得 ===
 echo ""
 echo "==> Fetching Vault client_secret..."
@@ -381,6 +400,25 @@ Created by: bootstrap/keycloak/setup.sh"
 save_bw "kensan-lab/keycloak/oidc-client-grafana" \
   "grafana" "$GRAFANA_CLIENT_SECRET" "$GRAFANA_NOTES"
 
+# === ArgoCD client_secret 取得 + Bitwarden 保存 ===
+echo ""
+echo "==> Fetching argocd client_secret..."
+ARGOCD_CLIENT_SECRET=$(kcadm get "clients/$ARGOCD_CLIENT_UUID/client-secret" -r "$REALM" 2>/dev/null \
+  | jq -r '.value')
+if [ -z "$ARGOCD_CLIENT_SECRET" ] || [ "$ARGOCD_CLIENT_SECRET" = "null" ]; then
+  echo "ERROR: argocd client_secret が取れない"; exit 1
+fi
+echo "    argocd client_secret 取得 OK (${ARGOCD_CLIENT_SECRET:0:8}...)"
+
+ARGOCD_NOTES="ArgoCD OIDC client (Path B — gateway bypass + argocd-cm.oidc.config 直結).
+Realm: $REALM
+ClientID: argocd
+DiscoveryURL: https://auth.platform.yu-min3.com/realms/$REALM
+Used by: ArgoCD in argocd namespace (configs.cm.oidc.config)
+Created by: bootstrap/keycloak/setup.sh"
+save_bw "kensan-lab/keycloak/oidc-client-argocd" \
+  "argocd" "$ARGOCD_CLIENT_SECRET" "$ARGOCD_NOTES"
+
 if [ -n "${USER_PW:-}" ]; then
   USER_NOTES="Keycloak user for kensan realm.
 Realm: $REALM
@@ -465,6 +503,31 @@ vault_populate_grafana_oidc_kv() {
   echo "    populated OK"
 }
 
+# === Vault KV 投入 (ArgoCD argocd-cm.oidc.config 用) ===
+# KV path: secret/security/argocd/oidc
+# 投入 keys: client-id / client-secret
+# ESO の external-secrets-read policy で read 可能、追加 policy 不要。
+ARGOCD_OIDC_VAULT_PATH="secret/security/argocd/oidc"
+
+vault_populate_argocd_oidc_kv() {
+  echo ""
+  echo "==> Populating Vault KV: $ARGOCD_OIDC_VAULT_PATH"
+
+  if vault kv get -format=json "$ARGOCD_OIDC_VAULT_PATH" >/dev/null 2>&1; then
+    local existing_keys
+    existing_keys=$(vault kv get -format=json "$ARGOCD_OIDC_VAULT_PATH" \
+      | jq -r '.data.data | keys | join(",")')
+    echo "    既存 KV あり (keys: $existing_keys) — 上書き"
+  else
+    echo "    KV path 未存在、新規作成"
+  fi
+
+  vault kv put "$ARGOCD_OIDC_VAULT_PATH" \
+    client-id=argocd \
+    client-secret="$ARGOCD_CLIENT_SECRET" > /dev/null
+  echo "    populated OK"
+}
+
 print_gateway_vault_manual() {
   cat <<MSG
 
@@ -478,6 +541,7 @@ print_gateway_vault_manual() {
     COOKIE=\$(openssl rand -base64 32 | tr '+/' '-_' | tr -d '=' | tr -d '\\n')   # URL-safe
     CSEC=\$(bw get item kensan-lab/keycloak/oidc-client-istio-gateway-platform | jq -r .login.password)
     GSEC=\$(bw get item kensan-lab/keycloak/oidc-client-grafana | jq -r .login.password)
+    ASEC=\$(bw get item kensan-lab/keycloak/oidc-client-argocd | jq -r .login.password)
 
     # 2. Vault に投入 (Gateway oauth2-proxy 用)
     vault kv put $GATEWAY_VAULT_PATH \\
@@ -490,9 +554,15 @@ print_gateway_vault_manual() {
       client-id=grafana \\
       client-secret="\$GSEC"
 
+    # 2''. Vault に投入 (ArgoCD 自前 OIDC 用)
+    vault kv put $ARGOCD_OIDC_VAULT_PATH \\
+      client-id=argocd \\
+      client-secret="\$ASEC"
+
     # 3. 確認
     vault kv get -format=json $GATEWAY_VAULT_PATH | jq '.data.data | keys'
     vault kv get -format=json $GRAFANA_OIDC_VAULT_PATH | jq '.data.data | keys'
+    vault kv get -format=json $ARGOCD_OIDC_VAULT_PATH | jq '.data.data | keys'
 MSG
 }
 
@@ -505,6 +575,7 @@ elif ! vault token lookup &>/dev/null; then
 else
   vault_populate_gateway_kv
   vault_populate_grafana_oidc_kv
+  vault_populate_argocd_oidc_kv
 fi
 
 # === 出力 ===
