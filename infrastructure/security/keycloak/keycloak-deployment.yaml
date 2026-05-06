@@ -2,6 +2,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: keycloak
+  namespace: platform-auth-prod
 spec:
   replicas: 1
   selector:
@@ -12,11 +13,19 @@ spec:
       labels:
         app: keycloak
       annotations:
-        ## Stakater Reloader (search/match): keycloak-postgres-cred (Vault dynamic
-        ## cred) が rotate されたら Pod を rolling restart して新 env を取り込む。
-        ## Secret 側 match=true は VDBE chart template で injected。
+        ## Stakater Reloader: keycloak-postgres-cred (Vault dynamic cred, 12h rotation)
+        ## が rotate されたら Pod を rolling restart して新 env を取り込む。
         reloader.stakater.com/search: "true"
     spec:
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+              - matchExpressions:
+                  - key: hardware-class
+                    operator: In
+                    values:
+                      - high-performance
       containers:
       - name: keycloak
         image: quay.io/keycloak/keycloak:23.0
@@ -27,8 +36,6 @@ spec:
             name: keycloak-env-config
         - secretRef:
             name: keycloak-secret
-        ## Vault dynamic cred (KC_DB_USERNAME / KC_DB_PASSWORD で上書き、rotation 12h)
-        ## prod/dev で同名 Secret (overlay 側 vault-database values で targetSecretName 指定)
         - secretRef:
             name: keycloak-postgres-cred
         ports:
@@ -49,7 +56,7 @@ spec:
         resources:
           requests:
             memory: "512Mi"
-            cpu: "500m"
+            cpu: "250m"
           limits:
-            memory: "1Gi"
-            cpu: "1000m"
+            memory: "2Gi"
+            cpu: "2000m"

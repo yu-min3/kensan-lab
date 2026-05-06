@@ -375,19 +375,15 @@ singleBinary:
                   - high-performance
 ```
 
-### 2.4 Patching Kustomize-Managed Components
+### 2.4 Patching Manifest-Managed Components
 
-Keycloak and Backstage are managed with Kustomize, so add strategic merge patches to overlays.
+For components managed via flat manifests (no kustomize overlay), edit the `affinity` block directly in the Deployment / StatefulSet manifest.
 
-#### Keycloak (each prod/dev overlay)
+#### Keycloak
 
-Create `infrastructure/security/keycloak/overlays/prod/affinity-patch.yaml`:
+Edit `affinity` in `infrastructure/security/keycloak/keycloak-deployment.yaml`:
 
 ```yaml
-apiVersion: apps/v1
-kind: Deployment
-metadata:
-  name: keycloak
 spec:
   template:
     spec:
@@ -403,18 +399,11 @@ spec:
                       - high-performance
 ```
 
-Add to `kustomization.yaml`'s `patches:`:
-
-```yaml
-patches:
-  - path: affinity-patch.yaml
-```
-
-> A similar patch can be applied to the PostgreSQL StatefulSet, but for databases it may be safer to pin to the current node from a data locality perspective. Make this decision in conjunction with PV placement.
+> A similar block can be added to `postgresql-statefulset.yaml`, but for databases it may be safer to pin to the current node from a data locality perspective. Make this decision in conjunction with PV placement.
 
 #### Backstage
 
-Apply the same approach by adding a patch to `backstage/manifests/overlays/prod/`.
+Edit the `affinity` block directly in `backstage/manifests/backstage-deployment.yaml`.
 
 ### 2.5 Applying Changes and Verification
 

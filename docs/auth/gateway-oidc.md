@@ -54,7 +54,6 @@
 | Host | Category | 許可 group | 認証方式 |
 |---|---|---|---|
 | `auth.platform.yu-min3.com` | 1: bypass | (claim 検査なし) | Keycloak 自身 |
-| `auth-dev.platform.yu-min3.com` | 1: bypass | (claim 検査なし) | Keycloak (dev) |
 | `oauth2-proxy.platform.yu-min3.com` | 1: bypass | (claim 検査なし) | callback 専用、保護対象外 |
 | `vault.platform.yu-min3.com` | 1: bypass | (claim 検査なし) | Vault native OIDC + Vault token |
 | `argocd.platform.yu-min3.com` | 1: bypass | (claim 検査なし) | ArgoCD native OIDC + 自前 JWT |

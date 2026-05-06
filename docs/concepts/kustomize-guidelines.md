@@ -1,5 +1,7 @@
 # Kustomize Usage Guidelines
 
+> **DEPRECATED (2026-05):** Kustomize has been removed from `infrastructure/` as part of the dev/prod consolidation work. All components now use ArgoCD `directory` source on flat YAML directories. The Backstage scaffolder template still emits Kustomize for new apps; that's the only remaining usage. This doc will be rewritten or removed in a follow-up.
+
 This document defines guidelines for when to use and when not to use Kustomize within the `infrastructure/` directory.
 
 ## Guiding Principles
