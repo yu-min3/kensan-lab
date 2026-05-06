@@ -13,9 +13,18 @@ spec:
       labels:
         app: backstage
     spec:
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+              - matchExpressions:
+                  - key: hardware-class
+                    operator: In
+                    values:
+                      - high-performance
       containers:
       - name: backstage
-        image: ghcr.io/yu-min3/backstage:latest
+        image: ghcr.io/yu-min3/backstage:v0.0.8
         imagePullPolicy: Always
         ports:
         - containerPort: 7007
