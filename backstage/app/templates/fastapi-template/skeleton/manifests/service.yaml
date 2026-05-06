@@ -2,6 +2,7 @@ apiVersion: v1
 kind: Service
 metadata:
   name: ${{ values.name }}
+  namespace: app-prod
   labels:
     app: ${{ values.name }}
 spec:

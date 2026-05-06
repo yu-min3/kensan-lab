@@ -2,6 +2,7 @@ apiVersion: monitoring.coreos.com/v1
 kind: ServiceMonitor
 metadata:
   name: ${{ values.name }}
+  namespace: app-prod
   labels:
     app: ${{ values.name }}
     prometheus: kube-prometheus
