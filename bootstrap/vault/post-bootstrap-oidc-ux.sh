@@ -56,23 +56,16 @@ vault write auth/oidc/config \
 echo "    OK"
 
 echo ""
-echo "==> Setting UI default login method = oidc (root namespace)"
-# ルール名は任意。namespace_path 空文字 = root namespace。
-# backup_auth_types は空 (token method は常に裏に居るので)。
-vault write sys/config/ui/login/default-auth/oidc-default \
-  namespace_path="" \
-  default_auth_type="oidc" \
-  disable_inheritance=false \
-  backup_auth_types=""
-echo "    OK"
+echo "==> UI default-auth はスキップ (Vault Enterprise 専用 endpoint、OSS では 404)"
+echo "    OSS 代替: ブックマーク URL で OIDC method を pre-select する:"
+echo "      https://vault.platform.yu-min3.com/ui/vault/auth?with=oidc/"
+echo "    開いたら Role 欄空のまま Sign in (default_role=default で通る)"
 
 echo ""
 echo "==> Verify"
 echo "  - auth/oidc/config:"
 vault read auth/oidc/config 2>&1 | grep -E "default_role|oidc_discovery_url" | sed 's/^/      /'
-echo ""
-echo "  - sys/config/ui/login/default-auth/oidc-default:"
-vault read sys/config/ui/login/default-auth/oidc-default 2>&1 | grep -E "default_auth_type|namespace_path" | sed 's/^/      /'
 
 echo ""
-echo "==> Done. UI を開くと OIDC method 既定 + Role 空欄で Sign in 可能になる。"
+echo "==> Done. ブラウザで下記を開けば 1-click login:"
+echo "    https://vault.platform.yu-min3.com/ui/vault/auth?with=oidc/"
