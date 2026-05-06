@@ -14,7 +14,7 @@ images:
 - name: ghcr.io/yu-min3/kensan-frontend
   newTag: v0.0.3
 - name: ghcr.io/yu-min3/kensan-user
-  newTag: v0.0.2
+  newTag: v0.0.3
 - name: ghcr.io/yu-min3/kensan-task
   newTag: v0.0.2
 - name: ghcr.io/yu-min3/kensan-timeblock
