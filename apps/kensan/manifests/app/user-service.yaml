@@ -1,0 +1,108 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: user-service
+  namespace: kensan-prod
+  labels:
+    app: user-service
+spec:
+  selector:
+    app: user-service
+  ports:
+  - port: 8081
+    targetPort: 8081
+    name: http
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: user-service
+  namespace: kensan-prod
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: user-service
+  template:
+    metadata:
+      labels:
+        app: user-service
+    spec:
+      # ServiceAccount = "user-service" (kensan-{prod,dev} ns に存在)
+      # Vault Transit に k8s SA JWT で auth する主体 (Stage 6, kensan-users-transit role)
+      serviceAccountName: user-service
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+            - matchExpressions:
+              - key: kubernetes.io/arch
+                operator: In
+                values:
+                - amd64
+      containers:
+      - name: user-service
+        image: ghcr.io/yu-min3/kensan-user:v0.0.3
+        imagePullPolicy: Always
+        envFrom:
+        - configMapRef:
+            name: kensan-env-config
+        env:
+        - name: SERVER_PORT
+          value: "8081"
+        - name: DB_HOST
+          value: postgresql.kensan-data.svc.cluster.local
+        - name: DB_PORT
+          value: "5432"
+        - name: DB_USER
+          valueFrom:
+            secretKeyRef:
+              name: kensan-app-credentials
+              key: DB_USER
+        - name: DB_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: kensan-app-credentials
+              key: DB_PASSWORD
+        - name: JWT_SECRET
+          valueFrom:
+            secretKeyRef:
+              name: kensan-app-credentials
+              key: JWT_SECRET
+        - name: DEMO_SEED_DIR
+          value: /app/seeds
+        # Vault Transit (Stage 6) - users.name 暗号化
+        - name: VAULT_ADDR
+          value: "http://vault.vault.svc.cluster.local:8200"
+        - name: VAULT_AUTH_ROLE
+          value: "kensan-users-transit"
+        - name: VAULT_TRANSIT_KEY
+          value: "users-name"
+        - name: OTEL_ENABLED
+          value: "true"
+        - name: OTEL_COLLECTOR_URL
+          value: "otel-collector-opentelemetry-collector.monitoring.svc:4318"
+        - name: OTEL_RESOURCE_ATTRIBUTES
+          value: "service.name=user-service,service.namespace=kensan,deployment.environment=$(DEPLOYMENT_ENVIRONMENT)"
+        ports:
+        - containerPort: 8081
+          name: http
+        resources:
+          requests:
+            cpu: 50m
+            memory: 128Mi
+          limits:
+            cpu: 200m
+            memory: 256Mi
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8081
+          initialDelaySeconds: 10
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 8081
+          initialDelaySeconds: 5
+          periodSeconds: 5

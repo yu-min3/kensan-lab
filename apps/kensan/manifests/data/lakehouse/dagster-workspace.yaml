@@ -1,0 +1,11 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: dagster-workspace
+  namespace: kensan-data
+data:
+  workspace.yaml: |
+    load_from:
+      - grpc_server:
+          host: dagster-user-code
+          port: 4000
