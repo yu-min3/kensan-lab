@@ -11,6 +11,10 @@ spec:
     metadata:
       labels:
         app: dagster-user-code
+      annotations:
+        ## Stakater Reloader: postgres-kensan-dagster-cred (Vault dynamic cred,
+        ## 12h rotation) が rotate されたら rolling restart で新 DAGSTER_PG_URL を取得。
+        reloader.stakater.com/search: "true"
     spec:
       containers:
       - name: dagster-user-code
