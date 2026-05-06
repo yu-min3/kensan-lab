@@ -17,18 +17,16 @@ globs: "infrastructure/network/**, **/httproute*, **/gateway*"
 | Gateway | IP |
 |---------|----|
 | gateway-platform | 192.168.0.242 |
-| gateway-dev | 192.168.0.241 |
 | gateway-prod | 192.168.0.243 |
 
 ## Gateway Architecture
 
-Three Istio Gateways in `infrastructure/network/istio/resources/`:
+Two Istio Gateways:
 
 | Gateway | Domain Pattern | Certificate Secret |
 |---------|---------------|--------------------|
 | gateway-platform | `*.platform.yu-min3.com` | `wildcard-platform-tls` |
 | gateway-prod | `*.app.yu-min3.com` | `wildcard-apps-tls` |
-| gateway-dev | `*.app.yu-min3.com` | `wildcard-apps-tls` |
 
 ## Domain Examples
 
@@ -36,8 +34,7 @@ Three Istio Gateways in `infrastructure/network/istio/resources/`:
 - Argo CD: `argocd.platform.yu-min3.com`
 - Prometheus: `prometheus.platform.yu-min3.com`
 - Grafana: `grafana.platform.yu-min3.com`
-- Keycloak (prod): `auth.platform.yu-min3.com`
-- Keycloak (dev): `auth-dev.platform.yu-min3.com`
+- Keycloak: `auth.platform.yu-min3.com`
 - Apps: `<appname>.app.yu-min3.com`
 
 ## HTTPRoute Convention

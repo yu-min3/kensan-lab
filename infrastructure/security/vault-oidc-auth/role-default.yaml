@@ -1,13 +1,11 @@
 ## Vault JWT/OIDC role "default" — 全 Keycloak ユーザーが通る単一 role
 ##
-## 旧 platform-admin / platform-dev role は role 別に bound_claims + token_policies で
-## ユーザーの権限を分けていたが、login UX が悪い (Role 入力必須)。本 role は:
-## - bound_claims で platform-admin or platform-dev を許可 (どちらにも居ないユーザーは reject)
+## - bound_claims で platform-admin のみ許可 (それ以外は reject)
 ## - token_policies は付けず、policy は External Identity Group (group-*.yaml) 側で attach
 ##   → entity が groups claim から派生した group_alias 経由で policy を継承する仕組み
 ##
 ## auth/oidc/config の default_role を "default" に切り替えることで、Vault UI の
-## Role 欄を空のまま Sign in でこの role が使われる (post-bootstrap-oidc-ux.sh で実行)。
+## Role 欄を空のまま Sign in でこの role が使われる。
 ##
 ## redirect_uris は bootstrap/keycloak/setup.sh が Keycloak の "vault" client に
 ## 登録してる UI と CLI 両方の callback。
@@ -30,7 +28,6 @@ spec:
   boundClaims:
     groups:
       - platform-admin
-      - platform-dev
   tokenPolicies: []              # policy は External Group 経由 (group-*.yaml) で attach
   tokenTTL: "1h"
   tokenMaxTTL: "8h"
