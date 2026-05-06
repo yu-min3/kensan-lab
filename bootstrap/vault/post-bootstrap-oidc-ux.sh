@@ -33,9 +33,11 @@ if ! vault token lookup >/dev/null 2>&1; then
 fi
 
 echo "==> Setting auth/oidc/config default_role=default"
-# config の他 field (oidc_discovery_url 等) を上書きしないよう、
-# JSON patch 的に default_role だけ送る。Vault は merge update なので OK。
-vault write auth/oidc/config default_role=default
+# 重要: `vault write` は full-replace なので、default_role だけ送ると
+# oidc_discovery_url / oidc_client_id 等が消える (HTTP PUT semantics)。
+# `vault patch` (Vault 1.16+ で導入された partial update) を使い、
+# 既存 field を維持したまま default_role だけ更新する。
+vault patch auth/oidc/config default_role=default
 echo "    OK"
 
 echo ""
