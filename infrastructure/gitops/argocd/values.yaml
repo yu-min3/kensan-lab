@@ -9,6 +9,16 @@ server:
   service:
     type: ClusterIP
 
+# repo-server: helm template / git clone を担当。Pi 群が NotReady になった
+# 直後の reschedule 時に大量の chart render が瞬間的に走り、chart default の
+# liveness/readiness `timeoutSeconds: 1` が短すぎて probe 失敗 → CrashLoopBackOff。
+# 5s に伸ばすと負荷スパイク中も生存。延ばしても通常時の検知遅延は数秒なので影響軽微。
+repoServer:
+  livenessProbe:
+    timeoutSeconds: 5
+  readinessProbe:
+    timeoutSeconds: 5
+
 # Argo CD parameters
 configs:
   params:
