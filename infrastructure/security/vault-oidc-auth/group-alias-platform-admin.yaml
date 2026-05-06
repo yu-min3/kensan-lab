@@ -1,0 +1,21 @@
+## GroupAlias: Keycloak group "platform-admin" → Vault Identity Group "platform-admin"
+##
+## OIDC login token の groups claim ["platform-admin"] が来ると、JWT backend は
+## 対応する mount path 上の name="platform-admin" alias を探し、それが指す
+## external Group の policies を entity に effective とする。
+##
+## name と groupName は混同注意:
+## - name: Keycloak 側の group 名 (= claim 値)
+## - groupName: Vault Identity Group の name (= group-platform-admin.yaml の spec.name)
+apiVersion: redhatcop.redhat.io/v1alpha1
+kind: GroupAlias
+metadata:
+  name: platform-admin
+  namespace: vault
+spec:
+  authentication:
+    path: kubernetes
+    role: vault-config-operator
+  name: platform-admin              # Keycloak group 名 (token claim value)
+  groupName: platform-admin         # Vault Identity Group name
+  authEngineMountPath: oidc         # JWT/OIDC backend の mount path

@@ -1,0 +1,15 @@
+## External Identity Group "platform-dev"
+## platform-admin と同じ仕組み、attach する policy が "platform-dev" になるだけ。
+apiVersion: redhatcop.redhat.io/v1alpha1
+kind: Group
+metadata:
+  name: platform-dev
+  namespace: vault
+spec:
+  authentication:
+    path: kubernetes
+    role: vault-config-operator
+  name: platform-dev
+  type: external
+  policies:
+    - platform-dev         # TF で作成済 (bootstrap/vault/policies.tf)
