@@ -24,8 +24,7 @@
 | ns | Secret | アプリ | 状態 |
 |---|---|---|---|
 | kensan-data | postgres-kensan-dagster-cred | dagster (3 deployment) | ✅ 使用中 |
-| platform-auth-prod | keycloak-postgres-cred | keycloak prod | ✅ 使用中 |
-| platform-auth-dev | keycloak-postgres-cred | keycloak dev | ✅ 使用中 |
+| platform-auth-prod | keycloak-postgres-cred | keycloak | ✅ 使用中 |
 | kensan-data | postgres-kensan-app-cred | (なし) | ⏸ 生成のみ。kensan-app は cross-ns 課題で revert (下記 *据置* 参照) |
 | backstage | postgres-backstage-cred | (なし) | ⏸ 生成のみ。backstage は plugin DB GRANT 課題で revert (下記 *据置* 参照) |
 
