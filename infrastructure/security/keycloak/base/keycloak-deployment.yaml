@@ -11,6 +11,11 @@ spec:
     metadata:
       labels:
         app: keycloak
+      annotations:
+        ## Stakater Reloader (search/match): keycloak-postgres-cred (Vault dynamic
+        ## cred) が rotate されたら Pod を rolling restart して新 env を取り込む。
+        ## Secret 側 match=true は VDBE chart template で injected。
+        reloader.stakater.com/search: "true"
     spec:
       containers:
       - name: keycloak
