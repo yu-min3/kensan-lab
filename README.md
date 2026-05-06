@@ -113,7 +113,7 @@ infrastructure/                    # Core platform (GitOps-managed)
 ├── observability/                # Prometheus, Grafana, Loki, Tempo, OTel Collector
 ├── network/                      # Cilium, Istio, Gateway API
 ├── security/                     # cert-manager, Sealed Secrets, Keycloak
-├── environments/                 # app-dev, app-prod, kensan-dev, kensan-prod, kensan-data, observability, system-infra
+├── environments/                 # app-dev, app-prod, kensan-prod, kensan-data, observability, system-infra
 └── storage/                      # local-path-provisioner
 backstage/                        # Developer portal (app/ + manifests/)
 apps/                             # Applications deployed on the platform

@@ -47,7 +47,7 @@ find infrastructure/gitops/ backstage/ apps/ -type f \( -name "*.yaml" -o -name 
 |-----------|------|-------|
 | Argo CD Apps | `infrastructure/gitops/argocd/applications/**/app.yaml` | `repoURL` |
 | Root App | `infrastructure/gitops/argocd/root-apps/platform-root-app.yaml` | `repoURL` |
-| Container images | `apps/kensan/manifests/base/app/*.yaml` | `ghcr.io/yu-min3/...` |
+| Container images | `apps/kensan/manifests/app/*.yaml` | `ghcr.io/yu-min3/...` |
 | Backstage image | `backstage/manifests/overlays/prod/kustomization.yaml` | `ghcr.io/yu-min3/backstage` |
 
 ### 3. LoadBalancer IP Range
