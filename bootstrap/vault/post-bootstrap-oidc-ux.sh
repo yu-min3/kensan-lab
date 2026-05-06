@@ -33,11 +33,26 @@ if ! vault token lookup >/dev/null 2>&1; then
 fi
 
 echo "==> Setting auth/oidc/config default_role=default"
-# 重要: `vault write` は full-replace なので、default_role だけ送ると
-# oidc_discovery_url / oidc_client_id 等が消える (HTTP PUT semantics)。
-# `vault patch` (Vault 1.16+ で導入された partial update) を使い、
-# 既存 field を維持したまま default_role だけ更新する。
-vault patch auth/oidc/config default_role=default
+# 重要: auth/oidc/config エンドポイントは:
+# - vault write は HTTP PUT で full-replace (指定しない field は消える)
+# - vault patch は HTTP PATCH 405 Method Not Allowed (実機検証 2026-05-06)
+# したがって全 field を毎回明示する full-write しか選択肢なし。
+# oidc_client_secret は Bitwarden から runtime 取得 (script 内に平文残さない)。
+if ! command -v bw >/dev/null 2>&1; then
+  echo "ERROR: bw CLI not found (Bitwarden CLI が必要)"; exit 1
+fi
+if [ "$(bw status 2>/dev/null | jq -r '.status' 2>/dev/null)" != "unlocked" ]; then
+  echo "ERROR: bw が unlock 状態じゃない (export BW_SESSION=\$(bw unlock --raw))"; exit 1
+fi
+VAULT_OIDC_CLIENT_SECRET=$(bw get item kensan-lab/keycloak/oidc-client-vault | jq -r '.login.password')
+if [ -z "$VAULT_OIDC_CLIENT_SECRET" ] || [ "$VAULT_OIDC_CLIENT_SECRET" = "null" ]; then
+  echo "ERROR: BW から vault client_secret 取得失敗"; exit 1
+fi
+vault write auth/oidc/config \
+  oidc_discovery_url="https://auth.platform.yu-min3.com/realms/kensan" \
+  oidc_client_id="vault" \
+  oidc_client_secret="$VAULT_OIDC_CLIENT_SECRET" \
+  default_role="default"
 echo "    OK"
 
 echo ""
