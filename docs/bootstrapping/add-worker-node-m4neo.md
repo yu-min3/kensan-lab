@@ -414,7 +414,7 @@ patches:
 
 #### Backstage
 
-Apply the same approach by adding a patch to `backstage/manifests/overlays/prod/`.
+Edit the `affinity` block directly in `backstage/manifests/backstage-deployment.yaml` (no kustomize overlay).
 
 ### 2.5 Applying Changes and Verification
 
