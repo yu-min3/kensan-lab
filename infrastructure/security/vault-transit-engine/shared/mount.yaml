@@ -1,0 +1,18 @@
+## Vault Transit secret engine の mount 有効化 (Stage 6 capability の bootstrap)
+##
+## VCO は TransitSecretEngine CR を持たない (2026-05 時点で対応 CR 無し)。
+## そのため:
+##  - mount: 本ファイル (SecretEngineMount で transit/ を生やす)
+##  - key の作成 / rotate: 本 capability の temp/setup-transit-keys.sh を Yu が一度だけ実行
+##  - policy / k8s SA auth role: 同階層の他ファイルで宣言的に管理
+apiVersion: redhatcop.redhat.io/v1alpha1
+kind: SecretEngineMount
+metadata:
+  name: transit
+  namespace: vault
+spec:
+  authentication:
+    path: kubernetes
+    role: vault-config-operator
+  type: transit
+  path: ""  # mount は "transit/" (metadata.name から決定)

@@ -1,0 +1,46 @@
+## Vault policy `kensan-users-transit`
+## kensan の user-service Pod (kensan-prod / kensan-dev) が users.name を
+## encrypt/decrypt/hmac する最小権限。key 単位 (transit/{encrypt,decrypt,hmac}/users-name) で限定。
+##
+## 設計方針:
+##  - user-service 専用 policy (他の app には付与しない)
+##  - encrypt / decrypt / hmac の 3 endpoint のみ。rotate / config / delete は禁止
+##  - token renew は kensan-users-transit に閉じず、共通 token API を許可
+apiVersion: redhatcop.redhat.io/v1alpha1
+kind: Policy
+metadata:
+  name: kensan-users-transit
+  namespace: vault
+spec:
+  authentication:
+    path: kubernetes
+    role: vault-config-operator
+  policy: |
+    # users.name 暗号化 / 復号 / HMAC (key 限定)
+    path "transit/encrypt/users-name" {
+      capabilities = ["update"]
+    }
+    path "transit/decrypt/users-name" {
+      capabilities = ["update"]
+    }
+    path "transit/hmac/users-name" {
+      capabilities = ["update"]
+    }
+
+    # rewrap (key rotation 時の旧 ciphertext → 最新 key version 再暗号化)
+    path "transit/rewrap/users-name" {
+      capabilities = ["update"]
+    }
+
+    # key の current version 等のメタ情報読み出し (rewrap 判定用、データ復号には不要)
+    path "transit/keys/users-name" {
+      capabilities = ["read"]
+    }
+
+    # token lease 維持 (kubernetes auth 経由 token は default lease 持ち、自動 renew 必要)
+    path "auth/token/renew-self" {
+      capabilities = ["update"]
+    }
+    path "auth/token/lookup-self" {
+      capabilities = ["read"]
+    }
