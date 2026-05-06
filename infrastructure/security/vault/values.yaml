@@ -1,30 +1,5 @@
-# Chart config: infrastructure/gitops/argocd/applications/security/vault/app.yaml
-# Version: 0.32.0 (2026-01-14 release, latest stable as of 2026-05)
-# Vault HA Helm chart with AWS KMS auto-unseal
-#
-# Reference: docs/bootstrapping/12-vault-stage1.md (Stage 1 完了後に作成予定)
-# - 3 replicas, anti-affinity required (各ノード分散)
-# - Storage: local-path 暫定 (Longhorn 未導入のため。Longhorn 導入後 longhorn-single に切替)
-# - AWS KMS auto-unseal (alias/vault-unseal-kensan, ap-northeast-1)
-# - ESO 路線のため injector は disabled
-# - audit device は bootstrap TF (Step e) で enable する
-#
-# 事前手動セットアップ (kubeseal で resources/aws-kms-credentials-sealed.yaml を生成):
-#   1) AWS で IAM user 作成、KMS Encrypt/Decrypt のみ許可、access key 取得
-#   2) cat <<EOF > temp/vault-aws-kms-credentials-raw.yaml
-#      apiVersion: v1
-#      kind: Secret
-#      metadata:
-#        name: vault-aws-kms-credentials
-#        namespace: vault
-#      type: Opaque
-#      stringData:
-#        aws_access_key_id: "<ACCESS_KEY>"
-#        aws_secret_access_key: "<SECRET_KEY>"
-#      EOF
-#   3) kubeseal --format=yaml < temp/vault-aws-kms-credentials-raw.yaml \
-#        > infrastructure/security/vault/resources/aws-kms-credentials-sealed.yaml
-#   4) commit (raw は git-ignored、sealed のみ commit)
+# Vault HA Helm chart with AWS KMS auto-unseal.
+# Bootstrap procedure (AWS IAM + kubeseal): docs/bootstrapping/12-vault-stage1.md
 
 global:
   enabled: true
@@ -39,22 +14,7 @@ injector:
 server:
   enabled: true
 
-  # multi-arch image (arm64 + amd64 で動く)
-  #
-  # tag に空文字 ("") を渡すと chart 0.32.0 の template 内で
-  # `default "latest"` が発動して image: hashicorp/vault:latest が render される。
-  # その結果 2026-04-14 に Vault 2.0.0 が `:latest` に publish されたタイミングで
-  # 全 pod が 2.0 に silent upgrade されてしまった (PR #271 で発覚)。
-  #
-  # 本来は `tag` 行を削除して chart default (0.32.0 では server.image.tag = 1.21.2)
-  # に従わせるのが原則だが、Vault は major 跨ぎ downgrade を公式サポートしないため
-  # 2.0 → 1.21 の戻しは raft snapshot / storage format 互換性で事故るリスクあり。
-  #
-  # 暫定対応: 現に動いている 2.0.0 を明示 pin。
-  # 解除条件: chart 0.33+ がリリースされて server.image.tag default が 2.x line に
-  # 追従した時点で、本 tag 行を削除して chart default に従う運用に戻す。
-  # (chart 0.32.0 は 2026-01-14 リリース、Vault 2.0.0 は 2026-04-14 GA、
-  #  まだ 2.0 を公式サポートする chart は出ていない)
+  # multi-arch image (arm64 + amd64). tag は明示 pin: docs/adr/011-vault-version-pinning.md
   image:
     repository: hashicorp/vault
     tag: "2.0.0"
@@ -65,9 +25,8 @@ server:
     raft:
       enabled: true
       setNodeId: true
-      # 注意: `config` は HCL 文字列で chart デフォルトを完全置換する (merge 不可)
-      # chart デフォルトの ui/listener/storage/service_registration を含めた上で
-      # seal/telemetry を追加。chart upgrade 時はこの string を見直す必要あり
+      # `config` は HCL string で chart default を完全置換する (deep merge 不可)。
+      # chart upgrade 時は default 内容を再確認すること。
       config: |
         ui = true
 
@@ -79,9 +38,7 @@ server:
 
         storage "raft" {
           path = "/vault/data"
-          # 各 Pod が起動時に他の peer に自動 join するため必須。
-          # これが無いと vault-0 が単独で initialize した後 vault-1/2 が
-          # Sealed のまま cluster に join できない (PR #228 までで漏れ)。
+          # retry_join で自動 peer join。詳細: docs/runbooks/vault-raft-join.md
           retry_join {
             leader_api_addr = "http://vault-0.vault-internal:8200"
           }
@@ -108,19 +65,14 @@ server:
           disable_hostname          = true
         }
 
-  # Raft data 用 PVC
-  # TODO(longhorn): Longhorn 導入後 storageClass を longhorn-single に戻す。
-  # local-path は node-local なので PVC は作成ノードに張り付く (移動 = data 喪失)。
-  # vault-0/1/2 は anti-affinity で別ノードに張り付く前提なので HA は形式上成立する。
+  # Raft data 用 PVC (local-path 暫定。docs/roadmap/storage-longhorn.md で Longhorn 移行検討)
   dataStorage:
     enabled: true
     size: 10Gi
     storageClass: local-path
     accessMode: ReadWriteOnce
 
-  # Audit log 用 PVC (audit device #1: file)
-  # audit device の enable は bootstrap TF で行う (vault audit enable file path=/vault/audit/audit.log)
-  # TODO(longhorn): 同上、Longhorn 導入後 longhorn-single に切替
+  # Audit log 用 PVC (file device、enable は bootstrap TF で実施)
   auditStorage:
     enabled: true
     size: 10Gi
@@ -128,8 +80,7 @@ server:
     accessMode: ReadWriteOnce
     mountPath: /vault/audit
 
-  # 各 Pod を別ノードに配置 (HA quorum 維持の前提)
-  # map syntax で書くと Helm の deep merge 対象になる (string `|` だと完全置換のみ)
+  # 各 Pod を別ノードに配置 (HA quorum 維持の前提)。map syntax で deep merge される
   affinity:
     podAntiAffinity:
       requiredDuringSchedulingIgnoredDuringExecution:

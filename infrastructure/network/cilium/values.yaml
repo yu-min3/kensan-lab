@@ -1,63 +1,40 @@
-# Chart config: infrastructure/gitops/argocd/applications/network/cilium/app.yaml
-# Version: 1.18.3
-#
-# Bare-metal cluster with kube-proxy replacement and Hubble observability
+# Bare-metal cluster: kube-proxy replacement + Hubble observability.
+# WiFi 経由のクラスタ向けチューニング: docs/runbooks/cilium-wifi-stability.md
+# DaemonSet update 制約 (maxUnavailable=1): docs/runbooks/cilium-update-strategy.md
 
-# Replace kube-proxy entirely with Cilium
 kubeProxyReplacement: true
 
-# Allow Istio CNI to coexist as a chained plugin
+# Istio CNI と chain させる (exclusive にしない)
 cni:
   exclusive: false
 
-# API server client rate limiting
-# Increased from default (qps:10/burst:20) to prevent lease renewal
-# timeouts on WiFi-only clusters where latency spikes are common.
 k8sClientRateLimit:
   qps: 20
   burst: 40
 
-# Pod CIDR for the cluster
 k8s:
   cluster:
     cidr: 10.244.0.0/16
 
-# IP Address Management mode
 ipam:
   mode: kubernetes
 
-# L2 announcements for LoadBalancer services (bare-metal)
-# Lease timings relaxed for WiFi-only cluster stability.
-# Defaults: leaseDuration=15s, leaseRenewDeadline=10s, leaseRetryPeriod=2s
-# Previous: 30s/20s/4s — still caused intermittent timeouts on WiFi
+# WiFi cluster 向け緩和値 (chart default 15s/10s/2s より長い)
 l2announcements:
   enabled: true
   leaseDuration: 60s
   leaseRenewDeadline: 40s
   leaseRetryPeriod: 8s
 
-# Enable external IPs support
 externalIPs:
   enabled: true
 
-# Network device auto-detection
-# Let Cilium detect the default-route device on each node automatically.
-# Required for mixed-interface clusters (RPi: wlan0, M4 Neo: wlp3s0).
-# L2 announcement interfaces are controlled separately in lb-ippool.yaml.
-
-# DaemonSet update strategy
-# Default maxUnavailable=2 は4ノードクラスタで同時に半数の Agent が停止し、
-# kube-proxy replacement 環境では ClusterIP ルーティングが消失する。
-# Operator のいるノードの Agent が再起動中に API Server 到達不能 → Operator crash の原因。
+# 4 ノードクラスタで Agent 半数同時停止を避ける
 updateStrategy:
   type: RollingUpdate
   rollingUpdate:
     maxUnavailable: 1
 
-# Cilium Operator settings
-# - replicas: 1 (default 2) — 4ノードクラスタで十分。CrashLoop 時の apiserver 負荷を半減
-# - resources: light workload パターンに準拠
-# - extraArgs: K8s client rate limit を抑制し、再起動時の API burst を制限
 operator:
   replicas: 1
   resources:

@@ -1,24 +1,13 @@
-# Chart config: infrastructure/gitops/argocd/applications/security/oauth2-proxy/app.yaml
-# Chart: oauth2-proxy/oauth2-proxy 10.4.3 (appVersion 7.15.2)
-# Reference: ADR-010 (Path A 採択)
-#
-# Role: Gateway-level OIDC authentication front for *.platform.yu-min3.com.
-# Istio's gateway-platform invokes this service via ext_authz (registered as
-# meshConfig.extensionProviders[oauth2-proxy] in istiod values.yaml).
-#
-# 失敗時挙動: Istio 側 failOpen: false なので、本 deployment が落ちると
-# gateway-platform 配下の保護対象 host (Hubble/Prom/Longhorn/Grafana 等)
-# は 503 を返す。replica 2 + PDB で軽減。
+# Gateway-level OIDC auth front (Istio ext_authz). 詳細: docs/auth/oauth2-proxy.md
 
 replicaCount: 2
 
 image:
-  # chart は image.registry (default: quay.io) を repository に prepend するため、
-  # ここで `quay.io/...` と書くと `quay.io/quay.io/...` の double prefix になる。
+  # chart は image.registry (default quay.io) を repository に prepend する。
+  # `quay.io/...` と書くと double prefix になるので registry なしで書く。
   repository: oauth2-proxy/oauth2-proxy
-  tag: v7.15.2  # chart appVersion と一致
+  tag: v7.15.2
 
-# AMD64 限定 (m4neo に固定。Pi5 群は OIDC redirect の負荷分散には不向き)
 nodeSelector:
   kubernetes.io/arch: amd64
 
@@ -36,13 +25,10 @@ resources:
     cpu: 200m
     memory: 128Mi
 
-# session affinity 不要 — cookie に session 情報が入ってる (cookie store)
-# Redis は homelab スケールでは不要 (carpenike 等は使ってるが advanced 用途向け)
+# cookie store のため session affinity 不要 (Redis は homelab スケールには重い)
 
-# Pod-level security: Pod Security Admission baseline 互換
 # chart の top-level `securityContext:` は container 側にマップされる (chart values 仕様)。
-# fsGroup は pod-level 専用フィールドなので podSecurityContext に置く必要がある。
-# runAs* もここに集約: pod から container へ cascade される。
+# fsGroup は pod-level 専用なので podSecurityContext に置く必要あり。
 podSecurityContext:
   runAsNonRoot: true
   runAsUser: 2000
@@ -68,66 +54,46 @@ config:
   # 全 email domain 受け入れ (group 認可は Istio AuthorizationPolicy 側で行う)
   emailDomains: ["*"]
 
-  # OIDC + cookie + session の主設定。configFile は inline 文字列で渡す。
-  # alphaConfig は使わない (legacy config の方が refresh / cookie オプション充実)。
+  # configFile を渡すと chart の `emailDomains` 値は無視される (configFile 優先)。
   configFile: |-
-    # OIDC Provider — Keycloak realm "kensan"
     provider                       = "keycloak-oidc"
     oidc_issuer_url                = "https://auth.platform.yu-min3.com/realms/kensan"
     insecure_oidc_allow_unverified_email = false
 
-    # Email domain — chart の `emailDomains` 値は configFile を渡したとき
-    # 無視される (configFile が優先) ため、ここに直接書く必要がある。
-    # group 認可は Istio AuthorizationPolicy 側でやるので "*" で受ける。
     email_domains                  = ["*"]
 
-    # Cookie 設定 — .platform.yu-min3.com 全 host で 1 session 共有 (SSO の核)
     cookie_domains                 = [".platform.yu-min3.com"]
     cookie_samesite                = "lax"
     cookie_secure                  = true
     cookie_httponly                = true
-    cookie_expire                  = "10h"           # workday 想定
-    cookie_refresh                 = "1h"            # 1h 毎に id_token refresh
+    cookie_expire                  = "10h"
+    cookie_refresh                 = "1h"
 
-    # Open-redirect 防止 — login 後の戻り先を *.platform.yu-min3.com に限定
     whitelist_domains              = [".platform.yu-min3.com"]
 
-    # ext_authz と config 整合 (meshConfig.extensionProviders[].pathPrefix)
     proxy_prefix                   = "/oauth2"
 
-    # OIDC scope — `groups` は scope ではなく claim 名なので scope パラメータには
-    # 含めない (含めると Keycloak が `Invalid scopes: groups` で reject)。
-    # groups claim は istio-gateway-platform client に直付けした
-    # oidc-group-membership-mapper が id.token.claim=true で id_token に
-    # 自動で乗せる。scope なしでも取得可能。
+    # `groups` は Keycloak では scope ではなく claim 名。scope に含めると reject される。
     scope                          = "openid email profile"
 
-    # upstream に渡すヘッダ
     pass_access_token              = true
     pass_authorization_header      = true
     set_authorization_header       = true
     set_xauthrequest               = true
 
-    # Reverse proxy mode — Istio が X-Forwarded-* を埋める
     reverse_proxy                  = true
     real_client_ip_header          = "X-Forwarded-For"
 
-    # ext_authz mode の upstream 必須: 認証成功時 oauth2-proxy が upstream へ
-    # forward しようとして無いと 404 を返す。static://200 で「認証成功 = 200
-    # OK を返してそのまま終了」させる。
-    # 重要: Istio ext_authz は HTTP 200 のみ「allow」と認識する仕様 (202 だと
-    # deny 扱いで oauth2-proxy の static response body "Authenticated" が
-    # client に返ってしまう)。oauth2-proxy upstream docs の標準例も 200。
+    # Istio ext_authz は HTTP 200 のみ「allow」と認識する。
+    # static://200 で 200 を返さないと oauth2-proxy が deny 扱いになる。
     upstreams                      = ["static://200"]
 
-    # IdP 1 種類だけなので "Sign in with Keycloak" ボタン省略
     skip_provider_button           = true
 
-    # Bearer token を持ち込んだリクエスト (CLI 等) は素通り — 二重認証回避
+    # CLI Bearer token (vault login -method=oidc 等) は素通り。
     skip_jwt_bearer_tokens         = true
     extra_jwt_issuers              = ["https://auth.platform.yu-min3.com/realms/kensan=istio-gateway-platform"]
 
-    # Health check endpoint (livenessProbe / readinessProbe 用)
     ping_path                      = "/ping"
     metrics_address                = "0.0.0.0:44180"
 
