@@ -1,18 +1,11 @@
-# Chart config: infrastructure/gitops/argocd/applications/gitops/argocd/app.yaml
-# Version: 9.1.0
-#
-# GitOps controller for Kubernetes
-# TLS termination is handled by Istio Gateway (gateway-platform)
+# GitOps controller. TLS termination は Istio Gateway 側 (gateway-platform)。
+# probe timeout / Keycloak 統合の経緯: docs/runbooks/argocd-repo-server-tuning.md
+#                                     docs/auth/argocd-keycloak-integration.md
 
-# Server configuration
 server:
   service:
     type: ClusterIP
 
-# repo-server: helm template / git clone を担当。Pi 群が NotReady になった
-# 直後の reschedule 時に大量の chart render が瞬間的に走り、chart default の
-# liveness/readiness `timeoutSeconds: 1` が短すぎて probe 失敗 → CrashLoopBackOff。
-# 5s に伸ばすと負荷スパイク中も生存。延ばしても通常時の検知遅延は数秒なので影響軽微。
 repoServer:
   livenessProbe:
     timeoutSeconds: 5
@@ -22,27 +15,12 @@ repoServer:
 # Argo CD parameters
 configs:
   params:
-    # Run without TLS - Istio Gateway handles TLS termination
     server.insecure: true
-    # ServerSideDiff: K8s API server に diff を計算させて field manager 情報を尊重する。
-    # K8s API / admission webhook が注入するデフォルト値 (StatefulSet の dnsPolicy,
-    # HTTPRoute backendRefs[].kind, ESO の deletionPolicy 等) を drift と誤検知しない。
+    # admission webhook の default 値注入を drift と誤検知させない。
     controller.diff.server.side: "true"
   cm:
-    # 公開 URL (OIDC redirect_uri 構築や server.url で使われる)
     url: "https://argocd.platform.yu-min3.com"
 
-    # === Keycloak OIDC 統合 (Path B — Vault / Grafana と同じ "app native auth") ===
-    # Dex を経由しない直接統合 (Vault / Grafana と同 pattern):
-    # - Keycloak realm "kensan" の `argocd` client を bootstrap/keycloak/setup.sh が作成
-    # - client_secret は Vault KV (secret/security/argocd/oidc) → ESO で argocd-oidc-secret 生成
-    # - argocd-cm が `$argocd-oidc-secret:client-secret` 構文で読む
-    # - role mapping は configs.rbac.policy.csv 側で platform-admin / platform-dev → role:admin / role:readonly
-    #
-    # requestedScopes に `groups` を **含めない**: Keycloak で groups は scope じゃなく
-    # claim 名なので、scope に入れると "Invalid scopes: groups" で reject される。
-    # client に直付けした oidc-group-membership-mapper が id_token に groups を乗せる。
-    # ArgoCD は requestedIDTokenClaims で groups を essential 指定して受け取る。
     oidc.config: |
       name: Keycloak
       issuer: https://auth.platform.yu-min3.com/realms/kensan
@@ -56,9 +34,7 @@ configs:
         groups:
           essential: true
 
-    # ESO admission webhook がデフォルト値 (deletionPolicy/conversionStrategy 等) を
-    # 注入するため、ArgoCD の drift 検知が常に OutOfSync になる。
-    # これらは webhook 管轄なので git に書かなくていい。drift 検知から除外する。
+    # ESO admission webhook が注入する default 値を drift から除外。
     resource.customizations.ignoreDifferences.external-secrets.io_ExternalSecret: |
       jqPathExpressions:
         - .spec.target.deletionPolicy
@@ -66,9 +42,7 @@ configs:
         - .spec.data[].remoteRef.decodingStrategy
         - .spec.data[].remoteRef.metadataPolicy
         - .spec.data[].remoteRef.nullBytePolicy
-    # 全 resource 共通で ignore: helm chart / kubeseal が template に出力する
-    # `creationTimestamp: null` や K8s API が server 側で書く `.status` 系。
-    # ServerSideDiff だけだと拾いきれない drift をここで畳む。
+    # ServerSideDiff で拾い切れない `creationTimestamp: null` / `.status` 系を除外。
     resource.customizations.ignoreDifferences.all: |
       jqPathExpressions:
         - .metadata.creationTimestamp
@@ -76,12 +50,9 @@ configs:
         - .spec.volumeClaimTemplates[]?.metadata.creationTimestamp
         - .status
 
-  # === RBAC (Keycloak group → ArgoCD role mapping) ===
+  # Keycloak group → ArgoCD role mapping。既存 admin user は break-glass として残す。
   rbac:
-    # platform-admin は ArgoCD admin、platform-dev は read-only。
-    # 既存 admin user (`admin.enabled: true` 既定) は break-glass として残す。
     policy.csv: |
       g, platform-admin, role:admin
       g, platform-dev, role:readonly
-    # JWT の groups claim を rbac evaluation で使うように指定
     scopes: '[groups]'
