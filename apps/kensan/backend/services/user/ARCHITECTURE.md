@@ -28,8 +28,9 @@ graph TB
         PubH["Public Handler<br/>/auth/register, /auth/login"]
         AuthH["Auth Handler<br/>/users/me, /users/me/settings"]
         Svc["Service"]
-        Repo["Repository"]
+        Repo["Repository<br/>(name encrypt/decrypt 透過)"]
         JWT["JWTManager"]
+        VEnc["shared/vault.Encryptor<br/>(Transit API client)"]
     end
 
     Client["Frontend / 他サービス"] -->|"POST /auth/*"| PubH
@@ -38,17 +39,31 @@ graph TB
     AuthH --> Svc
     Svc --> Repo
     Svc --> JWT
-    Repo --> DB[(PostgreSQL<br/>users, user_settings)]
+    Repo --> DB[(PostgreSQL<br/>users.name_enc / name_hash)]
+    Repo -->|"encrypt / decrypt / hmac"| VEnc
+    VEnc -->|"k8s SA JWT auth"| Vault[(Vault Transit<br/>transit/keys/users-name)]
     JWT -->|"HS256 署名"| Token["JWT Token"]
 
     style PubH fill:#fef3c7
     style AuthH fill:#dbeafe
+    style VEnc fill:#fce7f3
 ```
 
 **特徴:**
 - 認証エンドポイント（register/login）は Public Routes（JWT 不要）
 - プロファイル/設定エンドポイントは認証必須
 - 他サービスからの依存なし（JWT 検証は shared middleware で行う）
+- `users.name` は Vault Transit で暗号化して `name_enc` に保存、検索用に HMAC-SHA256 を `name_hash` に保存（Stage 6）。Service / Handler は既存の `User.Name` を使うだけで透過
+
+### Vault Transit (Stage 6)
+
+| 項目 | 値 |
+|------|-----|
+| 鍵 | `transit/keys/users-name` (aes256-gcm96) |
+| 認証 | k8s ServiceAccount `user-service` → Vault role `kensan-users-transit` |
+| Policy | `kensan-users-transit` (encrypt / decrypt / hmac / rewrap on `users-name`) |
+| ローカル開発 | `VAULT_ADDR` 未設定なら `vault.NoOpEncryptor` で passthrough（プレフィックス `noop:`） |
+| 検索性 | 完全一致のみ（HMAC で deterministic 比較）。LIKE / ORDER BY は不可 |
 
 ---
 
@@ -83,9 +98,12 @@ erDiagram
 |-----------|-----|------|
 | id | UUID | PK |
 | email | string | UK、ログイン識別子 |
-| name | string | 表示名 |
+| name_enc | BYTEA | Vault Transit ciphertext (`vault:v1:...`) of 表示名。Repository が透過 encrypt/decrypt |
+| name_hash | BYTEA | HMAC-SHA256 (Vault Transit `users-name` 鍵) of 表示名。完全一致検索用 |
 | password_hash | string | bcrypt ハッシュ（JSON 出力から除外） |
 | created_at / updated_at | timestamptz | タイムスタンプ |
+
+> 旧 `name VARCHAR(255)` カラムは Stage 6 移行 PR (#3) で `name_enc` + `name_hash` に置き換え。本 PR (#2) は repository 層の Vault Transit 統合のみ。
 
 ### user_settings
 
