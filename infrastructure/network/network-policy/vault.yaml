@@ -66,8 +66,9 @@ spec:
 ## ADR-009: allow-istio は CCNP allow-istio-for-mesh-ns に集約済み
 
 ---
-## Allow ingress from Vault clients (ESO / VCO) for API access on 8200
+## Allow ingress from Vault clients (ESO / VCO / kensan user-service) for API access on 8200
 ## ESO は ClusterSecretStore で K8s auth login、VCO は CRD reconcile のため Vault API を直接叩く
+## kensan user-service (kensan-{prod,dev}) は Stage 6 Transit (encrypt/decrypt/hmac) を呼ぶ
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
@@ -85,6 +86,12 @@ spec:
         - namespaceSelector:
             matchLabels:
               kubernetes.io/metadata.name: vault-config-operator
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kensan-prod
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kensan-dev
       ports:
         - protocol: TCP
           port: 8200
