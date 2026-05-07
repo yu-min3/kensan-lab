@@ -1,5 +1,7 @@
 # Adding a Bosgame M4 Neo Worker Node
 
+> **2026-05-07 update**: This document was originally written when the cluster ran on WiFi (wlp3s0 on m4neo). The cluster has since migrated to wired LAN (eno1 on m4neo) with WiFi fallback. The bootstrapping procedure below is **still valid** — only the network interface step differs (use `eno1` instead of `wlp3s0`). The IP table below is also updated to the actual `192.168.0.x` segment.
+
 ## Overview
 
 Procedure for adding a Bosgame M4 Neo (AMD64) as a worker node to the existing Raspberry Pi 5 (ARM64) cluster.
@@ -9,12 +11,12 @@ Since this creates a multi-architecture cluster (ARM64 + AMD64), the process is 
 
 ## Node Configuration
 
-| Node | Hostname | IP | Hardware | Architecture | Role |
-|--------|----------|----|-------------|--------------|------|
-| Master | master | 192.168.1.107 | Raspberry Pi 5 (8GB) | ARM64 | control-plane |
-| Worker1 | worker1 | 192.168.1.108 | Raspberry Pi 5 (8GB) | ARM64 | worker |
-| Worker2 | worker2 | 192.168.1.109 | Raspberry Pi 5 (8GB) | ARM64 | worker |
-| **M4 Neo** | **m4neo** | **192.168.1.110** | **Bosgame M4 Neo (Ryzen 7 7840HS, 32GB DDR5)** | **AMD64** | **worker** |
+| Node | Hostname | IP (wired / WiFi fallback) | Hardware | Architecture | Role |
+|--------|----------|------------------------------|-------------|--------------|------|
+| Master | master | 192.168.0.107 / 0.207 | Raspberry Pi 5 (8GB) | ARM64 | control-plane |
+| Worker1 | worker1 | 192.168.0.108 / 0.208 | Raspberry Pi 5 (8GB) | ARM64 | worker |
+| Worker2 | worker2 | 192.168.0.109 / 0.209 | Raspberry Pi 5 (8GB) | ARM64 | worker |
+| **M4 Neo** | **m4neo** | **192.168.0.110 / 0.210** | **Bosgame M4 Neo (Ryzen 7 7840HS, 32GB DDR5)** | **AMD64** | **worker** |
 
 ---
 

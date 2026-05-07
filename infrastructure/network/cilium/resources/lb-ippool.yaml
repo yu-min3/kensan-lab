@@ -13,7 +13,10 @@ metadata:
   name: platform-l2-policy
 spec:
   # Which network interfaces to announce on
+  # 2026-05-07 有線化以降は eth*/en* がメイン。wlan*/wlp* は fallback として残す。
   interfaces:
+  - "^eth.*"
+  - "^en.*"
   - "^wlan.*"
   - "^wlp.*"
 
