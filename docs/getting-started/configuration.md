@@ -60,9 +60,9 @@ Ensure the range does not overlap with your DHCP server's allocation.
 
 ### 4. Network Interface
 
-Cilium L2 Announcements use WiFi interfaces (`^wlan.*`, `^wlp.*`). If your nodes use wired connections, update the interface regex.
+Cilium L2 Announcements default to wired interfaces (`^eth.*`, `^en.*`) with WiFi fallback (`^wlan.*`, `^wlp.*`). Adjust the interface regex to match your nodes' interface names if different.
 
-**File:** `infrastructure/network/cilium/values.yaml`
+**File:** `infrastructure/network/cilium/resources/lb-ippool.yaml`
 
 ### 5. Sealed Secrets
 
