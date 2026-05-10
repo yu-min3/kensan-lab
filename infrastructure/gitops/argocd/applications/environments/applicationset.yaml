@@ -19,8 +19,12 @@ spec:
     metadata:
       name: '{{ .name }}'
       namespace: argocd
-      finalizers:
-        - resources-finalizer.argocd.argoproj.io
+      ## resources-finalizer.argocd.argoproj.io は cascade prune を起こす。
+      ## 本 ApplicationSet が生成する env-kensan-{prod,data} は近日中に
+      ## infrastructure/kensan/ 削除で prune される予定で、その際に
+      ## destination ns ごと巻き添えにすると local-path PV が消えて
+      ## kensan-data の PostgreSQL / MinIO / dagster-postgres が全消失する。
+      ## finalizer 抜きにすれば Application 削除時 resources は孤児化するだけ。
     spec:
       project: platform-project
       source:
