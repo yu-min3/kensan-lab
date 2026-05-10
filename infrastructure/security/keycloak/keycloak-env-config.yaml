@@ -2,13 +2,16 @@ apiVersion: v1
 kind: ConfigMap
 metadata:
   name: keycloak-env-config
+  namespace: platform-auth-prod
 data:
   KC_DB: postgres
   KC_DB_URL_HOST: postgresql
   KC_DB_URL_DATABASE: keycloak
   KC_DB_USERNAME: keycloak
-  KC_HOSTNAME_STRICT: "false"
-  KC_HOSTNAME_STRICT_HTTPS: "false"
+  KC_HOSTNAME: auth.platform.yu-min3.com
+  KC_HOSTNAME_ADMIN: auth.platform.yu-min3.com
+  KC_HOSTNAME_STRICT: "true"
+  KC_HOSTNAME_STRICT_HTTPS: "true"
   KC_HTTP_ENABLED: "true"
   KC_PROXY: "edge"
   KC_HEALTH_ENABLED: "true"

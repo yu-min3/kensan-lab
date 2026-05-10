@@ -38,7 +38,7 @@ Deployment order is controlled by Argo CD sync-waves.
 | -1 | Istiod | `applications/network/istiod/app.yaml` |
 | 0 | cert-manager | `applications/security/cert-manager/app.yaml` |
 | -- | Sealed Secrets | `applications/security/sealed-secrets/app.yaml` |
-| 2 | Keycloak (prod / dev) | `applications/security/keycloak/overlays/{prod,dev}/app.yaml` |
+| 2 | Keycloak | `applications/security/keycloak/app.yaml` |
 | 5 | Vault HA (KMS auto-unseal) | `applications/security/vault/app.yaml` |
 | 6 | External Secrets Operator | `applications/security/external-secrets/app.yaml` |
 | 7 | Vault Config Operator | `applications/security/vault-config-operator/app.yaml` |

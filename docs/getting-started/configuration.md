@@ -27,8 +27,8 @@ find infrastructure/ backstage/ apps/ -type f \( -name "*.yaml" -o -name "*.yml"
 | Certificates | `infrastructure/security/cert-manager/resources/wildcard-certificate-*.yaml` | `*.yu-min3.com` |
 | ClusterIssuer | `infrastructure/security/cert-manager/resources/clusterissuer.yaml` | `admin@yu-min3.com` |
 | HTTPRoutes | `infrastructure/**/resources/httproute*.yaml` | `*.platform.yu-min3.com` |
-| Keycloak | `infrastructure/security/keycloak/overlays/*/httproute.yaml` | `auth.platform.yu-min3.com` |
-| Keycloak env | `infrastructure/security/keycloak/overlays/prod/keycloak-env-patch.yaml` | `KC_HOSTNAME` |
+| Keycloak | `infrastructure/security/keycloak/httproute.yaml` | `auth.platform.yu-min3.com` |
+| Keycloak env | `infrastructure/security/keycloak/keycloak-env-config.yaml` | `KC_HOSTNAME` |
 
 ### 2. GitHub Organization
 

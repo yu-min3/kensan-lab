@@ -44,7 +44,7 @@ spec:
               kubernetes.io/metadata.name: istio-system
 ```
 
-No port restriction. Bidirectional. The `istio-system` namespaceSelector is the access boundary. This is the same shape as the existing `allow-istio` policies in `infrastructure/security/keycloak/base/network-policy.yaml`, `infrastructure/environments/kensan-{prod,dev}/network-policy.yaml`, etc.
+No port restriction. Bidirectional. The `istio-system` namespaceSelector is the access boundary. This is the same shape as the existing `allow-istio` policies in `infrastructure/network/network-policy/keycloak-prod.yaml`, `infrastructure/environments/kensan-{prod,dev}/network-policy.yaml`, etc.
 
 Apply to: `vault`, `external-secrets`, `vault-config-operator`.
 
