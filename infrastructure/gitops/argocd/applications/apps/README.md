@@ -52,7 +52,7 @@ metadata:
   name: app-<app-name>
   namespace: argocd
 spec:
-  project: app-project-prod
+  project: app-project
   source:
     repoURL: https://github.com/yu-min3/kensan-lab-apps-<app-name>.git
     targetRevision: main
