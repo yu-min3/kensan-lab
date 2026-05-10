@@ -112,7 +112,7 @@ infrastructure/                    # コアプラットフォーム（GitOps 管
 ├── observability/                # Prometheus, Grafana, Loki, Tempo, OTel Collector
 ├── network/                      # Cilium, Istio, Gateway API
 ├── security/                     # cert-manager, Sealed Secrets, Keycloak
-├── environments/                 # app-dev, app-prod, kensan-dev, kensan-prod, kensan-data, observability, system-infra
+├── environments/                 # app-dev, app-prod, kensan-prod, kensan-data, observability, system-infra
 └── storage/                      # local-path-provisioner
 backstage/                        # 開発者ポータル（app/ + manifests/）
 apps/                             # プラットフォーム上で稼働するアプリケーション

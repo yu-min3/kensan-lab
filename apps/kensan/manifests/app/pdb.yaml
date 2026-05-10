@@ -1,0 +1,87 @@
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: frontend-pdb
+  namespace: kensan-prod
+spec:
+  maxUnavailable: 1
+  selector:
+    matchLabels:
+      app: frontend
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: user-service-pdb
+  namespace: kensan-prod
+spec:
+  maxUnavailable: 1
+  selector:
+    matchLabels:
+      app: user-service
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: task-service-pdb
+  namespace: kensan-prod
+spec:
+  maxUnavailable: 1
+  selector:
+    matchLabels:
+      app: task-service
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: memo-service-pdb
+  namespace: kensan-prod
+spec:
+  maxUnavailable: 1
+  selector:
+    matchLabels:
+      app: memo-service
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: note-service-pdb
+  namespace: kensan-prod
+spec:
+  maxUnavailable: 1
+  selector:
+    matchLabels:
+      app: note-service
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: timeblock-service-pdb
+  namespace: kensan-prod
+spec:
+  maxUnavailable: 1
+  selector:
+    matchLabels:
+      app: timeblock-service
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: analytics-service-pdb
+  namespace: kensan-prod
+spec:
+  maxUnavailable: 1
+  selector:
+    matchLabels:
+      app: analytics-service
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: kensan-ai-pdb
+  namespace: kensan-prod
+spec:
+  maxUnavailable: 1
+  selector:
+    matchLabels:
+      app: kensan-ai

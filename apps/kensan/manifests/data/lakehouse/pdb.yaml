@@ -1,0 +1,54 @@
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: polaris-pdb
+  namespace: kensan-data
+spec:
+  maxUnavailable: 1
+  selector:
+    matchLabels:
+      app: polaris
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: dagster-postgres-pdb
+  namespace: kensan-data
+spec:
+  maxUnavailable: 1
+  selector:
+    matchLabels:
+      app: dagster-postgres
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: dagster-daemon-pdb
+  namespace: kensan-data
+spec:
+  maxUnavailable: 1
+  selector:
+    matchLabels:
+      app: dagster-daemon
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: dagster-webserver-pdb
+  namespace: kensan-data
+spec:
+  maxUnavailable: 1
+  selector:
+    matchLabels:
+      app: dagster-webserver
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: dagster-user-code-pdb
+  namespace: kensan-data
+spec:
+  maxUnavailable: 1
+  selector:
+    matchLabels:
+      app: dagster-user-code

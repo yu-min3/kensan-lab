@@ -1,13 +1,8 @@
 ## kensan の user-service Pod を Vault に bind する K8s auth role
 ##
 ## - Vault role 名: kensan-users-transit (policy と同名で揃える)
-## - bind 対象: kensan-prod / kensan-dev ns の "user-service" SA
+## - bind 対象: kensan-prod ns の "user-service" SA
 ## - 付与 policy: kensan-users-transit (transit/{encrypt,decrypt,hmac}/users-name のみ)
-##
-## user-service 側 (Stage 6 PR #2) で以下を準備する想定:
-##   - apps/kensan/manifests/base/app/user-service.yaml に serviceAccountName: user-service を追加
-##   - kensan-{prod,dev} ns に ServiceAccount: user-service を作成
-##     (infrastructure/kensan/kensan-{prod,dev}/serviceaccount-user-service.yaml)
 apiVersion: redhatcop.redhat.io/v1alpha1
 kind: KubernetesAuthEngineRole
 metadata:
@@ -26,7 +21,6 @@ spec:
   targetNamespaces:
     targetNamespaces:
       - kensan-prod
-      - kensan-dev
   # token TTL 明示 (default 短すぎ防止 / max は 1h で renew 強制)
   tokenTTL: 1800       # 30 分
   tokenMaxTTL: 3600    # 1 時間

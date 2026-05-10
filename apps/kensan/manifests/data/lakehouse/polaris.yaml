@@ -1,0 +1,106 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: polaris-config
+  namespace: kensan-data
+data:
+  application.properties: |
+    quarkus.datasource.db-kind=postgresql
+    quarkus.datasource.jdbc.url=jdbc:postgresql://dagster-postgres:5432/polaris
+    quarkus.datasource.username=dagster
+    quarkus.datasource.password=dagster
+  aws-config: |
+    [default]
+    region = us-east-1
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: polaris
+  namespace: kensan-data
+  labels:
+    app: polaris
+spec:
+  selector:
+    app: polaris
+  ports:
+  - port: 8181
+    targetPort: 8181
+    name: api
+  - port: 8182
+    targetPort: 8182
+    name: management
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: polaris
+  namespace: kensan-data
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: polaris
+  template:
+    metadata:
+      labels:
+        app: polaris
+    spec:
+      # k8s注入のPOLARIS_*環境変数がQuarkus設定を汚染しSTS呼び出しを誘発するため無効化
+      enableServiceLinks: false
+      containers:
+      - name: polaris
+        image: apache/polaris:1.3.0-incubating
+        env:
+        - name: POLARIS_BOOTSTRAP_CREDENTIALS
+          valueFrom:
+            secretKeyRef:
+              name: kensan-lakehouse-credentials
+              key: POLARIS_BOOTSTRAP_CREDENTIALS
+        - name: AWS_REGION
+          value: us-east-1
+        - name: AWS_ACCESS_KEY_ID
+          valueFrom:
+            secretKeyRef:
+              name: kensan-lakehouse-credentials
+              key: AWS_ACCESS_KEY_ID
+        - name: AWS_SECRET_ACCESS_KEY
+          valueFrom:
+            secretKeyRef:
+              name: kensan-lakehouse-credentials
+              key: AWS_SECRET_ACCESS_KEY
+        ports:
+        - containerPort: 8181
+          name: api
+        - containerPort: 8182
+          name: management
+        volumeMounts:
+        - name: polaris-config
+          mountPath: /deployments/config/application.properties
+          subPath: application.properties
+        - name: polaris-config
+          mountPath: /root/.aws/config
+          subPath: aws-config
+        resources:
+          requests:
+            cpu: 50m
+            memory: 256Mi
+          limits:
+            cpu: 500m
+            memory: 768Mi
+        livenessProbe:
+          httpGet:
+            path: /q/health
+            port: 8182
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /q/health
+            port: 8182
+          initialDelaySeconds: 10
+          periodSeconds: 5
+      volumes:
+      - name: polaris-config
+        configMap:
+          name: polaris-config

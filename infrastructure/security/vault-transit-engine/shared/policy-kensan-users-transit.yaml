@@ -1,5 +1,5 @@
 ## Vault policy `kensan-users-transit`
-## kensan の user-service Pod (kensan-prod / kensan-dev) が users.name を
+## kensan の user-service Pod (kensan-prod) が users.name を
 ## encrypt/decrypt/hmac する最小権限。key 単位 (transit/{encrypt,decrypt,hmac}/users-name) で限定。
 ##
 ## 設計方針:
