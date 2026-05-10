@@ -9,7 +9,7 @@ dev/prod 分離廃止に伴って、Keycloak の dev realm と関連リソース
 - Namespace: `platform-auth-dev`
 - Vault dynamic DB credential role: `keycloak-dev`
 - NetworkPolicy: `infrastructure/network/network-policy/keycloak-dev.yaml` (manifest 側で削除済)
-- Vault DB engine config: `infrastructure/security/vault-database-engine/platform-values/vault-database/keycloak-dev.yaml` (manifest 側で削除済)
+- Vault DB engine config: `infrastructure/secrets/vault-database-engine/platform-values/vault-database/keycloak-dev.yaml` (manifest 側で削除済)
 
 ## 前提
 

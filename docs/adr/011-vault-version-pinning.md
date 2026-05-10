@@ -10,7 +10,7 @@
 
 ## Context
 
-`infrastructure/security/vault/values.yaml` で `server.image.tag` を `"2.0.0"` に明示 pin している。本 ADR はその経緯と解除条件を残す。
+`infrastructure/secrets/vault/values.yaml` で `server.image.tag` を `"2.0.0"` に明示 pin している。本 ADR はその経緯と解除条件を残す。
 
 ### 背景: silent upgrade 事故
 

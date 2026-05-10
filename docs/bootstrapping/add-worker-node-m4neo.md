@@ -383,7 +383,7 @@ For components managed via flat manifests (no kustomize overlay), edit the `affi
 
 #### Keycloak
 
-Edit `affinity` in `infrastructure/security/keycloak/keycloak-deployment.yaml`:
+Edit `affinity` in `infrastructure/auth/keycloak/keycloak-deployment.yaml`:
 
 ```yaml
 spec:

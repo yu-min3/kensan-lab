@@ -1,6 +1,6 @@
 ---
 description: Sealed Secrets workflow, cert-manager, GHCR pull secrets, and sensitive data handling
-globs: "**/sealed-secret*, infrastructure/security/**"
+globs: "**/sealed-secret*, infrastructure/auth/**, infrastructure/secrets/**"
 ---
 
 # Security & Secrets
@@ -21,7 +21,7 @@ globs: "**/sealed-secret*, infrastructure/security/**"
 ## cert-manager
 
 - **ClusterIssuer**: Let's Encrypt (production + staging)
-- **Certificates**: auto-renewed, defined in `infrastructure/security/cert-manager/resources/`
+- **Certificates**: auto-renewed, defined in `infrastructure/secrets/cert-manager/resources/`
 - Wildcard certs: `wildcard-platform-tls` and `wildcard-apps-tls`
 - Manual renewal (rarely needed): delete the cert secret, cert-manager recreates it
 
