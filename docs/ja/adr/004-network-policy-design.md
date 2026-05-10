@@ -68,7 +68,7 @@ Istio sidecar 注入 namespace には追加で：
 | kensan-prod | `infrastructure/environments/kensan-prod/network-policy.yaml` | ApplicationSet (Git directory) |
 | kensan-dev | `infrastructure/environments/kensan-dev/network-policy.yaml` | ApplicationSet (Git directory) |
 | kensan-data | `infrastructure/environments/kensan-data/network-policy.yaml` | ApplicationSet (Git directory) |
-| backstage | `backstage/manifests/base/network-policy.yaml` | Kustomize |
+| backstage | `backstage/manifests/network-policy.yaml` | Argo CD directory source |
 | platform-auth-prod | `infrastructure/network/network-policy/keycloak-prod.yaml` | Argo CD directory source |
 | cert-manager | `infrastructure/security/cert-manager/resources/network-policy.yaml` | Argo CD resources source |
 

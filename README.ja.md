@@ -62,7 +62,7 @@
 - **Istio + Gateway API** — 単なる Ingress Controller ではなく、mTLS 付きのフルサービスメッシュ
 - **Backstage** — サービスカタログ、TechDocs、スキャフォールディングテンプレート付きの開発者ポータル
 - **マルチアーキテクチャ（ARM64 + AMD64）** — 実際のスケジューリング制約がある、均一でないクラスタ
-- **WiFi でも動作** — 有線 LAN なしでも構築可能（有線 LAN 推奨）
+- **有線 LAN メイン + WiFi fallback** — 各ノードに有線（1GbE）と WiFi の 2 系統を設定し、routing metric で有線優先。有線リンクダウン時は自動で WiFi にフォールバック（過去 WiFi only 運用も実績あり）
 
 ## 技術スタック
 

@@ -48,7 +48,7 @@ find infrastructure/gitops/ backstage/ apps/ -type f \( -name "*.yaml" -o -name 
 | Argo CD Apps | `infrastructure/gitops/argocd/applications/**/app.yaml` | `repoURL` |
 | Root App | `infrastructure/gitops/argocd/root-apps/platform-root-app.yaml` | `repoURL` |
 | Container images | `apps/kensan/manifests/base/app/*.yaml` | `ghcr.io/yu-min3/...` |
-| Backstage image | `backstage/manifests/overlays/prod/kustomization.yaml` | `ghcr.io/yu-min3/backstage` |
+| Backstage image | `backstage/manifests/backstage-deployment.yaml` | `ghcr.io/yu-min3/backstage` |
 
 ### 3. LoadBalancer IP Range
 
@@ -60,9 +60,9 @@ Ensure the range does not overlap with your DHCP server's allocation.
 
 ### 4. Network Interface
 
-Cilium L2 Announcements use WiFi interfaces (`^wlan.*`, `^wlp.*`). If your nodes use wired connections, update the interface regex.
+Cilium L2 Announcements default to wired interfaces (`^eth.*`, `^en.*`) with WiFi fallback (`^wlan.*`, `^wlp.*`). Adjust the interface regex to match your nodes' interface names if different.
 
-**File:** `infrastructure/network/cilium/values.yaml`
+**File:** `infrastructure/network/cilium/resources/lb-ippool.yaml`
 
 ### 5. Sealed Secrets
 

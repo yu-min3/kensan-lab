@@ -1,5 +1,7 @@
 # Cilium WiFi cluster stability tuning
 
+> **2026-05-07 更新**: kensan-lab は有線 LAN メイン運用に移行済み。WiFi は fallback として残しているため、ここに記載した緩和値（`leaseDuration: 60s` 等）はそのまま維持している（fallback 切替時のゆとり）。本ドキュメントは過去 WiFi only 運用時の経緯を残す参考資料。
+
 WiFi 経由で接続する homelab cluster (RPi 5 群が `wlan0`、Bosgame M4 Neo が `wlp3s0`) では、レイテンシスパイクで lease renewal や API 呼び出しが頻繁に timeout する。`infrastructure/network/cilium/values.yaml` でデフォルト値より緩めに調整している。
 
 ## API client rate limit

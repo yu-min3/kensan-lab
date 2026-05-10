@@ -1,5 +1,7 @@
 # Raspberry Pi WiFi Stabilization Settings
 
+> **2026-05-07 update**: kensan-lab migrated to wired LAN (Ethernet) as the primary path. WiFi remains as automatic fallback (routing metric 600). This document is now a **historical reference** capturing the stabilization knowledge from WiFi-only era; settings remain useful for the WiFi fallback path or for anyone running Pi clusters over WiFi.
+
 Stabilization settings for running Raspberry Pi 5 as Kubernetes nodes over WiFi (wlan0).
 
 > **Recommendation**: Use wired LAN (eth0) if possible. WiFi is inherently unstable as a connectivity method for Kubernetes nodes.
