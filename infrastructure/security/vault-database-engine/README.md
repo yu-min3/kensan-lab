@@ -198,8 +198,8 @@ kubectl exec -n vault vault-0 -c vault -- vault read database/creds/postgres-bac
 
 # 4. ESO 経由で K8s Secret が生成されている (5 ns 分)
 kubectl get secret -n backstage          postgres-backstage-cred
-kubectl get secret -n kensan-data        postgres-kensan-app-cred
-kubectl get secret -n kensan-data        postgres-kensan-dagster-cred
+kubectl get secret -n kensan             postgres-kensan-app-cred
+kubectl get secret -n kensan             postgres-kensan-dagster-cred
 kubectl get secret -n platform-auth-prod postgres-keycloak-prod-cred
 kubectl get secret -n platform-auth-dev  postgres-keycloak-dev-cred
 

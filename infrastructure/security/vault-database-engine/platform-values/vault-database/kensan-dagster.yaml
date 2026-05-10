@@ -1,8 +1,8 @@
-## Dagster system DB (kensan-data/dagster-postgres)
+## Dagster system DB (kensan/dagster-postgres) — Phase 3a-3 で kensan-data → kensan に統合
 ## release 名が標準 "postgresql" でなく "dagster-postgres"、user/db も "dagster"
 ## 既存 Dagster Pod の env が DAGSTER_PG_USER / DAGSTER_PG_PASSWORD を参照しているため、
 ## 生成 Secret の key 名を override (chart デフォルトは POSTGRES_USER / POSTGRES_PASSWORD)
-ns: kensan-data
+ns: kensan
 releaseName: dagster-postgres
 rootOwner: dagster
 ## Dagster は DAGSTER_PG_URL (postgresql://user:pass@host/db) 形式で env を要求するため

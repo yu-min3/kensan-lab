@@ -3,11 +3,10 @@
 ## This is the safe first step before migrating to STRICT.
 ##
 ## Namespaces with sidecar injection (mTLS active):
-##   app-dev, app-prod, backstage, kensan-dev, kensan-prod,
-##   platform-auth-prod
+##   app-prod, backstage, kensan, platform-auth-prod
 ##
 ## Namespaces without sidecar (plaintext only):
-##   monitoring, cert-manager, kube-system, argocd, kensan-data
+##   monitoring, cert-manager, kube-system, argocd
 ##
 ## To upgrade to STRICT:
 ##   1. Enable sidecar injection on all namespaces
