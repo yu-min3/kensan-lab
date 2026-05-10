@@ -111,7 +111,7 @@ platform-{component}        <- For platform components (existing convention pres
 
 Existing:
 - `platform-project` (Infrastructure)
-- `app-project-prod` / `app-project-dev` (env axis)
+- `app-project` (shared across all app namespaces)
 
 Splitting Projects along the team axis (`app-project-team-a`, etc.) is reconsidered in Phase 2 or later. In Phase 1, simply append the new-naming namespaces (`app-{name}`) to the existing Projects' `destinations`.
 

@@ -111,7 +111,7 @@ platform-{component}        ← プラットフォーム用（既存維持）
 
 既存:
 - `platform-project`（Infrastructure）
-- `app-project-prod` / `app-project-dev`（env 軸）
+- `app-project`（全 app namespace で共有）
 
 team 軸 Project（`app-project-team-a` 等）への分割は Phase 2 以降に再検討する。Phase 1 では既存 Project の `destinations` に新命名 namespace（`app-{name}`）を追加するのみで対応する。
 

@@ -12,7 +12,7 @@ dev/prod 分離は廃止済み。homelab で 2 環境運用は重く、必要な
 | Layer | Namespaces | Owner | Argo CD Project |
 |-------|-----------|-------|-----------------|
 | Infrastructure | `istio-system`, `monitoring`, `argocd`, `cert-manager`, `vault`, etc. | PE only | `platform-project` |
-| Environment | `app-prod` | PE manages ns; AD deploys apps | `app-project-prod` |
+| Environment | `app-prod` | PE manages ns; AD deploys apps | `app-project` |
 | Application | `app-prod-<name>` (将来 per-app ns) | Per-app isolation | Scoped to app namespace |
 
 ## Multi-Repository Strategy
@@ -35,7 +35,7 @@ dev/prod 分離は廃止済み。homelab で 2 環境運用は重く、必要な
 | Project | Scope | Allowed Namespaces |
 |---------|-------|--------------------|
 | `platform-project` | Infrastructure components | `kube-system`, `istio-system`, `monitoring`, `argocd`, etc. |
-| `app-project-prod` | App applications | `app-prod` |
+| `app-project` | App applications | `app-prod`, `kensan-prod`, `kensan-data` |
 
 ## Common Namespaces
 
