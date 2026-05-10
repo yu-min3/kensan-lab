@@ -2,6 +2,7 @@ apiVersion: apps/v1
 kind: StatefulSet
 metadata:
   name: postgresql
+  namespace: platform-auth-prod
 spec:
   serviceName: postgresql
   replicas: 1
@@ -13,6 +14,15 @@ spec:
       labels:
         app: postgresql
     spec:
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+              - matchExpressions:
+                  - key: hardware-class
+                    operator: In
+                    values:
+                      - high-performance
       containers:
       - name: postgresql
         image: postgres:16-alpine

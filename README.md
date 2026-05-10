@@ -63,7 +63,7 @@ The platform uses Cilium LoadBalancer with L2 announcements for local network ac
 - **Istio + Gateway API** — full service mesh with mTLS, not just an ingress controller
 - **Backstage** — developer portal with service catalog, TechDocs, and scaffolding templates
 - **Multi-arch (ARM64 + AMD64)** — real scheduling constraints, not a uniform cluster
-- **Runs on WiFi** — proven to work without ethernet, though wired LAN is recommended
+- **Wired LAN with WiFi fallback** — primary path on Ethernet (1GbE), WiFi automatically takes over via routing metric if the wire goes down. Originally proven on WiFi-only too
 
 ## Tech Stack
 

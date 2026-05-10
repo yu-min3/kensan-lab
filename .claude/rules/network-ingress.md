@@ -7,10 +7,11 @@ globs: "infrastructure/network/**, **/httproute*, **/gateway*"
 
 ## Cilium LoadBalancer
 
-- **L2 Announcements** enabled on WiFi: regex `^wlan.*`, `^wlp.*`
+- **L2 Announcements** enabled on wired + WiFi fallback: regex `^eth.*`, `^en.*`, `^wlan.*`, `^wlp.*`
 - **IP Pool**: 192.168.0.240–249 (must not overlap DHCP)
-- **Devices**: auto-detect (supports mixed `wlan0` / `wlp3s0`)
+- **Devices**: auto-detect (covers wired `eth0` / `eno1` / `enp4s0` and WiFi fallback `wlan0` / `wlp3s0`)
 - kube-proxy replacement enabled
+- 2026-05-07 以降は有線メイン運用（有線 metric 100、WiFi metric 600 で fallback）
 
 ## LoadBalancer IP Assignments
 

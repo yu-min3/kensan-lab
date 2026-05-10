@@ -7,15 +7,19 @@ globs: "infrastructure/**"
 
 ## Node Inventory
 
-| Node | Role | Arch | hardware-class | Storage | Network Interface |
-|------|------|------|---------------|---------|-------------------|
-| master | control-plane | arm64 | — | microSD | wlan0 |
-| worker1 | worker | arm64 | raspberry-pi | microSD | wlan0 |
-| worker2 | worker | arm64 | raspberry-pi | microSD | wlan0 |
-| m4neo | worker | amd64 | high-performance | NVMe PCIe 4.0 | wlp3s0 |
+各ノードは **有線メイン + WiFi fallback** の 2 系統構成（routing metric ベース、有線=100 / WiFi=600）。
+
+| Node | Role | Arch | hardware-class | Storage | Wired (metric 100) | WiFi fallback (metric 600) |
+|------|------|------|---------------|---------|--------------------|----------------------------|
+| master | control-plane | arm64 | — | microSD | eth0 (192.168.0.107) | wlan0 (192.168.0.207) |
+| worker1 | worker | arm64 | raspberry-pi | microSD | eth0 (192.168.0.108) | wlan0 (192.168.0.208) |
+| worker2 | worker | arm64 | raspberry-pi | microSD | eth0 (192.168.0.109) | wlan0 (192.168.0.209) |
+| m4neo | worker | amd64 | high-performance | NVMe PCIe 4.0 | eno1 (192.168.0.110) | wlp3s0 (192.168.0.210) |
 
 - **Runtime**: CRI-O via kubeadm
 - **Master IP**: 192.168.0.107, **Pod CIDR**: 10.244.0.0/16
+- **Switch**: TP-Link TL-SG116E (16-port 1GbE Easy Smart, fanless)
+- **Cabling**: 2026-05-07 wired migration. Static IP via netplan (not DHCP reservation). m4neo の `enp4s0` は予備で未設定。
 
 ## Label Axes
 

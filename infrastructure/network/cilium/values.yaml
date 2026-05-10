@@ -1,5 +1,6 @@
 # Bare-metal cluster: kube-proxy replacement + Hubble observability.
-# WiFi 経由のクラスタ向けチューニング: docs/runbooks/cilium-wifi-stability.md
+# 2026-05-07 以降は有線 LAN メイン + WiFi fallback 構成（routing metric ベース）。
+# 旧 WiFi 運用時のチューニング知見: docs/runbooks/cilium-wifi-stability.md
 # DaemonSet update 制約 (maxUnavailable=1): docs/runbooks/cilium-update-strategy.md
 
 kubeProxyReplacement: true
@@ -19,7 +20,9 @@ k8s:
 ipam:
   mode: kubernetes
 
-# WiFi cluster 向け緩和値 (chart default 15s/10s/2s より長い)
+# Lease 緩和値 (chart default 15s/10s/2s より長い)。
+# 元々 WiFi 運用時の安定化目的で導入。有線化後は短縮可能だが、
+# fallback で wlan*/wlp* に切替時のゆとり確保のため当面維持。
 l2announcements:
   enabled: true
   leaseDuration: 60s

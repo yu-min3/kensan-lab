@@ -46,7 +46,6 @@ spec:
         - operation:
             hosts:
               - auth.platform.yu-min3.com
-              - auth-dev.platform.yu-min3.com
               - vault.platform.yu-min3.com
               - argocd.platform.yu-min3.com
               - grafana.platform.yu-min3.com

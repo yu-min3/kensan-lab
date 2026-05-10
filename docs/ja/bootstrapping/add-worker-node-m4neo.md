@@ -414,7 +414,7 @@ patches:
 
 #### Backstage
 
-Backstage も同様の手法で `backstage/manifests/overlays/prod/` にパッチを追加する。
+Backstage は `backstage/manifests/backstage-deployment.yaml` の `affinity` ブロックを直接編集する (kustomize overlay なし)。
 
 ### 2.5 変更の適用と確認
 

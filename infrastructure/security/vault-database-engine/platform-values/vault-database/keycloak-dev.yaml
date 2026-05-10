@@ -1,7 +1,0 @@
-## Keycloak dev Postgres (platform-auth-dev/postgresql)
-ns: platform-auth-dev
-rootOwner: keycloak
-targetSecretName: keycloak-postgres-cred
-keyMapping:
-  user: KC_DB_USERNAME
-  password: KC_DB_PASSWORD

@@ -2,6 +2,7 @@ apiVersion: policy/v1
 kind: PodDisruptionBudget
 metadata:
   name: keycloak-pdb
+  namespace: platform-auth-prod
 spec:
   maxUnavailable: 1
   selector:
@@ -12,6 +13,7 @@ apiVersion: policy/v1
 kind: PodDisruptionBudget
 metadata:
   name: postgresql-pdb
+  namespace: platform-auth-prod
 spec:
   maxUnavailable: 1
   selector:
