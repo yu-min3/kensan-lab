@@ -2,7 +2,7 @@ apiVersion: v1
 kind: ConfigMap
 metadata:
   name: postgres-migrations
-  namespace: kensan-data
+  namespace: kensan
 data:
   001_init.sql: |
     -- ============================================================================
@@ -1294,7 +1294,7 @@ apiVersion: v1
 kind: ConfigMap
 metadata:
   name: postgres-init-script
-  namespace: kensan-data
+  namespace: kensan
 data:
   00-init.sh: |
     #!/bin/bash
@@ -1314,7 +1314,7 @@ apiVersion: v1
 kind: Service
 metadata:
   name: postgresql
-  namespace: kensan-data
+  namespace: kensan
   labels:
     app: postgresql
 spec:
@@ -1330,7 +1330,7 @@ apiVersion: apps/v1
 kind: StatefulSet
 metadata:
   name: postgresql
-  namespace: kensan-data
+  namespace: kensan
 spec:
   serviceName: postgresql
   replicas: 1

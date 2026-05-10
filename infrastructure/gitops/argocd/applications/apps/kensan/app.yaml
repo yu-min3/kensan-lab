@@ -1,7 +1,7 @@
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
-  name: kensan-app
+  name: kensan
   namespace: argocd
   finalizers:
     - resources-finalizer.argocd.argoproj.io
@@ -10,12 +10,12 @@ spec:
   source:
     repoURL: https://github.com/yu-min3/kensan-lab
     targetRevision: main
-    path: apps/kensan/manifests/app
+    path: apps/kensan/manifests
     directory:
-      recurse: false
+      recurse: true
   destination:
     server: https://kubernetes.default.svc
-    namespace: kensan-prod
+    namespace: kensan
   syncPolicy:
     automated:
       prune: true

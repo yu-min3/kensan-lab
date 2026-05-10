@@ -2,7 +2,7 @@ apiVersion: policy/v1
 kind: PodDisruptionBudget
 metadata:
   name: postgresql-pdb
-  namespace: kensan-data
+  namespace: kensan
 spec:
   maxUnavailable: 1
   selector:
@@ -13,7 +13,7 @@ apiVersion: policy/v1
 kind: PodDisruptionBudget
 metadata:
   name: minio-pdb
-  namespace: kensan-data
+  namespace: kensan
 spec:
   maxUnavailable: 1
   selector:
