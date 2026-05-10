@@ -31,7 +31,7 @@ The Dev Container includes:
 - Python 3.11
 - uv (package manager)
 - ruff (linter/formatter) - auto-format on save
-- kubectl, kustomize (for Kubernetes)
+- kubectl (for Kubernetes)
 - Docker CLI (for building images)
 - All VS Code extensions configured
 
@@ -105,75 +105,32 @@ This application uses GitOps with Argo CD for automated deployments.
 
 ### Quick Deployment with Makefile
 
-The included Makefile provides convenient commands for building, pushing, and deploying:
-
 ```bash
 # Show all available commands
 make help
 
-# Deploy to Dev environment (any tag format allowed)
-make deploy-dev TAG=dev-latest
-make deploy-dev TAG=dev-v1.0.0
-make deploy-dev TAG=feature-branch
+# Build, push, and update image tag in manifests/deployment.yaml (vX.Y format required)
+make deploy TAG=v1.0
+make deploy TAG=v1.2
 
-# Deploy to Prod environment (vX.Y format required)
-make deploy-prod TAG=v1.0
-make deploy-prod TAG=v1.2
-make deploy-prod TAG=v10.5
-
-# Build image only
+# Build only
 make build TAG=v1.0
 
-# Push image only
+# Push only
 make push TAG=v1.0
 
-# Update environment without building
-make update-dev TAG=dev-latest
-make update-prod TAG=v1.2
+# Update image tag in manifests without building
+make update-image TAG=v1.2
 
-# Validate Kustomize manifests
+# Validate manifests with kubectl dry-run
 make validate
 ```
 
-**TAG Format Requirements:**
-- **Dev environment**: Any tag format (e.g., `dev-latest`, `dev-v1.0`, `feature-branch`)
-- **Prod environment**: Must be `vX.Y` format (e.g., `v1.0`, `v1.2`, `v10.5`, `v12.34`)
+**TAG format**: Must be `vX.Y` (e.g., `v1.0`, `v1.2`, `v10.5`).
 
-The Makefile will:
-1. Validate the TAG format (Prod only)
-2. Build the Docker image with the specified TAG
-3. Push it to GHCR
-4. Update the `overlays/{dev,prod}/kustomization.yaml` file with the new tag
-5. Prompt you to commit and push the changes
+The `deploy` target builds the image, pushes to GHCR, and updates `manifests/deployment.yaml` with the new tag. Commit and push the manifest change to trigger Argo CD sync.
 
 ### Manual Deployment
-
-#### Dev Environment
-
-1. Build and push image:
-   ```bash
-   docker build -t ghcr.io/yu-min3/${{ values.name }}:dev-latest .
-   docker push ghcr.io/yu-min3/${{ values.name }}:dev-latest
-   ```
-
-2. Update tag in `overlays/dev/kustomization.yaml`:
-   ```yaml
-   images:
-     - name: app-image
-       newName: ghcr.io/yu-min3/${{ values.name }}
-       newTag: dev-latest  # Update this
-   ```
-
-3. Commit and push:
-   ```bash
-   git add overlays/dev/kustomization.yaml
-   git commit -m "Update Dev image to dev-latest"
-   git push
-   ```
-
-4. Argo CD will automatically sync to the `app-dev` namespace
-
-#### Prod Environment
 
 1. Build and push image with version tag:
    ```bash
@@ -181,22 +138,19 @@ The Makefile will:
    docker push ghcr.io/yu-min3/${{ values.name }}:v1.0.0
    ```
 
-2. Update tag in `overlays/prod/kustomization.yaml`:
+2. Update image tag in `manifests/deployment.yaml`:
    ```yaml
-   images:
-     - name: app-image
-       newName: ghcr.io/yu-min3/${{ values.name }}
-       newTag: v1.0.0  # Update this
+   image: ghcr.io/yu-min3/${{ values.name }}:v1.0.0  # Update this
    ```
 
 3. Commit and push:
    ```bash
-   git add overlays/prod/kustomization.yaml
-   git commit -m "Deploy v1.0.0 to Prod"
+   git add manifests/deployment.yaml
+   git commit -m "Deploy v1.0.0"
    git push
    ```
 
-4. Argo CD will automatically sync to the `app-prod` namespace
+4. Argo CD will automatically sync to the `app-prod` namespace.
 
 ## Directory Structure
 
@@ -204,20 +158,16 @@ The Makefile will:
 .
 ├── app/                      # Application source code
 │   └── main.py
-├── base/                     # Kustomize base manifests
+├── manifests/                # Kubernetes manifests (Argo CD directory source)
 │   ├── deployment.yaml
 │   ├── service.yaml
 │   ├── httproute.yaml
 │   ├── authz-policy.yaml
 │   └── servicemonitor.yaml
-├── overlays/                 # Environment-specific configurations
-│   ├── dev/
-│   └── prod/
 ├── docs/                     # TechDocs documentation
 │   └── index.md
-├── .backstage/              # Argo CD Application templates
-│   ├── argocd-app-dev.yaml
-│   └── argocd-app-prod.yaml
+├── .backstage/               # Argo CD Application template
+│   └── argocd-apps.yaml
 ├── Dockerfile
 ├── requirements.txt
 └── catalog-info.yaml        # Backstage catalog definition
@@ -237,8 +187,7 @@ Prometheus metrics are exposed at `/metrics` and automatically scraped via Servi
 ## Links
 
 - [Backstage](${{ values.destination.backstageUrl }})
-- [Argo CD Dev](https://argocd.yu-min3.com/applications/app-dev-${{ values.name }})
-- [Argo CD Prod](https://argocd.yu-min3.com/applications/app-prod-${{ values.name }})
+- [Argo CD](https://argocd.yu-min3.com/applications/app-${{ values.name }})
 - [Live App](https://${{ values.name }}.yu-min3.com)
 
 ## Owner

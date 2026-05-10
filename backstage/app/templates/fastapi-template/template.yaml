@@ -3,12 +3,11 @@ kind: Template
 metadata:
   name: fastapi-app-template
   title: FastAPI Application
-  description: Create a new FastAPI application with Kustomize-based GitOps deployment
+  description: Create a new FastAPI application with GitOps deployment to app-prod
   tags:
     - python
     - fastapi
     - gitops
-    - kustomize
 spec:
   owner: platform-team
   type: service

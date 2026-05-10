@@ -16,16 +16,17 @@
 
 ## ディレクトリ構造
 
-各アプリケーションは専用のサブディレクトリを持ち、Dev/Prod両環境のApplication CRを含みます：
+各アプリケーションは専用のサブディレクトリを持ち、単一の Application CR を含みます (dev/prod 廃止後):
 
 ```
 apps/
 ├── my-app/
-│   └── argocd-apps.yaml    # app-dev-my-app と app-prod-my-app を含む
+│   └── argocd-apps.yaml    # app-my-app を含む
 │                           # リポジトリ: kensan-lab-apps-my-app
 ├── api-server/
-│   └── argocd-apps.yaml    # app-dev-api-server と app-prod-api-server を含む
+│   └── argocd-apps.yaml    # app-api-server
 │                           # リポジトリ: kensan-lab-apps-api-server
+├── kensan/                 # kensan アプリ専用 (kensan-app, kensan-data)
 └── README.md
 ```
 
@@ -41,39 +42,23 @@ apps/
 
 ## Application CR フォーマット
 
-各`argocd-apps.yaml`ファイルには、`---`で区切られた2つのApplicationリソースが含まれます：
+各`argocd-apps.yaml`は単一の Application を含みます:
 
 ```yaml
 ---
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
-  name: app-dev-<app-name>
-  namespace: argocd
-spec:
-  project: app-project-dev
-  source:
-    repoURL: https://github.com/yu-min3/kensan-lab-apps-<app-name>.git
-    targetRevision: main
-    path: overlays/dev
-  destination:
-    namespace: app-dev
-  syncPolicy:
-    automated:
-      prune: true
-      selfHeal: true
----
-apiVersion: argoproj.io/v1alpha1
-kind: Application
-metadata:
-  name: app-prod-<app-name>
+  name: app-<app-name>
   namespace: argocd
 spec:
   project: app-project-prod
   source:
     repoURL: https://github.com/yu-min3/kensan-lab-apps-<app-name>.git
     targetRevision: main
-    path: overlays/prod
+    path: manifests
+    directory:
+      recurse: false
   destination:
     namespace: app-prod
   syncPolicy:
@@ -82,9 +67,8 @@ spec:
       selfHeal: true
 ```
 
-## この構造のメリット
+## メリット
 
-✅ **ファイル名の衝突なし**: 各アプリが専用ディレクトリを持つ
-✅ **簡単な追跡**: 1ディレクトリ = 1アプリケーション
-✅ **シンプルな管理**: ディレクトリ削除でDev/Prod両方を削除
-✅ **明確な整理**: 数百のアプリケーションでもスケール可能
+- ファイル名衝突なし: 各アプリが専用ディレクトリを持つ
+- 簡単な追跡: 1ディレクトリ = 1アプリケーション
+- 数百のアプリケーションでもスケール可能

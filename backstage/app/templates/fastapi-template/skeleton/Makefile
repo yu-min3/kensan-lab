@@ -26,7 +26,7 @@ GREEN := \033[0;32m
 YELLOW := \033[0;33m
 NC := \033[0m # No Color
 
-.PHONY: help build push update-dev update-prod deploy-dev deploy-prod clean validate
+.PHONY: help build push update-image deploy clean validate
 
 # Default target
 help: ## Show this help message
@@ -38,13 +38,11 @@ help: ## Show this help message
 	@echo "  Override: CONTAINER_RUNTIME=docker make build TAG=v1.0"
 	@echo ""
 	@echo "$(GREEN)TAG Format Requirements:$(NC)"
-	@echo "  $(YELLOW)Dev:$(NC)  Any tag format (e.g., dev-latest, dev-v1.0, feature-branch)"
-	@echo "  $(YELLOW)Prod:$(NC) Must be vX.Y format (e.g., v1.0, v1.2, v10.5, v12.34)"
+	@echo "  Must be vX.Y format (e.g., v1.0, v1.2, v10.5, v12.34)"
 	@echo ""
 	@echo "$(GREEN)Usage examples:$(NC)"
-	@echo "  make build TAG=v1.0             # Build image with tag v1.0"
-	@echo "  make deploy-dev TAG=dev-latest  # Build, push, and deploy to Dev"
-	@echo "  make deploy-prod TAG=v1.2       # Build, push, and deploy to Prod (vX.Y format required)"
+	@echo "  make build TAG=v1.0   # Build image with tag v1.0"
+	@echo "  make deploy TAG=v1.2  # Build, push, and deploy"
 	@echo "  CONTAINER_RUNTIME=docker make build TAG=v1.0  # Override runtime to use docker"
 
 check-tag:
@@ -55,15 +53,10 @@ check-tag:
 		exit 1; \
 	fi
 
-check-tag-format-prod:
+check-tag-format:
 	@if ! echo "$(TAG)" | grep -qE '^v[0-9]+\.[0-9]+$$'; then \
-		echo "$(RED)ERROR: Production TAG must be in format vX.Y (e.g., v1.0, v1.2, v10.5)$(NC)"; \
+		echo "$(RED)ERROR: TAG must be in format vX.Y (e.g., v1.0, v1.2, v10.5)$(NC)"; \
 		echo "Current TAG: $(TAG)"; \
-		echo "Valid examples:"; \
-		echo "  v1.0"; \
-		echo "  v1.2"; \
-		echo "  v10.5"; \
-		echo "  v12.34"; \
 		exit 1; \
 	fi
 	@echo "$(GREEN)✓ TAG format is valid: $(TAG)$(NC)"
@@ -87,44 +80,22 @@ push: check-tag login ## Push container image to registry (requires TAG=<version
 	$(CONTAINER_RUNTIME) push $(FULL_IMAGE)
 	@echo "$(GREEN)✓ Push complete: $(FULL_IMAGE)$(NC)"
 
-update-dev: check-tag ## Update Dev environment image tag in overlays/dev/kustomization.yaml
-	@echo "$(GREEN)Updating Dev environment to tag: $(TAG)$(NC)"
-	cd overlays/dev && \
-		kustomize edit set image $(FULL_IMAGE)
-	@echo "$(YELLOW)Updated overlays/dev/kustomization.yaml$(NC)"
-	@echo "$(RED)Don't forget to commit and push the changes!$(NC)"
-	@echo "  git add overlays/dev/kustomization.yaml"
-	@echo "  git commit -m 'Update Dev image to $(TAG)'"
-	@echo "  git push"
+update-image: check-tag check-tag-format ## Update image tag in manifests/deployment.yaml
+	@echo "$(GREEN)Updating image tag to: $(TAG)$(NC)"
+	sed -i.bak -E 's|(image: $(REGISTRY)/$(APP_NAME)):.*|\1:$(TAG)|' manifests/deployment.yaml && rm manifests/deployment.yaml.bak
+	@echo "$(YELLOW)Updated manifests/deployment.yaml$(NC)"
+	@echo "$(RED)Commit and push to deploy:$(NC)"
+	@echo "  git add manifests/deployment.yaml && git commit -m 'Deploy $(TAG)' && git push"
 
-update-prod: check-tag check-tag-format-prod ## Update Prod environment image tag in overlays/prod/kustomization.yaml
-	@echo "$(GREEN)Updating Prod environment to tag: $(TAG)$(NC)"
-	cd overlays/prod && \
-		kustomize edit set image $(FULL_IMAGE)
-	@echo "$(YELLOW)Updated overlays/prod/kustomization.yaml$(NC)"
-	@echo "$(RED)Don't forget to commit and push the changes!$(NC)"
-	@echo "  git add overlays/prod/kustomization.yaml"
-	@echo "  git commit -m 'Update Prod image to $(TAG)'"
-	@echo "  git push"
+deploy: build push update-image ## Build, push, and update image tag (requires TAG=vX.Y)
+	@echo "$(GREEN)✓ Build + push + manifest update complete!$(NC)"
+	@echo "$(YELLOW)Next: review and commit$(NC)"
+	@echo "  git diff manifests/deployment.yaml"
+	@echo "  git add manifests/deployment.yaml && git commit -m 'Deploy $(TAG)' && git push"
 
-deploy-dev: build push update-dev ## Build, push, and update Dev environment (requires TAG=<version>)
-	@echo "$(GREEN)✓ Dev deployment complete!$(NC)"
-	@echo "$(YELLOW)Next steps:$(NC)"
-	@echo "  1. Review changes: git diff overlays/dev/kustomization.yaml"
-	@echo "  2. Commit changes: git add overlays/dev/kustomization.yaml && git commit -m 'Deploy $(TAG) to Dev'"
-	@echo "  3. Push to trigger Argo CD: git push"
-
-deploy-prod: build push update-prod ## Build, push, and update Prod environment (requires TAG=<version>)
-	@echo "$(GREEN)✓ Prod deployment complete!$(NC)"
-	@echo "$(YELLOW)Next steps:$(NC)"
-	@echo "  1. Review changes: git diff overlays/prod/kustomization.yaml"
-	@echo "  2. Commit changes: git add overlays/prod/kustomization.yaml && git commit -m 'Deploy $(TAG) to Prod'"
-	@echo "  3. Push to trigger Argo CD: git push"
-
-validate: ## Validate Kustomize manifests
-	@echo "$(GREEN)Validating Kustomize manifests...$(NC)"
-	@kustomize build overlays/dev > /dev/null && echo "$(GREEN)✓ Dev manifests are valid$(NC)" || echo "$(RED)✗ Dev manifests have errors$(NC)"
-	@kustomize build overlays/prod > /dev/null && echo "$(GREEN)✓ Prod manifests are valid$(NC)" || echo "$(RED)✗ Prod manifests have errors$(NC)"
+validate: ## Validate manifests with kubectl dry-run
+	@echo "$(GREEN)Validating manifests...$(NC)"
+	@kubectl apply --dry-run=client -f manifests/ > /dev/null && echo "$(GREEN)✓ Manifests are valid$(NC)" || echo "$(RED)✗ Manifests have errors$(NC)"
 
 clean: ## Clean up local container images
 	@echo "$(YELLOW)Cleaning up container images for $(APP_NAME)...$(NC)"

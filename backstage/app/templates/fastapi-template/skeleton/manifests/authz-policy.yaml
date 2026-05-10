@@ -2,6 +2,7 @@ apiVersion: security.istio.io/v1beta1
 kind: AuthorizationPolicy
 metadata:
   name: ${{ values.name }}
+  namespace: app-prod
   labels:
     app: ${{ values.name }}
 spec:

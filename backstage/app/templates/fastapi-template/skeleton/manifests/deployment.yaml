@@ -2,10 +2,11 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: ${{ values.name }}
+  namespace: app-prod
   labels:
     app: ${{ values.name }}
 spec:
-  replicas: 1
+  replicas: 3
   selector:
     matchLabels:
       app: ${{ values.name }}
@@ -24,7 +25,7 @@ spec:
         - name: ghcr-pull-secret
       containers:
         - name: app
-          image: ghcr.io/yu-min3/${{ values.name }}:latest  # Placeholder, will be replaced by Kustomize
+          image: ghcr.io/yu-min3/${{ values.name }}:v1.0.0  # Update tag on each release
           imagePullPolicy: Always
           ports:
             - name: http
@@ -63,11 +64,11 @@ spec:
             failureThreshold: 3
           resources:
             requests:
-              cpu: 100m
-              memory: 128Mi
+              cpu: 200m
+              memory: 256Mi
             limits:
-              cpu: 500m
-              memory: 512Mi
+              cpu: 1000m
+              memory: 1Gi
           securityContext:
             runAsNonRoot: true
             runAsUser: 1000

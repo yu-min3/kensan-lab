@@ -25,7 +25,7 @@ The fastest way to get started is using VS Code Dev Containers:
    - Save files to auto-format with ruff
    - Use VS Code tasks for common operations
 
-The Dev Container includes Python 3.11, uv, ruff, kubectl, kustomize, and Docker CLI - everything pre-configured!
+The Dev Container includes Python 3.11, uv, ruff, kubectl, and Docker CLI - everything pre-configured!
 
 ### Local Development (Alternative)
 
@@ -86,55 +86,31 @@ The FastAPI application automatically generates OpenAPI documentation:
 
 ### Quick Start with Makefile
 
-The easiest way to build and deploy:
-
 ```bash
-# Deploy to Dev
-make deploy-dev TAG=dev-v1.0.0
-
-# Deploy to Prod
-make deploy-prod TAG=v1.0.0
+make deploy TAG=v1.0.0
 ```
 
 The Makefile automates:
 - Docker image build
 - Push to GHCR
-- Updating the image tag in `overlays/{dev,prod}/kustomization.yaml`
+- Updating the image tag in `manifests/deployment.yaml`
+
+Commit and push the change. Argo CD will automatically deploy to the `app-prod` namespace.
 
 ### Manual Build and Deploy
 
-#### Build Docker Image
-
 ```bash
-docker build -t ghcr.io/yu-min3/${{ values.name }}:dev-latest .
-docker push ghcr.io/yu-min3/${{ values.name }}:dev-latest
+docker build -t ghcr.io/yu-min3/${{ values.name }}:v1.0.0 .
+docker push ghcr.io/yu-min3/${{ values.name }}:v1.0.0
 ```
 
-#### Deploy to Dev Environment
-
-Update the image tag in `overlays/dev/kustomization.yaml`:
+Update the image tag in `manifests/deployment.yaml`:
 
 ```yaml
-images:
-  - name: app-image
-    newName: ghcr.io/yu-min3/${{ values.name }}
-    newTag: dev-latest  # Update this tag
+image: ghcr.io/yu-min3/${{ values.name }}:v1.0.0  # Update this tag
 ```
 
-Commit and push the change. Argo CD will automatically deploy to the Dev environment.
-
-#### Deploy to Prod Environment
-
-Update the image tag in `overlays/prod/kustomization.yaml`:
-
-```yaml
-images:
-  - name: app-image
-    newName: ghcr.io/yu-min3/${{ values.name }}
-    newTag: v1.0.0  # Update this tag
-```
-
-Commit and push the change. Argo CD will automatically deploy to the Prod environment.
+Commit and push the change. Argo CD will automatically deploy.
 
 ## Architecture
 
