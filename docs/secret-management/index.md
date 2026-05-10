@@ -45,6 +45,7 @@
 | monitoring | grafana-admin | Grafana admin | Grafana UI |
 | platform-auth-{prod,dev} | keycloak-secret | KEYCLOAK_ADMIN_PASSWORD | Keycloak admin (KC_DB_* は dynamic 移行で削除済) |
 | platform-auth-{prod,dev} | postgresql-secret | POSTGRES_USER/PASSWORD/DB | Keycloak Postgres boot + VCO root |
+| {app-prod, backstage, kensan-{prod,data}} | ghcr-pull-secret | `.dockerconfigjson` (GHCR image pull token) | 各 ns の imagePullSecrets。Vault path `secret/ghcr/pull-token` を全 ns で共有 |
 
 ### Vault Transit (Stage 6, アプリ側で encrypt/decrypt API を直叩き)
 
@@ -75,7 +76,6 @@ VCO は TransitSecretEngine 系 CR を持たないため、mount + policy + auth
 | cert-manager | route53-credentials | Let's Encrypt DNS-01 用 IAM | cert-manager は低レイヤ、ローテ低頻度 |
 | kube-system | cilium-ca / hubble-relay-client-certs / hubble-server-certs | Cilium / Hubble 内部 PKI | 内部発行、ローテ低頻度 |
 | longhorn-system | longhorn-r2-backup | R2 backup token | Longhorn 自己完結 |
-| {app-dev, app-prod, backstage, kensan-{prod,dev,data}} | ghcr-pull-secret | GHCR image pull token | 静的、各 ns に配布のみ |
 
 ### 据置 (dynamic 化が望ましいが構造的事情で未移行)
 
