@@ -23,9 +23,9 @@
 
 | ns | Secret | アプリ | 状態 |
 |---|---|---|---|
-| kensan-data | postgres-kensan-dagster-cred | dagster (3 deployment) | ✅ 使用中 |
+| kensan | postgres-kensan-dagster-cred | dagster (3 deployment) | ✅ 使用中 |
 | platform-auth-prod | keycloak-postgres-cred | keycloak | ✅ 使用中 |
-| kensan-data | postgres-kensan-app-cred | (なし) | ⏸ 生成のみ。kensan-app は cross-ns 課題で revert (下記 *据置* 参照) |
+| kensan | postgres-kensan-app-cred | (なし) | ⏸ 生成のみ。kensan-app は static cred で稼働中、dynamic cutover は別タスク |
 | backstage | postgres-backstage-cred | (なし) | ⏸ 生成のみ。backstage は plugin DB GRANT 課題で revert (下記 *据置* 参照) |
 
 ### Vault static (ESO 経由、Vault KV v2 → K8s Secret、refreshInterval 1h)
@@ -35,17 +35,17 @@
 | backstage | backstage-secret | GITHUB_TOKEN | Backstage GitHub 連携 |
 | backstage | postgresql-secret | POSTGRES_USER/PASSWORD/DB | Postgres StatefulSet boot + VCO root cred + backstage app (revert で参照中) |
 | cloudflare-tunnel | cloudflare-tunnel | tunnel token | Cloudflare Tunnel |
-| kensan-data | kensan-db-credentials | POSTGRES_USER/PASSWORD | kensan Postgres boot + VCO root |
-| kensan-data | kensan-lakehouse-credentials | AWS_*, POLARIS_BOOTSTRAP_CREDENTIALS | S3 / Polaris (DAGSTER_PG_* は dynamic 移行で削除済) |
-| kensan-data | kensan-minio-credentials | MinIO root | MinIO StatefulSet |
-| kensan-{prod,dev} | kensan-app-credentials | JWT_SECRET + DB_USER/PASSWORD (revert) | kensan app (cross-ns 課題で dynamic 据置) |
-| kensan-{prod,dev} | kensan-ai-credentials | API key 等 | kensan-ai |
-| kensan-{prod,dev} | kensan-minio-app-credentials | MinIO app cred | kensan app から MinIO アクセス |
+| kensan | kensan-db-credentials | POSTGRES_USER/PASSWORD | kensan Postgres boot + VCO root |
+| kensan | kensan-lakehouse-credentials | AWS_*, POLARIS_BOOTSTRAP_CREDENTIALS | S3 / Polaris (DAGSTER_PG_* は dynamic 移行で削除済) |
+| kensan | kensan-minio-credentials | MinIO root | MinIO StatefulSet |
+| kensan | kensan-app-credentials | JWT_SECRET + DB_USER/PASSWORD | kensan microservices (dynamic cutover は別タスク) |
+| kensan | kensan-ai-credentials | API key 等 | kensan-ai |
+| kensan | kensan-minio-app-credentials | MinIO app cred | kensan microservices から MinIO アクセス |
 | monitoring | alertmanager-slack | Slack webhook | Alertmanager 通知 |
 | monitoring | grafana-admin | Grafana admin | Grafana UI |
 | platform-auth-{prod,dev} | keycloak-secret | KEYCLOAK_ADMIN_PASSWORD | Keycloak admin (KC_DB_* は dynamic 移行で削除済) |
 | platform-auth-{prod,dev} | postgresql-secret | POSTGRES_USER/PASSWORD/DB | Keycloak Postgres boot + VCO root |
-| {app-prod, backstage, kensan-{prod,data}} | ghcr-pull-secret | `.dockerconfigjson` (GHCR image pull token) | 各 ns の imagePullSecrets。Vault path `secret/ghcr/pull-token` を全 ns で共有 |
+| {app-prod, backstage, kensan} | ghcr-pull-secret | `.dockerconfigjson` (GHCR image pull token) | 各 ns の imagePullSecrets。Vault path `secret/ghcr/pull-token` を全 ns で共有 |
 
 ### Vault Transit (Stage 6, アプリ側で encrypt/decrypt API を直叩き)
 
@@ -53,14 +53,14 @@ K8s Secret として配布する形式ではなく、アプリ Pod が Vault に
 
 | ns | 鍵名 / mount | 用途 | アプリ |
 |---|---|---|---|
-| vault | `transit/keys/users-name` (aes256-gcm96) | kensan `users.name` カラム encryption + HMAC | kensan user-service (kensan-{prod,dev}) |
+| vault | `transit/keys/users-name` (aes256-gcm96) | kensan `users.name` カラム encryption + HMAC | kensan user-service (kensan ns) |
 
 設計詳細: [`infrastructure/security/vault-transit-engine/README.md`](https://github.com/yu-min3/kensan-lab/tree/main/infrastructure/security/vault-transit-engine)
 
 | 項目 | 値 |
 |---|---|
 | Auth role | `kensan-users-transit` (kubernetes auth method) |
-| bind 先 SA | `kensan-{prod,dev}/user-service` |
+| bind 先 SA | `kensan/user-service` |
 | Policy | `kensan-users-transit` (transit/{encrypt,decrypt,hmac,rewrap}/users-name のみ) |
 | Token TTL | 30 min (アプリ側 renew loop で延長、max 1h) |
 | Key 作成 | `infrastructure/security/vault-transit-engine/temp/setup-transit-keys.sh` を 1 度だけ手動実行 |
@@ -81,7 +81,7 @@ VCO は TransitSecretEngine 系 CR を持たないため、mount + policy + auth
 
 | アプリ | 課題 | 後日方針 |
 |--------|------|----------|
-| kensan-app | Pod は `kensan-{prod,dev}` ns、Postgres は `kensan-data` ns。K8s Secret の cross-ns 参照不可 | app 側で ns 構造を統合してから再 cutover |
+| kensan-app | Phase 3a-3 で ns 統合済み (cross-ns 課題は解消)。dynamic 化の cutover はまだ実施していない | static (kensan-app-credentials) を ESO 経由で参照中。kensan-app 系の env を `postgres-kensan-app-cred` 参照に切り替えれば cutover 可能 |
 | backstage | Backstage は内部で 12 DB (`backstage` + `backstage_plugin_*` x11) に分散接続。VDBE の `creationStatements` は `dBName` のみ GRANT するため plugin DB 11 個で `permission denied` | Bitnami `initdbScripts` で plugin DB pre-create + group role 戦略 (dynamic role を `backstage` group の member に) で再 cutover |
 
 ## Operations

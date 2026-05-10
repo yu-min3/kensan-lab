@@ -26,7 +26,7 @@ apps/
 ├── api-server/
 │   └── argocd-apps.yaml    # app-api-server
 │                           # リポジトリ: kensan-lab-apps-api-server
-├── kensan/                 # kensan アプリ専用 (kensan-app, kensan-data)
+├── kensan/                 # kensan アプリ専用 (single ns: kensan)
 └── README.md
 ```
 

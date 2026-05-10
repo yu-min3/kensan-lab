@@ -17,13 +17,6 @@ spec:
     server: "https://kubernetes.default.svc"
   - namespace: app-prod
     server: "https://kubernetes.default.svc"
-  ## kensan-prod / kensan-data は ns 統合 (3a-3) で kensan に集約済み。
-  ## 旧 Application が prune 中の間は destination match が必要なので残置。
-  ## prune 完了 + ns 削除確認後に削除予定。
-  - namespace: kensan-prod
-    server: "https://kubernetes.default.svc"
-  - namespace: kensan-data
-    server: "https://kubernetes.default.svc"
 
   # Apps own their own namespace (per-app namespace design)
   clusterResourceWhitelist:

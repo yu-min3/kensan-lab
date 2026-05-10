@@ -88,7 +88,7 @@ spec:
               kubernetes.io/metadata.name: vault-config-operator
         - namespaceSelector:
             matchLabels:
-              kubernetes.io/metadata.name: kensan-prod
+              kubernetes.io/metadata.name: kensan
       ports:
         - protocol: TCP
           port: 8200

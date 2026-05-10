@@ -17,7 +17,7 @@
 ## 既存の per-ns default-deny-all NP は別 PR で削除する。
 ##
 ## 対象外 (istio-injection 無しなので per-ns NP のまま):
-##   - kensan-data / cert-manager / cloudflare-tunnel
+##   - cert-manager / cloudflare-tunnel
 apiVersion: cilium.io/v2
 kind: CiliumClusterwideNetworkPolicy
 metadata:
