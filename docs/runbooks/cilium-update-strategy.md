@@ -15,7 +15,7 @@ Cilium chart の DaemonSet `updateStrategy.rollingUpdate.maxUnavailable` の def
 
 ## 設定 (現状)
 
-`infrastructure/network/cilium/values.yaml`:
+`kubernetes/network/cilium/values.yaml`:
 
 ```yaml
 updateStrategy:

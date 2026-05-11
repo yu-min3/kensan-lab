@@ -105,8 +105,8 @@ Gateway 層 OIDC 諦め。各 service の native OIDC（ArgoCD / Grafana / Backs
 ADR-010 採択後の本 PR (Path A: oauth2-proxy via envoy_ext_authz_http) は以下を含む:
 
 1. `bootstrap/keycloak/setup.sh` を OIDC client 関数化 + `istio-gateway-platform` client 作成を Path A 仕様で activate (`redirectUris=[https://oauth2-proxy.platform.yu-min3.com/oauth2/callback]`)。Vault KV 投入も同 script に bundle。
-2. `infrastructure/network/istio/istiod/values.yaml` の `meshConfig.extensionProviders` に oauth2-proxy entry を登録。
-3. `infrastructure/auth/oauth2-proxy/` に Helm multi-source app (replicaCount 2 + PDB、ExternalSecret 経由 Vault KV)。
+2. `kubernetes/network/istio/istiod/values.yaml` の `meshConfig.extensionProviders` に oauth2-proxy entry を登録。
+3. `kubernetes/auth/oauth2-proxy/` に Helm multi-source app (replicaCount 2 + PDB、ExternalSecret 経由 Vault KV)。
 4. ADR-010 (本書) status を Decided: Path A に更新、ADR-005 を Re-evaluation Required に更新。
 
 `RequestAuthentication` / `AuthorizationPolicy` (deny-all + ALLOW + CUSTOM) は後続 PR で投入。本 PR では provider 登録 + deploy のみで、AuthZ binding がない以上ランタイム挙動の変更はゼロ。

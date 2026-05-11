@@ -19,7 +19,7 @@ In parallel with the Phase 1 auth design (ADR-005), we need a structure where Au
 
 ### Verifying the Existing Implementation
 
-Existing Gateways such as `infrastructure/network/istio/resources/gateway-platform.yaml` already use **label-based selectors** to control namespaces:
+Existing Gateways such as `kubernetes/network/istio/resources/gateway-platform.yaml` already use **label-based selectors** to control namespaces:
 
 ```yaml
 allowedRoutes:

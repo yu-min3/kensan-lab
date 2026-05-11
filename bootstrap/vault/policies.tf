@@ -50,7 +50,7 @@ resource "vault_policy" "vco_admin" {
 }
 
 # eso-read policy is managed by Vault Config Operator (VCO) via Policy CR
-# (infrastructure/security/vault-config-operator/resources/database-engine/policy-eso-read.yaml).
+# (kubernetes/security/vault-config-operator/resources/database-engine/policy-eso-read.yaml).
 # Bootstrap chain で必要な policy は admin / vco-admin のみ。eso-read は VCO 起動後に作成される。
 
 # platform-dev: 将来の dev チーム用 placeholder。Phase 1 では readonly 程度に絞る

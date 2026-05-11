@@ -220,8 +220,8 @@ Browser -> Istio Gateway -> OAuth2 Proxy (Auth Layer 1)
 **Phase 1 -> Phase 2:**
 ```bash
 # Just deploy OAuth2 Proxy
-kubectl apply -f infrastructure/oauth2-proxy/
-kubectl apply -f infrastructure/network/istio/oauth2-proxy-extauthz.yaml
+kubectl apply -f kubernetes/oauth2-proxy/
+kubectl apply -f kubernetes/network/istio/oauth2-proxy-extauthz.yaml
 
 # All services are automatically protected
 # No configuration changes needed per service
@@ -235,7 +235,7 @@ kubectl apply -f backstage/manifests/
 # OAuth2 Proxy unchanged
 
 # 2. Then Argo CD
-kubectl apply -f infrastructure/gitops/argocd/
+kubectl apply -f kubernetes/gitops/argocd/
 # OAuth2 Proxy unchanged
 
 # Prometheus/Hubble need no migration (stays at Phase 2)

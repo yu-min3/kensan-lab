@@ -65,12 +65,12 @@ For Istio sidecar-injected namespaces, additionally:
 
 | Namespace | Location | Management Method |
 |-----------|--------|---------|
-| kensan-prod | `infrastructure/environments/kensan-prod/network-policy.yaml` | ApplicationSet (Git directory) |
-| kensan-dev | `infrastructure/environments/kensan-dev/network-policy.yaml` | ApplicationSet (Git directory) |
-| kensan-data | `infrastructure/environments/kensan-data/network-policy.yaml` | ApplicationSet (Git directory) |
+| kensan-prod | `kubernetes/environments/kensan-prod/network-policy.yaml` | ApplicationSet (Git directory) |
+| kensan-dev | `kubernetes/environments/kensan-dev/network-policy.yaml` | ApplicationSet (Git directory) |
+| kensan-data | `kubernetes/environments/kensan-data/network-policy.yaml` | ApplicationSet (Git directory) |
 | backstage | `backstage/manifests/network-policy.yaml` | Argo CD directory source |
-| platform-auth-prod | `infrastructure/network/network-policy/keycloak-prod.yaml` | Argo CD directory source |
-| cert-manager | `infrastructure/secrets/cert-manager/resources/network-policy.yaml` | Argo CD resources source |
+| platform-auth-prod | `kubernetes/network/network-policy/keycloak-prod.yaml` | Argo CD directory source |
+| cert-manager | `kubernetes/secrets/cert-manager/resources/network-policy.yaml` | Argo CD resources source |
 
 ## Consequences
 

@@ -28,7 +28,7 @@ Phase 2 以降で Vault Database engine による動的 PG credentials が選択
 
 ### 既存実装
 
-`infrastructure/auth/keycloak/` 確認結果:
+`kubernetes/auth/keycloak/` 確認結果:
 
 - 専用 Postgres StatefulSet（Keycloak 専用、共用しない）
 - Keycloak / Postgres 両方の認証情報が Sealed Secrets で管理

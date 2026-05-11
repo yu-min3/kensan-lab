@@ -28,7 +28,7 @@ Check sync status for `$ARGUMENTS[0]` (or all apps if not specified).
 3. **Show diff** (for OutOfSync apps):
    - Check the Application CR in Git vs live state
    - Read the `values.yaml` and `resources/` for recent changes
-   - Check recent Git commits: `git log --oneline -5 -- infrastructure/<path>`
+   - Check recent Git commits: `git log --oneline -5 -- kubernetes/<path>`
 
 4. **Common issues and solutions**:
    - **OutOfSync after values change**: Argo CD may need a manual refresh

@@ -1,6 +1,6 @@
 ---
 description: Sealed Secrets workflow, cert-manager, GHCR pull secrets, and sensitive data handling
-globs: "**/sealed-secret*, infrastructure/auth/**, infrastructure/secrets/**"
+globs: "**/sealed-secret*, kubernetes/auth/**, kubernetes/secrets/**"
 ---
 
 # Security & Secrets
@@ -8,7 +8,7 @@ globs: "**/sealed-secret*, infrastructure/auth/**, infrastructure/secrets/**"
 ## Sealed Secrets Workflow
 
 1. Create raw secret → save to `temp/<name>-raw.yaml` (git-ignored)
-2. Seal: `kubeseal --format=yaml < temp/<name>-raw.yaml > infrastructure/<cat>/<comp>/resources/<name>-sealed.yaml`
+2. Seal: `kubeseal --format=yaml < temp/<name>-raw.yaml > kubernetes/<cat>/<comp>/resources/<name>-sealed.yaml`
 3. Commit sealed YAML (safe to store in Git)
 4. Argo CD syncs → Sealed Secrets controller decrypts in-cluster
 
@@ -21,7 +21,7 @@ globs: "**/sealed-secret*, infrastructure/auth/**, infrastructure/secrets/**"
 ## cert-manager
 
 - **ClusterIssuer**: Let's Encrypt (production + staging)
-- **Certificates**: auto-renewed, defined in `infrastructure/secrets/cert-manager/resources/`
+- **Certificates**: auto-renewed, defined in `kubernetes/secrets/cert-manager/resources/`
 - Wildcard certs: `wildcard-platform-tls` and `wildcard-apps-tls`
 - Manual renewal (rarely needed): delete the cert secret, cert-manager recreates it
 
@@ -29,7 +29,7 @@ globs: "**/sealed-secret*, infrastructure/auth/**, infrastructure/secrets/**"
 
 - Each app namespace (`app-dev`, `app-prod`) has `ghcr-pull-secret` (SealedSecret)
 - ServiceAccounts reference `imagePullSecrets: [ghcr-pull-secret]`
-- Located in `infrastructure/environments/<env>/`
+- Located in `kubernetes/environments/<env>/`
 
 ## Keycloak Authentication
 

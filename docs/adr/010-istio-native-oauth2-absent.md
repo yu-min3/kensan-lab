@@ -131,8 +131,8 @@ Keep gateway-level Authorization at host/IP level (or none). Each service does i
 After Path A was selected, this PR delivers the **deploy-layer** only:
 
 1. `bootstrap/keycloak/setup.sh` extended with a parameterized OIDC client function and an active `istio-gateway-platform` client whose `redirectUris=[https://oauth2-proxy.platform.yu-min3.com/oauth2/callback]`. Vault KV population (`secret/platform-auth/istio-gateway/platform`) is bundled into the same script.
-2. `meshConfig.extensionProviders` entry registering oauth2-proxy as `envoy_ext_authz_http` in `infrastructure/network/istio/istiod/values.yaml`.
-3. oauth2-proxy Helm multi-source app under `infrastructure/auth/oauth2-proxy/` (replicaCount 2 + PDB, ExternalSecret backed by the Vault KV path above).
+2. `meshConfig.extensionProviders` entry registering oauth2-proxy as `envoy_ext_authz_http` in `kubernetes/network/istio/istiod/values.yaml`.
+3. oauth2-proxy Helm multi-source app under `kubernetes/auth/oauth2-proxy/` (replicaCount 2 + PDB, ExternalSecret backed by the Vault KV path above).
 4. ADR-010 (this file) status updated to Decided: Path A. ADR-005 marked Re-evaluation Required.
 
 `RequestAuthentication` and the three-tier `AuthorizationPolicy` set (deny-all + ALLOW + CUSTOM) are intentionally deferred to follow-up PRs. Because no AuthZ policy binds the provider in this PR, runtime behavior is unchanged.
@@ -140,9 +140,9 @@ After Path A was selected, this PR delivers the **deploy-layer** only:
 ## Consequences
 
 **If Path A is chosen** (recommended):
-- One follow-up PR adds `infrastructure/auth/oauth2-proxy/` Helm multi-source app
-- Existing `meshConfig.extensionProviders` entry needs to be added (this PR includes a draft commented-out version in `infrastructure/network/istio/istiod/values.yaml`)
-- The OIDC foundation YAML moves into a synced path (e.g., `infrastructure/network/istio/resources/`) and `targetRef` is bound to `gateway-platform`
+- One follow-up PR adds `kubernetes/auth/oauth2-proxy/` Helm multi-source app
+- Existing `meshConfig.extensionProviders` entry needs to be added (this PR includes a draft commented-out version in `kubernetes/network/istio/istiod/values.yaml`)
+- The OIDC foundation YAML moves into a synced path (e.g., `kubernetes/network/istio/resources/`) and `targetRef` is bound to `gateway-platform`
 - `istio-gateway-platform` Keycloak client gets `redirectUris=[https://oauth2-proxy.platform.yu-min3.com/oauth2/callback]` (or the chosen oauth2-proxy hostname)
 
 **If Path B is chosen**:

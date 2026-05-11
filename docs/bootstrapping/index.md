@@ -7,8 +7,8 @@ This document serves as a reference for building the cluster from scratch.
 This platform is managed using Argo CD's **Helm multi-source Application** pattern. Each component's chart version, repository, and values are defined in Application CRs, and Argo CD automatically handles Helm rendering and deployment.
 
 ```
-infrastructure/gitops/argocd/applications/   <- Application CRs (Source of Truth for chart info)
-infrastructure/<category>/<component>/
+kubernetes/gitops/argocd/applications/   <- Application CRs (Source of Truth for chart info)
+kubernetes/<category>/<component>/
   ├── values.yaml                            <- Helm values
   └── resources/                             <- Custom resources outside Helm management
 ```
@@ -63,13 +63,13 @@ helm repo add cilium https://helm.cilium.io/
 helm install cilium cilium/cilium \
   --version 1.18.3 \
   --namespace kube-system \
-  --values infrastructure/network/cilium/values.yaml
+  --values kubernetes/network/cilium/values.yaml
 ```
 
 Apply custom resources (LB IP Pool, L2 Announcement Policy) manually.
 
 ```bash
-kubectl apply -f infrastructure/network/cilium/resources/
+kubectl apply -f kubernetes/network/cilium/resources/
 ```
 
 ---
@@ -94,17 +94,17 @@ helm install argocd argo/argo-cd \
   --version 9.1.0 \
   --namespace argocd \
   --create-namespace \
-  --values infrastructure/gitops/argocd/values.yaml
+  --values kubernetes/gitops/argocd/values.yaml
 ```
 
 After installation, apply the AppProject and Root Application to begin self-management.
 
 ```bash
-kubectl apply -f infrastructure/gitops/argocd/projects/platform-project.yaml
-kubectl apply -f infrastructure/gitops/argocd/root-apps/platform-root-app.yaml
+kubectl apply -f kubernetes/gitops/argocd/projects/platform-project.yaml
+kubectl apply -f kubernetes/gitops/argocd/root-apps/platform-root-app.yaml
 ```
 
-The Root Application recursively scans `infrastructure/gitops/argocd/applications/`, automatically detecting and deploying all child Application CRs. No further manual operations are needed for subsequent components.
+The Root Application recursively scans `kubernetes/gitops/argocd/applications/`, automatically detecting and deploying all child Application CRs. No further manual operations are needed for subsequent components.
 
 ---
 

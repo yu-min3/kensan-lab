@@ -1,4 +1,0 @@
-# Chart config: infrastructure/gitops/argocd/applications/network/istio-base/app.yaml
-# Version: 1.27.3
-#
-# Default configuration - CRDs only, no custom values needed

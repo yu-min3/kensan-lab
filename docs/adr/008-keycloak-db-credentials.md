@@ -28,7 +28,7 @@ If, under this structure, Keycloak's DB credentials are issued via Vault dynamic
 
 ### Existing Implementation
 
-`infrastructure/auth/keycloak/` review:
+`kubernetes/auth/keycloak/` review:
 
 - A dedicated Postgres StatefulSet (Keycloak-only, not shared)
 - Both Keycloak and Postgres credentials managed by Sealed Secrets

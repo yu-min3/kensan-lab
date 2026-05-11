@@ -1,1 +1,1 @@
----8<--- "infrastructure/README.md"
+---8<--- "kubernetes/README.md"

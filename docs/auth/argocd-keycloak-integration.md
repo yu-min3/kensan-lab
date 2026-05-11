@@ -9,7 +9,7 @@ ArgoCD は Keycloak realm `kensan` を IdP として、Dex を経由しない直
 | Keycloak client `argocd` | `bootstrap/keycloak/setup.sh` で作成 | redirect URI: `https://argocd.platform.yu-min3.com/auth/callback` |
 | client_secret | Vault KV `secret/security/argocd/oidc` | bootstrap TF で投入 |
 | Kubernetes Secret `argocd-oidc-secret` | ESO (ExternalSecret) で生成 | namespace: `argocd` |
-| `argocd-cm` の `oidc.config` | `infrastructure/gitops/argocd/values.yaml` | `$argocd-oidc-secret:client-secret` で参照 |
+| `argocd-cm` の `oidc.config` | `kubernetes/gitops/argocd/values.yaml` | `$argocd-oidc-secret:client-secret` で参照 |
 
 ## values.yaml の主要部
 

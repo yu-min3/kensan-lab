@@ -52,13 +52,13 @@ As operations progressed, the following problems became apparent:
 ### ApplicationSet Design
 
 #### Observability ApplicationSet
-- **Generator**: Git File Generator (`infrastructure/observability/*/config.json`)
+- **Generator**: Git File Generator (`kubernetes/observability/*/config.json`)
 - **Template**: Helm multi-source (chart source + values ref)
 - **templatePatch**: Add 3rd source (resources/) when `hasResources: "true"`
 - **Unified Policy**: Apply finalizer, ServerSideApply, and retry to all apps
 
 #### Environments ApplicationSet
-- **Generator**: Git File Generator (`infrastructure/environments/*/config.json`)
+- **Generator**: Git File Generator (`kubernetes/environments/*/config.json`)
 - **Template**: Single source (Git directory)
 - **Unified Policy**: Apply finalizer to all apps
 

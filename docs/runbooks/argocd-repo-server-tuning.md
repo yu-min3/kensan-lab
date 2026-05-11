@@ -10,7 +10,7 @@ repo-server は Helm template / git clone を担当しており、reschedule 時
 
 ## 設定 (現状)
 
-`infrastructure/gitops/argocd/values.yaml`:
+`kubernetes/gitops/argocd/values.yaml`:
 
 ```yaml
 repoServer:

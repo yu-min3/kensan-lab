@@ -1,6 +1,6 @@
 ---
 description: Cluster topology, node labels, scheduling rules, and storage constraints
-globs: "infrastructure/**"
+globs: "kubernetes/**"
 ---
 
 # Kubernetes Cluster

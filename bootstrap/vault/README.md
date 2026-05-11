@@ -85,9 +85,9 @@ state を持たないので **永続的な Vault 設定**は VCO + ArgoCD に任
 ```mermaid
 flowchart TB
     A["ArgoCD wave -3〜2:<br/>Cilium / Istio / cert-manager /<br/>Sealed Secrets / Keycloak<br/>(既存)"]
-    B["ArgoCD wave 5:<br/>Vault HA Helm chart<br/>(infrastructure/secrets/vault/)"]
-    C["ArgoCD wave 6:<br/>External Secrets Operator<br/>(infrastructure/secrets/external-secrets/)"]
-    D["ArgoCD wave 7:<br/>Vault Config Operator<br/>(infrastructure/secrets/vault-config-operator/)"]
+    B["ArgoCD wave 5:<br/>Vault HA Helm chart<br/>(kubernetes/secrets/vault/)"]
+    C["ArgoCD wave 6:<br/>External Secrets Operator<br/>(kubernetes/secrets/external-secrets/)"]
+    D["ArgoCD wave 7:<br/>Vault Config Operator<br/>(kubernetes/secrets/vault-config-operator/)"]
     E["**手動: vault operator init**<br/>Recovery Keys を 1Password へ<br/>root token 控える"]
     F["**手動: terraform apply**<br/>(このディレクトリ)<br/>auth methods + OIDC + roles +<br/>policies + KV mount + audit"]
     G["**手動: state 破棄 + root token revoke**"]
@@ -111,7 +111,7 @@ ArgoCD は **deploy 順序を保証**するが、Vault の **内部状態 (auth 
 
 ## 前提条件 (順番に確認)
 
-1. **Vault HA cluster up**: `infrastructure/secrets/vault/` が ArgoCD で sync 済み、3 pod が `Running`
+1. **Vault HA cluster up**: `kubernetes/secrets/vault/` が ArgoCD で sync 済み、3 pod が `Running`
 2. **Vault initialized**: `kubectl exec -n vault vault-0 -- vault operator init` 実行済み
    - Recovery Keys (Shamir 5/3) を **1Password に保存**
    - Initial root token を控える (このあと TF で使う)

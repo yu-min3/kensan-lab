@@ -11,9 +11,9 @@ Each infrastructure component consists of:
 
 | File | Location | Purpose |
 |------|----------|---------|
-| **Application CR** | `infrastructure/gitops/argocd/applications/<category>/<component>/app.yaml` | Chart repo, version (`targetRevision`), source references |
-| **values.yaml** | `infrastructure/<category>/<component>/values.yaml` | Helm values customization |
-| **resources/** | `infrastructure/<category>/<component>/resources/` | Additional raw manifests (HTTPRoutes, SealedSecrets, etc.) |
+| **Application CR** | `kubernetes/gitops/argocd/applications/<category>/<component>/app.yaml` | Chart repo, version (`targetRevision`), source references |
+| **values.yaml** | `kubernetes/<category>/<component>/values.yaml` | Helm values customization |
+| **resources/** | `kubernetes/<category>/<component>/resources/` | Additional raw manifests (HTTPRoutes, SealedSecrets, etc.) |
 
 ## Common Operations
 
@@ -36,7 +36,7 @@ Place YAML files in `resources/` directory → commit → push. Deployed as a se
 ## Directory Layout Example
 
 ```
-infrastructure/observability/grafana/
+kubernetes/observability/grafana/
 ├── values.yaml          # Helm chart values
 └── resources/
     ├── httproute.yaml   # Gateway routing
@@ -46,5 +46,5 @@ infrastructure/observability/grafana/
 
 Corresponding Application CR:
 ```
-infrastructure/gitops/argocd/applications/observability/grafana/app.yaml
+kubernetes/gitops/argocd/applications/observability/grafana/app.yaml
 ```

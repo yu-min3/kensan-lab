@@ -44,7 +44,7 @@ spec:
               kubernetes.io/metadata.name: istio-system
 ```
 
-No port restriction. Bidirectional. The `istio-system` namespaceSelector is the access boundary. This is the same shape as the existing `allow-istio` policies in `infrastructure/network/network-policy/keycloak-prod.yaml`, `infrastructure/environments/kensan-{prod,dev}/network-policy.yaml`, etc.
+No port restriction. Bidirectional. The `istio-system` namespaceSelector is the access boundary. This is the same shape as the existing `allow-istio` policies in `kubernetes/network/network-policy/keycloak-prod.yaml`, `kubernetes/environments/kensan-{prod,dev}/network-policy.yaml`, etc.
 
 Apply to: `vault`, `external-secrets`, `vault-config-operator`.
 
@@ -72,7 +72,7 @@ spec:
             k8s:io.kubernetes.pod.namespace: istio-system
 ```
 
-Place at `infrastructure/network/istio/resources/clusterwide-allow-istio.yaml`. Once verified, remove the per-namespace `allow-istio` from each component's `resources/network-policy.yaml`.
+Place at `kubernetes/network/istio/resources/clusterwide-allow-istio.yaml`. Once verified, remove the per-namespace `allow-istio` from each component's `resources/network-policy.yaml`.
 
 The CCNP supplements the per-namespace `default-deny-all` (Kubernetes NetworkPolicy semantics are additive: any policy that explicitly allows a destination unblocks it). So the chain becomes:
 

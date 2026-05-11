@@ -5,7 +5,7 @@
 set -e
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-OUTPUT_DIR="$SCRIPT_DIR/../../../infrastructure/observability/grafana"
+OUTPUT_DIR="$SCRIPT_DIR/../../../kubernetes/observability/grafana"
 OUTPUT_FILE="$OUTPUT_DIR/dashboards.yaml"
 
 echo "Downloading OpenTelemetry dashboards from Grafana.com..."

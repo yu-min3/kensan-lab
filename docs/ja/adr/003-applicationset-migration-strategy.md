@@ -52,13 +52,13 @@
 ### ApplicationSet 設計
 
 #### Observability ApplicationSet
-- **Generator**: Git File Generator (`infrastructure/observability/*/config.json`)
+- **Generator**: Git File Generator (`kubernetes/observability/*/config.json`)
 - **テンプレート**: Helm multi-source（chart source + values ref）
 - **templatePatch**: `hasResources: "true"` の場合に 3rd source（resources/）を追加
 - **統一ポリシー**: finalizer, ServerSideApply, retry を全アプリに適用
 
 #### Environments ApplicationSet
-- **Generator**: Git File Generator (`infrastructure/environments/*/config.json`)
+- **Generator**: Git File Generator (`kubernetes/environments/*/config.json`)
 - **テンプレート**: single source（Git directory）
 - **統一ポリシー**: finalizer を全アプリに適用
 

@@ -107,7 +107,7 @@
 ## リポジトリ構成
 
 ```
-infrastructure/                    # コアプラットフォーム（GitOps 管理）
+kubernetes/                    # コアプラットフォーム（GitOps 管理）
 ├── gitops/argocd/                # Argo CD: applications/, projects/, root-apps/
 ├── observability/                # Prometheus, Grafana, Loki, Tempo, OTel Collector
 ├── network/                      # Cilium, Istio, Gateway API

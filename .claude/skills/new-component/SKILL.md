@@ -16,14 +16,14 @@ Scaffold `$ARGUMENTS[1]` under category `$ARGUMENTS[0]`.
 
 2. **Create component directory**:
    ```
-   infrastructure/$ARGUMENTS[0]/$ARGUMENTS[1]/
+   kubernetes/$ARGUMENTS[0]/$ARGUMENTS[1]/
    ├── values.yaml
    └── resources/
    ```
 
 3. **Create Application CR**:
    ```
-   infrastructure/gitops/argocd/applications/$ARGUMENTS[0]/$ARGUMENTS[1]/app.yaml
+   kubernetes/gitops/argocd/applications/$ARGUMENTS[0]/$ARGUMENTS[1]/app.yaml
    ```
    - Ask user for: Helm chart repo URL, chart name, target version
    - Use existing app.yaml files as template (read one from same category)

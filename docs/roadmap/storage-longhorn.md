@@ -25,7 +25,7 @@ Longhorn 導入で分散ストレージに切り替える計画。
 1. Longhorn 導入 (別 ADR / 別 PR)
 2. 各 component の `storageClass` を `local-path` → `longhorn-single` に切替
 3. PVC migration (data の Longhorn volume への移行)
-4. local-path-provisioner を削除 (`infrastructure/storage/`)
+4. local-path-provisioner を削除 (`kubernetes/storage/`)
 
 ## 既知の前提
 
