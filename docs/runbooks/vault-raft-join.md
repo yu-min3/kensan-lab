@@ -12,7 +12,7 @@ PR #228 までこの設定が漏れており、毎回手動で `vault operator r
 
 ## 設定 (現状)
 
-`infrastructure/security/vault/values.yaml` の `server.ha.raft.config` に以下を含める:
+`infrastructure/secrets/vault/values.yaml` の `server.ha.raft.config` に以下を含める:
 
 ```hcl
 storage "raft" {

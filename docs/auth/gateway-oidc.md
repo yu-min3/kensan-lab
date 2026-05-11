@@ -70,7 +70,7 @@
 | `infrastructure/network/istio/requestauthentication-gateway-platform.yaml` | Authorization header の Bearer JWT を Keycloak で検証、`request.auth.claims` を populate |
 | `infrastructure/network/istio/authorizationpolicy-gateway-platform-allow.yaml` | 許可ルール本体。3 rule で全 host を網羅。ここに無い host は暗黙 deny |
 | `infrastructure/network/istio/authorizationpolicy-gateway-platform-oauth2.yaml` | Category 2/3 host にだけ oauth2-proxy ext_authz を強制 (CUSTOM action) |
-| `infrastructure/security/oauth2-proxy/values.yaml` | oauth2-proxy 自身の Helm values。cookie domain / Keycloak client id 等 |
+| `infrastructure/auth/oauth2-proxy/values.yaml` | oauth2-proxy 自身の Helm values。cookie domain / Keycloak client id 等 |
 | `infrastructure/network/istio/istiod/values.yaml` | `meshConfig.extensionProviders[oauth2-proxy]` で oauth2-proxy を ext_authz target として登録 |
 
 ## 新 host を追加するときのチェックリスト

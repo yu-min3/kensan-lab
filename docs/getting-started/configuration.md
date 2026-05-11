@@ -24,11 +24,11 @@ find infrastructure/ backstage/ apps/ -type f \( -name "*.yaml" -o -name "*.yml"
 | Component | File | Value |
 |-----------|------|-------|
 | Gateways | `infrastructure/network/istio/resources/gateway-*.yaml` | `*.platform.yu-min3.com`, `*.app.yu-min3.com` |
-| Certificates | `infrastructure/security/cert-manager/resources/wildcard-certificate-*.yaml` | `*.yu-min3.com` |
-| ClusterIssuer | `infrastructure/security/cert-manager/resources/clusterissuer.yaml` | `admin@yu-min3.com` |
+| Certificates | `infrastructure/secrets/cert-manager/resources/wildcard-certificate-*.yaml` | `*.yu-min3.com` |
+| ClusterIssuer | `infrastructure/secrets/cert-manager/resources/clusterissuer.yaml` | `admin@yu-min3.com` |
 | HTTPRoutes | `infrastructure/**/resources/httproute*.yaml` | `*.platform.yu-min3.com` |
-| Keycloak | `infrastructure/security/keycloak/httproute.yaml` | `auth.platform.yu-min3.com` |
-| Keycloak env | `infrastructure/security/keycloak/keycloak-env-config.yaml` | `KC_HOSTNAME` |
+| Keycloak | `infrastructure/auth/keycloak/httproute.yaml` | `auth.platform.yu-min3.com` |
+| Keycloak env | `infrastructure/auth/keycloak/keycloak-env-config.yaml` | `KC_HOSTNAME` |
 
 ### 2. GitHub Organization
 
@@ -86,7 +86,7 @@ rm temp/<name>-raw.yaml  # never commit raw secrets
 
 This repository uses AWS Route 53 for DNS-01 challenges. If you use a different DNS provider (Cloudflare, Google Cloud DNS, etc.), update:
 
-- `infrastructure/security/cert-manager/resources/clusterissuer.yaml` — solver configuration
+- `infrastructure/secrets/cert-manager/resources/clusterissuer.yaml` — solver configuration
 - The corresponding credentials Sealed Secret
 
 ---

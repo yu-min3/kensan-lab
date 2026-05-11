@@ -180,7 +180,7 @@ spec:
   source:
     repoURL: https://github.com/your-org/kensan-lab.git
     targetRevision: main
-    path: infrastructure/security/keycloak/overlays/prod  # <- Point to overlays
+    path: infrastructure/auth/keycloak/overlays/prod  # <- Point to overlays
 ```
 
 ### Flat YAML-Based:

@@ -9,7 +9,7 @@ dev/prod 分離廃止に伴って、Keycloak の dev realm と関連リソース
 - Namespace: `platform-auth-dev`
 - Vault dynamic DB credential role: `keycloak-dev`
 - NetworkPolicy: `infrastructure/network/network-policy/keycloak-dev.yaml` (manifest 側で削除済)
-- Vault DB engine config: `infrastructure/security/vault-database-engine/platform-values/vault-database/keycloak-dev.yaml` (manifest 側で削除済)
+- Vault DB engine config: `infrastructure/secrets/vault-database-engine/platform-values/vault-database/keycloak-dev.yaml` (manifest 側で削除済)
 
 ## 前提
 
@@ -46,7 +46,7 @@ kubectl exec -n platform-auth-dev deploy/keycloak -- /opt/keycloak/bin/kcadm.sh 
 
 ### 3. ArgoCD Application の自動 prune 確認
 
-`keycloak-dev` Application は manifest 側 (`infrastructure/gitops/argocd/applications/security/keycloak/overlays/dev/`) を削除済なので、ArgoCD が自動的に prune する。
+`keycloak-dev` Application は manifest 側 (`infrastructure/gitops/argocd/applications/auth/keycloak/overlays/dev/`) を削除済なので、ArgoCD が自動的に prune する。
 
 ```bash
 kubectl get application -n argocd keycloak-dev
