@@ -34,8 +34,8 @@ infrastructure/secrets/vault-database-engine/
 ```
 
 ArgoCD 側:
-- `applications/security/vault-database-engine/app-shared.yaml` — single Application、`shared/` を sync (mount + policy 1 度だけ)
-- `applications/security/vault-database-engine/applicationset-instances.yaml` — ApplicationSet、values file を recursive glob (`**/platform-values/vault-database/*.yaml`) で discover、per-instance ArgoCD app を auto 生成
+- `applications/secrets/vault-database-engine/app-shared.yaml` — single Application、`shared/` を sync (mount + policy 1 度だけ)
+- `applications/secrets/vault-database-engine/applicationset-instances.yaml` — ApplicationSet、values file を recursive glob (`**/platform-values/vault-database/*.yaml`) で discover、per-instance ArgoCD app を auto 生成
 
 ## 設計の核: smart default + override
 

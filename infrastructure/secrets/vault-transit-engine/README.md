@@ -30,7 +30,7 @@ infrastructure/secrets/vault-transit-engine/
 ```
 
 ArgoCD 側:
-- `infrastructure/gitops/argocd/applications/security/vault-transit-engine/app-shared.yaml`
+- `infrastructure/gitops/argocd/applications/secrets/vault-transit-engine/app-shared.yaml`
 
 ## 設計判断: なぜ key 作成だけ手動か
 

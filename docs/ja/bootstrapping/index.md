@@ -35,7 +35,7 @@ Argo CD の sync-wave によりデプロイ順序が制御されます。
 | -3 | Istio namespace + Gateways | `applications/network/istio-resources/app.yaml` |
 | -2 | Istio Base CRDs | `applications/network/istio-base/app.yaml` |
 | -1 | Istiod | `applications/network/istiod/app.yaml` |
-| 0 | cert-manager | `applications/security/cert-manager/app.yaml` |
+| 0 | cert-manager | `applications/secrets/cert-manager/app.yaml` |
 | — | Prometheus | `applications/observability/prometheus/app.yaml` |
 | — | Grafana | `applications/observability/grafana/app.yaml` |
 | — | Loki | `applications/observability/loki/app.yaml` |

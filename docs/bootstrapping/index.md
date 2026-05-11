@@ -36,12 +36,12 @@ Deployment order is controlled by Argo CD sync-waves.
 | -2 | Istio Base CRDs | `applications/network/istio-base/app.yaml` |
 | -2 | Istio CNI | `applications/network/istio-cni/app.yaml` |
 | -1 | Istiod | `applications/network/istiod/app.yaml` |
-| 0 | cert-manager | `applications/security/cert-manager/app.yaml` |
-| -- | Sealed Secrets | `applications/security/sealed-secrets/app.yaml` |
-| 2 | Keycloak | `applications/security/keycloak/app.yaml` |
-| 5 | Vault HA (KMS auto-unseal) | `applications/security/vault/app.yaml` |
-| 6 | External Secrets Operator | `applications/security/external-secrets/app.yaml` |
-| 7 | Vault Config Operator | `applications/security/vault-config-operator/app.yaml` |
+| 0 | cert-manager | `applications/secrets/cert-manager/app.yaml` |
+| -- | Sealed Secrets | `applications/secrets/sealed-secrets/app.yaml` |
+| 2 | Keycloak | `applications/auth/keycloak/app.yaml` |
+| 5 | Vault HA (KMS auto-unseal) | `applications/secrets/vault/app.yaml` |
+| 6 | External Secrets Operator | `applications/secrets/external-secrets/app.yaml` |
+| 7 | Vault Config Operator | `applications/secrets/vault-config-operator/app.yaml` |
 | -- | Prometheus | `applications/observability/prometheus/app.yaml` |
 | -- | Grafana | `applications/observability/grafana/app.yaml` |
 | -- | Loki | `applications/observability/loki/app.yaml` |
