@@ -235,7 +235,7 @@ kubectl apply -f backstage/manifests/
 # OAuth2 Proxy unchanged
 
 # 2. Then Argo CD
-kubectl apply -f kubernetes/gitops/argocd/
+kubectl apply -f kubernetes/argocd/
 # OAuth2 Proxy unchanged
 
 # Prometheus/Hubble need no migration (stays at Phase 2)

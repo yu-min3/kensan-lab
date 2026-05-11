@@ -46,7 +46,7 @@ kubectl exec -n platform-auth-dev deploy/keycloak -- /opt/keycloak/bin/kcadm.sh 
 
 ### 3. ArgoCD Application の自動 prune 確認
 
-`keycloak-dev` Application は manifest 側 (`kubernetes/gitops/argocd/applications/auth/keycloak/overlays/dev/`) を削除済なので、ArgoCD が自動的に prune する。
+`keycloak-dev` Application は manifest 側 (`kubernetes/argocd/applications/auth/keycloak/overlays/dev/`) を削除済なので、ArgoCD が自動的に prune する。
 
 ```bash
 kubectl get application -n argocd keycloak-dev

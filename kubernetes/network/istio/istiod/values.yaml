@@ -1,4 +1,4 @@
-# Chart config: kubernetes/gitops/argocd/applications/network/istiod/app.yaml
+# Chart config: kubernetes/argocd/applications/network/istiod/app.yaml
 # Version: 1.27.3
 #
 # Gateway API support enabled for Kubernetes Gateway API integration

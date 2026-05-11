@@ -15,13 +15,13 @@ spec:
       helm:
         releaseName: argocd
         valueFiles:
-          - $values/kubernetes/gitops/argocd/values.yaml
+          - $values/kubernetes/argocd/values.yaml
     - repoURL: https://github.com/yu-min3/kensan-lab
       targetRevision: main
       ref: values
     - repoURL: https://github.com/yu-min3/kensan-lab
       targetRevision: main
-      path: kubernetes/gitops/argocd/resources
+      path: kubernetes/argocd/resources
 
   destination:
     server: https://kubernetes.default.svc

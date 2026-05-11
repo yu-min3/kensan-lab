@@ -11,7 +11,7 @@ Upgrade `$ARGUMENTS[0]` to chart version `$ARGUMENTS[1]`.
 ## Steps
 
 1. **Locate Application CR**:
-   - Search: `kubernetes/gitops/argocd/applications/**/$ARGUMENTS[0]/app.yaml`
+   - Search: `kubernetes/argocd/applications/**/$ARGUMENTS[0]/app.yaml`
 
 2. **Read current version**:
    - Show current `targetRevision` value

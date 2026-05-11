@@ -1,4 +1,4 @@
-# Chart config: kubernetes/gitops/argocd/applications/observability/prometheus/app.yaml
+# Chart config: kubernetes/argocd/applications/observability/prometheus/app.yaml
 # IMPORTANT: Must use --include-crds flag to include Prometheus Operator CRDs
 
 # Global settings

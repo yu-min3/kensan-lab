@@ -11,7 +11,7 @@ Each infrastructure component consists of:
 
 | File | Location | Purpose |
 |------|----------|---------|
-| **Application CR** | `kubernetes/gitops/argocd/applications/<category>/<component>/app.yaml` | Chart repo, version (`targetRevision`), source references |
+| **Application CR** | `kubernetes/argocd/applications/<category>/<component>/app.yaml` | Chart repo, version (`targetRevision`), source references |
 | **values.yaml** | `kubernetes/<category>/<component>/values.yaml` | Helm values customization |
 | **resources/** | `kubernetes/<category>/<component>/resources/` | Additional raw manifests (HTTPRoutes, SealedSecrets, etc.) |
 
@@ -46,5 +46,5 @@ kubernetes/observability/grafana/
 
 Corresponding Application CR:
 ```
-kubernetes/gitops/argocd/applications/observability/grafana/app.yaml
+kubernetes/argocd/applications/observability/grafana/app.yaml
 ```

@@ -108,7 +108,7 @@
 
 ```
 kubernetes/                    # コアプラットフォーム（GitOps 管理）
-├── gitops/argocd/                # Argo CD: applications/, projects/, root-apps/
+├── argocd/                       # Argo CD: applications/, projects/, root-apps/
 ├── observability/                # Prometheus, Grafana, Loki, Tempo, OTel Collector
 ├── network/                      # Cilium, Istio, Gateway API
 ├── security/                     # cert-manager, Sealed Secrets, Keycloak

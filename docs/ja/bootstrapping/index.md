@@ -7,7 +7,7 @@
 このプラットフォームは Argo CD の **Helm multi-source Application** パターンで管理されています。各コンポーネントのチャートバージョン・リポジトリ・values は Application CR に定義されており、Argo CD が Helm のレンダリングとデプロイを自動で行います。
 
 ```
-kubernetes/gitops/argocd/applications/   ← Application CR（チャート情報の Source of Truth）
+kubernetes/argocd/applications/   ← Application CR（チャート情報の Source of Truth）
 kubernetes/<category>/<component>/
   ├── values.yaml                            ← Helm values
   └── resources/                             ← Helm 管理外のカスタムリソース
@@ -85,17 +85,17 @@ helm install argocd argo/argo-cd \
   --version 9.1.0 \
   --namespace argocd \
   --create-namespace \
-  --values kubernetes/gitops/argocd/values.yaml
+  --values kubernetes/argocd/values.yaml
 ```
 
 インストール後、AppProject と Root Application を apply して自己管理を開始します。
 
 ```bash
-kubectl apply -f kubernetes/gitops/argocd/projects/platform-project.yaml
-kubectl apply -f kubernetes/gitops/argocd/root-apps/platform-root-app.yaml
+kubectl apply -f kubernetes/argocd/projects/platform-project.yaml
+kubectl apply -f kubernetes/argocd/root-apps/platform-root-app.yaml
 ```
 
-Root Application が `kubernetes/gitops/argocd/applications/` を再帰スキャンし、全ての子 Application CR を自動検知・デプロイします。以降のコンポーネントは手動操作不要です。
+Root Application が `kubernetes/argocd/applications/` を再帰スキャンし、全ての子 Application CR を自動検知・デプロイします。以降のコンポーネントは手動操作不要です。
 
 ---
 

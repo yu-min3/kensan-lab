@@ -23,8 +23,8 @@ ALL infrastructure changes MUST go through Git → Argo CD sync. No exceptions.
 
 ## App of Apps Pattern
 
-- Root Applications: `kubernetes/gitops/argocd/root-apps/`
-- Each root app discovers Application CRs in `kubernetes/gitops/argocd/applications/<category>/`
+- Root Applications: `kubernetes/argocd/root-apps/`
+- Each root app discovers Application CRs in `kubernetes/argocd/applications/<category>/`
 - New apps added by Backstage auto-commit to `applications/apps/`
 
 ## Container Runtime

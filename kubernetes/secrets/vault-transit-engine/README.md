@@ -30,7 +30,7 @@ kubernetes/secrets/vault-transit-engine/
 ```
 
 ArgoCD 側:
-- `kubernetes/gitops/argocd/applications/secrets/vault-transit-engine/app-shared.yaml`
+- `kubernetes/argocd/applications/secrets/vault-transit-engine/app-shared.yaml`
 
 ## 設計判断: なぜ key 作成だけ手動か
 

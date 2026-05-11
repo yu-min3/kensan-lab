@@ -23,7 +23,7 @@
 
 ```
 kubernetes/                    # Core infra (GitOps-managed)
-├── gitops/argocd/                # Argo CD: applications/, projects/, root-apps/
+├── argocd/                       # Argo CD: applications/, projects/, root-apps/
 ├── observability/                # grafana, prometheus, loki, tempo, otel-collector
 ├── network/                      # cilium, istio, gateway-api
 ├── security/                     # cert-manager, sealed-secrets, keycloak

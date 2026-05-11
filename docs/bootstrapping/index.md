@@ -7,7 +7,7 @@ This document serves as a reference for building the cluster from scratch.
 This platform is managed using Argo CD's **Helm multi-source Application** pattern. Each component's chart version, repository, and values are defined in Application CRs, and Argo CD automatically handles Helm rendering and deployment.
 
 ```
-kubernetes/gitops/argocd/applications/   <- Application CRs (Source of Truth for chart info)
+kubernetes/argocd/applications/   <- Application CRs (Source of Truth for chart info)
 kubernetes/<category>/<component>/
   ├── values.yaml                            <- Helm values
   └── resources/                             <- Custom resources outside Helm management
@@ -94,17 +94,17 @@ helm install argocd argo/argo-cd \
   --version 9.1.0 \
   --namespace argocd \
   --create-namespace \
-  --values kubernetes/gitops/argocd/values.yaml
+  --values kubernetes/argocd/values.yaml
 ```
 
 After installation, apply the AppProject and Root Application to begin self-management.
 
 ```bash
-kubectl apply -f kubernetes/gitops/argocd/projects/platform-project.yaml
-kubectl apply -f kubernetes/gitops/argocd/root-apps/platform-root-app.yaml
+kubectl apply -f kubernetes/argocd/projects/platform-project.yaml
+kubectl apply -f kubernetes/argocd/root-apps/platform-root-app.yaml
 ```
 
-The Root Application recursively scans `kubernetes/gitops/argocd/applications/`, automatically detecting and deploying all child Application CRs. No further manual operations are needed for subsequent components.
+The Root Application recursively scans `kubernetes/argocd/applications/`, automatically detecting and deploying all child Application CRs. No further manual operations are needed for subsequent components.
 
 ---
 
