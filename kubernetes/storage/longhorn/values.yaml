@@ -1,4 +1,4 @@
-# Chart config: kubernetes/gitops/argocd/applications/storage/longhorn/app.yaml
+# Chart config: kubernetes/argocd/applications/storage/longhorn/app.yaml
 # Phase 1: m4neo only, replica=1, /opt/longhorn (root 同居)
 # Reference: projects/kensan-lab/storage-plan.md §4 Phase 1
 

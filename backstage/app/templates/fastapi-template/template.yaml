@@ -158,7 +158,7 @@ spec:
           - **Domain**: `${{ parameters.domain }}`
           - **System**: `${{ parameters.system }}`
 
-          **Location**: `kubernetes/gitops/argocd/applications/apps/${{ parameters.name }}/argocd-apps.yaml`
+          **Location**: `kubernetes/argocd/applications/apps/${{ parameters.name }}/argocd-apps.yaml`
 
           ## 🔐 Repository Authentication
 
@@ -178,7 +178,7 @@ spec:
           2. Authenticate to the repository using Credential Templates
           3. Sync the application to both Dev and Prod environments
         sourcePath: .backstage
-        targetPath: kubernetes/gitops/argocd/applications/apps/${{ parameters.name }}
+        targetPath: kubernetes/argocd/applications/apps/${{ parameters.name }}
 
     # Step 4: Register component in Backstage catalog
     - id: register

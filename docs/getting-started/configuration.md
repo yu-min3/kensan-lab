@@ -35,9 +35,9 @@ find kubernetes/ backstage/ apps/ -type f \( -name "*.yaml" -o -name "*.yml" \) 
 This repository uses `yu-min3`. Replace in Argo CD Application CRs and container image references.
 
 ```bash
-grep -r "yu-min3" kubernetes/gitops/ backstage/ apps/ --include="*.yaml" --include="*.yml" | grep -v "yu-min3\.com"
+grep -r "yu-min3" kubernetes/argocd/ backstage/ apps/ --include="*.yaml" --include="*.yml" | grep -v "yu-min3\.com"
 
-find kubernetes/gitops/ backstage/ apps/ -type f \( -name "*.yaml" -o -name "*.yml" \) \
+find kubernetes/argocd/ backstage/ apps/ -type f \( -name "*.yaml" -o -name "*.yml" \) \
   -exec sed -i '' 's/yu-min3/your-github-org/g' {} +
 ```
 
@@ -45,8 +45,8 @@ find kubernetes/gitops/ backstage/ apps/ -type f \( -name "*.yaml" -o -name "*.y
 
 | Component | File | Value |
 |-----------|------|-------|
-| Argo CD Apps | `kubernetes/gitops/argocd/applications/**/app.yaml` | `repoURL` |
-| Root App | `kubernetes/gitops/argocd/root-apps/platform-root-app.yaml` | `repoURL` |
+| Argo CD Apps | `kubernetes/argocd/applications/**/app.yaml` | `repoURL` |
+| Root App | `kubernetes/argocd/root-apps/platform-root-app.yaml` | `repoURL` |
 | Container images | `apps/kensan/manifests/app/*.yaml` | `ghcr.io/yu-min3/...` |
 | Backstage image | `backstage/manifests/backstage-deployment.yaml` | `ghcr.io/yu-min3/backstage` |
 
@@ -100,5 +100,5 @@ After replacing all values:
 grep -r "yu-min3" kubernetes/ backstage/ --include="*.yaml" | head -20
 
 # Validate Argo CD Application CRs point to your repo
-grep -rh "repoURL:" kubernetes/gitops/argocd/ --include="*.yaml" | sort -u
+grep -rh "repoURL:" kubernetes/argocd/ --include="*.yaml" | sort -u
 ```

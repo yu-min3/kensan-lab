@@ -5,7 +5,7 @@
 Grafana has been separated from kube-prometheus-stack and independently deployed as the unified visualization layer for the entire Observability stack (Prometheus/Tempo/Loki).
 
 It is currently managed as an Argo CD Helm multi-source Application.
-- Application CR: `kubernetes/gitops/argocd/applications/observability/grafana/app.yaml`
+- Application CR: `kubernetes/argocd/applications/observability/grafana/app.yaml`
 - Helm values: `kubernetes/observability/grafana/values.yaml`
 - Custom resources: `kubernetes/observability/grafana/resources/`
 

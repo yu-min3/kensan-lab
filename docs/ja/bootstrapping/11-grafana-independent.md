@@ -5,7 +5,7 @@
 Grafana を kube-prometheus-stack から分離し、Observability スタック全体（Prometheus/Tempo/Loki）の統一された可視化レイヤーとして独立デプロイしています。
 
 現在は Argo CD の Helm multi-source Application として管理されています。
-- Application CR: `kubernetes/gitops/argocd/applications/observability/grafana/app.yaml`
+- Application CR: `kubernetes/argocd/applications/observability/grafana/app.yaml`
 - Helm values: `kubernetes/observability/grafana/values.yaml`
 - カスタムリソース: `kubernetes/observability/grafana/resources/`
 
