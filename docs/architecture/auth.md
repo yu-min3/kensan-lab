@@ -1,0 +1,1 @@
+---8<--- "infrastructure/auth/README.md"

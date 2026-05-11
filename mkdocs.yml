@@ -82,7 +82,9 @@ markdown_extensions:
       line_spans: __span
       pygments_lang_class: true
   - pymdownx.inlinehilite
-  - pymdownx.snippets
+  - pymdownx.snippets:
+      base_path: ["."]
+      check_paths: true
   - pymdownx.superfences:
       custom_fences:
         - name: mermaid
@@ -113,6 +115,11 @@ nav:
           - Overview: bootstrapping/index.md
           - Add worker node (M4 Neo): bootstrapping/add-worker-node-m4neo.md
           - Grafana independent setup: bootstrapping/11-grafana-independent.md
+  - Architecture:
+      - Infrastructure overview: architecture/infrastructure.md
+      - auth/: architecture/auth.md
+      - secrets/: architecture/secrets.md
+      - network/: architecture/network.md
   - Concepts:
       - Kustomize Guidelines: concepts/kustomize-guidelines.md
       - Namespace Label Design: concepts/namespace-label-design.md
