@@ -2,8 +2,8 @@
 # Build context is the parent directory (kensan-lab/)
 # We need to exclude everything except backstage-app/
 
-# Exclude infrastructure (Kubernetes manifests not needed in image)
-infrastructure
+# Exclude kubernetes manifests (not needed in image)
+kubernetes
 
 # Exclude docs (not needed in image)
 docs

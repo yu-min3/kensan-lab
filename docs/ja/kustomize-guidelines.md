@@ -1,6 +1,6 @@
 # Kustomize使用ガイドライン
 
-このドキュメントでは、`infrastructure/`ディレクトリ内でKustomizeを使用するタイミングと使用しないタイミングのガイドラインを定義します。
+このドキュメントでは、`kubernetes/`ディレクトリ内でKustomizeを使用するタイミングと使用しないタイミングのガイドラインを定義します。
 
 ## 使い分けの原則
 
@@ -98,7 +98,7 @@ images:
 **更新コマンド:**
 ```bash
 # CI/CDパイプラインやMakefileで実行
-cd infrastructure/backstage/overlays/prod
+cd kubernetes/backstage/overlays/prod
 kustomize edit set image ghcr.io/your-org/backstage:v0.0.6
 
 # または
@@ -178,7 +178,7 @@ spec:
   source:
     repoURL: https://github.com/your-org/kensan-lab.git
     targetRevision: main
-    path: infrastructure/keycloak/overlays/prod  # ← overlaysを指定
+    path: kubernetes/keycloak/overlays/prod  # ← overlaysを指定
 ```
 
 ### フラットYAMLベース:
@@ -191,7 +191,7 @@ spec:
   source:
     repoURL: https://github.com/your-org/kensan-lab.git
     targetRevision: main
-    path: infrastructure/cilium                 # ← ディレクトリを直接指定
+    path: kubernetes/cilium                 # ← ディレクトリを直接指定
     directory:
       recurse: true
 ```
@@ -263,7 +263,7 @@ spec:
    EOF
 
    # Step 4: Argo CD Application CRを更新
-   # path: infrastructure/component → infrastructure/component/overlays/prod
+   # path: kubernetes/component → kubernetes/component/overlays/prod
    ```
 
 ## まとめ

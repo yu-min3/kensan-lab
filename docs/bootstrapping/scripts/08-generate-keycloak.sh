@@ -6,11 +6,11 @@ helm repo update
 # Prod 環境マニフェスト生成
 helm template keycloak-prod bitnami/keycloak \
   --namespace platform-auth \
-  --values ../../infrastructure/keycloak/overlays/prod/values.yaml \
-  > ../../infrastructure/keycloak/overlays/prod/keycloak.yaml
+  --values ../../kubernetes/keycloak/overlays/prod/values.yaml \
+  > ../../kubernetes/keycloak/overlays/prod/keycloak.yaml
 
 # Dev 環境マニフェスト生成
 helm template keycloak-dev bitnami/keycloak \
   --namespace platform-auth \
-  --values ../../infrastructure/keycloak/overlays/dev/values.yaml \
-  > ../../infrastructure/keycloak/overlays/dev/keycloak.yaml
+  --values ../../kubernetes/keycloak/overlays/dev/values.yaml \
+  > ../../kubernetes/keycloak/overlays/dev/keycloak.yaml

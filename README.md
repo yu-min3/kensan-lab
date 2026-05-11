@@ -108,7 +108,7 @@ The platform uses Cilium LoadBalancer with L2 announcements for local network ac
 ## Repository Structure
 
 ```
-infrastructure/                    # Core platform (GitOps-managed)
+kubernetes/                    # Core platform (GitOps-managed)
 ├── gitops/argocd/                # Argo CD: applications/, projects/, root-apps/
 ├── observability/                # Prometheus, Grafana, Loki, Tempo, OTel Collector
 ├── network/                      # Cilium, Istio, Gateway API

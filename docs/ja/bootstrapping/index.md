@@ -7,8 +7,8 @@
 このプラットフォームは Argo CD の **Helm multi-source Application** パターンで管理されています。各コンポーネントのチャートバージョン・リポジトリ・values は Application CR に定義されており、Argo CD が Helm のレンダリングとデプロイを自動で行います。
 
 ```
-infrastructure/gitops/argocd/applications/   ← Application CR（チャート情報の Source of Truth）
-infrastructure/<category>/<component>/
+kubernetes/gitops/argocd/applications/   ← Application CR（チャート情報の Source of Truth）
+kubernetes/<category>/<component>/
   ├── values.yaml                            ← Helm values
   └── resources/                             ← Helm 管理外のカスタムリソース
 ```
@@ -54,13 +54,13 @@ helm repo add cilium https://helm.cilium.io/
 helm install cilium cilium/cilium \
   --version 1.18.3 \
   --namespace kube-system \
-  --values infrastructure/network/cilium/values.yaml
+  --values kubernetes/network/cilium/values.yaml
 ```
 
 カスタムリソース（LB IP Pool, L2 Announcement Policy）は手動で適用します。
 
 ```bash
-kubectl apply -f infrastructure/network/cilium/resources/
+kubectl apply -f kubernetes/network/cilium/resources/
 ```
 
 ---
@@ -85,17 +85,17 @@ helm install argocd argo/argo-cd \
   --version 9.1.0 \
   --namespace argocd \
   --create-namespace \
-  --values infrastructure/gitops/argocd/values.yaml
+  --values kubernetes/gitops/argocd/values.yaml
 ```
 
 インストール後、AppProject と Root Application を apply して自己管理を開始します。
 
 ```bash
-kubectl apply -f infrastructure/gitops/argocd/projects/platform-project.yaml
-kubectl apply -f infrastructure/gitops/argocd/root-apps/platform-root-app.yaml
+kubectl apply -f kubernetes/gitops/argocd/projects/platform-project.yaml
+kubectl apply -f kubernetes/gitops/argocd/root-apps/platform-root-app.yaml
 ```
 
-Root Application が `infrastructure/gitops/argocd/applications/` を再帰スキャンし、全ての子 Application CR を自動検知・デプロイします。以降のコンポーネントは手動操作不要です。
+Root Application が `kubernetes/gitops/argocd/applications/` を再帰スキャンし、全ての子 Application CR を自動検知・デプロイします。以降のコンポーネントは手動操作不要です。
 
 ---
 

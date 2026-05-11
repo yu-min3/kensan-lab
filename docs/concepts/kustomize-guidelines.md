@@ -1,8 +1,8 @@
 # Kustomize Usage Guidelines
 
-> **DEPRECATED (2026-05):** Kustomize has been removed from `infrastructure/` as part of the dev/prod consolidation work. All components now use ArgoCD `directory` source on flat YAML directories. The Backstage scaffolder template still emits Kustomize for new apps; that's the only remaining usage. This doc will be rewritten or removed in a follow-up.
+> **DEPRECATED (2026-05):** Kustomize has been removed from `kubernetes/` as part of the dev/prod consolidation work. All components now use ArgoCD `directory` source on flat YAML directories. The Backstage scaffolder template still emits Kustomize for new apps; that's the only remaining usage. This doc will be rewritten or removed in a follow-up.
 
-This document defines guidelines for when to use and when not to use Kustomize within the `infrastructure/` directory.
+This document defines guidelines for when to use and when not to use Kustomize within the `kubernetes/` directory.
 
 ## Guiding Principles
 
@@ -100,7 +100,7 @@ images:
 **Update command:**
 ```bash
 # Run in CI/CD pipeline or Makefile
-cd infrastructure/backstage/overlays/prod
+cd kubernetes/backstage/overlays/prod
 kustomize edit set image ghcr.io/your-org/backstage:v0.0.6
 
 # Or
@@ -180,7 +180,7 @@ spec:
   source:
     repoURL: https://github.com/your-org/kensan-lab.git
     targetRevision: main
-    path: infrastructure/auth/keycloak/overlays/prod  # <- Point to overlays
+    path: kubernetes/auth/keycloak/overlays/prod  # <- Point to overlays
 ```
 
 ### Flat YAML-Based:
@@ -193,7 +193,7 @@ spec:
   source:
     repoURL: https://github.com/your-org/kensan-lab.git
     targetRevision: main
-    path: infrastructure/network/cilium                   # <- Point to directory directly
+    path: kubernetes/network/cilium                   # <- Point to directory directly
     directory:
       recurse: true
 ```
@@ -265,7 +265,7 @@ When migrating existing flat YAML to Kustomize:
    EOF
 
    # Step 4: Update the Argo CD Application CR
-   # path: infrastructure/component -> infrastructure/component/overlays/prod
+   # path: kubernetes/component -> kubernetes/component/overlays/prod
    ```
 
 ## Summary

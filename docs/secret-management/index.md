@@ -55,7 +55,7 @@ K8s Secret として配布する形式ではなく、アプリ Pod が Vault に
 |---|---|---|---|
 | vault | `transit/keys/users-name` (aes256-gcm96) | kensan `users.name` カラム encryption + HMAC | kensan user-service (kensan ns) |
 
-設計詳細: [`infrastructure/secrets/vault-transit-engine/README.md`](https://github.com/yu-min3/kensan-lab/tree/main/infrastructure/secrets/vault-transit-engine)
+設計詳細: [`kubernetes/secrets/vault-transit-engine/README.md`](https://github.com/yu-min3/kensan-lab/tree/main/kubernetes/secrets/vault-transit-engine)
 
 | 項目 | 値 |
 |---|---|
@@ -63,7 +63,7 @@ K8s Secret として配布する形式ではなく、アプリ Pod が Vault に
 | bind 先 SA | `kensan/user-service` |
 | Policy | `kensan-users-transit` (transit/{encrypt,decrypt,hmac,rewrap}/users-name のみ) |
 | Token TTL | 30 min (アプリ側 renew loop で延長、max 1h) |
-| Key 作成 | `infrastructure/secrets/vault-transit-engine/temp/setup-transit-keys.sh` を 1 度だけ手動実行 |
+| Key 作成 | `kubernetes/secrets/vault-transit-engine/temp/setup-transit-keys.sh` を 1 度だけ手動実行 |
 | Rotation | `vault write -f transit/keys/users-name/rotate` → アプリ側で `transit/rewrap` 経由で旧 ciphertext を更新 |
 
 VCO は TransitSecretEngine 系 CR を持たないため、mount + policy + auth role は GitOps、key 作成だけ手動 (1 度きり) のハイブリッド構成。
@@ -94,7 +94,7 @@ kubectl create secret generic <name> --namespace <ns> \
   --from-literal=<key>=<value> --dry-run=client -o yaml > temp/<name>-raw.yaml
 
 # 2. kubeseal で暗号化
-kubeseal --format yaml < temp/<name>-raw.yaml > infrastructure/<cat>/<comp>/resources/<name>-sealed.yaml
+kubeseal --format yaml < temp/<name>-raw.yaml > kubernetes/<cat>/<comp>/resources/<name>-sealed.yaml
 
 # 3. raw を破棄
 rm temp/<name>-raw.yaml
@@ -111,7 +111,7 @@ rm temp/<name>-raw.yaml
 vault kv put secret/<path> KEY1=value1 KEY2=value2
 
 # 2. ExternalSecret manifest を作成 (例)
-cat <<EOF > infrastructure/<cat>/<comp>/resources/<name>-external-secret.yaml
+cat <<EOF > kubernetes/<cat>/<comp>/resources/<name>-external-secret.yaml
 apiVersion: external-secrets.io/v1
 kind: ExternalSecret
 metadata:
@@ -135,15 +135,15 @@ EOF
 
 ### Vault dynamic (VDBE) 追加
 
-1. `infrastructure/secrets/vault-database-engine/platform-values/vault-database/<name>.yaml` を作成 (`ns`, `rootOwner`, `keyMapping` 等を override)
+1. `kubernetes/secrets/vault-database-engine/platform-values/vault-database/<name>.yaml` を作成 (`ns`, `rootOwner`, `keyMapping` 等を override)
 2. ApplicationSet が拾って `DatabaseSecretEngineRole` (Vault) + `ExternalSecret` (K8s) を自動生成
-3. 詳細: [`infrastructure/secrets/vault-database-engine/README.md`](https://github.com/yu-min3/kensan-lab/blob/main/infrastructure/secrets/vault-database-engine/README.md)
+3. 詳細: [`kubernetes/secrets/vault-database-engine/README.md`](https://github.com/yu-min3/kensan-lab/blob/main/kubernetes/secrets/vault-database-engine/README.md)
 
 ## 関連ドキュメント
 
-- Sealed Secrets controller: [`infrastructure/secrets/sealed-secrets/`](https://github.com/yu-min3/kensan-lab/tree/main/infrastructure/secrets/sealed-secrets)
-- External Secrets Operator: [`infrastructure/secrets/external-secrets/`](https://github.com/yu-min3/kensan-lab/tree/main/infrastructure/secrets/external-secrets)
-- Vault: [`infrastructure/secrets/vault/`](https://github.com/yu-min3/kensan-lab/tree/main/infrastructure/secrets/vault)
-- Vault Config Operator: [`infrastructure/secrets/vault-config-operator/`](https://github.com/yu-min3/kensan-lab/tree/main/infrastructure/secrets/vault-config-operator)
-- Vault Database engine + ESO 統合: [`infrastructure/secrets/vault-database-engine/`](https://github.com/yu-min3/kensan-lab/tree/main/infrastructure/secrets/vault-database-engine)
-- Vault Transit engine (Stage 6): [`infrastructure/secrets/vault-transit-engine/`](https://github.com/yu-min3/kensan-lab/tree/main/infrastructure/secrets/vault-transit-engine)
+- Sealed Secrets controller: [`kubernetes/secrets/sealed-secrets/`](https://github.com/yu-min3/kensan-lab/tree/main/kubernetes/secrets/sealed-secrets)
+- External Secrets Operator: [`kubernetes/secrets/external-secrets/`](https://github.com/yu-min3/kensan-lab/tree/main/kubernetes/secrets/external-secrets)
+- Vault: [`kubernetes/secrets/vault/`](https://github.com/yu-min3/kensan-lab/tree/main/kubernetes/secrets/vault)
+- Vault Config Operator: [`kubernetes/secrets/vault-config-operator/`](https://github.com/yu-min3/kensan-lab/tree/main/kubernetes/secrets/vault-config-operator)
+- Vault Database engine + ESO 統合: [`kubernetes/secrets/vault-database-engine/`](https://github.com/yu-min3/kensan-lab/tree/main/kubernetes/secrets/vault-database-engine)
+- Vault Transit engine (Stage 6): [`kubernetes/secrets/vault-transit-engine/`](https://github.com/yu-min3/kensan-lab/tree/main/kubernetes/secrets/vault-transit-engine)

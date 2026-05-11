@@ -1,6 +1,6 @@
 ---
 description: Three-layer separation model, multi-repo strategy, PE/AD responsibilities, and Backstage scaffolding
-globs: "infrastructure/environments/**, **/projects/**"
+globs: "kubernetes/environments/**, **/projects/**"
 ---
 
 # Environment Separation
@@ -27,7 +27,7 @@ dev/prod 分離は廃止済み。homelab で 2 環境運用は重く、必要な
 
 1. AD creates app through Backstage template
 2. Backstage creates `kensan-lab-apps-<name>` repository with flat `manifests/`
-3. Backstage auto-commits Application CR to `infrastructure/gitops/argocd/applications/apps/<name>/`
+3. Backstage auto-commits Application CR to `kubernetes/gitops/argocd/applications/apps/<name>/`
 4. Argo CD detects new CR → deploys to `app-prod`
 
 ## Argo CD Projects

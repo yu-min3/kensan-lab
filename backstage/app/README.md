@@ -236,7 +236,7 @@ If you need to deploy manually without GitOps:
 
 ```bash
 # Apply manifests directly
-kubectl apply -f ../infrastructure/backstage/
+kubectl apply -f ../kubernetes/backstage/
 
 # Check deployment
 kubectl get pods -n backstage

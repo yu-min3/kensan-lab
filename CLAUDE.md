@@ -22,7 +22,7 @@
 ## Repository Structure
 
 ```
-infrastructure/                    # Core infra (GitOps-managed)
+kubernetes/                    # Core infra (GitOps-managed)
 ├── gitops/argocd/                # Argo CD: applications/, projects/, root-apps/
 ├── observability/                # grafana, prometheus, loki, tempo, otel-collector
 ├── network/                      # cilium, istio, gateway-api

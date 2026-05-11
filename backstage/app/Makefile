@@ -157,14 +157,14 @@ clean:
 .PHONY: update-image
 update-image: build push
 	@echo "Updating Kustomize overlay with tag: $(TAG)..."
-	cd ../infrastructure/backstage/overlays/prod && \
+	cd ../kubernetes/backstage/overlays/prod && \
 		kustomize edit set image ghcr.io/$(GITHUB_USER)/backstage:$(TAG)
 	@echo ""
 	@echo "✅ Image built, pushed, and kustomization.yaml updated"
 	@echo "   Image: $(FULL_IMAGE)"
 	@echo ""
 	@echo "Next steps:"
-	@echo "  - Review changes: git diff ../infrastructure/backstage/overlays/prod/kustomization.yaml"
+	@echo "  - Review changes: git diff ../kubernetes/backstage/overlays/prod/kustomization.yaml"
 	@echo "  - Deploy via GitOps: make deploy TAG=$(TAG)"
 	@echo "  - Or commit manually: make commit-deploy TAG=$(TAG)"
 
@@ -173,7 +173,7 @@ deploy: update-image
 	@echo "Creating deployment branch..."
 	cd .. && git checkout -b deploy-backstage-$(TAG)
 	@echo "Committing change to Git..."
-	cd .. && git add infrastructure/backstage/overlays/prod/kustomization.yaml
+	cd .. && git add kubernetes/backstage/overlays/prod/kustomization.yaml
 	cd .. && git commit -m "Deploy Backstage $(TAG)"
 	@echo "Pushing to remote..."
 	cd .. && git push origin deploy-backstage-$(TAG)
@@ -195,7 +195,7 @@ deploy: update-image
 .PHONY: commit-deploy
 commit-deploy:
 	@echo "Committing Kustomize overlay change..."
-	cd .. && git add infrastructure/backstage/overlays/prod/kustomization.yaml
+	cd .. && git add kubernetes/backstage/overlays/prod/kustomization.yaml
 	cd .. && git commit -m "Deploy Backstage $(TAG)"
 	cd .. && git push
 	@echo "✅ Committed and pushed"
@@ -204,11 +204,11 @@ commit-deploy:
 .PHONY: preview
 preview:
 	@echo "Previewing deployment with tag: $(TAG)..."
-	@cd ../infrastructure/backstage/overlays/prod && \
+	@cd ../kubernetes/backstage/overlays/prod && \
 		kustomize edit set image ghcr.io/$(GITHUB_USER)/backstage:$(TAG)
 	@echo ""
 	@echo "Generated Deployment (image section):"
-	@kubectl kustomize ../infrastructure/backstage/overlays/prod | grep -A10 "kind: Deployment" | grep -A5 "containers:" || echo "  (Could not extract container section)"
+	@kubectl kustomize ../kubernetes/backstage/overlays/prod | grep -A10 "kind: Deployment" | grep -A5 "containers:" || echo "  (Could not extract container section)"
 	@echo ""
 	@echo "Full manifests:"
-	@echo "  kubectl kustomize ../infrastructure/backstage/overlays/prod"
+	@echo "  kubectl kustomize ../kubernetes/backstage/overlays/prod"

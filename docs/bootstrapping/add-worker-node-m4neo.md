@@ -189,7 +189,7 @@ sudo kubeadm join 192.168.1.107:6443 --token <token> --discovery-token-ca-cert-h
 The existing Cilium configuration targets only `wlan0` (the Raspberry Pi WiFi interface).
 Since the M4 Neo uses WiFi `wlp3s0`, **the cluster-wide** Cilium configuration must be changed to match both interface names.
 
-#### Changes to `infrastructure/network/cilium/values.yaml`
+#### Changes to `kubernetes/network/cilium/values.yaml`
 
 ```yaml
 # Before:
@@ -202,7 +202,7 @@ devices: ""   # auto-detect (automatically recognizes wlan0, wlp3s0, etc.)
 > An empty string (auto-detect) causes both RPi's `wlan0` and M4 Neo's `wlp3s0` to be automatically recognized.
 > Cilium's `devices` also accepts Linux device name wildcards, but auto-detect is recommended.
 
-#### Changes to `infrastructure/network/cilium/resources/lb-ippool.yaml`
+#### Changes to `kubernetes/network/cilium/resources/lb-ippool.yaml`
 
 ```yaml
 # Before:
@@ -224,8 +224,8 @@ spec:
 
 ```bash
 # After changing values.yaml, push to Git and Argo CD will auto-sync
-git add infrastructure/network/cilium/values.yaml
-git add infrastructure/network/cilium/resources/lb-ippool.yaml
+git add kubernetes/network/cilium/values.yaml
+git add kubernetes/network/cilium/resources/lb-ippool.yaml
 git commit -m "Cilium: multi-interface support (wlan + wlp)"
 git push
 
@@ -299,16 +299,16 @@ Components to add nodeAffinity to:
 
 | Component | File | How to Add |
 |--------------|---------|---------|
-| Prometheus | `infrastructure/observability/prometheus/values.yaml` | Add to `prometheus.prometheusSpec.affinity` |
-| Grafana | `infrastructure/observability/grafana/values.yaml` | Add top-level `affinity:` block |
-| Tempo | `infrastructure/observability/tempo/values.yaml` | Replace existing `affinity: {}` |
-| Loki | `infrastructure/observability/loki/values.yaml` | Add to `singleBinary.affinity` |
-| OTel Collector | `infrastructure/observability/otel-collector/values.yaml` | Replace existing `affinity: {}` |
+| Prometheus | `kubernetes/observability/prometheus/values.yaml` | Add to `prometheus.prometheusSpec.affinity` |
+| Grafana | `kubernetes/observability/grafana/values.yaml` | Add top-level `affinity:` block |
+| Tempo | `kubernetes/observability/tempo/values.yaml` | Replace existing `affinity: {}` |
+| Loki | `kubernetes/observability/loki/values.yaml` | Add to `singleBinary.affinity` |
+| OTel Collector | `kubernetes/observability/otel-collector/values.yaml` | Replace existing `affinity: {}` |
 
 #### Prometheus
 
 ```yaml
-# infrastructure/observability/prometheus/values.yaml
+# kubernetes/observability/prometheus/values.yaml
 # Add to prometheus.prometheusSpec:
 prometheus:
   prometheusSpec:
@@ -327,7 +327,7 @@ prometheus:
 #### Grafana
 
 ```yaml
-# infrastructure/observability/grafana/values.yaml
+# kubernetes/observability/grafana/values.yaml
 # Add at top level:
 affinity:
   nodeAffinity:
@@ -344,8 +344,8 @@ affinity:
 #### Tempo / OTel Collector
 
 ```yaml
-# infrastructure/observability/tempo/values.yaml
-# infrastructure/observability/otel-collector/values.yaml
+# kubernetes/observability/tempo/values.yaml
+# kubernetes/observability/otel-collector/values.yaml
 # Replace existing affinity: {} with:
 affinity:
   nodeAffinity:
@@ -362,7 +362,7 @@ affinity:
 #### Loki
 
 ```yaml
-# infrastructure/observability/loki/values.yaml
+# kubernetes/observability/loki/values.yaml
 # Add to singleBinary section:
 singleBinary:
   affinity:
@@ -383,7 +383,7 @@ For components managed via flat manifests (no kustomize overlay), edit the `affi
 
 #### Keycloak
 
-Edit `affinity` in `infrastructure/auth/keycloak/keycloak-deployment.yaml`:
+Edit `affinity` in `kubernetes/auth/keycloak/keycloak-deployment.yaml`:
 
 ```yaml
 spec:

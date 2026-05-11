@@ -1,0 +1,49 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: istio-base
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "-2"  # CRDs: after namespace (wave -3), before istiod (wave -1)
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: platform-project
+
+  sources:
+    - repoURL: https://istio-release.storage.googleapis.com/charts
+      chart: base
+      targetRevision: 1.27.3
+      helm:
+        releaseName: istio-base
+        valueFiles:
+          - $values/kubernetes/network/istio/base/values.yaml
+    - repoURL: https://github.com/yu-min3/kensan-lab
+      targetRevision: main
+      ref: values
+
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: istio-system
+
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=false  # Created by istio-resources (wave -3)
+      - ServerSideApply=true
+    retry:
+      limit: 5
+      backoff:
+        duration: 5s
+        factor: 2
+        maxDuration: 3m
+
+  # istiod overwrites this webhook at runtime
+  ignoreDifferences:
+    - group: admissionregistration.k8s.io
+      kind: ValidatingWebhookConfiguration
+      name: istiod-default-validator
+      jqPathExpressions:
+        - .webhooks

@@ -12,10 +12,10 @@ This repository uses `yu-min3.com`. Replace with your own domain.
 
 ```bash
 # Preview what will change
-grep -r "yu-min3\.com" infrastructure/ backstage/ apps/ --include="*.yaml" --include="*.yml"
+grep -r "yu-min3\.com" kubernetes/ backstage/ apps/ --include="*.yaml" --include="*.yml"
 
 # Replace (Linux/Mac)
-find infrastructure/ backstage/ apps/ -type f \( -name "*.yaml" -o -name "*.yml" \) \
+find kubernetes/ backstage/ apps/ -type f \( -name "*.yaml" -o -name "*.yml" \) \
   -exec sed -i '' 's/yu-min3\.com/your-domain.com/g' {} +
 ```
 
@@ -23,21 +23,21 @@ find infrastructure/ backstage/ apps/ -type f \( -name "*.yaml" -o -name "*.yml"
 
 | Component | File | Value |
 |-----------|------|-------|
-| Gateways | `infrastructure/network/istio/resources/gateway-*.yaml` | `*.platform.yu-min3.com`, `*.app.yu-min3.com` |
-| Certificates | `infrastructure/secrets/cert-manager/resources/wildcard-certificate-*.yaml` | `*.yu-min3.com` |
-| ClusterIssuer | `infrastructure/secrets/cert-manager/resources/clusterissuer.yaml` | `admin@yu-min3.com` |
-| HTTPRoutes | `infrastructure/**/resources/httproute*.yaml` | `*.platform.yu-min3.com` |
-| Keycloak | `infrastructure/auth/keycloak/httproute.yaml` | `auth.platform.yu-min3.com` |
-| Keycloak env | `infrastructure/auth/keycloak/keycloak-env-config.yaml` | `KC_HOSTNAME` |
+| Gateways | `kubernetes/network/istio/resources/gateway-*.yaml` | `*.platform.yu-min3.com`, `*.app.yu-min3.com` |
+| Certificates | `kubernetes/secrets/cert-manager/resources/wildcard-certificate-*.yaml` | `*.yu-min3.com` |
+| ClusterIssuer | `kubernetes/secrets/cert-manager/resources/clusterissuer.yaml` | `admin@yu-min3.com` |
+| HTTPRoutes | `kubernetes/**/resources/httproute*.yaml` | `*.platform.yu-min3.com` |
+| Keycloak | `kubernetes/auth/keycloak/httproute.yaml` | `auth.platform.yu-min3.com` |
+| Keycloak env | `kubernetes/auth/keycloak/keycloak-env-config.yaml` | `KC_HOSTNAME` |
 
 ### 2. GitHub Organization
 
 This repository uses `yu-min3`. Replace in Argo CD Application CRs and container image references.
 
 ```bash
-grep -r "yu-min3" infrastructure/gitops/ backstage/ apps/ --include="*.yaml" --include="*.yml" | grep -v "yu-min3\.com"
+grep -r "yu-min3" kubernetes/gitops/ backstage/ apps/ --include="*.yaml" --include="*.yml" | grep -v "yu-min3\.com"
 
-find infrastructure/gitops/ backstage/ apps/ -type f \( -name "*.yaml" -o -name "*.yml" \) \
+find kubernetes/gitops/ backstage/ apps/ -type f \( -name "*.yaml" -o -name "*.yml" \) \
   -exec sed -i '' 's/yu-min3/your-github-org/g' {} +
 ```
 
@@ -45,8 +45,8 @@ find infrastructure/gitops/ backstage/ apps/ -type f \( -name "*.yaml" -o -name 
 
 | Component | File | Value |
 |-----------|------|-------|
-| Argo CD Apps | `infrastructure/gitops/argocd/applications/**/app.yaml` | `repoURL` |
-| Root App | `infrastructure/gitops/argocd/root-apps/platform-root-app.yaml` | `repoURL` |
+| Argo CD Apps | `kubernetes/gitops/argocd/applications/**/app.yaml` | `repoURL` |
+| Root App | `kubernetes/gitops/argocd/root-apps/platform-root-app.yaml` | `repoURL` |
 | Container images | `apps/kensan/manifests/app/*.yaml` | `ghcr.io/yu-min3/...` |
 | Backstage image | `backstage/manifests/backstage-deployment.yaml` | `ghcr.io/yu-min3/backstage` |
 
@@ -54,7 +54,7 @@ find infrastructure/gitops/ backstage/ apps/ -type f \( -name "*.yaml" -o -name 
 
 This repository uses `192.168.0.240-249`. Adjust to your local network.
 
-**File:** `infrastructure/network/cilium/values.yaml`
+**File:** `kubernetes/network/cilium/values.yaml`
 
 Ensure the range does not overlap with your DHCP server's allocation.
 
@@ -62,7 +62,7 @@ Ensure the range does not overlap with your DHCP server's allocation.
 
 Cilium L2 Announcements default to wired interfaces (`^eth.*`, `^en.*`) with WiFi fallback (`^wlan.*`, `^wlp.*`). Adjust the interface regex to match your nodes' interface names if different.
 
-**File:** `infrastructure/network/cilium/resources/lb-ippool.yaml`
+**File:** `kubernetes/network/cilium/resources/lb-ippool.yaml`
 
 ### 5. Sealed Secrets
 
@@ -70,7 +70,7 @@ All Sealed Secrets are encrypted with this cluster's sealing key. **They cannot 
 
 ```bash
 # List all sealed secrets
-find infrastructure/ backstage/ apps/ -name "*sealed*" -o -name "*secret*" | grep -v node_modules
+find kubernetes/ backstage/ apps/ -name "*sealed*" -o -name "*secret*" | grep -v node_modules
 
 # General pattern: create raw secret, then seal
 kubectl create secret generic <name> \
@@ -86,7 +86,7 @@ rm temp/<name>-raw.yaml  # never commit raw secrets
 
 This repository uses AWS Route 53 for DNS-01 challenges. If you use a different DNS provider (Cloudflare, Google Cloud DNS, etc.), update:
 
-- `infrastructure/secrets/cert-manager/resources/clusterissuer.yaml` — solver configuration
+- `kubernetes/secrets/cert-manager/resources/clusterissuer.yaml` — solver configuration
 - The corresponding credentials Sealed Secret
 
 ---
@@ -97,8 +97,8 @@ After replacing all values:
 
 ```bash
 # Check no author-specific values remain
-grep -r "yu-min3" infrastructure/ backstage/ --include="*.yaml" | head -20
+grep -r "yu-min3" kubernetes/ backstage/ --include="*.yaml" | head -20
 
 # Validate Argo CD Application CRs point to your repo
-grep -rh "repoURL:" infrastructure/gitops/argocd/ --include="*.yaml" | sort -u
+grep -rh "repoURL:" kubernetes/gitops/argocd/ --include="*.yaml" | sort -u
 ```

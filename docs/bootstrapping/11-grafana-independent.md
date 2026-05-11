@@ -5,13 +5,13 @@
 Grafana has been separated from kube-prometheus-stack and independently deployed as the unified visualization layer for the entire Observability stack (Prometheus/Tempo/Loki).
 
 It is currently managed as an Argo CD Helm multi-source Application.
-- Application CR: `infrastructure/gitops/argocd/applications/observability/grafana/app.yaml`
-- Helm values: `infrastructure/observability/grafana/values.yaml`
-- Custom resources: `infrastructure/observability/grafana/resources/`
+- Application CR: `kubernetes/gitops/argocd/applications/observability/grafana/app.yaml`
+- Helm values: `kubernetes/observability/grafana/values.yaml`
+- Custom resources: `kubernetes/observability/grafana/resources/`
 
 ## Key Grafana Values Settings
 
-File: `infrastructure/observability/grafana/values.yaml`
+File: `kubernetes/observability/grafana/values.yaml`
 
 - `admin.existingSecret`: Retrieve admin credentials from Sealed Secret
 - `sidecar.datasources.enabled`: Auto-discover datasources from ConfigMaps
@@ -35,7 +35,7 @@ kubeseal --controller-name=sealed-secrets \
   --controller-namespace=kube-system \
   --format=yaml \
   < temp/grafana-admin-secret-raw.yaml \
-  > infrastructure/observability/grafana/resources/grafana-admin-sealed-secret.yaml
+  > kubernetes/observability/grafana/resources/grafana-admin-sealed-secret.yaml
 
 # Delete the raw secret
 rm temp/grafana-admin-secret-raw.yaml
@@ -49,7 +49,7 @@ Script to fetch official dashboards from Grafana.com and update ConfigMaps:
 docs/bootstrapping/scripts/13-generate-grafana-dashboards.sh
 ```
 
-Output: `infrastructure/observability/grafana/resources/dashboards.yaml`
+Output: `kubernetes/observability/grafana/resources/dashboards.yaml`
 
 ## Verification
 
@@ -100,7 +100,7 @@ kubectl get configmap -n monitoring -l grafana_dashboard=1
 ## File Structure
 
 ```
-infrastructure/observability/grafana/
+kubernetes/observability/grafana/
 ├── values.yaml                         # Helm values
 └── resources/
     ├── datasources.yaml                # Prometheus/Tempo/Loki datasource definitions
@@ -108,7 +108,7 @@ infrastructure/observability/grafana/
     ├── grafana-admin-sealed-secret.yaml
     └── httproute.yaml
 
-infrastructure/observability/prometheus/
+kubernetes/observability/prometheus/
 ├── values.yaml                         # grafana.enabled: false
 └── resources/
     ├── httproute-prometheus.yaml

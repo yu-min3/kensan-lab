@@ -19,7 +19,7 @@ Phase 1 の認証/認可設計（ADR-005）と並行して、AuthorizationPolicy
 
 ### 既存実装の確認
 
-`infrastructure/network/istio/resources/gateway-platform.yaml` 等の既存 Gateway は **既に label-based selector** で namespace を制御している:
+`kubernetes/network/istio/resources/gateway-platform.yaml` 等の既存 Gateway は **既に label-based selector** で namespace を制御している:
 
 ```yaml
 allowedRoutes:
