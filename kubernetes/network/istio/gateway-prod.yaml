@@ -8,6 +8,10 @@ metadata:
     argocd.argoproj.io/sync-wave: "2" # Deploy after istiod (CRDs must be installed first)
 spec:
   gatewayClassName: istio
+  # IP pin (Cilium L2 IPAM 並び替え防止、Cloudflare DNS 整合)
+  addresses:
+    - type: IPAddress
+      value: 192.168.0.243
   listeners:
   - name: http
     protocol: HTTP

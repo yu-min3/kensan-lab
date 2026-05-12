@@ -98,7 +98,7 @@ resource "vault_kubernetes_auth_backend_role" "external_secrets" {
   role_name                        = "external-secrets"
   bound_service_account_names      = ["external-secrets"]
   bound_service_account_namespaces = ["external-secrets"]
-  token_policies                   = [vault_policy.eso_read.name]
+  token_policies                   = ["eso-read"]  # eso-read は VCO Policy CR で管理 (policies.tf 参照、TF resource は宣言されていない)
   token_ttl                        = 3600
   token_max_ttl                    = 86400
 }

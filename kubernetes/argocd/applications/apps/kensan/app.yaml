@@ -3,8 +3,9 @@ kind: Application
 metadata:
   name: kensan
   namespace: argocd
-  finalizers:
-    - resources-finalizer.argocd.argoproj.io
+  annotations:
+    argocd.argoproj.io/sync-options: Prune=false  # disaster recovery: kensan ns 内 Postgres/Dagster/MinIO PVC 保護
+  # NOTE: resources-finalizer 不在 — Application 削除で kensan データ蒸発を防ぐ
 spec:
   project: app-project
   source:
