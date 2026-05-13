@@ -38,6 +38,9 @@ spec:
     metadata:
       labels:
         app: dagster-postgres
+      annotations:
+        # Istio sidecar が PostgreSQL wire protocol を壊すため (kensan postgresql と同じ)
+        sidecar.istio.io/inject: "false"
     spec:
       containers:
       - name: dagster-postgres
