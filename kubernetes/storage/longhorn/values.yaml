@@ -15,8 +15,8 @@ longhornManager:
 # 扱いし、初回 install で SA 未作成で詰まる chicken-and-egg 回避)。SA が cluster に
 # 存在する今は再有効化、chart 内のバージョン互換チェックを安全網として使う。
 # 再度 chicken-and-egg が問題になる場面 (clean reinstall) では一時的に false に戻す。
-preUpgradeChecker:
-  jobEnabled: true
+preUpgradeChecker:  # disaster recovery: clean reinstall 中、後で true に戻す
+  jobEnabled: false
 
 longhornUI:
   replicas: 1
