@@ -48,7 +48,7 @@ spec:
       name: postgresql-data
     spec:
       accessModes: ["ReadWriteOnce"]
-      storageClassName: local-path
+      storageClassName: longhorn  # disaster recovery (reclaim=Delete 回避)
       resources:
         requests:
           storage: 5Gi

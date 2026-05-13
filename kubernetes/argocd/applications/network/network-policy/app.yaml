@@ -5,8 +5,8 @@ metadata:
   namespace: argocd
   annotations:
     argocd.argoproj.io/sync-wave: "-4"  # Cluster-wide network policy: deploy before workloads
-  finalizers:
-    - resources-finalizer.argocd.argoproj.io
+    argocd.argoproj.io/sync-options: Prune=false  # disaster recovery: CCNP default-deny + per-ns allow を保護 (一括 prune で全 mesh ns が黙る)
+  # NOTE: resources-finalizer 不在 — Application 削除で CCNP 蒸発 → mesh 通信全滅を防ぐ
 spec:
   project: platform-project
 

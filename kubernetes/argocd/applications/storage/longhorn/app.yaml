@@ -5,8 +5,8 @@ metadata:
   namespace: argocd
   annotations:
     argocd.argoproj.io/sync-wave: "0"
-  finalizers:
-    - resources-finalizer.argocd.argoproj.io
+    argocd.argoproj.io/sync-options: Prune=false  # disaster recovery: 全 stateful workload の bedrock。誤削除絶対回避
+  # NOTE: resources-finalizer 不在 — Application 削除で longhorn-system ns + 全 PV 蒸発を防ぐ
 spec:
   project: platform-project
 
