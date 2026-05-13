@@ -1341,6 +1341,10 @@ spec:
     metadata:
       labels:
         app: postgresql
+      annotations:
+        # Istio sidecar が PostgreSQL wire protocol を壊して "unexpected EOF" を起こすため
+        # postgresql pod は sidecar 除外。PeerAuthentication=PERMISSIVE で他 service からの平文接続も OK
+        sidecar.istio.io/inject: "false"
     spec:
       containers:
       - name: postgresql

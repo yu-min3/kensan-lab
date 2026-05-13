@@ -13,6 +13,9 @@ spec:
     metadata:
       labels:
         app: postgresql
+      annotations:
+        # Istio sidecar が PostgreSQL wire protocol を壊すため除外 (kensan postgresql と同じ)
+        sidecar.istio.io/inject: "false"
     spec:
       containers:
       - name: postgresql
