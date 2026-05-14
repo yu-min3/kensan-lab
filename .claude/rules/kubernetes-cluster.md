@@ -37,9 +37,14 @@ globs: "kubernetes/**"
 | Light | No affinity | Grafana, Hubble UI |
 | AMD64-only | `required: kubernetes.io/arch=amd64` | kensan, Backstage |
 
-## Storage Warning
+## Storage
 
-PersistentVolumes are **node-local** (`local-path-provisioner`). Moving a StatefulSet to a different node requires PVC recreation and **data loss**.
+| Class | Provisioner | 用途 |
+|---|---|---|
+| `longhorn`（default） | Longhorn | 通常の StatefulSet / アプリ PVC。レプリケート（複数ノードに block レベルで複製）するため、ノード障害でデータ消失しない |
+| `local-path` | local-path-provisioner | レガシー / Longhorn 移行未完の PVC のみ。**node-local** で、StatefulSet を別ノードに移すと PVC 再作成 + データ消失 |
+
+新規ワークロードは原則 `longhorn` を使う（Longhorn 移行は commit 45a6a61 で完了）。`local-path` は段階的に廃止予定。
 
 ## Adding New Nodes
 

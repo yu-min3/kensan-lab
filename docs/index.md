@@ -19,11 +19,12 @@ A bare-metal Kubernetes homelab built with technologies typical of enterprise pl
   <figcaption>How traffic flows through the platform and how components interact</figcaption>
 </figure>
 
-- **Gateway** — Cloudflare Tunnel (internet) and Cilium L2 LB (LAN) route traffic through Istio Gateway via Gateway API
-- **Applications** — workloads deployed to prod/dev namespaces via Argo CD
+- **Gateway** — Cloudflare Tunnel (internet) and Cilium L2 LB (LAN) route traffic through Istio Gateway via Gateway API; oauth2-proxy enforces OIDC at the Gateway via ext_authz
+- **Applications** — workloads deployed to `app-{name}` namespaces (ADR-006) via Argo CD
 - **Internal Developer Platform** — Backstage provides service catalog, TechDocs, and Golden Path scaffolding
 - **Observability** — apps emit telemetry to OTel Collector → Prometheus / Loki / Tempo, visualized in Grafana
-- **Security** — Sealed Secrets, Cilium + Istio NetworkPolicy, cert-manager, Pod Security Standards
+- **Secrets** — Vault + External Secrets Operator for dynamic / static creds, Sealed Secrets for Vault-independent bootstrap, Reloader for rollout on rotation
+- **Security** — Cilium + Istio NetworkPolicy, cert-manager (Let's Encrypt), Pod Security Standards
 - **GitOps** — Argo CD splits into `platform-project` (infra) and `app-project` (applications)
 
 ## How to use this site
@@ -47,9 +48,10 @@ This site is the **single source of truth** for the current state of kensan-lab.
 | CNI / LB | [Cilium](https://cilium.io/) — kube-proxy replacement, L2 LoadBalancer |
 | Service Mesh | [Istio](https://istio.io/) + Gateway API |
 | GitOps | [Argo CD](https://argo-cd.readthedocs.io/) — Helm multi-source pattern |
-| Secrets | [Sealed Secrets](https://sealed-secrets.netlify.app/) |
+| Secrets | [Vault](https://www.vaultproject.io/) + [External Secrets Operator](https://external-secrets.io/) (dynamic / static), [Sealed Secrets](https://sealed-secrets.netlify.app/) (bootstrap), [Reloader](https://github.com/stakater/Reloader) |
 | Certificates | [cert-manager](https://cert-manager.io/) + Let's Encrypt |
-| Auth | [Keycloak](https://www.keycloak.org/) |
+| Auth | [Keycloak](https://www.keycloak.org/) (OIDC IdP) + oauth2-proxy (Istio Gateway ext_authz) |
+| Storage | [Longhorn](https://longhorn.io/) (replicated block, default) |
 | Observability | Prometheus, Grafana, Loki, Tempo, OpenTelemetry Collector |
 | Developer Portal | [Backstage](https://backstage.io/) |
 
