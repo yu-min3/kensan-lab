@@ -33,21 +33,10 @@ Cloudflare Tunnel の token は ESO 経由（`external-secret.yaml`、Vault path
 
 ## Gateway Architecture
 
-Two Istio Gateways:
+- `gateway-platform` (192.168.0.242) → `*.platform.yu-min3.com` / `wildcard-platform-tls` — platform UI (Backstage, ArgoCD, Grafana, Vault 等)
+- `gateway-prod` (192.168.0.243) → `*.app.yu-min3.com` / `wildcard-apps-tls` — user app
 
-| Gateway | Domain Pattern | Certificate Secret |
-|---------|---------------|--------------------|
-| gateway-platform | `*.platform.yu-min3.com` | `wildcard-platform-tls` |
-| gateway-prod | `*.app.yu-min3.com` | `wildcard-apps-tls` |
-
-## Domain Examples
-
-- Backstage: `backstage.platform.yu-min3.com`
-- Argo CD: `argocd.platform.yu-min3.com`
-- Prometheus: `prometheus.platform.yu-min3.com`
-- Grafana: `grafana.platform.yu-min3.com`
-- Keycloak: `auth.platform.yu-min3.com`
-- Apps: `<appname>.app.yu-min3.com`
+ホスト一覧と全体図: [`kubernetes/network/README.md`](../../kubernetes/network/README.md) / [`docs/architecture/network.md`](../../docs/architecture/network.md)
 
 ## Gateway-level Authentication
 
