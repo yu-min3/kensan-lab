@@ -70,5 +70,5 @@ hubble:
       certValidityDuration: 1095   # 3 年 (workload cert、 renewBefore で前倒し更新)
       certManagerIssuerRef:
         group: cert-manager.io
-        kind: ClusterIssuer
+        kind: Issuer
         name: cilium-ca-issuer
