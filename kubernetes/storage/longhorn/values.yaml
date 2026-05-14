@@ -2,12 +2,15 @@
 # Phase 1: m4neo only, replica=1, /opt/longhorn (root 同居)
 # Reference: projects/kensan-lab/storage-plan.md §4 Phase 1
 
-# m4neo only: pi5 群 (master/worker1/worker2) は microSD/USB のみで Longhorn 不適。
-# hardware-class=high-performance は m4neo にのみ付与されている (kubernetes-cluster.md)。
+# Phase 1: replica は m4neo のみに置く (Pi5 microSD は寿命懸念で除外)。
+# ただし DaemonSet (manager / csi-plugin / engine-image / instance-manager) は
+# **全 node に展開する必要がある**。csi-plugin が居ない node の pod は
+# longhorn PVC を attach できないため。
+# Pi5 が replica を受けないようにするのは node annotation で制御:
+#   kubectl annotate node <pi5> node.longhorn.io/create-default-disk=false
+# これにより Pi5 では default disk が作られず replica scheduling 対象外。
 
 longhornManager:
-  nodeSelector:
-    hardware-class: high-performance
   priorityClass: system-cluster-critical
 
 # Helm pre-upgrade Job hook。
@@ -28,9 +31,10 @@ longhornDriver:
     hardware-class: high-performance
 
 defaultSettings:
-  # システム管理コンポーネント (instance-manager, share-manager, CSI plugin) も m4neo に限定
-  # フォーマットは "key:value" (Longhorn 独自構文、k8s nodeSelector とは異なる)
-  systemManagedComponentsNodeSelector: "hardware-class:high-performance"
+  # systemManagedComponentsNodeSelector はあえて設定しない:
+  # instance-manager / share-manager / csi-plugin は全 node に展開させる
+  # (worker1 等の pod が m4neo の replica に iSCSI attach するため)。
+  # Pi5 の disk 使用回避は node annotation node.longhorn.io/create-default-disk=false で行う。
 
   # Phase 1: replica=1 (HA なし)。Phase 3 で 3 に上げる
   defaultReplicaCount: 1
