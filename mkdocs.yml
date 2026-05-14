@@ -120,6 +120,7 @@ nav:
       - secrets/: architecture/secrets.md
       - network/: architecture/network.md
   - Concepts:
+      - Documentation Layout: concepts/doc-layout.md
       - Kustomize Guidelines: concepts/kustomize-guidelines.md
       - Namespace Label Design: concepts/namespace-label-design.md
       - Network Policy: concepts/network-policy-guide.md
