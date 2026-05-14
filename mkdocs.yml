@@ -9,7 +9,6 @@ copyright: Copyright &copy; yu-min3
 docs_dir: docs
 
 exclude_docs: |
-  ja/
   bootstrapping/manifests/
   bootstrapping/scripts/
 

@@ -1,7 +1,5 @@
 <div align="center">
 
-<a href="README.md">English</a> | <a href="README.ja.md">日本語</a>
-
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/assets/kensan-logo-dark.svg" width="120">
   <source media="(prefers-color-scheme: light)" srcset="docs/assets/kensan-logo-light.svg" width="120">
@@ -127,7 +125,6 @@ docs/                             # ADRs, architecture, bootstrapping guides
 | **Docs site**       | **[https://yu-min3.github.io/kensan-lab/](https://yu-min3.github.io/kensan-lab/)** — full documentation site |
 | **Getting Started** | [Installation](./docs/getting-started/installation.md) / [Configuration](./docs/getting-started/configuration.md) / [Bootstrapping](./docs/bootstrapping/index.md) _(in progress)_ / [Secret Management](./docs/secret-management/index.md) |
 | **Architecture**    | [Namespace Labels](./docs/concepts/namespace-label-design.md) / [ADRs](./docs/adr/) / [Kustomize Guidelines](./docs/concepts/kustomize-guidelines.md)                                                                        |
-| **日本語**          | [Japanese documentation (日本語ドキュメント)](./docs/ja/)                                                                                                                                                   |
 
 ## Application: kensan
 
