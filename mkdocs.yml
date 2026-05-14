@@ -119,6 +119,7 @@ nav:
       - auth/: architecture/auth.md
       - secrets/: architecture/secrets.md
       - network/: architecture/network.md
+      - observability/: architecture/observability.md
   - Concepts:
       - Documentation Layout: concepts/doc-layout.md
       - Kustomize Guidelines: concepts/kustomize-guidelines.md
