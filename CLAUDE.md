@@ -13,9 +13,11 @@
 | CNI / LB | Cilium (kube-proxy replacement, L2 LoadBalancer) |
 | Service Mesh | Istio + Gateway API |
 | GitOps | Argo CD — Helm multi-source Application pattern |
-| Secrets | Sealed Secrets (kubeseal) |
+| Secrets | Vault + External Secrets Operator (dynamic), Sealed Secrets (static GitOps), Reloader (rollout on rotation) |
 | Certificates | cert-manager + Let's Encrypt |
-| Auth | Keycloak (JWT, prod/dev) |
+| Auth | Keycloak (OIDC IdP) + oauth2-proxy (Istio Gateway ext_authz) |
+| Edge | Cloudflare Tunnel (internet) + Cilium L2 LoadBalancer (LAN) |
+| Storage | Longhorn (replicated block, default) + local-path-provisioner (legacy) |
 | Observability | Prometheus, Grafana, Loki, Tempo, OTel Collector |
 | Developer Portal | Backstage with scaffolder templates |
 
@@ -24,11 +26,14 @@
 ```
 kubernetes/                    # Core infra (GitOps-managed)
 ├── argocd/                       # Argo CD: applications/, projects/, root-apps/
+├── network/                      # cilium, istio, gateway-api, cloudflare-tunnel, network-policy, coredns
+├── auth/                         # keycloak, oauth2-proxy, vault-oidc-auth
+├── secrets/                      # vault, vault-config-operator, vault-{database,transit}-engine,
+│                                 #   external-secrets, sealed-secrets, cert-manager, reloader
 ├── observability/                # grafana, prometheus, loki, tempo, otel-collector
-├── network/                      # cilium, istio, gateway-api
-├── security/                     # cert-manager, sealed-secrets, keycloak
-├── environments/                 # app-dev, app-prod, observability, system-infra
-└── storage/                      # local-path-provisioner
+├── storage/                      # longhorn, local-path-provisioner
+├── kube-system/                  # PSA labels / shared kube-system resources
+└── environments/                 # app-prod (shared app namespace bootstrap)
 backstage/                        # Developer portal (app/ + manifests/)
 apps/                             # Sample applications
 docs/                             # ADRs, architecture, bootstrapping guides
@@ -66,7 +71,7 @@ cd backstage/app && make all TAG=v1.0.0    # Build + push (Podman)
 1. **GitOps only**: ALL infrastructure changes via Git → Argo CD. No direct `kubectl apply`.
 2. **Podman, not Docker**: All image builds use Podman.
 3. **No rendered manifests**: Argo CD renders Helm charts natively. Never commit `helm template` output.
-4. **Secrets via Sealed Secrets**: Raw secrets in `temp/` only. Commit only sealed YAMLs.
+4. **Secrets**: dynamic creds via Vault + External Secrets; static bootstrap creds via Sealed Secrets. Raw secrets in `temp/` only — commit only sealed/encrypted YAMLs.
 5. **No .env commits**: Sensitive tokens stay out of Git.
 
 ## Skills (Slash Commands)
@@ -89,8 +94,8 @@ cd backstage/app && make all TAG=v1.0.0    # Build + push (Podman)
 | `helm-multisource.md` | 3-file pattern details |
 | `kubernetes-cluster.md` | Node topology, scheduling, storage |
 | `network-ingress.md` | Cilium, Gateways, domains, certs |
-| `security-secrets.md` | Sealed Secrets, cert-manager, GHCR |
-| `environment-separation.md` | PE/AD roles, multi-repo, namespaces |
+| `security-secrets.md` | Vault + ESO, Sealed Secrets, Reloader, cert-manager, GHCR |
+| `environment-separation.md` | PE/AD roles, multi-repo, namespaces (ADR-006) |
 
 ## User Preferences
 
