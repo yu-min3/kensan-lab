@@ -10,7 +10,9 @@
 | **observability/** | ApplicationSet | Helm multi-source で構造が均一。config.json でパラメータ化 |
 | **environments/** | ApplicationSet | single source (Git directory) で構造が均一。namespace 追加が容易 |
 | **network/** | 個別 Application | sync-wave 依存関係、ignoreDifferences が各アプリ固有 |
-| **security/** | 個別 Application | Helm と Kustomize が混在、sync-wave あり |
+| **auth/** | 個別 Application | Keycloak / oauth2-proxy / vault-oidc-auth で構成が異なる |
+| **secrets/** | 個別 Application + 一部 ApplicationSet (per-DB instance) | sync-wave あり。vault-database-engine の instance は ApplicationSet で量産 |
+| **storage/** | 個別 Application | Longhorn は Prune=false など固有設定多数 |
 | **gitops/** | 個別 Application | Argo CD 自己管理、複雑な ignoreDifferences |
 | **backstage/** | 個別 Application | 単独 Kustomize アプリ |
 | **apps/** | 個別 Application | Backstage が自動コミット、イメージタグ個別更新 |
