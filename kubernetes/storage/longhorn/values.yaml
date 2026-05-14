@@ -34,7 +34,15 @@ defaultSettings:
   # systemManagedComponentsNodeSelector はあえて設定しない:
   # instance-manager / share-manager / csi-plugin は全 node に展開させる
   # (worker1 等の pod が m4neo の replica に iSCSI attach するため)。
-  # Pi5 の disk 使用回避は node annotation node.longhorn.io/create-default-disk=false で行う。
+
+  # Pi5 で disk 自動作成を抑止する:
+  # createDefaultDiskLabeledNodes: true にすると、annotation
+  # node.longhorn.io/create-default-disk=true が **明示的に付いた node のみ**
+  # default disk が作成される。Phase 1 では m4neo にのみ annotation 付与:
+  #   kubectl annotate node m4neo node.longhorn.io/create-default-disk=true
+  # Pi5 (master/worker1/worker2) には annotation を付けないので disk 作成されず、
+  # SD/USB ストレージへの書き込みゼロ (microSD 寿命温存)。
+  createDefaultDiskLabeledNodes: true
 
   # Phase 1: replica=1 (HA なし)。Phase 3 で 3 に上げる
   defaultReplicaCount: 1
