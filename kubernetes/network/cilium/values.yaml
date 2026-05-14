@@ -58,3 +58,17 @@ hubble:
     enabled: true
   ui:
     enabled: true
+  # internal mTLS は cert-manager 統合 (自動更新)
+  # - cilium-ca (root) は resources/cilium-ca-certificate.yaml で発行 → Secret cilium-ca
+  # - hubble-server-certs / hubble-relay-client-certs は chart が Certificate CR を生成、
+  #   cilium-ca-issuer から発行 → cert-manager が renewBefore で自動更新
+  # 旧 SealedSecret (kubernetes/secrets/sealed-secrets/{cilium-ca-secret,hubble-*}.yaml) は廃止
+  tls:
+    auto:
+      enabled: true
+      method: certmanager
+      certValidityDuration: 1095   # 3 年 (workload cert、 renewBefore で前倒し更新)
+      certManagerIssuerRef:
+        group: cert-manager.io
+        kind: ClusterIssuer
+        name: cilium-ca-issuer

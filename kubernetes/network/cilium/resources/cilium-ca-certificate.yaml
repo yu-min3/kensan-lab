@@ -1,0 +1,44 @@
+# Cilium / Hubble の internal mTLS root CA (cert-manager 管理)
+#
+# 経緯:
+#   - 元々は Helm chart の tls.auto.method: helm (default) で chart が一度だけ
+#     auto-generate していた (ローテなし、 災害復旧時に再生成されると既存接続壊れる)
+#   - SealedSecret で固定値を git に残す保険を入れていたが、 chart 側 Secret と
+#     名前衝突 (ownerRef = Helm) で SealedSecret controller が takeover 不可
+#   - cert-manager 統合に切り替え → Certificate CR を SoT、 自動更新 (renewBefore)
+#
+# 構成:
+#   1. selfsigned-cluster-issuer (cert-manager/resources/clusterissuer.yaml) で
+#      自己署名で root CA cert を発行 → secretName=cilium-ca
+#   2. cilium-ca を ClusterIssuer 化して、 chart が Hubble の workload cert を
+#      ここから発行する (values.yaml: hubble.tls.auto.method=certmanager)
+
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: cilium-ca
+  namespace: kube-system
+spec:
+  isCA: true
+  commonName: cilium-ca.cilium.io
+  secretName: cilium-ca           # Helm chart が期待する Secret 名と一致
+  duration: 87600h                # 10 年 (root CA は長期 = ローテ頻度低くて OK)
+  renewBefore: 8760h              # 1 年前から更新試行
+  privateKey:
+    algorithm: ECDSA
+    size: 256
+  issuerRef:
+    name: selfsigned-cluster-issuer
+    kind: ClusterIssuer
+    group: cert-manager.io
+---
+# cilium-ca Secret を発行元とする ClusterIssuer
+# Hubble の各種 cert (hubble-server-certs, hubble-relay-client-certs 等) は
+# この issuer から chart が Certificate CR を生成して発行する
+apiVersion: cert-manager.io/v1
+kind: ClusterIssuer
+metadata:
+  name: cilium-ca-issuer
+spec:
+  ca:
+    secretName: cilium-ca
