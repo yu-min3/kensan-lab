@@ -44,3 +44,9 @@ spec:
         kind: Secret
       - group: apps
         kind: ReplicaSet
+      # Istio control plane auto-distributed ConfigMaps (mesh CA pubkey / CRL)
+      # istiod auto-distributes these to every istio-injection=enabled namespace
+      - kind: ConfigMap
+        name: istio-ca-root-cert
+      - kind: ConfigMap
+        name: istio-ca-crl
