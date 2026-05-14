@@ -10,8 +10,8 @@
 # 構成:
 #   1. selfsigned-cluster-issuer (cert-manager/resources/clusterissuer.yaml) で
 #      自己署名で root CA cert を発行 → secretName=cilium-ca
-#   2. cilium-ca を ClusterIssuer 化して、 chart が Hubble の workload cert を
-#      ここから発行する (values.yaml: hubble.tls.auto.method=certmanager)
+#   2. cilium-ca を namespace-scoped Issuer (kube-system) として束ね、 chart が
+#      Hubble の workload cert をここから発行する (values.yaml: hubble.tls.auto.method=certmanager)
 
 apiVersion: cert-manager.io/v1
 kind: Certificate
@@ -32,13 +32,16 @@ spec:
     kind: ClusterIssuer
     group: cert-manager.io
 ---
-# cilium-ca Secret を発行元とする ClusterIssuer
-# Hubble の各種 cert (hubble-server-certs, hubble-relay-client-certs 等) は
-# この issuer から chart が Certificate CR を生成して発行する
+# cilium-ca Secret を発行元とする Issuer
+# namespace-scoped Issuer (kube-system) にすることで、 cert-manager の
+# cluster-resource-namespace 設定 (= cert-manager ns) に依存せず、 同じ ns 内の
+# cilium-ca Secret を直接参照できる。 Hubble の workload cert は chart が
+# kube-system ns に Certificate CR を生成するため、 Issuer も同 ns に置くのが自然。
 apiVersion: cert-manager.io/v1
-kind: ClusterIssuer
+kind: Issuer
 metadata:
   name: cilium-ca-issuer
+  namespace: kube-system
 spec:
   ca:
     secretName: cilium-ca
