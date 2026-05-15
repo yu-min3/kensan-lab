@@ -17,7 +17,7 @@ You can develop this application in two ways:
 The easiest way to get started! Open this project in VS Code and use Dev Containers.
 
 **Prerequisites:**
-- [Docker](https://www.docker.com/get-started) or [Podman](https://podman.io/)
+- [Docker](https://www.docker.com/get-started) (default) or [Podman](https://podman.io/)
 - [VS Code](https://code.visualstudio.com/)
 - [Dev Containers extension](https://marketplace.visualstudio.com/items?itemName=ms-vscode-remote.remote-containers)
 

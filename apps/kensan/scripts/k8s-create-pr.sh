@@ -82,6 +82,7 @@ BODY="## Summary
 - \`ghcr.io/yu-min3/kensan-memo:${TAG}\`
 - \`ghcr.io/yu-min3/kensan-note:${TAG}\`
 - \`ghcr.io/yu-min3/kensan-ai:${TAG}\`
+- \`ghcr.io/yu-min3/kensan-dagster:${TAG}\`
 
 ## Deploy
 Merge this PR -> Argo CD auto-sync"

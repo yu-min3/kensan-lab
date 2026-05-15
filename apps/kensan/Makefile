@@ -1,7 +1,7 @@
 .PHONY: up down build logs ps clean frontend backend db storage help dev dev-backend e2e-install e2e e2e-ui e2e-headed demo-seed demo-clean backup restore db-backup db-restore storage-backup storage-restore \
        lakehouse lakehouse-dremio lakehouse-trino lakehouse-all lakehouse-down openmetadata openmetadata-down \
        prod-up prod-down prod-logs prod-lakehouse deploy \
-       k8s-build k8s-build-frontend k8s-build-backend k8s-push k8s-push-frontend k8s-push-backend \
+       k8s-build k8s-build-frontend k8s-build-backend k8s-build-dagster k8s-push k8s-push-frontend k8s-push-backend k8s-push-dagster \
        k8s-deploy-dev k8s-deploy-prod k8s-deploy k8s-release-dev k8s-release-prod k8s-release
 
 # Default target
@@ -156,30 +156,36 @@ deploy:
 # =============================================================================
 # Kubernetes (k8s) Image Build, Push & Deploy
 # =============================================================================
-# Podman でイメージをビルドし GHCR に push → newTag 更新 PR を作成する。
+# docker buildx でマルチアーキ (linux/amd64 + linux/arm64) のイメージを GHCR に push し
+# (buildx --push で build + push を一括実行)、newTag 更新 PR を作成する。
 # フロントエンドは VITE_* を空文字でビルドし、相対URL（k8s HTTPRoute パスベースルーティング対応）にする。
 #
 # クイックリファレンス:
-#   make k8s-release-dev TAG=v0.0.2    # dev:  build → push → PR作成
-#   make k8s-release-prod TAG=v0.0.2   # prod: build → push → PR作成
-#   make k8s-release TAG=v0.0.2        # both: build → push → PR作成
+#   make k8s-release-dev TAG=v0.0.2    # dev:  build+push → PR作成
+#   make k8s-release-prod TAG=v0.0.2   # prod: build+push → PR作成
+#   make k8s-release TAG=v0.0.2        # both: build+push → PR作成
 #
 #   make k8s-deploy-dev TAG=v0.0.2     # dev:  PR作成のみ (build/push済み前提)
 #   make k8s-deploy-prod TAG=v0.0.2    # prod: PR作成のみ
 #   make k8s-deploy TAG=v0.0.2         # both: PR作成のみ
+#
+# Container runtime: Docker (default)。`docker buildx` のセットアップが必要。
+#   docker buildx create --use   # 初回のみ
+# Podman を使いたい場合は各 build コマンドを podman に置き換える (buildx 相当の
+# マルチアーキ build は `podman build --platform <list> --manifest ...` で可能)。
 
 REGISTRY ?= ghcr.io/yu-min3
 TAG ?= latest
-PLATFORM ?= linux/amd64
+PLATFORM ?= linux/amd64,linux/arm64
 
-# --- Build ---
+# --- Build (docker buildx; build + push を一括で実行する) ---
 
-## Build all k8s images (frontend + backend)
-k8s-build: k8s-build-frontend k8s-build-backend
+## Build (and push) all k8s images (frontend + backend + dagster)
+k8s-build: k8s-build-frontend k8s-build-backend k8s-build-dagster
 
 ## Build frontend for k8s (VITE_* empty = relative URLs for HTTPRoute)
 k8s-build-frontend:
-	podman build --platform $(PLATFORM) \
+	docker buildx build --platform=$(PLATFORM) \
 	  --build-arg VITE_USER_SERVICE_URL= \
 	  --build-arg VITE_TASK_SERVICE_URL= \
 	  --build-arg VITE_TIMEBLOCK_SERVICE_URL= \
@@ -188,32 +194,49 @@ k8s-build-frontend:
 	  --build-arg VITE_MEMO_SERVICE_URL= \
 	  --build-arg VITE_NOTE_SERVICE_URL= \
 	  -t $(REGISTRY)/kensan-frontend:$(TAG) \
+	  --push \
 	  frontend/
 
 ## Build all backend services for k8s
 k8s-build-backend:
 	@for svc in user task timeblock analytics memo note; do \
 	  echo "Building $$svc-service..."; \
-	  podman build --platform $(PLATFORM) -t $(REGISTRY)/kensan-$$svc:$(TAG) \
+	  docker buildx build --platform=$(PLATFORM) \
+	    -t $(REGISTRY)/kensan-$$svc:$(TAG) \
+	    --push \
 	    -f backend/services/$$svc/Dockerfile backend/; \
 	done
-	podman build --platform $(PLATFORM) -t $(REGISTRY)/kensan-ai:$(TAG) kensan-ai/
+	docker buildx build --platform=$(PLATFORM) \
+	  -t $(REGISTRY)/kensan-ai:$(TAG) \
+	  --push \
+	  kensan-ai/
+
+## Build dagster image for k8s (Dockerfile.dagster は lakehouse/ 配下)
+k8s-build-dagster:
+	docker buildx build --platform=$(PLATFORM) \
+	  -t $(REGISTRY)/kensan-dagster:$(TAG) \
+	  --push \
+	  -f lakehouse/Dockerfile.dagster \
+	  lakehouse/
 
 # --- Push ---
+# buildx --push で build + push を一括実行するため、独立した push target は
+# 既存スクリプトとの互換のために残しているが、no-op となる。
 
-## Push all k8s images to GHCR
-k8s-push: k8s-push-frontend k8s-push-backend
+## Push all k8s images to GHCR (no-op; build に統合済み)
+k8s-push: k8s-push-frontend k8s-push-backend k8s-push-dagster
 
-## Push frontend image to GHCR
+## Push frontend image (no-op; k8s-build-frontend に統合済み)
 k8s-push-frontend:
-	podman push $(REGISTRY)/kensan-frontend:$(TAG)
+	@echo "k8s-push-frontend: no-op (use k8s-build-frontend; includes --push via buildx)"
 
-## Push all backend images to GHCR
+## Push backend images (no-op; k8s-build-backend に統合済み)
 k8s-push-backend:
-	@for svc in user task timeblock analytics memo note ai; do \
-	  echo "Pushing kensan-$$svc..."; \
-	  podman push $(REGISTRY)/kensan-$$svc:$(TAG); \
-	done
+	@echo "k8s-push-backend: no-op (use k8s-build-backend; includes --push via buildx)"
+
+## Push dagster image (no-op; k8s-build-dagster に統合済み)
+k8s-push-dagster:
+	@echo "k8s-push-dagster: no-op (use k8s-build-dagster; includes --push via buildx)"
 
 # --- Deploy (newTag 更新 + PR作成) ---
 
@@ -230,15 +253,16 @@ k8s-deploy:
 	@bash scripts/k8s-create-pr.sh all $(TAG)
 
 # --- Release (build + push + deploy) ---
+# build target が buildx --push を含むので push step は不要。
 
-## Full release dev: build + push + PR
-k8s-release-dev: k8s-build k8s-push k8s-deploy-dev
+## Full release dev: build (+push) + PR
+k8s-release-dev: k8s-build k8s-deploy-dev
 
-## Full release prod: build + push + PR
-k8s-release-prod: k8s-build k8s-push k8s-deploy-prod
+## Full release prod: build (+push) + PR
+k8s-release-prod: k8s-build k8s-deploy-prod
 
-## Full release dev+prod: build + push + PR
-k8s-release: k8s-build k8s-push k8s-deploy
+## Full release dev+prod: build (+push) + PR
+k8s-release: k8s-build k8s-deploy
 
 # =============================================================================
 # Lakehouse (delegates to lakehouse/Makefile, requires app stack running)
@@ -465,14 +489,14 @@ help:
 	@echo "  deploy         Deploy to GCE via SSH (requires JWT_SECRET, GOOGLE_API_KEY)"
 	@echo ""
 	@echo "Kubernetes (k8s):"
-	@echo "  k8s-release TAG=x         Build + push + PR (dev+prod)"
-	@echo "  k8s-release-dev TAG=x     Build + push + PR (dev only)"
-	@echo "  k8s-release-prod TAG=x    Build + push + PR (prod only)"
+	@echo "  k8s-release TAG=x         Build (multi-arch buildx, push 込み) + PR (dev+prod)"
+	@echo "  k8s-release-dev TAG=x     Build + PR (dev only)"
+	@echo "  k8s-release-prod TAG=x    Build + PR (prod only)"
 	@echo "  k8s-deploy TAG=x          Update newTag + PR only (dev+prod)"
 	@echo "  k8s-deploy-dev TAG=x      Update newTag + PR only (dev only)"
 	@echo "  k8s-deploy-prod TAG=x     Update newTag + PR only (prod only)"
-	@echo "  k8s-build TAG=x           Build all images (podman)"
-	@echo "  k8s-push TAG=x            Push all images to GHCR"
+	@echo "  k8s-build TAG=x           Build + push all images (docker buildx, linux/amd64,linux/arm64)"
+	@echo "  k8s-push TAG=x            No-op (build に統合済み)"
 	@echo ""
 	@echo "Utilities:"
 	@echo "  health    Check health of all services"

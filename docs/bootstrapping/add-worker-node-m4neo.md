@@ -502,34 +502,34 @@ However, if **native extensions** (modules built with `node-gyp`, Python C exten
 - **kensan-ai**: Python package. Watch for native extensions with `uv pip install`.
 - **backstage**: Has `node-gyp` dependency (`isolated-vm`). `npm install` must run on each architecture.
 
-### 3.5 Podman Multi-Platform Build Procedure
+### 3.5 Docker buildx Multi-Platform Build Procedure
 
-This platform uses Podman for image builds.
+This platform uses Docker buildx for multi-arch image builds (Podman でも `--platform <list> --manifest` で同等のことが可能)。
 
-#### Prerequisites: QEMU Emulation
+#### Prerequisites: QEMU Emulation + buildx builder
 
 Building ARM64 images on an AMD64 machine (or vice versa) requires QEMU user-mode emulation.
 
 ```bash
-# Install on Ubuntu
+# Install on Ubuntu (Docker Desktop には QEMU が同梱されているため不要)
 sudo apt-get install -y qemu-user-static
 
 # Verify
 ls /proc/sys/fs/binfmt_misc/qemu-*
+
+# Create / select a buildx builder (初回のみ)
+docker buildx create --use
 ```
 
-#### Multi-Platform Build
+#### Multi-Platform Build (推奨は `apps/kensan/Makefile` の `make k8s-build TAG=vX.Y.Z`)
 
 ```bash
-# Create manifest list and build
-podman build --platform linux/amd64,linux/arm64 \
-  --manifest ghcr.io/<your-git-org>/kensan-user:v0.1.0 \
+# Build + push を一括 (buildx --push で manifest list が GHCR に上がる)
+docker buildx build --platform=linux/amd64,linux/arm64 \
+  -t ghcr.io/<your-git-org>/kensan-user:v0.1.0 \
+  --push \
   -f apps/kensan/backend/services/user/Dockerfile \
   apps/kensan/backend/
-
-# Push the manifest list
-podman manifest push ghcr.io/<your-git-org>/kensan-user:v0.1.0 \
-  docker://ghcr.io/<your-git-org>/kensan-user:v0.1.0
 ```
 
 #### Batch Build Example for All Services
@@ -541,22 +541,19 @@ PLATFORMS="linux/amd64,linux/arm64"
 
 # Go services
 for svc in user task timeblock analytics memo note; do
-  podman build --platform $PLATFORMS \
-    --manifest $REGISTRY/kensan-$svc:$TAG \
+  docker buildx build --platform=$PLATFORMS \
+    -t $REGISTRY/kensan-$svc:$TAG \
+    --push \
     -f apps/kensan/backend/services/$svc/Dockerfile \
     apps/kensan/backend/
-  podman manifest push $REGISTRY/kensan-$svc:$TAG \
-    docker://$REGISTRY/kensan-$svc:$TAG
 done
 
 # Frontend
-podman build --platform $PLATFORMS \
-  --manifest $REGISTRY/kensan-frontend:$TAG \
+docker buildx build --platform=$PLATFORMS \
+  -t $REGISTRY/kensan-frontend:$TAG \
+  --push \
   -f apps/kensan/frontend/Dockerfile \
   apps/kensan/frontend/
-
-podman manifest push $REGISTRY/kensan-frontend:$TAG \
-  docker://$REGISTRY/kensan-frontend:$TAG
 ```
 
 ### 3.6 GitHub Actions Sample (Future Reference)
@@ -649,13 +646,13 @@ Occurs when an ARM64 image runs on an AMD64 node.
 
 ```bash
 # Check image architecture
-podman inspect <image> | grep Architecture
+docker buildx imagetools inspect <image>
 
 # Check which node the Pod is running on
 kubectl get pod <pod-name> -o wide
 
 # Check the manifest list
-podman manifest inspect ghcr.io/<your-git-org>/<image>:<tag>
+docker buildx imagetools inspect ghcr.io/<your-git-org>/<image>:<tag>
 ```
 
 Fixes:

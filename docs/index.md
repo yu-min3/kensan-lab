@@ -44,7 +44,7 @@ This site is the **single source of truth** for the current state of kensan-lab.
 | Layer | Technology |
 |---|---|
 | Kubernetes | bare-metal kubeadm (RPi 5 ARM64 ×3 + Bosgame M4 Neo AMD64 ×1) |
-| Runtime | CRI-O (cluster), Podman (image builds) |
+| Runtime | CRI-O (cluster), Docker buildx (multi-arch image builds; `CONTAINER_RUNTIME` で Podman 切替可) |
 | CNI / LB | [Cilium](https://cilium.io/) — kube-proxy replacement, L2 LoadBalancer |
 | Service Mesh | [Istio](https://istio.io/) + Gateway API |
 | GitOps | [Argo CD](https://argo-cd.readthedocs.io/) — Helm multi-source pattern |

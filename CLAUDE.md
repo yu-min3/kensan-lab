@@ -9,7 +9,7 @@
 | Layer | Technology |
 |-------|-----------|
 | Kubernetes | Bare-metal kubeadm (RPi 5 ARM64 x3 + Bosgame M4 Neo AMD64 x1) |
-| Runtime | CRI-O (cluster), **Podman** (image builds — never Docker) |
+| Runtime | CRI-O (cluster), **Docker buildx** (image builds; multi-arch、`CONTAINER_RUNTIME` で Podman 切替可) |
 | CNI / LB | Cilium (kube-proxy replacement, L2 LoadBalancer) |
 | Service Mesh | Istio + Gateway API |
 | GitOps | Argo CD — Helm multi-source Application pattern |
@@ -63,13 +63,13 @@ Backstage development:
 ```bash
 cd backstage/app && make install           # Dependencies
 cd backstage/app && make dev               # Local dev (localhost:3000)
-cd backstage/app && make all TAG=v1.0.0    # Build + push (Podman)
+cd backstage/app && make all TAG=v1.0.0    # Build + push (default: Docker; CONTAINER_RUNTIME=podman で切替可)
 ```
 
 ## Mandatory Constraints
 
 1. **GitOps only**: ALL infrastructure changes via Git → Argo CD. No direct `kubectl apply`.
-2. **Podman, not Docker**: All image builds use Podman.
+2. **Container runtime**: Default は Docker (`docker buildx` で multi-arch build)。`backstage/app/Makefile` の `CONTAINER_RUNTIME ?= docker` パターンで Podman 切替も可。
 3. **No rendered manifests**: Argo CD renders Helm charts natively. Never commit `helm template` output.
 4. **Secrets**: dynamic creds via Vault + External Secrets; static bootstrap creds via Sealed Secrets. Raw secrets in `temp/` only — commit only sealed/encrypted YAMLs.
 5. **No .env commits**: Sensitive tokens stay out of Git.
@@ -90,7 +90,7 @@ cd backstage/app && make all TAG=v1.0.0    # Build + push (Podman)
 
 | Rule File | Scope |
 |-----------|-------|
-| `gitops-workflow.md` | GitOps principles, deploy order, Podman |
+| `gitops-workflow.md` | GitOps principles, deploy order, container runtime |
 | `helm-multisource.md` | 3-file pattern details |
 | `kubernetes-cluster.md` | Node topology, scheduling, storage |
 | `network-ingress.md` | Cilium, Gateways, domains, certs |
