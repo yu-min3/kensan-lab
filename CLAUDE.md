@@ -2,52 +2,19 @@
 
 ## Repository Overview
 
-**kensan-lab** — Kubernetes GitOps platform for bare-metal multi-arch cluster. Manages cluster infrastructure, security, and Argo CD control structures. Owned by Platform Engineers (PE); enables Application Developers (AD) to deploy via Backstage.
+**kensan-lab** — Kubernetes GitOps platform for bare-metal multi-arch cluster. Owned by Platform Engineers (PE); App Developers (AD) deploy via Backstage.
 
-## Technology Stack
+- **What this is / tech stack / hardware**: [`README.md`](./README.md)
+- **Directory layout conventions (Pattern A/B)**: [`kubernetes/README.md`](./kubernetes/README.md)
+- **Doc-layout discipline (where to write what)**: [`docs/concepts/doc-layout.md`](./docs/concepts/doc-layout.md)
 
-| Layer | Technology |
-|-------|-----------|
-| Kubernetes | Bare-metal kubeadm (RPi 5 ARM64 x3 + Bosgame M4 Neo AMD64 x1) |
-| Runtime | CRI-O (cluster), **Podman** (image builds — never Docker) |
-| CNI / LB | Cilium (kube-proxy replacement, L2 LoadBalancer) |
-| Service Mesh | Istio + Gateway API |
-| GitOps | Argo CD — Helm multi-source Application pattern |
-| Secrets | Vault + External Secrets Operator (dynamic), Sealed Secrets (static GitOps), Reloader (rollout on rotation) |
-| Certificates | cert-manager + Let's Encrypt |
-| Auth | Keycloak (OIDC IdP) + oauth2-proxy (Istio Gateway ext_authz) |
-| Edge | Cloudflare Tunnel (internet) + Cilium L2 LoadBalancer (LAN) |
-| Storage | Longhorn (replicated block, default) + local-path-provisioner (legacy) |
-| Observability | Prometheus, Grafana, Loki, Tempo, OTel Collector |
-| Developer Portal | Backstage with scaffolder templates |
+## Mandatory Constraints
 
-## Repository Structure
-
-```
-kubernetes/                    # Core infra (GitOps-managed)
-├── argocd/                       # Argo CD: applications/, projects/, root-apps/
-├── network/                      # cilium, istio, gateway-api, cloudflare-tunnel, network-policy, coredns
-├── auth/                         # keycloak, oauth2-proxy, vault-oidc-auth
-├── secrets/                      # vault, vault-config-operator, vault-{database,transit}-engine,
-│                                 #   external-secrets, sealed-secrets, cert-manager, reloader
-├── observability/                # grafana, prometheus, loki, tempo, otel-collector
-├── storage/                      # longhorn, local-path-provisioner
-├── kube-system/                  # PSA labels / shared kube-system resources
-└── environments/                 # app-prod (shared app namespace bootstrap)
-backstage/                        # Developer portal (app/ + manifests/)
-apps/                             # Sample applications
-docs/                             # ADRs, architecture, bootstrapping guides
-scripts/                          # Automation scripts
-temp/                             # Temporary files (git-ignored, raw secrets)
-```
-
-## Helm Multi-Source Pattern
-
-Each component = **Application CR** + **values.yaml** + **resources/**. See `.claude/rules/helm-multisource.md` for details.
-
-- **Change config**: Edit `values.yaml` → commit → push
-- **Upgrade chart**: Update `targetRevision` in Application CR → commit → push
-- **Add resources**: Place YAML in `resources/` → commit → push
+1. **GitOps only**: ALL infrastructure changes via Git → Argo CD. No direct `kubectl apply`.
+2. **Podman, not Docker**: All image builds use Podman.
+3. **No rendered manifests**: Argo CD renders Helm charts natively. Never commit `helm template` output.
+4. **Secrets**: dynamic creds via Vault + External Secrets; bootstrap creds via Sealed Secrets. Raw secrets in `temp/` only — commit only sealed/encrypted YAMLs.
+5. **No .env commits**: Sensitive tokens stay out of Git.
 
 ## Quick Reference
 
@@ -56,23 +23,10 @@ kubectl get nodes                          # Cluster health
 kubectl get applications -n argocd         # GitOps status
 kubectl get gateway -A                     # Gateways
 kubectl get certificate -A                 # Certificates
-kubectl get pods -A --field-selector=status.phase!=Running,status.phase!=Succeeded  # Unhealthy pods
+kubectl get pods -A --field-selector=status.phase!=Running,status.phase!=Succeeded
 ```
 
-Backstage development:
-```bash
-cd backstage/app && make install           # Dependencies
-cd backstage/app && make dev               # Local dev (localhost:3000)
-cd backstage/app && make all TAG=v1.0.0    # Build + push (Podman)
-```
-
-## Mandatory Constraints
-
-1. **GitOps only**: ALL infrastructure changes via Git → Argo CD. No direct `kubectl apply`.
-2. **Podman, not Docker**: All image builds use Podman.
-3. **No rendered manifests**: Argo CD renders Helm charts natively. Never commit `helm template` output.
-4. **Secrets**: dynamic creds via Vault + External Secrets; static bootstrap creds via Sealed Secrets. Raw secrets in `temp/` only — commit only sealed/encrypted YAMLs.
-5. **No .env commits**: Sensitive tokens stay out of Git.
+Backstage: `cd backstage/app && make {install,dev,all TAG=...}`
 
 ## Skills (Slash Commands)
 
@@ -93,25 +47,19 @@ cd backstage/app && make all TAG=v1.0.0    # Build + push (Podman)
 | `gitops-workflow.md` | GitOps principles, deploy order, Podman |
 | `helm-multisource.md` | 3-file pattern details |
 | `kubernetes-cluster.md` | Node topology, scheduling, storage |
-| `network-ingress.md` | Cilium, Gateways, domains, certs |
+| `network-ingress.md` | Cilium, Gateways, edge, certs |
 | `security-secrets.md` | Vault + ESO, Sealed Secrets, Reloader, cert-manager, GHCR |
 | `environment-separation.md` | PE/AD roles, multi-repo, namespaces (ADR-006) |
 
-## User Preferences
-
-- **コマンド出力**: シェルコマンドを提示する際は `temp/` にスクリプトファイル（`.sh`）として書き出す。改行崩れ防止。
-- **言語**: 日本語での対話を優先。
-- **コミットメッセージ**: 1行目は50文字以内で簡潔に。本文は不要（diffを見ればわかる）。
-
 ## Domain & Network
 
-- **ドメイン**: `yu-min3.com`（Cloudflare DNS）
+- **ドメイン**: `yu-min3.com` (Cloudflare DNS)
 - **LB IP range**: `192.168.0.240-249`
 - **GitHub org**: `yu-min3`
-- フォークする場合は `docs/configuration.md` を参照してドメイン等を置換すること
+- フォーク時は [`docs/getting-started/configuration.md`](./docs/getting-started/configuration.md) でドメイン等を置換
 
-## Documentation
+## User Preferences
 
-- Architecture & ADRs: `docs/`
-- Bootstrapping: `docs/bootstrapping/`
-- Kustomize guidelines: `docs/kustomize-guidelines.md`
+- **コマンド出力**: シェルコマンドを提示する際は `temp/` に `.sh` で書き出す（改行崩れ防止）
+- **言語**: 日本語での対話を優先
+- **コミット**: 1 行目 50 文字以内、本文不要（diff を見ればわかる）

@@ -39,12 +39,10 @@ globs: "kubernetes/**"
 
 ## Storage
 
-| Class | Provisioner | 用途 |
-|---|---|---|
-| `longhorn`（default） | Longhorn | 通常の StatefulSet / アプリ PVC。レプリケート（複数ノードに block レベルで複製）するため、ノード障害でデータ消失しない |
-| `local-path` | local-path-provisioner | レガシー / Longhorn 移行未完の PVC のみ。**node-local** で、StatefulSet を別ノードに移すと PVC 再作成 + データ消失 |
+- 新規 PVC は `longhorn`（default、replicated block）。`local-path` は legacy で段階的廃止
+- `local-path` PVC は **node-local**。StatefulSet を別ノードに移すと再作成 + データ消失
 
-新規ワークロードは原則 `longhorn` を使う（Longhorn 移行は commit 45a6a61 で完了）。`local-path` は段階的に廃止予定。
+詳細・R2 backup 構成: [`kubernetes/storage/README.md`](../../kubernetes/storage/README.md) / [`docs/architecture/infrastructure.md`](../../docs/architecture/infrastructure.md)
 
 ## Adding New Nodes
 
