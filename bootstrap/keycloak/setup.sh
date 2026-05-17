@@ -261,6 +261,11 @@ GATEWAY_PROTECTED_HOSTS=(
   prometheus.platform.yu-min3.com
   hubble.platform.yu-min3.com
   longhorn.platform.yu-min3.com
+  # Cloudflare Tunnel 経由の外部公開 host (`.yu-mins.com`)。
+  # hubble は yu-mins HTTPRoute 未配備のため除外。
+  backstage.yu-mins.com
+  prometheus.yu-mins.com
+  longhorn.yu-mins.com
 )
 # Grafana は auth.generic_oauth で Keycloak 直結 (Path B)。Authorization Bearer
 # 解釈の衝突を避けるため gateway-platform は bypass、別 client で OIDC する。
@@ -284,10 +289,15 @@ GATEWAY_CLIENT_UUID=$(ensure_oidc_client \
 # Category 1 で bypass し、自前 client で OIDC させる。
 # redirect_uri: Grafana の generic_oauth handler の固定 path /login/generic_oauth
 GRAFANA_HOSTNAME="grafana.platform.yu-min3.com"
+GRAFANA_HOSTNAME_TUNNEL="grafana.yu-mins.com"
 GRAFANA_REDIRECT_URIS=$(jq -nc \
   --arg cb "https://$GRAFANA_HOSTNAME/login/generic_oauth" \
-  '[$cb]')
-GRAFANA_WEB_ORIGINS=$(jq -nc --arg origin "https://$GRAFANA_HOSTNAME" '[$origin]')
+  --arg cb_tunnel "https://$GRAFANA_HOSTNAME_TUNNEL/login/generic_oauth" \
+  '[$cb, $cb_tunnel]')
+GRAFANA_WEB_ORIGINS=$(jq -nc \
+  --arg origin "https://$GRAFANA_HOSTNAME" \
+  --arg origin_tunnel "https://$GRAFANA_HOSTNAME_TUNNEL" \
+  '[$origin, $origin_tunnel]')
 GRAFANA_CLIENT_UUID=$(ensure_oidc_client \
   "grafana" \
   "Grafana OIDC" \
@@ -301,12 +311,18 @@ GRAFANA_CLIENT_UUID=$(ensure_oidc_client \
 # Vault / ArgoCD は Category 1 (bypass) で扱い、app native auth に任せる方針通り。
 # redirect_uri: ArgoCD の OIDC callback path /auth/callback (UI), /pkce/verify (CLI)
 ARGOCD_HOSTNAME="argocd.platform.yu-min3.com"
+ARGOCD_HOSTNAME_TUNNEL="argocd.yu-mins.com"
 ARGOCD_REDIRECT_URIS=$(jq -nc \
   --arg ui_cb "https://$ARGOCD_HOSTNAME/auth/callback" \
   --arg cli_cb "http://localhost:8085/auth/callback" \
   --arg pkce_cb "https://$ARGOCD_HOSTNAME/pkce/verify" \
-  '[$ui_cb, $cli_cb, $pkce_cb]')
-ARGOCD_WEB_ORIGINS=$(jq -nc --arg origin "https://$ARGOCD_HOSTNAME" '[$origin]')
+  --arg ui_cb_tunnel "https://$ARGOCD_HOSTNAME_TUNNEL/auth/callback" \
+  --arg pkce_cb_tunnel "https://$ARGOCD_HOSTNAME_TUNNEL/pkce/verify" \
+  '[$ui_cb, $cli_cb, $pkce_cb, $ui_cb_tunnel, $pkce_cb_tunnel]')
+ARGOCD_WEB_ORIGINS=$(jq -nc \
+  --arg origin "https://$ARGOCD_HOSTNAME" \
+  --arg origin_tunnel "https://$ARGOCD_HOSTNAME_TUNNEL" \
+  '[$origin, $origin_tunnel]')
 ARGOCD_CLIENT_UUID=$(ensure_oidc_client \
   "argocd" \
   "ArgoCD OIDC" \

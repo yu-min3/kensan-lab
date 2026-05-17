@@ -25,6 +25,11 @@ spec:
     - "prometheus.platform.yu-min3.com"
     - "hubble.platform.yu-min3.com"
     - "longhorn.platform.yu-min3.com"
+    # Cloudflare Tunnel 経由 (`*.yu-mins.com`) — oauth2-proxy が host ごとに
+    # callback URL を組み立てるため、ここでも `/oauth2/*` を受ける必要がある。
+    - "backstage.yu-mins.com"
+    - "prometheus.yu-mins.com"
+    - "longhorn.yu-mins.com"
   rules:
     - matches:
         - path:

@@ -38,6 +38,10 @@ spec:
               - prometheus.platform.yu-min3.com
               - hubble.platform.yu-min3.com
               - longhorn.platform.yu-min3.com
+              # `.yu-mins.com` (Cloudflare Tunnel 経由) も同じく oauth2-proxy ext_authz を強制
+              - backstage.yu-mins.com
+              - prometheus.yu-mins.com
+              - longhorn.yu-mins.com
             notPaths:
               - /oauth2
               - /oauth2/*
