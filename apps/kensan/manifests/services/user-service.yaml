@@ -42,7 +42,7 @@ spec:
                 - amd64
       containers:
       - name: user-service
-        image: ghcr.io/yu-min3/kensan-user:v0.0.3
+        image: ghcr.io/yu-min3/kensan-user:v0.0.2
         imagePullPolicy: Always
         envFrom:
         - configMapRef:

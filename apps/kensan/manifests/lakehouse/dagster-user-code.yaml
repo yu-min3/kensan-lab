@@ -19,7 +19,7 @@ spec:
     spec:
       containers:
       - name: dagster-user-code
-        image: ghcr.io/yu-min3/kensan-dagster:v0.0.1
+        image: ghcr.io/yu-min3/kensan-dagster:v0.0.2
         imagePullPolicy: Always
         env:
         - name: DAGSTER_HOME
