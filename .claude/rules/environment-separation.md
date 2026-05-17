@@ -17,22 +17,16 @@ dev/prod 分離は廃止済み。homelab で 2 環境運用は重く、必要な
 
 ## Application Namespace Naming（ADR-006）
 
-採用パターン: **`app-{name}` flat + 3-axis labels**
+採用パターン: **`app-{name}` flat + 3-axis labels** (`environment` / `team` / `app`)。
 
 ```
 app-{name}            # 例: app-streamlit, app-iceberg-ui
 platform-{component}  # 例: platform-auth-prod, platform-keycloak（既存命名は維持）
 ```
 
-### 3-axis labels
-
-| Label | 例 | 用途 |
-|---|---|---|
-| `kensan-lab.platform/environment` | `production` / `development` / `infrastructure` | Gateway API allowedRoutes selector |
-| `kensan-lab.platform/team` | `team-a` / `platform` | AuthorizationPolicy / NetworkPolicy / Argo CD project scope |
-| `kensan-lab.platform/app` | `streamlit` 等 | 識別用（任意） |
-
 旧 `app-{env}-<name>` 命名（`app-prod-foo` 等）は当面 coexistence。新規は `app-{name}` flat で作る。`app-prod` は env-shared landing zone として残置（空になり次第削除候補）。
+
+詳細 (label 定義、選定理由、移行方針): [ADR-006](../../docs/adr/006-namespace-naming.md) / [`docs/concepts/namespace-label-design.md`](../../docs/concepts/namespace-label-design.md)
 
 ## Multi-Repository Strategy
 
