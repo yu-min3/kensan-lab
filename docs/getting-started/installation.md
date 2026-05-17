@@ -1,42 +1,30 @@
 # Prerequisites
 
-### Hardware
+## Hardware
 
-- **Minimum Configuration**: 1 Master + 1 or more Workers
-- **Recommended Configuration**: 1 Master + 2 or more Workers
-- **Memory**: Minimum 4GB per node, 8GB or more recommended
-- **Storage**: Minimum 50GB per node, 100GB or more recommended
-- **Network**: An environment where L2 network communication is possible
+- **Minimum**: 1 control plane + 1 worker (4 GB RAM, 50 GB disk each)
+- **Recommended**: 1 control plane + 2+ workers (8 GB RAM, 100 GB disk each)
+- L2-capable LAN with a free static IP range for Cilium LoadBalancer
 
-### Software
+The reference cluster's exact node inventory (RPi 5 + M4 Neo, hardware-class labels) is in [`.claude/rules/kubernetes-cluster.md`](https://github.com/yu-min3/kensan-lab/blob/main/.claude/rules/kubernetes-cluster.md).
 
-**For an existing cluster environment:**
-- Kubernetes 1.27 or higher (built with kubeadm)
-- kubectl (a version compatible with the cluster version)
-- kubeconfig configured
+## Cluster
 
-**On a development machine:**
-- kubectl
-- helm 3.x
-- kubeseal (Sealed Secrets CLI)
-- docker (default; `docker buildx` for multi-arch builds) or podman (for building container images)
-- make
-- Python 3.8 or higher (for CRD splitting script)
+- Kubernetes 1.27 or higher (kubeadm)
+- kubectl configured to talk to the cluster
+- Helm 3.x — only needed for the **initial** Cilium / Argo CD bootstrap. Everything afterwards is managed by Argo CD.
 
-**Optional (for Backstage development):**
-- Node.js 18.x or higher
-- Yarn 4.x
+## Build / Dev Machine
 
-### Accounts & Credentials
+- `kubectl`, `helm`, `kubeseal`
+- `docker` (default; multi-arch via `docker buildx`) — `make ... CONTAINER_RUNTIME=podman` to switch
+- `make` — every component uses `make <target>` as the entry point. See `make help` in the repository root and in `apps/kensan/`, `backstage/app/`.
+- Node.js 22.x + Yarn — only for Backstage frontend development (Yarn 4 is bundled in `.yarn/releases/`, no global install needed)
 
-- GitHub Account (for container registry GHCR)
-- GitHub Personal Access Token (with `packages:write` permissions)
-- DNS Provider (for Cert-Manager + Let's Encrypt, e.g., AWS Route53)
-- Domain Name (for issuing TLS certificates)
+## Accounts & Credentials
 
-### Network Requirements
+- GitHub account + Personal Access Token with `packages:write` (GHCR push)
+- Domain name + DNS provider for cert-manager DNS-01 (the reference cluster uses AWS Route 53; see [Configuration Guide](./configuration.md) §6 for swapping)
+- Free IP range on your LAN for Cilium LoadBalancer (must not overlap DHCP)
 
-- IP range for Cilium LoadBalancer (a range that does not overlap with DHCP)
-- Externally accessible IP address (for Istio Gateway)
-
-> **Note**: For detailed configuration items, please refer to the [Environment-Specific Configuration Guide](./configuration.md).
+> **Next**: replace author-specific values per the [Configuration Guide](./configuration.md), then follow the [Bootstrapping Guide](../bootstrapping/index.md).

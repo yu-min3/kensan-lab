@@ -39,30 +39,9 @@ This site is the **single source of truth** for the current state of kensan-lab.
 | Read the back-stories | [Articles](articles.md) — Zenn / dev.to deep-dive index |
 | See what broke and why | [Incidents](incidents/2026-03-02-system-infra-sync-blocked.md) |
 
-## Tech Stack
+## Tech Stack & Hardware
 
-| Layer | Technology |
-|---|---|
-| Kubernetes | bare-metal kubeadm (RPi 5 ARM64 ×3 + Bosgame M4 Neo AMD64 ×1) |
-| Runtime | CRI-O (cluster), Docker buildx (multi-arch image builds; `CONTAINER_RUNTIME` で Podman 切替可) |
-| CNI / LB | [Cilium](https://cilium.io/) — kube-proxy replacement, L2 LoadBalancer |
-| Service Mesh | [Istio](https://istio.io/) + Gateway API |
-| GitOps | [Argo CD](https://argo-cd.readthedocs.io/) — Helm multi-source pattern |
-| Secrets | [Vault](https://www.vaultproject.io/) + [External Secrets Operator](https://external-secrets.io/) (dynamic / static), [Sealed Secrets](https://sealed-secrets.netlify.app/) (bootstrap), [Reloader](https://github.com/stakater/Reloader) |
-| Certificates | [cert-manager](https://cert-manager.io/) + Let's Encrypt |
-| Auth | [Keycloak](https://www.keycloak.org/) (OIDC IdP) + oauth2-proxy (Istio Gateway ext_authz) |
-| Storage | [Longhorn](https://longhorn.io/) (replicated block, default) |
-| Observability | Prometheus, Grafana, Loki, Tempo, OpenTelemetry Collector |
-| Developer Portal | [Backstage](https://backstage.io/) |
-
-## Hardware
-
-| Device | Qty | Arch | RAM | Role |
-|---|---|---|---|---|
-| Raspberry Pi 5 | 3 | ARM64 | 8 GB | Control plane + workers |
-| Bosgame M4 Neo | 1 | AMD64 | 32 GB | Worker (I/O-heavy workloads) |
-
-4 nodes, multi-architecture. Managed by kubeadm with CRI-O runtime.
+Tech stack table, hardware inventory, and feature highlights are in the [Top README](https://github.com/yu-min3/kensan-lab/blob/main/README.md) — the single source of truth.
 
 ## License
 
