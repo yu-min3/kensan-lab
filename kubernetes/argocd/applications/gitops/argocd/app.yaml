@@ -22,6 +22,11 @@ spec:
     - repoURL: https://github.com/yu-min3/kensan-lab
       targetRevision: main
       path: kubernetes/argocd/resources
+    # AppProject CRs live under kubernetes/argocd/projects/ and are synced
+    # by the argocd Application itself (bootstrapping the projects from git)
+    - repoURL: https://github.com/yu-min3/kensan-lab
+      targetRevision: main
+      path: kubernetes/argocd/projects
 
   destination:
     server: https://kubernetes.default.svc
