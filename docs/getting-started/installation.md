@@ -19,7 +19,7 @@
 - kubectl
 - helm 3.x
 - kubeseal (Sealed Secrets CLI)
-- docker or podman (for building container images)
+- docker (default; `docker buildx` for multi-arch builds) or podman (for building container images)
 - make
 - Python 3.8 or higher (for CRD splitting script)
 

@@ -13,7 +13,7 @@ ALL infrastructure changes MUST go through Git → Argo CD sync. No exceptions.
 - `kubectl apply` / `kubectl delete` on infrastructure namespaces (except initial bootstrapping)
 - `helm install` / `helm upgrade` directly — Argo CD renders charts natively
 - Committing rendered Helm manifests (`helm template` output) to Git
-- `docker build` / `docker push` — use **Podman** instead
+- 画像 build に single-arch tag を push しない — multi-arch (linux/amd64 + linux/arm64) manifest list で push する (Pi5 + amd64 worker 混在のため)
 
 ## Change Workflow
 
@@ -30,8 +30,10 @@ ALL infrastructure changes MUST go through Git → Argo CD sync. No exceptions.
 ## Container Runtime
 
 - **Cluster**: CRI-O
-- **Image builds**: Podman (never Docker)
-- Backstage Makefile uses Podman by default: `make build TAG=v1.0.0`
+- **Image builds**: Docker buildx (multi-arch、 `linux/amd64,linux/arm64` manifest list を default)
+  - 各 Makefile に `CONTAINER_RUNTIME ?= docker` 変数あり、 `make ... CONTAINER_RUNTIME=podman` で podman 切替も可
+  - `apps/kensan/Makefile` の `k8s-build-*` は `docker buildx build --platform=linux/amd64,linux/arm64 --push` で build + GHCR push を atomic に
+- Backstage / kensan アプリ image: `make build TAG=v1.0.0`
 
 ## Script Output Rule
 

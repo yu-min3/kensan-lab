@@ -85,14 +85,14 @@ Access Backstage at **http://localhost:7007** 🎉
 | Requirement | Version | Notes |
 |-------------|---------|-------|
 | **Node.js** | 22.x | Use nvm for version management |
-| **Podman** | Latest | For building container images (recommended) |
+| **Docker** | Latest | For building container images (default; `CONTAINER_RUNTIME=podman` で Podman 切替可) |
 | **GitHub PAT** | Read packages | For GHCR and GitHub integration |
 | **Memory** | 2GB+ available | For dependency installation |
 
 **Notes:**
 - **Yarn is NOT required** - This project bundles Yarn 4 in `.yarn/releases/`.
-- **Node.js & Podman are pre-installed** if you use the devcontainer in the repository root.
-- **Docker compatibility**: Docker may work but is not officially supported. This project is developed and tested with Podman.
+- **Node.js & Docker are pre-installed** if you use the devcontainer in the repository root.
+- **Container runtime**: Default は Docker。`CONTAINER_RUNTIME=podman make build TAG=v1.0.0` で Podman も使用可。
 
 ---
 
@@ -199,7 +199,7 @@ make run
 
 # This performs:
 # 1. Backend build (yarn workspace backend build)
-# 2. Docker image build (podman build)
+# 2. Container image build (docker build; CONTAINER_RUNTIME=podman で切替可)
 # 3. Run container on port 7007
 
 # Access at http://localhost:7007
@@ -215,8 +215,8 @@ make deploy TAG=v0.0.6
 
 # This command performs the following steps:
 # 1. Build backend (yarn workspace backend build)
-# 2. Build container image (podman build)
-# 3. Push to GHCR (podman push ghcr.io/yu-min3/backstage:v0.0.6)
+# 2. Build container image (docker build; CONTAINER_RUNTIME=podman で切替可)
+# 3. Push to GHCR (docker push ghcr.io/yu-min3/backstage:v0.0.6)
 # 4. Update kustomization.yaml with new image tag
 # 5. Git commit with message "Deploy Backstage v0.0.6"
 # 6. Git push to remote repository

@@ -11,7 +11,7 @@
 ## Mandatory Constraints
 
 1. **GitOps only**: ALL infrastructure changes via Git → Argo CD. No direct `kubectl apply`.
-2. **Podman, not Docker**: All image builds use Podman.
+2. **Container runtime**: Default は Docker (`docker buildx` で multi-arch build)。`backstage/app/Makefile` の `CONTAINER_RUNTIME ?= docker` パターンで Podman 切替も可。
 3. **No rendered manifests**: Argo CD renders Helm charts natively. Never commit `helm template` output.
 4. **Secrets**: dynamic creds via Vault + External Secrets; bootstrap creds via Sealed Secrets. Raw secrets in `temp/` only — commit only sealed/encrypted YAMLs.
 5. **No .env commits**: Sensitive tokens stay out of Git.
@@ -44,7 +44,7 @@ Backstage: `cd backstage/app && make {install,dev,all TAG=...}`
 
 | Rule File | Scope |
 |-----------|-------|
-| `gitops-workflow.md` | GitOps principles, deploy order, Podman |
+| `gitops-workflow.md` | GitOps principles, deploy order, container runtime |
 | `helm-multisource.md` | 3-file pattern details |
 | `kubernetes-cluster.md` | Node topology, scheduling, storage |
 | `network-ingress.md` | Cilium, Gateways, edge, certs |

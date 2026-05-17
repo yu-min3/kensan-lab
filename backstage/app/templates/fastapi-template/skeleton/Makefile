@@ -17,8 +17,8 @@ TAG ?=
 # Full image name
 FULL_IMAGE := $(IMAGE):$(TAG)
 
-# Container runtime (podman or docker) - auto-detect or override via CONTAINER_RUNTIME env var
-CONTAINER_RUNTIME ?= $(shell which podman >/dev/null 2>&1 && echo podman || echo docker)
+# Container runtime (docker or podman) - default docker, override via CONTAINER_RUNTIME env var
+CONTAINER_RUNTIME ?= docker
 
 # Colors for output
 RED := \033[0;31m
@@ -34,8 +34,8 @@ help: ## Show this help message
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "  $(YELLOW)%-20s$(NC) %s\n", $$1, $$2}'
 	@echo ""
 	@echo "$(GREEN)Container Runtime:$(NC)"
-	@echo "  Current: $(YELLOW)$(CONTAINER_RUNTIME)$(NC)"
-	@echo "  Override: CONTAINER_RUNTIME=docker make build TAG=v1.0"
+	@echo "  Current: $(YELLOW)$(CONTAINER_RUNTIME)$(NC) (default: docker)"
+	@echo "  Override: CONTAINER_RUNTIME=podman make build TAG=v1.0"
 	@echo ""
 	@echo "$(GREEN)TAG Format Requirements:$(NC)"
 	@echo "  Must be vX.Y format (e.g., v1.0, v1.2, v10.5, v12.34)"
@@ -43,7 +43,7 @@ help: ## Show this help message
 	@echo "$(GREEN)Usage examples:$(NC)"
 	@echo "  make build TAG=v1.0   # Build image with tag v1.0"
 	@echo "  make deploy TAG=v1.2  # Build, push, and deploy"
-	@echo "  CONTAINER_RUNTIME=docker make build TAG=v1.0  # Override runtime to use docker"
+	@echo "  CONTAINER_RUNTIME=podman make build TAG=v1.0  # Override runtime to use podman"
 
 check-tag:
 	@if [ -z "$(TAG)" ]; then \
@@ -63,7 +63,7 @@ check-tag-format:
 
 build: check-tag ## Build container image (requires TAG=<version>)
 	@echo "$(GREEN)Building container image with $(CONTAINER_RUNTIME): $(FULL_IMAGE)$(NC)"
-	$(CONTAINER_RUNTIME) build --format=docker -t $(FULL_IMAGE) .
+	$(CONTAINER_RUNTIME) build -t $(FULL_IMAGE) .
 	@echo "$(GREEN)✓ Build complete: $(FULL_IMAGE)$(NC)"
 
 login: ## Login to GHCR
