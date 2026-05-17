@@ -1,471 +1,128 @@
 # Backstage Developer Portal
 
-A production-ready Backstage application for the kensan-lab GitOps Kubernetes platform, with integrated application scaffolding templates and optimized for bare-metal deployment.
+Production Backstage app for the kensan-lab GitOps platform. Application scaffolding templates live in `templates/` (integrated, not a separate repo). Bundled Yarn 4 in `.yarn/releases/` — no global Yarn install needed.
 
-## ✨ Features
-
-- 🚀 **Integrated Templates**: Application scaffolding templates built-in (`templates/`)
-- 📦 **Zero-Install Ready**: Yarn 4 bundled (no global installation needed)
-- 🐳 **Container-Ready**: Optimized Docker build with multi-stage support
-- 🔐 **Production Configured**: PostgreSQL backend, Sealed Secrets integration
-- 📚 **TechDocs Enabled**: Built-in documentation generation
-- 🎨 **Customizable**: Easy plugin integration and theming
-
-## 📋 Table of Contents
-
-- [Quick Start](#-quick-start)
-- [Prerequisites](#-prerequisites)
-- [Configuration](#-configuration)
-- [Development](#-development)
-- [Building & Deployment](#-building--deployment)
-- [Architecture](#-architecture)
-- [Application Scaffolding Architecture](#application-scaffolding-architecture)
-- [Troubleshooting](#-troubleshooting)
-
----
-
-## 🚀 Quick Start
-
-### 1. Clone the Repository
+## Quick Reference
 
 ```bash
-git clone https://github.com/yu-min3/kensan-lab.git
-cd kensan-lab/backstage-app
+make help      # show all targets and required env vars
+make install   # install dependencies (bundled Yarn 4)
+make dev       # local dev server on :7007
+make build     # build container image
+make push      # build + push to GHCR
+make all TAG=v0.0.7   # build + push + bump kustomization.yaml
 ```
 
-### 2. Configure Environment Variables
+`make` is the single entry point for build/deploy. The full target list, container runtime switch, and required env vars are documented in `make help`.
 
-**IMPORTANT**: Create `.env` file in the repository root (`../`) before starting:
-
-```bash
-GITHUB_USER=your-github-username
-GITHUB_GHCR_PAT=ghp_your_personal_access_token_here
-```
-
-The `app-config.local.yaml` is already committed and references these environment variables:
-
-```yaml
-integrations:
-  github:
-    - host: github.com
-      token: ${GITHUB_GHCR_PAT}  # Loaded from .env file
-```
-
-### 3. Install Dependencies
-
-```bash
-# Using Makefile (recommended)
-make install
-
-# Or using the bundled Yarn wrapper
-./yarn.sh install
-
-# Or directly
-node .yarn/releases/yarn-4.4.1.cjs install
-```
-
-**Note**: Installation requires 2GB+ memory. If you encounter issues:
-```bash
-export NODE_OPTIONS="--max-old-space-size=4096"
-make install
-```
-
-### 4. Start Development Server
-
-```bash
-make dev
-```
-
-Access Backstage at **http://localhost:7007** 🎉
-
----
-
-## 📦 Prerequisites
+## Prerequisites
 
 | Requirement | Version | Notes |
 |-------------|---------|-------|
-| **Node.js** | 22.x | Use nvm for version management |
-| **Docker** | Latest | For building container images (default; `CONTAINER_RUNTIME=podman` で Podman 切替可) |
-| **GitHub PAT** | Read packages | For GHCR and GitHub integration |
-| **Memory** | 2GB+ available | For dependency installation |
+| Node.js | 22.x | Use nvm for version management |
+| Docker | latest | `CONTAINER_RUNTIME=podman` to switch |
+| GitHub PAT | `packages:write` | GHCR push + GitHub integration |
+| Memory | 2 GB+ free | For dependency installation (`NODE_OPTIONS=--max-old-space-size=4096` if low) |
 
-**Notes:**
-- **Yarn is NOT required** - This project bundles Yarn 4 in `.yarn/releases/`.
-- **Node.js & Docker are pre-installed** if you use the devcontainer in the repository root.
-- **Container runtime**: Default は Docker。`CONTAINER_RUNTIME=podman make build TAG=v1.0.0` で Podman も使用可。
+> **Yarn is NOT required globally** — Yarn 4 is bundled in `.yarn/releases/`.
 
----
-
-## ⚙️ Configuration
-
-### Configuration Files Overview
+## Configuration
 
 ```
-backstage-app/
-├── app-config.yaml                  # Base configuration (committed)
-├── app-config.kubernetes.yaml       # Kubernetes environment (committed)
-└── app-config.local.yaml            # Local overrides (committed, uses env vars)
+backstage/app/
+├── app-config.yaml              # base
+├── app-config.kubernetes.yaml   # k8s overlay
+└── app-config.local.yaml        # local overrides (env-var-driven)
 ```
 
-**Note**: All configuration files are committed to the repository. Sensitive values are referenced as environment variables.
+All three are committed. Sensitive values come from env vars. Create `../.env` (one level up, repository root) with:
 
-### Local Development Configuration
-
-**IMPORTANT**: You must set environment variables before running Backstage.
-
-**Option 1**: Create `.env` file in repository root (`../`)
 ```bash
 GITHUB_USER=your-username
 GITHUB_GHCR_PAT=ghp_xxxxxxxxxxxxx
 ```
 
-**Option 2**: Export directly in your shell
-```bash
-export GITHUB_USER=your-username
-export GITHUB_GHCR_PAT=ghp_xxxxxxxxxxxxx
-```
+`app-config.local.yaml` references `${GITHUB_GHCR_PAT}` for GitHub integration.
 
----
+## Deployment
 
-## 💻 Development　& Deployment
+GitOps via Argo CD — `make all TAG=v0.0.7` builds, pushes to GHCR, and updates `kubernetes/backstage/overlays/prod/kustomization.yaml`. Commit + push the kustomization change to trigger sync.
 
-### Available Commands
+Manual `kubectl apply` is **not** recommended — auto-sync + self-heal will revert manual changes. To pause for emergencies: `argocd app set backstage --sync-policy none`.
 
-| Command | Description |
-|---------|-------------|
-| `make dev` | Start development server (port 7007) |
-| `make install` | Install dependencies with bundled Yarn 4 |
-| `make build` | Build Docker image |
-| `make push` | Push image to GHCR |
-| `make all` | Build and push in one command |
-| `make tsc` | TypeScript type checking |
-| `make lint` | Run ESLint |
-| `make test` | Run unit tests |
-| `make test:e2e` | Run Playwright E2E tests |
-| `make clean` | Remove local Docker image |
+## Architecture
 
-### Development Workflows
-
-#### 1. Configuration Changes (Most Common)
-
-Edit YAML configuration files and see changes immediately:
-
-```bash
-# Start development server
-make dev
-
-# Edit configuration files (server auto-reloads on changes):
-# - app-config.yaml              # Backstage configuration
-# - app-config.local.yaml        # Local overrides
-# - templates/*/template.yaml    # Scaffolder templates
-# - catalog/*.yaml               # Catalog entities
-
-# Changes are reflected immediately at http://localhost:7007
-```
-
-**Common configuration changes:**
-- Add/modify catalog locations
-- Configure integrations (GitHub, GitLab, etc.)
-- Update authentication providers
-- Customize app title and branding
-- Edit scaffolder templates
-
-#### 2. Adding Plugins
-
-When adding new Backstage plugins:
-
-```bash
-# 1. Install plugin packages
-./yarn.sh add @backstage/plugin-kubernetes --cwd packages/app
-./yarn.sh add @backstage/plugin-kubernetes-backend --cwd packages/backend
-
-# 2. Register plugin in packages/app/src/App.tsx
-# (Edit the file to import and add routes)
-
-# 3. Configure in app-config.yaml
-# (Add plugin-specific configuration)
-
-# 4. Restart development server
-make dev
-```
-
-#### 3. Container Image Testing
-
-Test the production Docker image locally:
-
-```bash
-# Build and run in one command (build is automatic)
-make run
-
-# This performs:
-# 1. Backend build (yarn workspace backend build)
-# 2. Container image build (docker build; CONTAINER_RUNTIME=podman で切替可)
-# 3. Run container on port 7007
-
-# Access at http://localhost:7007
-```
-
-#### 4. Production Deployment
-
-Deploy to kensan-lab cluster:
-
-```bash
-# Full GitOps deployment
-make deploy TAG=v0.0.6
-
-# This command performs the following steps:
-# 1. Build backend (yarn workspace backend build)
-# 2. Build container image (docker build; CONTAINER_RUNTIME=podman で切替可)
-# 3. Push to GHCR (docker push ghcr.io/yu-min3/backstage:v0.0.6)
-# 4. Update kustomization.yaml with new image tag
-# 5. Git commit with message "Deploy Backstage v0.0.6"
-# 6. Git push to remote repository
-# 7. Trigger Argo CD sync (if argocd CLI is available)
-```
-
-**What happens after `make deploy`:**
-- Argo CD detects the kustomization.yaml change
-- Automatically syncs the new image to the Kubernetes cluster
-- Backstage pods are updated with the new version
-
-**Manual Deployment (Not Recommended):**
-
-⚠️ **Warning**: If Argo CD is configured with auto-sync and self-healing enabled, manual changes may be automatically reverted to match the Git repository state. This behavior depends on Argo CD's sync policy configuration.
-
-If you need to deploy manually without GitOps:
-
-```bash
-# Apply manifests directly
-kubectl apply -f ../kubernetes/backstage/
-
-# Check deployment
-kubectl get pods -n backstage
-kubectl logs -n backstage deployment/backstage
-```
-
-**Note**: To prevent Argo CD from reverting manual changes, you may need to:
-- Disable auto-sync: `argocd app set backstage --sync-policy none`
-- Or pause the application temporarily
-
----
-
-## 🏗️ Architecture
-
-### Directory Structure
+### Directory Layout
 
 ```
-backstage-app/
-├── .yarn/
-│   └── releases/
-│       └── yarn-4.4.1.cjs       # Bundled Yarn 4 (2.7MB)
-├── packages/
-│   ├── app/                     # Frontend (React)
-│   │   ├── src/                 # Source code
-│   │   └── e2e-tests/           # Playwright E2E tests
-│   └── backend/                 # Backend (Express.js)
-│       ├── src/                 # Source code
-│       └── Dockerfile           # Production build
-├── plugins/                     # Custom Backstage plugins
-├── templates/                   # 🌟 Scaffolder templates (integrated)
-│   ├── fastapi-template/        # FastAPI app template
-│   └── README.md
-├── catalog/                     # Production catalog data
-│   ├── domains/
-│   └── organizations/
-├── examples/                    # Local development samples
-├── app-config.yaml              # Base configuration
-├── app-config.kubernetes.yaml   # Kubernetes config
-├── app-config.local.yaml        # Local overrides (gitignored)
-├── app-config.local.yaml.example # Template
-├── backstage.json               # Backstage version (1.44.0)
-├── playwright.config.ts         # E2E test configuration
-├── Makefile                     # Build automation
-├── yarn.sh                      # Yarn wrapper script
-└── README.md                    # This file
+backstage/app/
+├── .yarn/releases/yarn-4.4.1.cjs    # bundled Yarn 4
+├── packages/{app,backend}/           # frontend / backend
+├── plugins/                          # custom Backstage plugins
+├── templates/                        # scaffolder templates (bundled into image)
+├── catalog/                          # production catalog data
+├── examples/                         # local-dev samples
+├── app-config*.yaml                  # 3-file config (see above)
+├── Makefile                          # entry point — see `make help`
+└── yarn.sh                           # wrapper for bundled Yarn 4
 ```
 
-### Key Design Decisions
+### Design Notes
 
-#### 🎯 Integrated Templates
-- **Location**: `templates/` (not a separate repository)
-- **Why**: Simplifies deployment, easier version control
-- **Usage**: Automatically loaded in Docker image
+- **Templates are co-located**, not in a separate repo — simpler version control, image bundles them in the production layer.
+- **Database**: in-memory SQLite locally, PostgreSQL in production (switched via env vars).
+- **Secrets**: env vars locally, Sealed Secrets in cluster.
 
-#### 🗄️ Database Strategy
-- **Local**: In-memory SQLite (fast, ephemeral)
-- **Production**: PostgreSQL (persistent, reliable)
-- **Config**: Switched via environment variables
+## Application Scaffolding
 
-#### 🔐 Secret Management
-- **Local**: Environment variables
-- **Production**: Sealed Secrets in Kubernetes
+Backstage scaffolds new apps from `templates/`. AD selects a template in the UI → Backstage generates a new repo with manifests/ + Dockerfile, and auto-commits an Argo CD Application CR into kensan-lab.
 
-### Container Image Layers
-
-```dockerfile
-FROM node:22-bookworm-slim
-
-# Layer 1: System dependencies (Python, SQLite, mkdocs)
-RUN apt-get update && apt-get install -y python3 ...
-
-# Layer 2: Yarn files and workspace setup
-COPY backstage-app/.yarn ./.yarn
-COPY backstage-app/yarn.lock backstage-app/package.json ...
-
-# Layer 3: Dependencies installation
-RUN yarn workspaces focus --all --production
-
-# Layer 4: Production data
-COPY backstage-app/catalog ./catalog
-COPY backstage-app/templates ./templates    # 🌟 Bundled templates
-
-# Layer 5: Application bundle
-COPY backstage-app/packages/backend/dist/bundle.tar.gz ...
-
-CMD ["node", "packages/backend", "--config", "app-config.yaml", "--config", "app-config.kubernetes.yaml"]
-```
-
----
-
-## Application Scaffolding Architecture
-
-This section describes the architecture of the application templates used by Backstage to scaffold new services.
-
-### 1. Application Templates (`backstage-app/templates/`)
-
-**Responsibility**: Backstage scaffolding templates for new applications (Kustomize-based)
-**Administrator**: Platform Engineer (PE)
-**Location**: `backstage-app/templates/` within the `kensan-lab` repository
-**Status**: ✅ Implemented
-
-#### Directory Structure
+### Template Structure
 
 ```
-backstage-app/templates/
-├── fastapi-template/
-│   ├── template.yaml                      # Backstage template execution definition
-│   ├── skeleton/
-│   │   ├── app/
-│   │   │   └── main.py                    # Application code skeleton
-│   │   ├── Dockerfile                     # Docker build file
-│   │   ├── docs/
-│   │   │   └── index.md                   # Backstage TechDocs source
-│   │   ├── base/                          # Kustomize base manifests
-│   │   │   ├── kustomization.yaml
-│   │   │   ├── deployment.yaml            # Base Deployment
-│   │   │   ├── service.yaml               # Base Service
-│   │   │   ├── httproute.yaml             # HTTPRoute (attaches to Gateway)
-│   │   │   ├── authz-policy.yaml          # Istio AuthorizationPolicy (app-specific)
-│   │   │   └── servicemonitor.yaml        # Prometheus ServiceMonitor
-│   │   └── overlays/
-│   │       ├── dev/
-│   │       │   ├── kustomization.yaml     # Dev overlay (references base)
-│   │       │   ├── image-patch.yaml       # Dev image tag
-│   │       │   └── replica-patch.yaml     # Dev replica count (e.g., 1)
-│   │       └── prod/
-│   │           ├── kustomization.yaml     # Prod overlay (references base)
-│   │           ├── image-patch.yaml       # Prod image tag
-│   │           └── replica-patch.yaml     # Prod replica count (e.g., 5)
-│   └── catalog-info.yaml                  # Backstage catalog registration
-└── streamlit-template/
-    └── ...                                # Similar structure for other frameworks
+templates/fastapi-template/
+├── template.yaml          # scaffolder definition
+├── catalog-info.yaml      # catalog registration
+└── skeleton/              # files written into the generated app repo
+    ├── app/main.py
+    ├── manifests/         # flat manifests (deployment, service, httproute, …)
+    ├── Dockerfile
+    └── docs/              # TechDocs
 ```
 
-### Template Workflow
-
-1.  **Template Creation**: PE creates a template with a Kustomize structure (base + overlays).
-2.  **Backstage Registration**: The template is registered in the Backstage catalog.
-3.  **AD Selection**: AD selects the template from the Backstage UI.
-4.  **Repository Generation**: Backstage scaffolds a new `app-<name>` repository.
-5.  **GitOps Registration**: Backstage automatically commits the Application CR to the `kensan-lab` repository.
-6.  **Automatic Deployment**: Argo CD detects the change and deploys to both environments.
-
----
-
-### 2. Generated Application Repository (`app-<app-name>`)
-
-**Responsibility**: Application code, Dockerfile, TechDocs, and environment-specific deployment settings.
-**Administrator**: Application Developer (AD)
-**Repository**: A per-application repository generated by Backstage.
-**Status**: 🚧 To be implemented (Validation in Phase 5-6)
-
-#### Example: `app-fastapi-user`
-
-```
-app-fastapi-user/
-├── app/
-│   └── main.py                            # Application code (implemented by AD)
-├── Dockerfile                             # Container build definition
-├── docs/
-│   └── index.md                           # TechDocs documentation
-├── catalog-info.yaml                      # Backstage catalog entry
-├── base/                                  # Environment-agnostic base manifests
-│   ├── kustomization.yaml
-│   ├── deployment.yaml
-│   ├── service.yaml
-│   ├── httproute.yaml
-│   ├── authz-policy.yaml
-│   └── servicemonitor.yaml
-└── overlays/
-    ├── dev/
-    │   ├── kustomization.yaml             # References ../base
-    │   ├── image-patch.yaml               # Dev image tag (GitOps trigger)
-    │   └── replica-patch.yaml             # Dev replica count
-    └── prod/
-        ├── kustomization.yaml             # References ../base
-        ├── image-patch.yaml               # Prod image tag (GitOps trigger)
-        └── replica-patch.yaml             # Prod replica count
-```
+> **Note**: Currently flat manifests (Argo CD directory source). Kustomize overlays for dev/prod were retired after the dev/prod split was dropped — see [`.claude/rules/environment-separation.md`](https://github.com/yu-min3/kensan-lab/blob/main/.claude/rules/environment-separation.md).
 
 ### AD Workflow
 
-1.  **Code Development**: AD modifies the code in the `app/` directory.
-2.  **Image Build**: AD builds a Docker image and pushes it to GHCR.
-3.  **Deployment Update**: AD updates `image-patch.yaml` with the new image tag.
-4.  **GitOps Sync**: Argo CD detects the change and redeploys the application.
-5.  **Documentation**: AD updates the TechDocs in the `docs/` directory.
-6.  **Environment Promotion**: AD can use different image tags for Dev and Prod.
+1. Develop code in `app/`.
+2. Build + push image with versioned tag (via the generated app's `make build TAG=...`).
+3. Bump image tag in `manifests/deployment.yaml`.
+4. Commit + push → Argo CD syncs.
+5. Update TechDocs in `docs/`.
 
-### Key Features
+### Key Properties
 
-- **Kustomize-based**: Base manifests + environment-specific patches.
-- **GitOps Trigger**: Redeployment is triggered by changing the image tag in `overlays/*/image-patch.yaml`.
-- **Self-Service**: AD has full control over the application lifecycle.
-- **Security**: AD cannot modify infrastructure and has no access to other apps.
-- **Observability**: ServiceMonitor automatically enables Prometheus scraping.
+- **Self-service**: AD owns app lifecycle, no PE involvement after scaffold.
+- **Security**: AD cannot modify infra and has no access to other apps' namespaces.
+- **Observability**: ServiceMonitor enables Prometheus scraping automatically.
 
----
+## Troubleshooting
 
-## 🐛 Troubleshooting
+### Memory during install
 
-### Memory Issues During Installation
-
-**Symptom**: `JavaScript heap out of memory`
-
-**Solution**:
 ```bash
 export NODE_OPTIONS="--max-old-space-size=4096"
 make install
 ```
 
-### Yarn Command Not Found
+### Yarn command not found
 
-**Symptom**: `yarn: command not found`
+Use the bundled Yarn: `./yarn.sh install` or `node .yarn/releases/yarn-4.4.1.cjs install`.
 
-**Solution**: Use bundled Yarn:
-```bash
-# Use helper script
-./yarn.sh install
+### Template not loading
 
-# Or directly
-node .yarn/releases/yarn-4.4.1.cjs install
-```
+Check `app-config.yaml`:
 
-### Template Not Loading
-
-**Symptom**: Templates don't appear in Backstage UI
-
-**Solution**: Check configuration in `app-config.yaml`:
 ```yaml
 catalog:
   locations:
@@ -475,98 +132,42 @@ catalog:
         - allow: [Template]
 ```
 
-### Database Connection Error
+### Database connection error in cluster
 
-**Symptom**: `connect ECONNREFUSED` or `password authentication failed`
-
-**Solution**:
 ```bash
-# Check environment variables
 kubectl exec -n backstage deployment/backstage -- env | grep POSTGRES
-
-# Check PostgreSQL is running
 kubectl get pods -n backstage
 kubectl logs -n backstage statefulset/postgresql
 ```
 
-### Image Pull Error in Kubernetes
+### Image pull error in cluster
 
-**Symptom**: `ErrImagePull` or `ImagePullBackOff`
-
-**Solution**:
 ```bash
-# Check GHCR credentials
 kubectl get secret backstage-secret -n backstage -o yaml
-
-# Verify secret contains GITHUB_TOKEN
 kubectl get secret backstage-secret -n backstage -o jsonpath='{.data.GITHUB_TOKEN}' | base64 -d
 ```
 
----
-
-## 🧪 Testing
-
-### Unit Tests
+## Testing
 
 ```bash
-# Run all tests
-make test
-
-# Run with coverage
-yarn test:all
+make test        # unit tests (yarn test:all)
+make test-e2e    # Playwright E2E
 ```
 
-### E2E Tests (Playwright)
+E2E test report: `npx playwright show-report e2e-test-report`.
 
-```bash
-# Run E2E tests
-make test:e2e
+## Resources
 
-# Or directly
-yarn test:e2e
+- Backstage docs: https://backstage.io/docs
+- Yarn 4 docs: https://yarnpkg.com
+- Platform repo: https://github.com/yu-min3/kensan-lab
 
-# View test report
-npx playwright show-report e2e-test-report
-```
+## Version
 
-**What's tested**:
-- ✅ App renders welcome page
-- ✅ Enter button is clickable
-- ✅ Catalog page loads after login
+- Backstage 1.44.0 (see `backstage.json`)
+- Node.js 22.x
+- Yarn 4.4.1 (bundled)
 
----
+## License
 
-## 📚 Additional Resources
-
-- **Backstage Documentation**: https://backstage.io/docs
-- **Yarn 4 Documentation**: https://yarnpkg.com
-- **Platform Repository**: https://github.com/yu-min3/kensan-lab
-- **CLAUDE.md**: See repository root for AI assistant instructions
-
----
-
-## 📝 License
-
-This project follows the Backstage license (Apache 2.0) for framework code.
-
----
-
-## 🤝 Contributing
-
-1. **Fork** the repository
-2. **Create** a feature branch (`git checkout -b feature/amazing-feature`)
-3. **Commit** your changes (`git commit -m 'Add amazing feature'`)
-4. **Push** to the branch (`git push origin feature/amazing-feature`)
-5. **Open** a Pull Request
-
----
-
-## 🔖 Version
-
-- **Backstage Version**: 1.44.0 (see `backstage.json`)
-- **Node.js**: 22.x
-- **Yarn**: 4.4.1 (bundled)
-
----
-
-**Built with ❤️ for the kensan-lab GitOps ecosystem**
+Apache 2.0.

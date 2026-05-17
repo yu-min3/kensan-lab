@@ -11,241 +11,69 @@ Since this creates a multi-architecture cluster (ARM64 + AMD64), the process is 
 
 ## Node Configuration
 
-| Node | Hostname | IP (wired / WiFi fallback) | Hardware | Architecture | Role |
-|--------|----------|------------------------------|-------------|--------------|------|
-| Master | master | 192.168.0.107 / 0.207 | Raspberry Pi 5 (8GB) | ARM64 | control-plane |
-| Worker1 | worker1 | 192.168.0.108 / 0.208 | Raspberry Pi 5 (8GB) | ARM64 | worker |
-| Worker2 | worker2 | 192.168.0.109 / 0.209 | Raspberry Pi 5 (8GB) | ARM64 | worker |
-| **M4 Neo** | **m4neo** | **192.168.0.110 / 0.210** | **Bosgame M4 Neo (Ryzen 7 7840HS, 32GB DDR5)** | **AMD64** | **worker** |
+Refer to the canonical node inventory in [`.claude/rules/kubernetes-cluster.md`](https://github.com/yu-min3/kensan-lab/blob/main/.claude/rules/kubernetes-cluster.md) (wired IP / WiFi fallback / hardware-class).
 
 ---
 
 ## Phase 1: Node Setup and Cluster Join
 
-> **Setup Script**: Phase 1 steps are consolidated in `temp/setup-m4neo.sh`.
-> Run it on the M4 Neo.
+> **Setup Script**: All Phase 1 steps (amdgpu blacklist, netplan, kernel params, CRI-O install, kubeadm install) are consolidated in `temp/setup-m4neo.sh`.
+> Read the script for the exact commands. Below are the **conceptual** steps and the few decisions that need human input.
 
 ### 1.1 Install Ubuntu Server 24.04 LTS
 
-Install Ubuntu Server 24.04 LTS in minimal configuration from a USB boot media.
-
-- **Profile**: minimal (minimal installation)
-- **Additional packages**: Select only OpenSSH Server
-- **Username**: Your choice (referred to as `yu` hereafter)
-- **Disk**: Use the entire internal NVMe (LVM recommended)
+Install Ubuntu Server 24.04 LTS (minimal profile, OpenSSH only) from a USB boot media. Use the entire internal NVMe (LVM recommended).
 
 > **Note**: Use the Server edition, not Desktop. This fundamentally avoids amdgpu driver instability.
 
 ### 1.2 Disable the amdgpu Kernel Module
 
-The amdgpu module may still be loaded on Ubuntu Server. Completely disable it for headless operation.
-
-```bash
-# Create /etc/modprobe.d/blacklist-amdgpu.conf
-sudo tee /etc/modprobe.d/blacklist-amdgpu.conf <<'EOF'
-# Disable amdgpu for headless worker node stability
-blacklist amdgpu
-blacklist drm_kms_helper
-EOF
-
-sudo update-initramfs -u
-sudo reboot
-```
-
-Verify after reboot:
-
-```bash
-lsmod | grep amdgpu
-# No output = success
-```
+Headless workers must blacklist `amdgpu` and `drm_kms_helper` (`/etc/modprobe.d/blacklist-amdgpu.conf`) and rebuild initramfs. See `temp/setup-m4neo.sh` for the exact command sequence.
 
 ### 1.3 Network Configuration
 
-Configure a static IP with netplan. The M4 Neo uses WiFi (`wlp3s0`) (wired ports `eno1`/`enp4s0` are disconnected).
+Configure a static IP with netplan on the wired interface `eno1` (`enp4s0` is reserved, `wlp3s0` is WiFi fallback). Set hostname to `m4neo`.
 
-```yaml
-# /etc/netplan/01-static.yaml
-network:
-  version: 2
-  wifis:
-    wlp3s0:        # Adjust to your actual interface name (check with ip a)
-      addresses:
-        - 192.168.1.110/24
-      routes:
-        - to: default
-          via: 192.168.1.1
-      nameservers:
-        addresses:
-          - 192.168.1.1
-          - 8.8.8.8
-      dhcp4: false
-      access-points:
-        "YOUR_SSID":
-          password: "YOUR_PASSWORD"
-```
-
-```bash
-sudo netplan apply
-```
-
-> **Interface name check**: Use `ip a` to verify the actual interface name (`wlp3s0`, etc.) and reflect it in netplan and subsequent Cilium configuration. RPi nodes use `wlan0`, while M4 Neo uses `wlp3s0`.
-
-Set the hostname:
-
-```bash
-sudo hostnamectl set-hostname m4neo
-```
+> **Interface name check**: Use `ip a` to verify the actual interface name and reflect it in netplan. The cluster Cilium config is already set to auto-detect, so no per-node Cilium change is needed (see [`.claude/rules/kubernetes-cluster.md`](https://github.com/yu-min3/kensan-lab/blob/main/.claude/rules/kubernetes-cluster.md) "Adding New Nodes").
 
 ### 1.4 Kernel Parameters
 
-Configure the kernel modules and parameters required by Kubernetes.
+Standard Kubernetes pre-flight (`overlay` / `br_netfilter` modules, `net.ipv4.ip_forward`, swap off). Refer to `temp/setup-m4neo.sh`.
+
+### 1.5 / 1.6 Install CRI-O and kubeadm / kubelet / kubectl
+
+Use the **same versions** as the existing cluster:
 
 ```bash
-# Persist kernel modules
-cat <<'EOF' | sudo tee /etc/modules-load.d/k8s.conf
-overlay
-br_netfilter
-EOF
-
-sudo modprobe overlay
-sudo modprobe br_netfilter
-
-# sysctl parameters
-cat <<'EOF' | sudo tee /etc/sysctl.d/k8s.conf
-net.bridge.bridge-nf-call-iptables  = 1
-net.bridge.bridge-nf-call-ip6tables = 1
-net.ipv4.ip_forward                 = 1
-EOF
-
-sudo sysctl --system
+# On master
+crio --version
+kubectl version --short
 ```
 
-Disable swap:
-
-```bash
-sudo swapoff -a
-# Remove or comment out the swap entry in /etc/fstab
-sudo sed -i '/\sswap\s/s/^/#/' /etc/fstab
-```
-
-### 1.5 Install CRI-O
-
-Use the same CRI-O version as the existing cluster. Check with `crio --version` on the master before installing.
-
-```bash
-# Add CRI-O repository (v1.31 series example)
-CRIO_VERSION="v1.31"
-
-curl -fsSL https://pkgs.k8s.io/addons:/cri-o:/stable:/$CRIO_VERSION/deb/Release.key | \
-  sudo gpg --dearmor -o /etc/apt/keyrings/cri-o-apt-keyring.gpg
-
-echo "deb [signed-by=/etc/apt/keyrings/cri-o-apt-keyring.gpg] https://pkgs.k8s.io/addons:/cri-o:/stable:/$CRIO_VERSION/deb/ /" | \
-  sudo tee /etc/apt/sources.list.d/cri-o.list
-
-sudo apt-get update
-sudo apt-get install -y cri-o
-
-sudo systemctl enable --now crio
-```
-
-### 1.6 Install kubeadm / kubelet / kubectl
-
-Use the same Kubernetes version as the existing cluster. Check with `kubectl version --short` on the master.
-
-```bash
-KUBE_VERSION="v1.31"
-
-curl -fsSL https://pkgs.k8s.io/core:/stable:/$KUBE_VERSION/deb/Release.key | \
-  sudo gpg --dearmor -o /etc/apt/keyrings/kubernetes-apt-keyring.gpg
-
-echo "deb [signed-by=/etc/apt/keyrings/kubernetes-apt-keyring.gpg] https://pkgs.k8s.io/core:/stable:/$KUBE_VERSION/deb/ /" | \
-  sudo tee /etc/apt/sources.list.d/kubernetes.list
-
-sudo apt-get update
-sudo apt-get install -y kubelet kubeadm kubectl
-sudo apt-mark hold kubelet kubeadm kubectl
-
-sudo systemctl enable --now kubelet
-```
+Then install matching versions on M4 Neo. Standard `pkgs.k8s.io` repository setup — see `temp/setup-m4neo.sh`.
 
 ### 1.7 kubeadm join
 
 Generate a join token **on the Master node**:
 
 ```bash
-# Run on Master
 kubeadm token create --print-join-command
 ```
 
-Run the output command **on the M4 Neo**:
+Run the printed command on the M4 Neo.
 
-```bash
-# Run on M4 Neo (paste the output command as-is)
-sudo kubeadm join 192.168.1.107:6443 --token <token> --discovery-token-ca-cert-hash sha256:<hash>
-```
+### 1.8 Cilium Configuration (No Change Required)
 
-### 1.8 Cilium Configuration Changes (Important)
+The cluster Cilium config has used **auto-detect** for device discovery and a regex pattern (`^eth.*`, `^en.*`, `^wlan.*`, `^wlp.*`) for L2 announcements since the 2026-05-07 wired migration. No change is needed when adding a new node.
 
-The existing Cilium configuration targets only `wlan0` (the Raspberry Pi WiFi interface).
-Since the M4 Neo uses WiFi `wlp3s0`, **the cluster-wide** Cilium configuration must be changed to match both interface names.
-
-#### Changes to `kubernetes/network/cilium/values.yaml`
-
-```yaml
-# Before:
-devices: wlan0
-
-# After (change to auto-detect to automatically recognize all node interfaces):
-devices: ""   # auto-detect (automatically recognizes wlan0, wlp3s0, etc.)
-```
-
-> An empty string (auto-detect) causes both RPi's `wlan0` and M4 Neo's `wlp3s0` to be automatically recognized.
-> Cilium's `devices` also accepts Linux device name wildcards, but auto-detect is recommended.
-
-#### Changes to `kubernetes/network/cilium/resources/lb-ippool.yaml`
-
-```yaml
-# Before:
-spec:
-  interfaces:
-  - wlan0
-
-# After (regex pattern):
-spec:
-  interfaces:
-  - "^wlan.*"
-  - "^wlp.*"
-```
-
-> CiliumL2AnnouncementPolicy's `interfaces` field accepts regular expressions.
-> `^wlan.*` matches RPi's `wlan0`, and `^wlp.*` matches M4 Neo's `wlp3s0`.
-
-#### Applying Changes
-
-```bash
-# After changing values.yaml, push to Git and Argo CD will auto-sync
-git add kubernetes/network/cilium/values.yaml
-git add kubernetes/network/cilium/resources/lb-ippool.yaml
-git commit -m "Cilium: multi-interface support (wlan + wlp)"
-git push
-
-# Verify Cilium agent restart
-kubectl -n kube-system rollout status daemonset/cilium
-```
+Details: [`.claude/rules/network-ingress.md`](https://github.com/yu-min3/kensan-lab/blob/main/.claude/rules/network-ingress.md) (Cilium LoadBalancer section).
 
 ### 1.9 Join Verification
 
 ```bash
-# Verify the node is Ready
 kubectl get nodes -o wide
-
-# Verify Cilium agent is Running on all nodes
 kubectl -n kube-system get pods -l k8s-app=cilium -o wide
-
-# Check architectures
-kubectl get nodes -o custom-columns=NAME:.metadata.name,ARCH:.status.nodeInfo.architecture,OS:.status.nodeInfo.operatingSystem
-
-# Verify L2 Announcement (LoadBalancer IPs should respond)
+kubectl get nodes -o custom-columns=NAME:.metadata.name,ARCH:.status.nodeInfo.architecture
 kubectl get svc -A | grep LoadBalancer
 ```
 
@@ -257,78 +85,31 @@ The M4 Neo significantly exceeds the RPi 5 in both CPU and memory, so resource-i
 
 ### 2.1 Node Label Design
 
-Assign custom labels to the M4 Neo:
-
 ```bash
 kubectl label node m4neo hardware-class=high-performance
-```
-
-Also label the existing RPi nodes (for explicit classification):
-
-```bash
 kubectl label node worker1 hardware-class=raspberry-pi
 kubectl label node worker2 hardware-class=raspberry-pi
 ```
 
 ### 2.2 nodeAffinity Strategy
 
-Use **preferredDuringSchedulingIgnoredDuringExecution** (preferred scheduling).
+Use **preferredDuringSchedulingIgnoredDuringExecution** (preferred scheduling), not `required`, to keep fallback to RPi nodes if M4 Neo is down. Per-workload strategy table (I/O Heavy / Medium / Light / AMD64-only) is in [`.claude/rules/kubernetes-cluster.md`](https://github.com/yu-min3/kensan-lab/blob/main/.claude/rules/kubernetes-cluster.md) (Scheduling Rules).
 
-- **Preferentially** schedule to M4 Neo when available
-- Falls back to RPi nodes if M4 Neo is down (maintaining availability)
-- Avoid using `required` as it would prevent workloads from starting during node failure
+### 2.3 Affinity Targets per Component
 
-<!-- TODO(human): Determine weight values and component groupings for nodeAffinity -->
-
-```yaml
-affinity:
-  nodeAffinity:
-    preferredDuringSchedulingIgnoredDuringExecution:
-      - weight: __WEIGHT__
-        preference:
-          matchExpressions:
-            - key: hardware-class
-              operator: In
-              values:
-                - high-performance
-```
-
-### 2.3 Adding affinity to Each Component's values.yaml
-
-Components to add nodeAffinity to:
-
-| Component | File | How to Add |
+| Component | values.yaml | Affinity Key |
 |--------------|---------|---------|
-| Prometheus | `kubernetes/observability/prometheus/values.yaml` | Add to `prometheus.prometheusSpec.affinity` |
-| Grafana | `kubernetes/observability/grafana/values.yaml` | Add top-level `affinity:` block |
-| Tempo | `kubernetes/observability/tempo/values.yaml` | Replace existing `affinity: {}` |
-| Loki | `kubernetes/observability/loki/values.yaml` | Add to `singleBinary.affinity` |
-| OTel Collector | `kubernetes/observability/otel-collector/values.yaml` | Replace existing `affinity: {}` |
+| Prometheus | `kubernetes/observability/prometheus/values.yaml` | `prometheus.prometheusSpec.affinity` |
+| Grafana | `kubernetes/observability/grafana/values.yaml` | top-level `affinity:` |
+| Tempo | `kubernetes/observability/tempo/values.yaml` | top-level `affinity:` |
+| Loki | `kubernetes/observability/loki/values.yaml` | `singleBinary.affinity` |
+| OTel Collector | `kubernetes/observability/otel-collector/values.yaml` | top-level `affinity:` |
+| Keycloak | `kubernetes/auth/keycloak/keycloak-deployment.yaml` | direct `spec.template.spec.affinity` |
+| Backstage | `backstage/manifests/backstage-deployment.yaml` | direct `spec.template.spec.affinity` |
 
-#### Prometheus
-
-```yaml
-# kubernetes/observability/prometheus/values.yaml
-# Add to prometheus.prometheusSpec:
-prometheus:
-  prometheusSpec:
-    affinity:
-      nodeAffinity:
-        preferredDuringSchedulingIgnoredDuringExecution:
-          - weight: 80
-            preference:
-              matchExpressions:
-                - key: hardware-class
-                  operator: In
-                  values:
-                    - high-performance
-```
-
-#### Grafana
+Standard affinity block (weight 80, `hardware-class=high-performance`):
 
 ```yaml
-# kubernetes/observability/grafana/values.yaml
-# Add at top level:
 affinity:
   nodeAffinity:
     preferredDuringSchedulingIgnoredDuringExecution:
@@ -341,267 +122,64 @@ affinity:
                 - high-performance
 ```
 
-#### Tempo / OTel Collector
+### 2.4 Apply and Verify
 
-```yaml
-# kubernetes/observability/tempo/values.yaml
-# kubernetes/observability/otel-collector/values.yaml
-# Replace existing affinity: {} with:
-affinity:
-  nodeAffinity:
-    preferredDuringSchedulingIgnoredDuringExecution:
-      - weight: 80
-        preference:
-          matchExpressions:
-            - key: hardware-class
-              operator: In
-              values:
-                - high-performance
-```
-
-#### Loki
-
-```yaml
-# kubernetes/observability/loki/values.yaml
-# Add to singleBinary section:
-singleBinary:
-  affinity:
-    nodeAffinity:
-      preferredDuringSchedulingIgnoredDuringExecution:
-        - weight: 80
-          preference:
-            matchExpressions:
-              - key: hardware-class
-                operator: In
-                values:
-                  - high-performance
-```
-
-### 2.4 Patching Manifest-Managed Components
-
-For components managed via flat manifests (no kustomize overlay), edit the `affinity` block directly in the Deployment / StatefulSet manifest.
-
-#### Keycloak
-
-Edit `affinity` in `kubernetes/auth/keycloak/keycloak-deployment.yaml`:
-
-```yaml
-spec:
-  template:
-    spec:
-      affinity:
-        nodeAffinity:
-          preferredDuringSchedulingIgnoredDuringExecution:
-            - weight: 80
-              preference:
-                matchExpressions:
-                  - key: hardware-class
-                    operator: In
-                    values:
-                      - high-performance
-```
-
-> A similar block can be added to `postgresql-statefulset.yaml`, but for databases it may be safer to pin to the current node from a data locality perspective. Make this decision in conjunction with PV placement.
-
-#### Backstage
-
-Edit the `affinity` block directly in `backstage/manifests/backstage-deployment.yaml` (no kustomize overlay).
-
-### 2.5 Applying Changes and Verification
+Standard GitOps flow — commit, push, Argo CD auto-syncs:
 
 ```bash
-# Commit & push all changes (Argo CD auto-syncs)
-git add -A
-git commit -m "nodeAffinity: prefer scheduling Observability workloads to M4 Neo"
-git push
-
-# Check Pod placement
 kubectl get pods -n monitoring -o wide
-
-# Check scheduling events for a specific Pod
 kubectl describe pod <pod-name> -n monitoring | grep -A5 "Events:"
 ```
 
 ---
 
-## Phase 3: Multi-Architecture Image Build Support
+## Phase 3: Multi-Architecture Image Build
 
 ### 3.1 Background
 
-The existing cluster was ARM64-only (Raspberry Pi 5), so all custom images were built for ARM64.
-With the M4 Neo (AMD64) joining, ARM64 images **cannot run** on AMD64 nodes (`exec format error`).
+ARM64 images **cannot run** on AMD64 nodes (`exec format error`). Two solutions:
 
-```
-standard_init_linux.go: exec user process caused: exec format error
-```
+1. **Multi-platform images** (recommended): single tag, both arches via `docker buildx --platform=linux/amd64,linux/arm64 --push`
+2. **nodeSelector pinning**: schedule to specific arch only (workaround)
 
-Two solutions:
+### 3.2 Build via Makefile
 
-1. **Multi-platform images**: A single image tag supports both architectures (recommended)
-2. **nodeSelector pinning**: Schedule only to specific architecture nodes (workaround)
+All `apps/kensan/` images are built via the `apps/kensan/Makefile` `k8s-*` targets, which already produce multi-arch manifest lists:
 
-Phase 3 recommends multi-platform image creation.
-
-### 3.2 Custom Image Inventory
-
-| Image | Base Image | Language | Dockerfile |
-|---------|-------------|------|-----------|
-| kensan-user | golang -> alpine | Go | `apps/kensan/backend/services/user/Dockerfile` |
-| kensan-task | golang -> alpine | Go | `apps/kensan/backend/services/task/Dockerfile` |
-| kensan-timeblock | golang -> alpine | Go | `apps/kensan/backend/services/timeblock/Dockerfile` |
-| kensan-analytics | golang -> alpine | Go | `apps/kensan/backend/services/analytics/Dockerfile` |
-| kensan-memo | golang -> alpine | Go | `apps/kensan/backend/services/memo/Dockerfile` |
-| kensan-note | golang -> alpine | Go | `apps/kensan/backend/services/note/Dockerfile` |
-| kensan-frontend | node:22-alpine | Node.js | `apps/kensan/frontend/Dockerfile` |
-| kensan-ai | python:3.12-slim | Python | `apps/kensan/kensan-ai/Dockerfile` |
-| backstage | node:22-bookworm-slim | Node.js | `backstage/app/packages/backend/Dockerfile` |
-
-### 3.3 Go Service Dockerfile Changes
-
-Go has cross-compilation built in as a standard feature, making it the easiest to adapt.
-
-**Before:**
-
-```dockerfile
-FROM golang:1.24-alpine AS builder
-WORKDIR /app
-COPY . .
-RUN CGO_ENABLED=0 GOOS=linux go build -ldflags="-w -s" -o /app/server ./services/user/cmd
-
-FROM alpine:3.19
-COPY --from=builder /app/server .
+```bash
+cd apps/kensan
+make k8s-release-dev TAG=v0.1.0      # build + push + PR (dev)
+make k8s-release-prod TAG=v0.1.0     # build + push + PR (prod)
+make k8s-release TAG=v0.1.0          # build + push + PR (both)
 ```
 
-**After:**
+See `make help` for the full target list. Backstage uses its own `backstage/app/Makefile` (`make all TAG=...`).
+
+### 3.3 Dockerfile Requirements for Multi-Arch
+
+Go services use cross-compilation via `--platform=$BUILDPLATFORM` + `GOARCH=$TARGETARCH`. The Dockerfiles under `apps/kensan/backend/services/*/Dockerfile` already follow this pattern. Reference:
 
 ```dockerfile
 FROM --platform=$BUILDPLATFORM golang:1.24-alpine AS builder
 ARG TARGETARCH
-
-WORKDIR /app
-COPY . .
-RUN CGO_ENABLED=0 GOOS=linux GOARCH=$TARGETARCH go build -ldflags="-w -s" -o /app/server ./services/user/cmd
-
-FROM alpine:3.19
-COPY --from=builder /app/server .
+RUN CGO_ENABLED=0 GOARCH=$TARGETARCH go build ...
 ```
 
-Key points:
-- `--platform=$BUILDPLATFORM`: Build stage runs on the host architecture (fast)
-- `ARG TARGETARCH`: Target architecture is automatically injected (`amd64` or `arm64`)
-- `GOARCH=$TARGETARCH`: Uses Go's cross-compilation
+Node.js / Python apps work as long as the base image supports both arches. Watch out for native extensions (e.g., backstage's `isolated-vm`) — these may require per-arch build stages.
 
-### 3.4 Node.js / Python App Strategy
-
-Node.js and Python are interpreted languages, so they work as long as the base image architecture matches.
-No special Dockerfile changes are needed -- just specify `--platform` at build time.
-
-However, if **native extensions** (modules built with `node-gyp`, Python C extensions, etc.) are included, build stages must be executed on each architecture.
-
-- **kensan-frontend**: Pure Node.js app. No changes needed.
-- **kensan-ai**: Python package. Watch for native extensions with `uv pip install`.
-- **backstage**: Has `node-gyp` dependency (`isolated-vm`). `npm install` must run on each architecture.
-
-### 3.5 Docker buildx Multi-Platform Build Procedure
-
-This platform uses Docker buildx for multi-arch image builds (Podman でも `--platform <list> --manifest` で同等のことが可能)。
-
-#### Prerequisites: QEMU Emulation + buildx builder
-
-Building ARM64 images on an AMD64 machine (or vice versa) requires QEMU user-mode emulation.
+### 3.4 Prerequisites for the Build Host
 
 ```bash
-# Install on Ubuntu (Docker Desktop には QEMU が同梱されているため不要)
+# Linux only — Docker Desktop bundles QEMU
 sudo apt-get install -y qemu-user-static
 
-# Verify
-ls /proc/sys/fs/binfmt_misc/qemu-*
-
-# Create / select a buildx builder (初回のみ)
+# First time only
 docker buildx create --use
 ```
 
-#### Multi-Platform Build (推奨は `apps/kensan/Makefile` の `make k8s-build TAG=vX.Y.Z`)
+### 3.5 GitHub Actions
 
-```bash
-# Build + push を一括 (buildx --push で manifest list が GHCR に上がる)
-docker buildx build --platform=linux/amd64,linux/arm64 \
-  -t ghcr.io/<your-git-org>/kensan-user:v0.1.0 \
-  --push \
-  -f apps/kensan/backend/services/user/Dockerfile \
-  apps/kensan/backend/
-```
-
-#### Batch Build Example for All Services
-
-```bash
-REGISTRY="ghcr.io/<your-git-org>"
-TAG="v0.1.0"
-PLATFORMS="linux/amd64,linux/arm64"
-
-# Go services
-for svc in user task timeblock analytics memo note; do
-  docker buildx build --platform=$PLATFORMS \
-    -t $REGISTRY/kensan-$svc:$TAG \
-    --push \
-    -f apps/kensan/backend/services/$svc/Dockerfile \
-    apps/kensan/backend/
-done
-
-# Frontend
-docker buildx build --platform=$PLATFORMS \
-  -t $REGISTRY/kensan-frontend:$TAG \
-  --push \
-  -f apps/kensan/frontend/Dockerfile \
-  apps/kensan/frontend/
-```
-
-### 3.6 GitHub Actions Sample (Future Reference)
-
-Example GitHub Actions for multi-platform builds in CI/CD:
-
-```yaml
-# .github/workflows/build-multiarch.yaml
-name: Build Multi-Arch Image
-
-on:
-  push:
-    tags: ['v*']
-
-jobs:
-  build:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: docker/setup-qemu-action@v3
-
-      - uses: docker/setup-buildx-action@v3
-
-      - uses: docker/login-action@v3
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      - uses: docker/build-push-action@v6
-        with:
-          context: apps/kensan/backend/
-          file: apps/kensan/backend/services/user/Dockerfile
-          platforms: linux/amd64,linux/arm64
-          push: true
-          tags: ghcr.io/${{ github.repository_owner }}/kensan-user:${{ github.ref_name }}
-```
-
-### 3.7 Migration Checklist
-
-- [ ] Add `--platform=$BUILDPLATFORM` / `TARGETARCH` to Go service (6) Dockerfiles
-- [ ] Test multi-platform build for kensan-frontend
-- [ ] Test multi-platform build for kensan-ai (check for native extensions)
-- [ ] Test multi-platform build for backstage (check `isolated-vm`)
-- [ ] Rebuild and push all images as multi-platform
-- [ ] Verify Pods are scheduled to AMD64 nodes on the cluster
-- [ ] Verify no `exec format error` occurs with `kubectl describe pod`
+Not currently wired up. When CI is added, use `docker/setup-qemu-action` + `docker/setup-buildx-action` + `docker/build-push-action` with `platforms: linux/amd64,linux/arm64`. See `apps/kensan/Makefile` `k8s-build-*` for the equivalent local commands.
 
 ---
 
@@ -610,85 +188,40 @@ jobs:
 ### Node Stuck in NotReady
 
 ```bash
-# Check kubelet logs
 sudo journalctl -u kubelet -f --no-pager
-
-# Check Cilium agent status
 kubectl -n kube-system get pods -l k8s-app=cilium -o wide
 kubectl -n kube-system logs -l k8s-app=cilium --tail=50
 ```
 
 Common causes:
-- CRI-O not running -> `sudo systemctl status crio`
-- Cilium agent crashing -> Cilium's `devices` setting doesn't match M4 Neo's WiFi interface name (`wlp3s0`)
-- Swap enabled -> Disable with `sudo swapoff -a`
+- CRI-O not running → `sudo systemctl status crio`
+- Swap enabled → `sudo swapoff -a`
 
 ### Cilium Agent Startup Failure
 
-```bash
-# Check Cilium status
-kubectl -n kube-system exec -it ds/cilium -- cilium status
+Cluster Cilium config uses auto-detect, so per-node interface mismatch should not occur. If it does:
 
-# Check device recognition
+```bash
 kubectl -n kube-system exec -it ds/cilium -- cilium status --verbose | grep "Devices"
 ```
 
-If the `devices` setting doesn't match M4 Neo's WiFi interface name (`wlp3s0`), the Cilium agent will fail to start.
-Check the actual interface name with `ip a` and fix the `devices` pattern in `values.yaml`.
-
 ### exec format error
 
-```
-standard_init_linux.go: exec user process caused: exec format error
-```
-
-Occurs when an ARM64 image runs on an AMD64 node.
+ARM64 image running on AMD64 node. Rebuild with multi-arch (Phase 3.2) or pin temporarily with `nodeSelector: kubernetes.io/arch: arm64`.
 
 ```bash
-# Check image architecture
-docker buildx imagetools inspect <image>
-
-# Check which node the Pod is running on
-kubectl get pod <pod-name> -o wide
-
-# Check the manifest list
-docker buildx imagetools inspect ghcr.io/<your-git-org>/<image>:<tag>
+docker buildx imagetools inspect ghcr.io/<org>/<image>:<tag>   # verify manifest list
 ```
 
-Fixes:
-1. Complete the Phase 3 multi-platform image build
-2. As a temporary workaround, pin to ARM64 nodes with `nodeSelector`:
+### L2 Announcement Not Working on a Node
 
-```yaml
-spec:
-  template:
-    spec:
-      nodeSelector:
-        kubernetes.io/arch: arm64
-```
-
-### L2 Announcement Not Working on M4 Neo
+Check the regex covers the node's interface:
 
 ```bash
-# Check L2 Policy status
 kubectl get ciliuml2announcementpolicies -o yaml
-
-# Check Cilium leases for the node
 kubectl get lease -n kube-system | grep cilium
 ```
 
-Verify that the `CiliumL2AnnouncementPolicy`'s `interfaces` includes M4 Neo's WiFi interface name (`wlp3s0`).
-Confirm the regex pattern (`^wlan.*`, `^wlp.*`) was applied as described in Phase 1.8.
+### PersistentVolume Issues (legacy local-path)
 
-### PersistentVolume Issues
-
-`local-path-provisioner` creates volumes locally on nodes, so Pods cannot access PVs when migrating between nodes.
-
-```bash
-# Check PV node affinity
-kubectl get pv -o custom-columns=NAME:.metadata.name,NODE:.spec.nodeAffinity.required.nodeSelectorTerms[0].matchExpressions[0].values[0]
-```
-
-Fixes:
-- StatefulSets (Prometheus, Loki, Tempo, PostgreSQL) are automatically scheduled to the node with their PV
-- If nodeAffinity moves workloads to M4 Neo, existing PVs remain on the RPi. If data migration is needed, delete and recreate the PVC (be aware of data loss)
+`local-path` PVCs are node-local — moving a Pod recreates the PV and loses data. New PVCs use Longhorn (replicated, node-independent). Details: [`.claude/rules/kubernetes-cluster.md`](https://github.com/yu-min3/kensan-lab/blob/main/.claude/rules/kubernetes-cluster.md) (Storage section).
