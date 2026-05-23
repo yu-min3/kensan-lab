@@ -2,7 +2,11 @@
 set -euo pipefail
 
 # Usage: scripts/k8s-create-pr.sh <dev|prod|all> <TAG>
-# kustomization.yaml の newTag を更新し、main から分岐した deploy ブランチで PR を作成する。
+# kensan の flat manifest (manifests/services/*.yaml, manifests/lakehouse/dagster-*.yaml)
+# の image tag を更新し、 main から分岐した deploy ブランチで PR を作成する。
+#
+# 注: kustomize overlay は PR #305 で廃止 (dev/prod 分離撤去)。
+# dev/prod/all のいずれを指定しても同じ flat manifest を更新する (歴史的互換性のため引数は残す)。
 
 ENV="${1:?Usage: k8s-create-pr.sh <dev|prod|all> <TAG>}"
 TAG="${2:?Usage: k8s-create-pr.sh <dev|prod|all> <TAG>}"
@@ -31,26 +35,47 @@ git fetch origin main
 echo "Creating branch: $BRANCH (from origin/main)"
 git checkout -b "$BRANCH" origin/main
 
-# --- Update newTag ---
-update_tag() {
-  local overlay="$1"
-  local file="manifests/overlays/${overlay}/kustomization.yaml"
-  if [ ! -f "$file" ]; then
-    echo "ERROR: $file not found"
-    git checkout "$ORIGINAL_BRANCH"
-    git branch -D "$BRANCH"
-    exit 1
-  fi
-  sed -i '' "s/newTag: .*/newTag: ${TAG}/" "$file"
-  git add "$file"
-  echo "Updated $file -> newTag: $TAG"
-}
+# --- Update image tags in flat manifests ---
+# 各 (service, image) ペアを (file, image-name) で表現。
+# polaris-init-job.yaml は :latest 運用なので対象外。
+declare -a TARGETS=(
+  "manifests/services/frontend.yaml:kensan-frontend"
+  "manifests/services/user-service.yaml:kensan-user"
+  "manifests/services/task-service.yaml:kensan-task"
+  "manifests/services/timeblock-service.yaml:kensan-timeblock"
+  "manifests/services/analytics-service.yaml:kensan-analytics"
+  "manifests/services/memo-service.yaml:kensan-memo"
+  "manifests/services/note-service.yaml:kensan-note"
+  "manifests/services/kensan-ai.yaml:kensan-ai"
+  "manifests/lakehouse/dagster-webserver.yaml:kensan-dagster"
+  "manifests/lakehouse/dagster-daemon.yaml:kensan-dagster"
+  "manifests/lakehouse/dagster-user-code.yaml:kensan-dagster"
+)
 
-if [ "$ENV" = "dev" ] || [ "$ENV" = "all" ]; then
-  update_tag dev
-fi
-if [ "$ENV" = "prod" ] || [ "$ENV" = "all" ]; then
-  update_tag prod
+UPDATED=0
+for entry in "${TARGETS[@]}"; do
+  file="${entry%%:*}"
+  image="${entry##*:}"
+  if [ ! -f "$file" ]; then
+    echo "WARNING: $file not found, skipping"
+    continue
+  fi
+  # ghcr.io/yu-min3/<image>:<old> -> ghcr.io/yu-min3/<image>:<TAG>
+  if grep -q "image: ghcr.io/yu-min3/${image}:" "$file"; then
+    sed -i '' "s|image: ghcr.io/yu-min3/${image}:.*|image: ghcr.io/yu-min3/${image}:${TAG}|g" "$file"
+    git add "$file"
+    echo "Updated $file -> ghcr.io/yu-min3/${image}:${TAG}"
+    UPDATED=$((UPDATED + 1))
+  else
+    echo "WARNING: no image: ghcr.io/yu-min3/${image}: in $file, skipping"
+  fi
+done
+
+if [ "$UPDATED" -eq 0 ]; then
+  echo "ERROR: no image tags updated"
+  git checkout "$ORIGINAL_BRANCH"
+  git branch -D "$BRANCH"
+  exit 1
 fi
 
 # --- Commit & Push ---
