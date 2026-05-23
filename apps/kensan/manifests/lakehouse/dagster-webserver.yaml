@@ -34,7 +34,7 @@ spec:
     spec:
       containers:
       - name: dagster-webserver
-        image: ghcr.io/yu-min3/kensan-dagster:v0.0.1
+        image: ghcr.io/yu-min3/kensan-dagster:v0.0.2
         imagePullPolicy: Always
         command: ["uv", "run", "dagster-webserver", "-h", "0.0.0.0", "-p", "3070", "-w", "workspace.yaml"]
         env:
