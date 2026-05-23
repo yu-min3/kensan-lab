@@ -88,13 +88,14 @@ K8s Secret として配布する形式ではなく、アプリ Pod が Vault に
 | 項目 | 値 |
 |---|---|
 | Auth role | `transit-kensan-users` (kubernetes auth method、vault-database-engine の命名 `postgres-<base>` と対称) |
-| bind 先 SA | `kensan/user-service` |
+| bind 先 SA | `kensan/transit-kensan-users` (chart が自動生成、user-service Pod の SA) |
 | Policy | `transit-kensan-users` (transit/{encrypt,decrypt,hmac,rewrap}/users-name のみ) |
+| ConfigMap | `kensan/transit-kensan-users-config` (chart 生成、`VAULT_ADDR` / `VAULT_AUTH_ROLE` / `VAULT_TRANSIT_KEY`、Reloader match=true) |
 | Token TTL | 30 min (アプリ側 renew loop で延長、max 1h) |
 | Key 作成 | `kubernetes/secrets/vault-transit-engine/temp/setup-transit-keys.sh` を 1 度だけ手動実行 |
 | Rotation | `vault write -f transit/keys/users-name/rotate` → アプリ側で `transit/rewrap` 経由で旧 ciphertext を更新 |
 
-mount + policy + auth role は chart 化済 (`vault-transit-engine/chart/` + `platform-values/vault-transit/<consumer>.yaml`)、key 作成だけ手動 (VCO 限界)。詳細: 上の「VCO カバレッジと例外」セクション。
+Vault 側 (mount/policy/auth role) と consumer ns 側 (SA/ConfigMap) は chart 化済 (`vault-transit-engine/chart/` + `platform-values/vault-transit/<consumer>.yaml`)。consumer Deployment は `serviceAccountName` + `envFrom: configMapRef` で参照、Reloader で rotation 連動。key 作成だけ手動 (VCO 限界、上の「VCO カバレッジと例外」参照)。
 
 ### SealedSecret (Vault に依存しない静的、ローテ頻度低)
 
