@@ -23,6 +23,17 @@ spec:
 apiVersion: policy/v1
 kind: PodDisruptionBudget
 metadata:
+  name: polaris-postgres-pdb
+  namespace: kensan
+spec:
+  maxUnavailable: 1
+  selector:
+    matchLabels:
+      app: polaris-postgres
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
   name: dagster-daemon-pdb
   namespace: kensan
 spec:
