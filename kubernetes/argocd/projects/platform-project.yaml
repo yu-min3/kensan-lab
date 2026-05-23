@@ -50,3 +50,13 @@ spec:
         name: istio-ca-root-cert
       - kind: ConfigMap
         name: istio-ca-crl
+      # Service が自動生成する EndpointSlice (group: discovery.k8s.io)
+      # 旧来の Endpoints (group: "") とは別 kind なので個別 ignore が必要
+      - group: discovery.k8s.io
+        kind: EndpointSlice
+      # StatefulSet の volumeClaimTemplates が自動生成する PVC
+      # ArgoCD は parent StatefulSet を管理するが、 子 PVC は別 resource として
+      # tracking-id を持たないため orphan として検出される。 GitOps 化不可
+      # (volumeClaimTemplates は cluster 側で自動展開される)。
+      - group: ""
+        kind: PersistentVolumeClaim
