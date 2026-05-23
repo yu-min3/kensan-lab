@@ -60,8 +60,8 @@ graph TB
 | 項目 | 値 |
 |------|-----|
 | 鍵 | `transit/keys/users-name` (aes256-gcm96) |
-| 認証 | k8s ServiceAccount `user-service` → Vault role `kensan-users-transit` |
-| Policy | `kensan-users-transit` (encrypt / decrypt / hmac / rewrap on `users-name`) |
+| 認証 | k8s ServiceAccount `user-service` → Vault role `transit-kensan-users` |
+| Policy | `transit-kensan-users` (encrypt / decrypt / hmac / rewrap on `users-name`) |
 | ローカル開発 | `VAULT_ADDR` 未設定なら `vault.NoOpEncryptor` で passthrough（プレフィックス `noop:`） |
 | 検索性 | 完全一致のみ（HMAC で deterministic 比較）。LIKE / ORDER BY は不可 |
 

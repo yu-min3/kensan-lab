@@ -1,94 +1,106 @@
-## Vault Transit Engine (Stage 6)
+# vault-transit-engine
 
-kensan の users.name (個人氏名) を **Vault Transit API で暗号化** する capability。
-Postgres には ciphertext + HMAC のみ保存し、平文の鍵管理を Vault に集約する。
-
-## なぜ Transit か (vs pgcrypto / TDE)
-
-| 方式 | 鍵の所在 | 鍵 rotation | 監査 |
-|---|---|---|---|
-| Postgres TDE | DB ファイルに紐付く KEK | DB 再起動級 | DB 内のみ |
-| pgcrypto | Postgres の関数引数で都度渡す | アプリ実装次第 | DB 内のみ |
-| **Vault Transit** | **Vault** に常駐、ciphertext が DB | `vault write -f transit/keys/<k>/rotate` | Vault audit log で API 単位に追える |
-
-Vault Transit は **鍵を一切アプリ Pod / DB に出さない** envelope 暗号化のショーケース。
-Stage 5 (動的 DB cred) で「DB cred の所在を Vault に集約」したのと同じ思想。
+Vault Transit secret engine の cluster-wide capability。
+Postgres カラム等の **アプリ層暗号化** (Vault が鍵を保持、Pod / DB に鍵を降ろさない envelope encryption) を、consumer ごとに最小権限で払い出す。
 
 ## 構成
 
 ```
 kubernetes/secrets/vault-transit-engine/
-├── README.md                                  # 本ファイル
-├── shared/                                    # GitOps 管理 (Application: vault-transit-engine-shared)
-│   ├── mount.yaml                             # SecretEngineMount (transit/)
-│   ├── policy-kensan-users-transit.yaml       # Policy (kensan-users-transit)
-│   └── vault-auth-role-kensan-user-service.yaml
-│                                              # KubernetesAuthEngineRole
-│                                              # (kensan-{prod,dev}/user-service SA を bind)
+├── README.md                                # 本ファイル
+├── chart/                                   # Helm chart (PE 管理、不動)
+│   ├── Chart.yaml
+│   ├── values.yaml                          # PE 規約のデフォルト値 (TTL / 命名規約)
+│   └── templates/
+│       ├── _helpers.tpl                     # name / basename / vcoAuth helper
+│       ├── policy.yaml                      # Policy (key 単位、encrypt/decrypt/hmac/rewrap)
+│       └── vault-auth-role.yaml             # KubernetesAuthEngineRole
+├── shared/                                  # capability bootstrap (1 度だけ)
+│   └── mount.yaml                           # SecretEngineMount (transit/)
+├── platform-values/
+│   └── vault-transit/                       # capability convention dir
+│       └── kensan-users.yaml                # 1 consumer ぶん、AD が触る
 └── temp/
-    └── setup-transit-keys.sh                  # 1 度きり: transit/keys/users-name 作成 (手動)
+    └── setup-transit-keys.sh                # 1 度きり: transit/keys/<name> 作成 (VCO 未対応)
 ```
 
 ArgoCD 側:
-- `kubernetes/argocd/applications/secrets/vault-transit-engine/app-shared.yaml`
+- `applications/secrets/vault-transit-engine/app-shared.yaml` — single Application、`shared/` を sync (mount だけ)
+- `applications/secrets/vault-transit-engine/applicationset-instances.yaml` — ApplicationSet、`**/platform-values/vault-transit/*.yaml` を glob で discover、per-consumer ArgoCD app を auto 生成
+
+## 設計の核: smart default + override (vault-database-engine と同パターン)
+
+PE が `chart/values.yaml` で convention based デフォルトを埋め、AD は **必須項目のみ** 書く。
+
+### AD が書く項目
+
+| キー | 必須? | デフォルト | 補足 |
+|---|---|---|---|
+| `ns` | ✅ 必須 | なし | consumer SA がある K8s namespace |
+| `serviceAccount` | ✅ 必須 | なし | consumer SA 名 (chart は SA 自体は作らない、app 側 manifest に置く) |
+| `keyName` | ✅ 必須 | なし | Transit key 名 (encrypt/decrypt 対象) |
+| `extraKeyNames` | 任意 | `[]` | 同一 consumer に複数 key を許可したい場合 |
+| `tokenTTL` / `tokenMaxTTL` | 任意 | `1800` / `3600` | Vault k8s auth token lease (秒) |
+| `name` | 任意 | AppSet inject `transit-<filename>` | 通常書かない |
+
+### PE 側の convention (chart 内に閉じる)
+
+| 項目 | 値 |
+|---|---|
+| Vault role / policy 命名 | `transit-<filename-basename>` (vault-database-engine の `postgres-<base>` と対称) |
+| Token TTL / maxTTL | 30 min / 1 h (default 12h+ 防止、renew loop 強制) |
+| 許可 endpoint | `transit/{encrypt,decrypt,hmac,rewrap}/<keyName>` + `keys/<keyName>` read + `auth/token/{renew,lookup}-self` |
+
+## 1 consumer 追加方法
+
+(1) values file を 1 個書く、で済む。
+
+```yaml
+# <owner-dir>/platform-values/vault-transit/<consumer>.yaml
+ns: my-app
+serviceAccount: my-service
+keyName: my-pii-column
+```
+
+これで以下が成立:
+- Vault role / policy 名 = `transit-<consumer>` (filename から)
+- `my-app` ns の `my-service` SA が Vault に bind される
+- `transit/{encrypt,decrypt,hmac,rewrap}/my-pii-column` のみ最小権限で許可
+
+key (`transit/keys/my-pii-column`) は **1 度きり手動作成**。`temp/setup-transit-keys.sh` を参考に新 key 名で実行する (VCO 未対応のため。後述「設計判断」参照)。
 
 ## 設計判断: なぜ key 作成だけ手動か
 
 redhat-cop/vault-config-operator は **TransitSecretEngine 系 CR を持たない** (2026-05 時点)。
-利用可能な CRD は `SecretEngineMount` (mount だけ) と `Policy` / `KubernetesAuthEngineRole` のみ。
+利用可能な CRD は `SecretEngineMount` / `Policy` / `KubernetesAuthEngineRole` のみ。
 
 選択肢:
 
 | 案 | pros | cons | 採否 |
 |---|---|---|---|
-| 1. mount のみ GitOps、key は手動 | 単純、追加 operator 不要 | key 作成が手作業 (ただし 1 度きり) | ✅ **採用** |
-| 2. 別 operator (ex: hashicorp/vault-secrets-operator) を導入 | key も declarative | operator 増、Stage 6 のためだけは過剰 | ✕ |
+| 1. mount + policy + auth role を GitOps、key は手動 | 単純、追加 operator 不要 | key 作成が手作業 (ただし 1 度きり) | ✅ **採用** |
+| 2. 別 operator (hashicorp/vault-secrets-operator 等) を導入 | key も declarative | operator 増、Transit のためだけは過剰 | ✕ |
 | 3. VCO を fork して TransitSecretEngine CR を追加 | declarative + 純正 VCO 1 本 | fork 維持コスト | ✕ |
-| 4. CronJob で `vault write -f transit/keys/users-name` を冪等実行 | GitOps 寄り | "delete されないこと" だけ保証、操作は依然非 declarative | ✕ |
+| 4. CronJob で `vault write -f transit/keys/<name>` を冪等実行 | GitOps 寄り | "delete されないこと" だけ保証、操作は依然非 declarative | ✕ |
 
-→ key 作成は 1 度きりかつ手動 rotate 運用なので、案 1 でコスト最小。
-
-## デプロイ手順
-
-### 1) GitOps (本 Application)
-
-PR `vault-stage6-transit/vco-config` を merge → ArgoCD が自動 sync:
-
-- `transit/` mount が enable される
-- Policy `kensan-users-transit` が作成される
-- KubernetesAuthEngineRole `kensan-users-transit` が作成される (kensan-{prod,dev}/user-service SA を bind)
-
-### 2) Key 作成 (1 度きり、手動)
-
-```bash
-# vault Pod に入って実行 (もしくは macOS から VAULT_TOKEN export して実行)
-kubectl exec -n vault vault-0 -c vault -i -- /bin/sh \
-  < kubernetes/secrets/vault-transit-engine/temp/setup-transit-keys.sh
-```
-
-確認:
-```bash
-kubectl exec -n vault vault-0 -c vault -- vault list transit/keys
-# → users-name が見える
-```
-
-### 3) user-service 側 (Stage 6 PR #2 / #3 で実装)
-
-- `apps/kensan/manifests/base/app/user-service.yaml` の `spec.serviceAccountName: user-service`
-- `kubernetes/kensan/kensan-{prod,dev}/serviceaccount-user-service.yaml` (本 PR で同梱)
-- user-service Pod が起動時に Vault k8s auth method で login → token 取得 → `transit/encrypt/users-name` 等を呼ぶ
+→ key 作成は 1 度きりかつ手動 rotate 運用なので、案 1 でコスト最小。VCO 全体のカバレッジと例外整理は [`docs/secret-management/index.md`](../../../docs/secret-management/index.md) の「VCO カバレッジと例外」を参照。
 
 ## Key Rotation 運用
 
 ```bash
 # 旧 ciphertext は復号可、新規 encrypt は最新 version
-kubectl exec -n vault vault-0 -c vault -- vault write -f transit/keys/users-name/rotate
+kubectl exec -n vault vault-0 -c vault -- vault write -f transit/keys/<keyName>/rotate
 
-# ※ 全行 rewrap したい場合 (Stage 6 後続タスク):
-#   user-service の rewrap loop が transit/rewrap/users-name で更新する
+# ※ 全行 rewrap したい場合: app 側 (Repository 層) で transit/rewrap/<keyName> を呼ぶ
 ```
 
-## Audit (Vault audit log で encrypt/decrypt を追跡)
+## Audit
 
-Vault audit device は bootstrap TF (Step e) で enable 済み (`/vault/audit/audit.log`)。
-`transit/encrypt/users-name` / `transit/decrypt/users-name` 各 1 リクエストが per-call ログされる。
+Vault audit device は bootstrap TF で enable 済み (`/vault/audit/audit.log`)。
+`transit/encrypt/<keyName>` / `transit/decrypt/<keyName>` が per-call ログされる。
+
+## 関連
+
+- 全体方針: [docs/secret-management/index.md](../../../docs/secret-management/index.md)
+- 同パターンの先行例: [vault-database-engine/README.md](../vault-database-engine/README.md)
+- 実装サンプル (Go shared/vault): `apps/kensan/backend/shared/vault/`
