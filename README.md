@@ -42,10 +42,12 @@ The platform covers technologies behind 12 out of 16 Golden Kubestronaut certifi
 
 
 - **Gateway** — Cloudflare Tunnel (internet) and Cilium L2 LB (LAN) route traffic through Istio Gateway using Gateway API
-- **Applications** — workloads deployed to prod/dev namespaces via Argo CD, plus the kensan app in a dedicated namespace
+- **Applications** — workloads deployed to per-app namespaces (`app-{name}`) via Argo CD, plus the kensan app in a dedicated namespace
 - **Internal Developer Platform** — Backstage provides a service catalog (catalog-info.yaml), TechDocs (MkDocs), and Golden Path scaffolding templates
 - **Observability** — applications emit telemetry to OTel Collector, which fans out to Prometheus (metrics), Loki (logs), and Tempo (traces), all visualized in Grafana. AlertManager sends alerts to Slack
-- **Security & Internal Network** — Sealed Secrets for Git-encrypted credentials, Cilium + Istio NetworkPolicy, cert-manager for automated TLS, Pod Security Standards
+- **Authentication** — Keycloak is the OIDC identity provider; the Istio Gateway offloads auth to oauth2-proxy (ext_authz), so SSO is enforced at the edge before traffic ever reaches a workload
+- **Secrets** — HashiCorp Vault issues dynamic, short-lived database credentials and offers Transit encryption-as-a-service; External Secrets syncs them into the cluster, with Sealed Secrets covering Git-encrypted bootstrap credentials
+- **Zero-trust internal network** — Cilium enforces a default-deny NetworkPolicy baseline while Istio provides automatic mTLS for all service-to-service traffic; cert-manager automates TLS and Pod Security Standards harden workloads
 - **Argo CD** — manages all zones via GitOps. Split into `platform-project` (infrastructure) and `app-project` (applications)
 
 <details>
@@ -54,14 +56,6 @@ The platform covers technologies behind 12 out of 16 Golden Kubestronaut certifi
 The platform uses Cilium LoadBalancer with L2 announcements for local network access. For internet exposure, Cloudflare Tunnel provides Zero Trust access without exposing the home IP. See [this article (Japanese)](https://zenn.dev/yuu7751/articles/9df7ce4f1f4830) for setup details.
 
 </details>
-
-**Features:**
-
-- **Argo CD + Helm multi-source** — App of Apps + ApplicationSet for GitOps at scale
-- **Istio + Gateway API** — full service mesh with mTLS, not just an ingress controller
-- **Backstage** — developer portal with service catalog, TechDocs, and scaffolding templates
-- **Multi-arch (ARM64 + AMD64)** — real scheduling constraints, not a uniform cluster
-- **Wired LAN with WiFi fallback** — primary path on Ethernet (1GbE), WiFi automatically takes over via routing metric if the wire goes down. Originally proven on WiFi-only too
 
 ## Tech Stack
 
@@ -73,6 +67,7 @@ The platform uses Cilium LoadBalancer with L2 announcements for local network ac
 |      <img src="docs/assets/logos/argo.svg" width="32">      | [Argo CD](https://argoproj.github.io/cd/)                                                           | GitOps continuous delivery (Helm multi-source, App of Apps, ApplicationSet) |
 |   <img src="docs/assets/logos/backstage.svg" width="32">    | [Backstage](https://backstage.io/)                                                                  | Developer portal — service catalog, TechDocs, templates                     |
 |    <img src="docs/assets/logos/keycloak.svg" width="32">    | [Keycloak](https://www.keycloak.org/)                                                               | Identity and access management (IAM / SSO)                                  |
+|     <img src="docs/assets/logos/vault.svg" width="32">      | [Vault](https://www.vaultproject.io/)                                                               | Secrets management — dynamic DB credentials, Transit encryption, OIDC       |
 |   <img src="docs/assets/logos/prometheus.svg" width="32">   | [Prometheus](https://prometheus.io/)                                                                | Metrics collection and alerting                                             |
 |    <img src="docs/assets/logos/grafana.svg" width="32">     | [Grafana](https://grafana.com/)                                                                     | Observability dashboards                                                    |
 |      <img src="docs/assets/logos/loki.svg" width="32">      | [Loki](https://grafana.com/oss/loki/)                                                               | Log aggregation                                                             |
@@ -108,14 +103,17 @@ The platform uses Cilium LoadBalancer with L2 announcements for local network ac
 ```
 kubernetes/                    # Core platform (GitOps-managed)
 ├── argocd/                       # Argo CD: applications/, projects/, root-apps/
+├── network/                      # Cilium, Istio, Gateway API, Cloudflare Tunnel, NetworkPolicy
 ├── observability/                # Prometheus, Grafana, Loki, Tempo, OTel Collector
-├── network/                      # Cilium, Istio, Gateway API
-├── security/                     # cert-manager, Sealed Secrets, Keycloak
-├── environments/                 # app-dev, app-prod, kensan-prod, kensan-data, observability, system-infra
-└── storage/                      # local-path-provisioner
+├── auth/                         # Keycloak, oauth2-proxy, Vault OIDC auth
+├── secrets/                      # Vault, External Secrets, Sealed Secrets, cert-manager, Reloader
+├── storage/                      # Longhorn, local-path-provisioner
+├── environments/                 # Shared-namespace bootstrap (app-prod)
+└── kube-system/                  # Namespace labels, Pod Security Standards
 backstage/                        # Developer portal (app/ + manifests/)
-apps/                             # Applications deployed on the platform
-docs/                             # ADRs, architecture, bootstrapping guides
+apps/                             # Applications deployed on the platform (kensan)
+bootstrap/                        # Vault & Keycloak bootstrap (Terraform + scripts)
+docs/                             # ADRs, architecture, guides (MkDocs site)
 ```
 
 ## Documentation
