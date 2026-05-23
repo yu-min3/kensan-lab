@@ -22,6 +22,13 @@ spec:
     - repoURL: https://github.com/yu-min3/kensan-lab
       targetRevision: main
       path: kubernetes/argocd/resources
+    # AppProject manifests (platform-project / app-project / default) を GitOps 管理に。
+    # 旧来 platform-project は repo に存在しつつどの Application からも sync されず、
+    # cluster は手動 apply された残骸状態だった (kubectl get appproject platform-project
+    # で確認できるが、 git の変更は反映されない)。 argocd app に sources を追加して解消。
+    - repoURL: https://github.com/yu-min3/kensan-lab
+      targetRevision: main
+      path: kubernetes/argocd/projects
 
   destination:
     server: https://kubernetes.default.svc
