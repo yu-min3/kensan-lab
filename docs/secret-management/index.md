@@ -17,6 +17,34 @@
 - **DB カラムに保存する PII (氏名など)** → Vault Transit (鍵をアプリ Pod / DB に降ろさない envelope 暗号化、Stage 6)
 - Vault 自身 / cert-manager / Cilium PKI など **Vault に依存できない低レイヤ** → SealedSecret
 
+## VCO カバレッジと例外
+
+Vault 側の declarative 管理は **Vault Config Operator (VCO、redhat-cop/vault-config-operator)** が担う。CR を kensan-lab repo に置いて GitOps、controller が reconcile して Vault に sync。
+ただし Vault API の全てに CR が用意されているわけではなく、**少数の例外は手動 (setup script) で運用** している。
+
+### VCO で declarative にできる操作
+
+| Vault 操作 | CR | 使用箇所 |
+|---|---|---|
+| Secret engine mount | `SecretEngineMount` | `vault-database-engine/shared/mount.yaml`、`vault-transit-engine/shared/mount.yaml` |
+| Policy (HCL) | `Policy` | `vault-database-engine/shared/policy-eso-read.yaml`、`vault-transit-engine/chart/templates/policy.yaml` |
+| K8s auth role (SA bind + policy 付与) | `KubernetesAuthEngineRole` | 両 engine の `chart/templates/vault-auth-role.yaml` |
+| OIDC auth role | `JWTOIDCAuthEngineRole` | Keycloak SSO 統合 (Stage 4) |
+| Database engine config (root cred + connectionURL) | `DatabaseSecretEngineConfig` | `vault-database-engine/chart/templates/connection.yaml` (root cred は Vault KV から参照 = 完全 declarative) |
+| Database engine role (CREATE/REVOKE SQL) | `DatabaseSecretEngineRole` | `vault-database-engine/chart/templates/role.yaml` |
+| Identity Group / Alias | `Group` / `GroupAlias` | OIDC ログイン UX (Stage 4-5) |
+
+Stage 2〜5 と Stage 6 の policy/auth role は **ほぼ 100% VCO で完結** している。
+
+### 例外 (setup script で運用)
+
+| Vault 操作 | 状況 | 手当て |
+|---|---|---|
+| **Transit key 作成 / rotate** | VCO に `TransitSecretEngine` 系 CR が存在しない | `kubernetes/secrets/vault-transit-engine/temp/setup-transit-keys.sh` を新 key 名で 1 度きり実行。rotate は `vault write -f transit/keys/<name>/rotate` を手動 |
+| **OIDC config (`auth/oidc/config`)** | VCO の patch が未対応で、provider URL 等の full-write が必要 | `temp/post-bootstrap-oidc-ux.sh` (Stage 4) で full-write |
+
+撤去せずハイブリッド継続を選んだ理由 (撤去判断のトリガーライン含む) は **ADR-012 (起票予定)** で扱う。
+
 ## Inventory
 
 ### Vault dynamic (Postgres app cred)
@@ -59,14 +87,14 @@ K8s Secret として配布する形式ではなく、アプリ Pod が Vault に
 
 | 項目 | 値 |
 |---|---|
-| Auth role | `kensan-users-transit` (kubernetes auth method) |
+| Auth role | `transit-kensan-users` (kubernetes auth method、vault-database-engine の命名 `postgres-<base>` と対称) |
 | bind 先 SA | `kensan/user-service` |
-| Policy | `kensan-users-transit` (transit/{encrypt,decrypt,hmac,rewrap}/users-name のみ) |
+| Policy | `transit-kensan-users` (transit/{encrypt,decrypt,hmac,rewrap}/users-name のみ) |
 | Token TTL | 30 min (アプリ側 renew loop で延長、max 1h) |
 | Key 作成 | `kubernetes/secrets/vault-transit-engine/temp/setup-transit-keys.sh` を 1 度だけ手動実行 |
 | Rotation | `vault write -f transit/keys/users-name/rotate` → アプリ側で `transit/rewrap` 経由で旧 ciphertext を更新 |
 
-VCO は TransitSecretEngine 系 CR を持たないため、mount + policy + auth role は GitOps、key 作成だけ手動 (1 度きり) のハイブリッド構成。
+mount + policy + auth role は chart 化済 (`vault-transit-engine/chart/` + `platform-values/vault-transit/<consumer>.yaml`)、key 作成だけ手動 (VCO 限界)。詳細: 上の「VCO カバレッジと例外」セクション。
 
 ### SealedSecret (Vault に依存しない静的、ローテ頻度低)
 

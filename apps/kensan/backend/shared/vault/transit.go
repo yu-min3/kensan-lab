@@ -49,7 +49,7 @@ type Config struct {
 	// Required.
 	Address string
 
-	// Role is the Vault Kubernetes auth role name (e.g., "kensan-users-transit").
+	// Role is the Vault Kubernetes auth role name (e.g., "transit-kensan-users").
 	// Required when LocalToken is empty.
 	Role string
 

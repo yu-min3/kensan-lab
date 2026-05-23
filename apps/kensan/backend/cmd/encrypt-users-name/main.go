@@ -15,7 +15,7 @@
 //	DB_HOST=postgresql.kensan-data.svc.cluster.local \
 //	DB_USER=$(...) DB_PASSWORD=$(...) DB_NAME=kensan \
 //	VAULT_ADDR=http://vault.vault.svc.cluster.local:8200 \
-//	VAULT_AUTH_ROLE=kensan-users-transit \
+//	VAULT_AUTH_ROLE=transit-kensan-users \
 //	VAULT_TRANSIT_KEY=users-name \
 //	  go run ./cmd/encrypt-users-name -dry-run
 //

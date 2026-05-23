@@ -38,11 +38,11 @@ sudo rm -rf /opt/local-path-provisioner/<該当ディレクトリ>
 
 ### 4. Vault role の確認
 
-`kensan-users-transit` Vault role の targetNamespaces から `kensan-dev` は manifest で削除済。VCO が自動的に Vault role を更新する。
+`transit-kensan-users` Vault role の targetNamespaces から `kensan-dev` は manifest で削除済。VCO が自動的に Vault role を更新する。
 
 ```bash
 # Vault 側で確認
-vault read auth/kubernetes/role/kensan-users-transit
+vault read auth/kubernetes/role/transit-kensan-users
 # 想定: bound_service_account_namespaces に kensan-dev は含まれない
 ```
 
