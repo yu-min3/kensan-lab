@@ -26,8 +26,8 @@ spec:
           echo "Polaris is ready."
       containers:
       - name: polaris-init
-        image: ghcr.io/yu-min3/kensan-dagster:latest
-        imagePullPolicy: Always
+        image: ghcr.io/yu-min3/kensan-dagster:v0.0.2
+        imagePullPolicy: IfNotPresent
         workingDir: /app
         env:
         # venv activation
