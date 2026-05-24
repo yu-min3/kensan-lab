@@ -23,13 +23,19 @@ metadata:
 spec:
   selector:
     app: polaris
+  # Istio は Service の port name (http-/grpc-/tcp- prefix) で L7 protocol を判定する。
+  # "api"/"management" だと protocol 不明 → client sidecar が auto-mTLS を張らず平文送信 →
+  # mTLS principal が付かず AuthorizationPolicy (kensan ns 身元要求) で 403 (polaris-init hang)。
+  # http- prefix + appProtocol で L7 HTTP + auto-mTLS を成立させる。
   ports:
   - port: 8181
     targetPort: 8181
-    name: api
+    name: http-api
+    appProtocol: http
   - port: 8182
     targetPort: 8182
-    name: management
+    name: http-management
+    appProtocol: http
 ---
 apiVersion: apps/v1
 kind: Deployment
