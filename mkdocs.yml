@@ -107,42 +107,64 @@ extra:
 
 nav:
   - Home: index.md
-  - Getting Started:
-      - Installation: getting-started/installation.md
-      - Configuration: getting-started/configuration.md
+
+  # ── 📖 Understand — human zone: overview, diagrams, narrative, the "why" ──
+  - 📖 Understand:
+      - Getting Started:
+          - Installation: getting-started/installation.md
+          - Configuration: getting-started/configuration.md
+      - Architecture:
+          - Infrastructure overview: architecture/infrastructure.md
+          - auth/: architecture/auth.md
+          - secrets/: architecture/secrets.md
+          - network/: architecture/network.md
+          - observability/: architecture/observability.md
+      - Concepts:
+          - Documentation Layout: concepts/doc-layout.md
+          - Namespace Label Design: concepts/namespace-label-design.md
+          - Network Policy: concepts/network-policy-guide.md
+          - Kustomize Guidelines (deprecated): concepts/kustomize-guidelines.md
+      - Architecture Decisions:
+          - Overview: adr/index.md
+          - 001 — TLS Termination Pattern: adr/001-tls-termination-pattern.md
+          - 002 — Authentication & Authorization: adr/002-authentication-authorization-architecture.md
+          - 003 — ApplicationSet Migration: adr/003-applicationset-migration-strategy.md
+          - 004 — Network Policy Design: adr/004-network-policy-design.md
+          - 005 — Istio Native OAuth2: adr/005-istio-native-oauth2.md
+          - 006 — Namespace Naming: adr/006-namespace-naming.md
+          - 007 — No Vault PKI: adr/007-no-vault-pki.md
+          - 008 — Keycloak DB Credentials: adr/008-keycloak-db-credentials.md
+          - 009 — Shared Allow-Istio NetworkPolicy: adr/009-shared-allow-istio-network-policy.md
+          - 010 — Istio Native OAuth2 (Absent): adr/010-istio-native-oauth2-absent.md
+          - 011 — Vault Version Pinning: adr/011-vault-version-pinning.md
+      - Roadmap:
+          - Storage (local-path → Longhorn): roadmap/storage-longhorn.md
+      - Articles: articles.md
+
+  # ── 🤖 Operate & Reference — agent/operator zone: deterministic, exhaustive, look-up ──
+  - 🤖 Operate & Reference:
+      - Agent Index: agents-index.md
       - Bootstrapping:
           - Overview: bootstrapping/index.md
-          - Add worker node (M4 Neo): bootstrapping/add-worker-node-m4neo.md
+          - Stage 1 — Vault HA: bootstrapping/12-vault-stage1.md
           - Grafana independent setup: bootstrapping/11-grafana-independent.md
-  - Architecture:
-      - Infrastructure overview: architecture/infrastructure.md
-      - auth/: architecture/auth.md
-      - secrets/: architecture/secrets.md
-      - network/: architecture/network.md
-      - observability/: architecture/observability.md
-  - Concepts:
-      - Documentation Layout: concepts/doc-layout.md
-      - Kustomize Guidelines: concepts/kustomize-guidelines.md
-      - Namespace Label Design: concepts/namespace-label-design.md
-      - Network Policy: concepts/network-policy-guide.md
-  - Operations:
+          - Add worker node (M4 Neo): bootstrapping/add-worker-node-m4neo.md
       - Secret Management: secret-management/index.md
+      - Auth integration:
+          - ArgoCD ↔ Keycloak (Path B): auth/argocd-keycloak-integration.md
+          - Gateway OIDC (Path A): auth/gateway-oidc.md
+          - oauth2-proxy: auth/oauth2-proxy.md
       - Runbooks:
-          - Longhorn Restore Test: runbooks/longhorn-restore-test.md
+          - Vault Raft auto-join: runbooks/vault-raft-join.md
+          - Cilium WiFi stability: runbooks/cilium-wifi-stability.md
+          - Cilium update strategy: runbooks/cilium-update-strategy.md
+          - Longhorn restore test: runbooks/longhorn-restore-test.md
+          - ArgoCD repo-server tuning: runbooks/argocd-repo-server-tuning.md
       - Guides:
-          - WiFi Stabilization: guides/wifi-stabilization.md
-  - Architecture Decisions:
-      - Overview: adr/index.md
-      - 001 — TLS Termination Pattern: adr/001-tls-termination-pattern.md
-      - 002 — Authentication & Authorization: adr/002-authentication-authorization-architecture.md
-      - 003 — ApplicationSet Migration: adr/003-applicationset-migration-strategy.md
-      - 004 — Network Policy Design: adr/004-network-policy-design.md
-      - 005 — Istio Native OAuth2: adr/005-istio-native-oauth2.md
-      - 006 — Namespace Naming: adr/006-namespace-naming.md
-      - 007 — No Vault PKI: adr/007-no-vault-pki.md
-      - 008 — Keycloak DB Credentials: adr/008-keycloak-db-credentials.md
-      - 009 — Shared Allow-Istio NetworkPolicy: adr/009-shared-allow-istio-network-policy.md
-      - 010 — Istio Native OAuth2 (Absent): adr/010-istio-native-oauth2-absent.md
-  - Incidents:
-      - 2026-03-02 system-infra Sync Blocked: incidents/2026-03-02-system-infra-sync-blocked.md
-  - Articles: articles.md
+          - Raspberry Pi WiFi stabilization: guides/wifi-stabilization.md
+      - Operations:
+          - kensan dev cleanup: operations/kensan-dev-cleanup.md
+          - Keycloak dev cleanup: operations/keycloak-dev-cleanup.md
+          - Vault role & gateway cleanup: operations/vault-dev-role-and-gateway-cleanup.md
+      - Incidents:
+          - 2026-03-02 system-infra Sync Blocked: incidents/2026-03-02-system-infra-sync-blocked.md
