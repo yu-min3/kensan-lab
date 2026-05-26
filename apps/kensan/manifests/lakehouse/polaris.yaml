@@ -5,10 +5,13 @@ metadata:
   namespace: kensan
 data:
   application.properties: |
+    # Iceberg catalog metastore: production 標準の relational-jdbc (PostgreSQL) を使う。
+    # 旧 in-memory は pod restart で catalog (namespace/table/RBAC/metadata ポインタ) が揮発するため廃止。
+    polaris.persistence.type=relational-jdbc
     quarkus.datasource.db-kind=postgresql
-    quarkus.datasource.jdbc.url=jdbc:postgresql://dagster-postgres:5432/polaris
-    quarkus.datasource.username=dagster
-    quarkus.datasource.password=dagster
+    quarkus.datasource.jdbc.url=jdbc:postgresql://polaris-postgres:5432/polaris
+    # username / password は VCO dynamic cred (postgres-polaris-cred) 由来の
+    # QUARKUS_DATASOURCE_USERNAME / _PASSWORD env で上書きする (application.properties には書かない)
   aws-config: |
     [default]
     region = us-east-1
@@ -51,9 +54,57 @@ spec:
     metadata:
       labels:
         app: polaris
+      annotations:
+        # VCO dynamic cred (postgres-polaris-cred) は ESO refresh ごとに動的 user が書き換わる。
+        # Stakater Reloader が match=true な Secret 更新を検知して polaris を rolling restart する
+        # (Secret 側は ESO template の reloader.stakater.com/match=true で chart が一律付与済み)。
+        reloader.stakater.com/search: "true"
     spec:
       # k8s注入のPOLARIS_*環境変数がQuarkus設定を汚染しSTS呼び出しを誘発するため無効化
       enableServiceLinks: false
+      # relational-jdbc は server 起動前に admin-tool で schema (polaris_schema) と realm を
+      # bootstrap する必要がある。idempotent なので restart で再実行されても安全。
+      # datasource cred は server と同じく VCO dynamic cred (postgres-polaris-cred) を参照する。
+      initContainers:
+      - name: bootstrap-schema
+        image: apache/polaris-admin-tool:1.3.0-incubating
+        args:
+        - bootstrap
+        - -r
+        - POLARIS
+        - -c
+        - $(POLARIS_BOOTSTRAP_CREDENTIALS)
+        env:
+        # admin-tool は server と同じ datasource 設定が必要 (Quarkus env naming)
+        - name: POLARIS_PERSISTENCE_TYPE
+          value: relational-jdbc
+        - name: QUARKUS_DATASOURCE_DB_KIND
+          value: postgresql
+        - name: QUARKUS_DATASOURCE_JDBC_URL
+          value: jdbc:postgresql://polaris-postgres:5432/polaris
+        - name: QUARKUS_DATASOURCE_USERNAME
+          valueFrom:
+            secretKeyRef:
+              name: postgres-polaris-cred
+              key: QUARKUS_DATASOURCE_USERNAME
+        - name: QUARKUS_DATASOURCE_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: postgres-polaris-cred
+              key: QUARKUS_DATASOURCE_PASSWORD
+        # -c の値 (realm,clientId,clientSecret) は server の bootstrap creds をそのまま流用
+        - name: POLARIS_BOOTSTRAP_CREDENTIALS
+          valueFrom:
+            secretKeyRef:
+              name: kensan-lakehouse-credentials
+              key: POLARIS_BOOTSTRAP_CREDENTIALS
+        resources:
+          requests:
+            cpu: 50m
+            memory: 256Mi
+          limits:
+            cpu: 500m
+            memory: 512Mi
       containers:
       - name: polaris
         image: apache/polaris:1.3.0-incubating
@@ -63,6 +114,17 @@ spec:
             secretKeyRef:
               name: kensan-lakehouse-credentials
               key: POLARIS_BOOTSTRAP_CREDENTIALS
+        # relational-jdbc datasource cred (VCO dynamic、application.properties の値を上書き)
+        - name: QUARKUS_DATASOURCE_USERNAME
+          valueFrom:
+            secretKeyRef:
+              name: postgres-polaris-cred
+              key: QUARKUS_DATASOURCE_USERNAME
+        - name: QUARKUS_DATASOURCE_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: postgres-polaris-cred
+              key: QUARKUS_DATASOURCE_PASSWORD
         - name: AWS_REGION
           value: us-east-1
         - name: AWS_ACCESS_KEY_ID
