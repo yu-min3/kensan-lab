@@ -6,8 +6,7 @@
 
 - **What this is / tech stack / hardware**: [`README.md`](./README.md)
 - **Directory layout conventions (Pattern A/B)**: [`kubernetes/README.md`](./kubernetes/README.md)
-- **Where to find / read docs (agent index)**: [`docs/agents-index.md`](./docs/agents-index.md) — deterministic map into the docs "Operate & Reference" zone
-- **Doc-layout discipline (where to write what)**: [`docs/concepts/doc-layout.md`](./docs/concepts/doc-layout.md)
+- **Doc-layout discipline (where to find / write docs)**: [`docs/concepts/doc-layout.md`](./docs/concepts/doc-layout.md) — SoT map + the human/AI two-output model
 
 ## Mandatory Constraints
 

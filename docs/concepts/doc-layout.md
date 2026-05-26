@@ -2,7 +2,7 @@
 
 このリポジトリのドキュメントは **層ごとに役割が分かれている**。新しい情報を書くときに「どこに書けばいいか」が機械的に決まるよう、各層の責務を以下に固定する。**同じ事実を複数の場所に書かない** のが基本ルール。
 
-> **読む時 vs 書く時**: このページは「新しい事実を **どこに書くか**」の authoring policy。既存の事実が **どこにあるか** を引く時は、AI/operator 向けの目次 [agents-index.md](../agents-index.md) を入口にする。docs サイトは人間向けの **📖 Understand**（概要・図・narrative）と、AI/operator 向けの **🤖 Operate & Reference**（決定的・網羅・引く）の 2 ゾーンに分かれている。事実は二重化せず、両ゾーンは link で繋ぐ。
+> **人間向け / AI 向けは「2 ゾーン」ではなく「1 ソース → 2 出力」**: 事実は `docs/` に 1 度だけ書く。MkDocs build がそこから 2 つの出力を産む — 人間向けの **HTML サイト**（概要・図・narrative）と、AI 向けの **`/llms.txt`（目次）+ `/llms-full.txt`（全文）**（`mkdocs-llmstxt` が自動生成、[llmstxt.org](https://llmstxt.org/) 標準）。docs サイトのナビは人間専用なので audience ラベルは付けない。`.claude/rules/` は薄いまま `docs/` を参照し、agent 向けの作業指示は root の `AGENTS.md` / `CLAUDE.md` に置く（事実は二重化しない）。
 
 ## 5 つの層
 
