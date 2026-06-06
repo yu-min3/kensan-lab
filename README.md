@@ -126,7 +126,7 @@ docs/                             # ADRs, architecture, guides (MkDocs site)
 
 ## Application: kensan
 
-The `apps/kensan/` directory contains a full-stack application running on this platform — a personal productivity tool built with React, Go microservices, Python AI agents, and an Iceberg data lakehouse (Dagster + Polaris). It serves as both a real workload and a reference for what the platform supports: multi-service deployments, database management, CI/CD via Argo CD, and full observability integration with OpenTelemetry instrumentation across all services.
+The `apps/kensan-legacy/` directory contains a full-stack application running on this platform — a personal productivity tool built with React, Go microservices, Python AI agents, and an Iceberg data lakehouse (Dagster + Polaris). It serves as both a real workload and a reference for what the platform supports: multi-service deployments, database management, CI/CD via Argo CD, and full observability integration with OpenTelemetry instrumentation across all services.
 
 ## Acknowledgments
 
