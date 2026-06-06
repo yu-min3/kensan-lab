@@ -1,0 +1,47 @@
+# Prometheus Blackbox Exporter — 能動 probe (ICMP / HTTPS)
+# 設計: docs/architecture/cluster-health-monitoring.md (Phase 2)
+# probe 対象は resources/ の Probe CRD で宣言する (対象追加は Probe CR に 1 行)
+
+fullnameOverride: blackbox-exporter
+
+securityContext:
+  runAsUser: 1000
+  runAsGroup: 1000
+  readOnlyRootFilesystem: true
+  runAsNonRoot: true
+  allowPrivilegeEscalation: false
+  capabilities:
+    drop: ["ALL"]
+    add: ["NET_RAW"]  # ICMP probe に必要 (chart default はコメントアウト)
+
+config:
+  modules:
+    # HTTPS エンドツーエンド疎通 (LB → Gateway → cert → backend)。
+    # oauth2-proxy 保護ホストは Keycloak login への redirect を follow して
+    # 最終 200 で成功 = 認証チェーン込みの疎通確認になる
+    http_2xx:
+      prober: http
+      timeout: 5s
+      http:
+        valid_http_versions: ["HTTP/1.1", "HTTP/2.0"]
+        follow_redirects: true
+        preferred_ip_protocol: "ip4"
+    # ノード OS レベルの死活 (kubelet 死亡と区別するため)
+    icmp:
+      prober: icmp
+      timeout: 5s
+      icmp:
+        preferred_ip_protocol: "ip4"
+
+resources:
+  requests:
+    cpu: 20m
+    memory: 32Mi
+  limits:
+    cpu: 50m
+    memory: 64Mi
+
+# 自己メトリクスは不要 (probe 結果は Prometheus が Probe CRD 経由で scrape する)
+serviceMonitor:
+  selfMonitor:
+    enabled: false

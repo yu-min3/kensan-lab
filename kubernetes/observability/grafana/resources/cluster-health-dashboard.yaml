@@ -611,6 +611,130 @@ data:
               "refId": "A"
             }
           ]
+        },
+        {
+          "collapsed": false,
+          "gridPos": { "h": 1, "w": 24, "x": 0, "y": 33 },
+          "id": 500,
+          "panels": [],
+          "title": "能動 Probe (blackbox)",
+          "type": "row"
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "title": "ICMP 有線",
+          "type": "state-timeline",
+          "description": "OS レベルの死活 (kubelet 死亡と区別)。有線断 + WiFi 生存 = fallback 縮退運転",
+          "gridPos": { "h": 7, "w": 8, "x": 0, "y": 34 },
+          "id": 16,
+          "fieldConfig": {
+            "defaults": {
+              "color": { "mode": "thresholds" },
+              "custom": { "fillOpacity": 70, "lineWidth": 0, "spanNulls": false },
+              "mappings": [
+                { "type": "value", "options": { "1": { "text": "OK", "color": "green" }, "0": { "text": "NG", "color": "red" } } }
+              ],
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  { "color": "red", "value": null },
+                  { "color": "green", "value": 1 }
+                ]
+              }
+            },
+            "overrides": []
+          },
+          "options": {
+            "legend": { "displayMode": "list", "placement": "bottom", "showLegend": false },
+            "rowHeight": 0.8,
+            "showValue": "never",
+            "tooltip": { "mode": "single", "sort": "none" }
+          },
+          "targets": [
+            {
+              "datasource": { "type": "prometheus", "uid": "prometheus" },
+              "expr": "probe_success{job=\"icmp-wired\"}",
+              "legendFormat": "{{nodename}}",
+              "refId": "A"
+            }
+          ]
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "title": "ICMP WiFi (fallback 系統)",
+          "type": "state-timeline",
+          "gridPos": { "h": 7, "w": 8, "x": 8, "y": 34 },
+          "id": 17,
+          "fieldConfig": {
+            "defaults": {
+              "color": { "mode": "thresholds" },
+              "custom": { "fillOpacity": 70, "lineWidth": 0, "spanNulls": false },
+              "mappings": [
+                { "type": "value", "options": { "1": { "text": "OK", "color": "green" }, "0": { "text": "NG", "color": "red" } } }
+              ],
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  { "color": "red", "value": null },
+                  { "color": "green", "value": 1 }
+                ]
+              }
+            },
+            "overrides": []
+          },
+          "options": {
+            "legend": { "displayMode": "list", "placement": "bottom", "showLegend": false },
+            "rowHeight": 0.8,
+            "showValue": "never",
+            "tooltip": { "mode": "single", "sort": "none" }
+          },
+          "targets": [
+            {
+              "datasource": { "type": "prometheus", "uid": "prometheus" },
+              "expr": "probe_success{job=\"icmp-wifi\"}",
+              "legendFormat": "{{nodename}}",
+              "refId": "A"
+            }
+          ]
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "title": "HTTPS エンドポイント",
+          "type": "state-timeline",
+          "description": "LB → Gateway → 証明書 → backend のエンドツーエンド疎通",
+          "gridPos": { "h": 7, "w": 8, "x": 16, "y": 34 },
+          "id": 18,
+          "fieldConfig": {
+            "defaults": {
+              "color": { "mode": "thresholds" },
+              "custom": { "fillOpacity": 70, "lineWidth": 0, "spanNulls": false },
+              "mappings": [
+                { "type": "value", "options": { "1": { "text": "OK", "color": "green" }, "0": { "text": "NG", "color": "red" } } }
+              ],
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  { "color": "red", "value": null },
+                  { "color": "green", "value": 1 }
+                ]
+              }
+            },
+            "overrides": []
+          },
+          "options": {
+            "legend": { "displayMode": "list", "placement": "bottom", "showLegend": false },
+            "rowHeight": 0.8,
+            "showValue": "never",
+            "tooltip": { "mode": "single", "sort": "none" }
+          },
+          "targets": [
+            {
+              "datasource": { "type": "prometheus", "uid": "prometheus" },
+              "expr": "probe_success{job=\"https-platform\"}",
+              "legendFormat": "{{instance}}",
+              "refId": "A"
+            }
+          ]
         }
       ],
       "refresh": "1m",
