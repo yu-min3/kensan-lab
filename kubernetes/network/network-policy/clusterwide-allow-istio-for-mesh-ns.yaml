@@ -14,6 +14,10 @@
 apiVersion: cilium.io/v2
 kind: CiliumClusterwideNetworkPolicy
 metadata:
+  annotations:
+    # リソース個別の prune 防御（PR #366 の実証: Application メタデータの
+    # Prune=false は子リソースを守らない）。git から消しても ArgoCD は削除しない
+    argocd.argoproj.io/sync-options: Prune=false
   name: allow-istio-for-mesh-ns
 spec:
   description: "All namespaces with istio-injection=enabled may freely talk to istio-system"
