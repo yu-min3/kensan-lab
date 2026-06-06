@@ -50,6 +50,7 @@ Backstage: `cd backstage/app && make {install,dev,all TAG=...}`
 | `network-ingress.md` | Cilium, Gateways, edge, certs |
 | `security-secrets.md` | Vault + ESO, Sealed Secrets, Reloader, cert-manager, GHCR |
 | `environment-separation.md` | PE/AD roles, multi-repo, namespaces (ADR-006) |
+| `design-system.md` | Whetstone UI tokens/components — 全 app の UI を書く前に読む |
 
 ## Domain & Network
 
