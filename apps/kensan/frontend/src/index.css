@@ -1,0 +1,17 @@
+@import "tailwindcss";
+/* Whetstone design tokens — SSoT は packages/design-tokens（当面は相対 import で共有: docs/design/adoption-status.md） */
+@import "../../../../packages/design-tokens/tokens.css";
+
+body {
+  background: hsl(var(--background));
+  color: hsl(var(--foreground));
+  font-family: var(--font-sans);
+}
+
+/* 見出し用 serif（DESIGN_SYSTEM.md 3.2） */
+.h-serif {
+  font-family: var(--font-serif);
+}
+.tnum {
+  font-variant-numeric: tabular-nums;
+}

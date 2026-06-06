@@ -1,4 +1,4 @@
-module github.com/yu-min3/kensan-lab/apps/kensan-next/backend
+module github.com/yu-min3/kensan-lab/apps/kensan/backend
 
 go 1.25.5
 
