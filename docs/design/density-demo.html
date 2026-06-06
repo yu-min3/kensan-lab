@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Whetstone — data-density demo</title>
+<!-- 実装の真実をそのまま読む。@theme は browser が無視し、:root / density vars / .ds-* は効く -->
+<link rel="stylesheet" href="../../packages/design-tokens/tokens.css">
+<style>
+  body{ background:hsl(var(--background)); color:hsl(var(--foreground)); margin:0; padding:40px; }
+  .lead{ max-width:760px; margin:0 auto 28px; }
+  .lead h1{ font-family:var(--font-serif); font-weight:600; font-size:26px; margin:0 0 6px; }
+  .lead p{ color:hsl(var(--muted-foreground)); font-size:14px; margin:0; }
+  .cols{ display:grid; grid-template-columns:1fr 1fr; gap:24px; max-width:760px; margin:0 auto; align-items:start; }
+  .col > .tag{ display:inline-block; font-family:var(--font-mono); font-size:11px; color:hsl(var(--brand));
+               border:1px solid hsl(var(--brand)); border-radius:6px; padding:2px 8px; margin-bottom:10px; }
+  /* card / row / control / button は density utility だけで寸法が決まる（個別指定なし） */
+  .card{ background:hsl(var(--card)); border:1px solid hsl(var(--border)); border-radius:var(--radius-lg); }
+  .row{ display:flex; align-items:center; justify-content:space-between;
+        border-bottom:1px solid hsl(var(--border)); padding:0 12px; font-size:var(--text-size); }
+  .row:last-child{ border-bottom:none; }
+  .num{ font-family:var(--font-mono); font-variant-numeric:tabular-nums; color:hsl(var(--muted-foreground)); }
+  .btn{ display:inline-flex; align-items:center; padding:0 14px; border:none; border-radius:var(--radius-md);
+        background:hsl(var(--brand)); color:hsl(var(--brand-foreground)); font-size:var(--text-size); cursor:pointer; }
+  .meter{ font-family:var(--font-mono); font-size:11px; color:hsl(var(--muted-foreground)); margin-top:10px; }
+</style>
+</head>
+<body>
+  <div class="lead">
+    <h1>data-density は飾りではない</h1>
+    <p>左右はマークアップが同一。違いは祖先の <code>data-density</code> だけ。寸法は <code>.ds-card / .ds-row / .ds-control</code> が density トークンを読んで決めている。</p>
+  </div>
+
+  <div class="cols">
+    <!-- comfortable -->
+    <div class="col" data-density="comfortable">
+      <span class="tag">data-density="comfortable"</span>
+      <div class="card ds-card ds-stack">
+        <span class="ds-label">今週のフォーカス</span>
+        <div class="card" style="border-radius:var(--radius-md)">
+          <div class="row ds-row"><span>Polaris 永続化</span><span class="num">4/4</span></div>
+          <div class="row ds-row"><span>Whetstone 結線</span><span class="num">3/5</span></div>
+          <div class="row ds-row"><span>Vault Transit</span><span class="num">2/2</span></div>
+        </div>
+        <button class="btn ds-control">タスクを追加</button>
+      </div>
+      <div class="meter">row 44px · control 36px · card-pad 20/24px</div>
+    </div>
+
+    <!-- compact -->
+    <div class="col" data-density="compact">
+      <span class="tag">data-density="compact"</span>
+      <div class="card ds-card ds-stack">
+        <span class="ds-label">今週のフォーカス</span>
+        <div class="card" style="border-radius:var(--radius-md)">
+          <div class="row ds-row"><span>Polaris 永続化</span><span class="num">4/4</span></div>
+          <div class="row ds-row"><span>Whetstone 結線</span><span class="num">3/5</span></div>
+          <div class="row ds-row"><span>Vault Transit</span><span class="num">2/2</span></div>
+        </div>
+        <button class="btn ds-control">タスクを追加</button>
+      </div>
+      <div class="meter">row 32px · control 30px · card-pad 12/16px</div>
+    </div>
+  </div>
+</body>
+</html>
