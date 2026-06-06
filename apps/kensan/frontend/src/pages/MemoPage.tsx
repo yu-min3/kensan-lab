@@ -13,11 +13,14 @@ export function MemoPage() {
   const qc = useQueryClient();
   const memo = useQuery({ queryKey: ["file", "memos.md"], queryFn: () => api.file("memos.md") });
 
-  const [draft, setDraft] = useState<string | null>(null);
+  // draft は「fork 元の mtime」と一緒に保持する（DailyPage と同じ理由 — refetch で
+  // doc.mtime が進んでも、保存は編集開始時点の mtime で行い、外部編集を確実に 409 にする）
+  const [draft, setDraft] = useState<{ content: string; baseMtime: string } | null>(null);
   const [quick, setQuick] = useState("");
 
   const save = useMutation({
-    mutationFn: (content: string) => api.putFile("memos.md", content, memo.data!.doc.mtime),
+    mutationFn: ({ content, baseMtime }: { content: string; baseMtime: string }) =>
+      api.putFile("memos.md", content, baseMtime),
     onSuccess: () => {
       setDraft(null);
       setQuick("");
@@ -25,19 +28,21 @@ export function MemoPage() {
     },
   });
 
-  // クイック追記: ## Scratch セクションの末尾に 1 行足して保存
+  // クイック追記: ## Scratch セクションの末尾に 1 行足して保存。
+  // draft が dirty ならその fork 元 mtime を、そうでなければ最新 fetch の mtime を使う
   function appendQuick() {
     if (!memo.data || !quick.trim()) return;
-    const content = draft ?? memo.data.content;
+    const content = draft?.content ?? memo.data.content;
+    const baseMtime = draft?.baseMtime ?? memo.data.doc.mtime;
     const updated = content.includes("## Scratch")
       ? content.replace(/(## Scratch[\s\S]*?)(\n## |$)/, (_, scratch, next) =>
           `${scratch.trimEnd()}\n\n${quick.trim()}\n${next === "\n## " ? "\n## " : next}`)
       : `${content.trimEnd()}\n\n## Scratch\n\n${quick.trim()}\n`;
-    save.mutate(updated);
+    save.mutate({ content: updated, baseMtime });
   }
 
   const conflict = save.error instanceof ApiError && save.error.status === 409;
-  const dirty = draft !== null && draft !== memo.data?.content;
+  const dirty = draft !== null && draft.content !== memo.data?.content;
 
   return (
     <>
@@ -52,7 +57,7 @@ export function MemoPage() {
               size="sm"
               disabled={!dirty}
               loading={save.isPending && !quick}
-              onClick={() => save.mutate(draft ?? "")}
+              onClick={() => draft && save.mutate(draft)}
             >
               保存
             </Button>
@@ -99,8 +104,14 @@ export function MemoPage() {
               <CardBody>
                 <textarea
                   className="w-full min-h-[24rem] resize-y bg-transparent text-sm leading-relaxed focus:outline-none font-sans"
-                  value={draft ?? memo.data.content}
-                  onChange={(e) => setDraft(e.target.value)}
+                  value={draft?.content ?? memo.data.content}
+                  onChange={(e) => {
+                    const content = e.target.value;
+                    setDraft((prev) => ({
+                      content,
+                      baseMtime: prev?.baseMtime ?? memo.data!.doc.mtime,
+                    }));
+                  }}
                   aria-label="メモ全文"
                 />
               </CardBody>

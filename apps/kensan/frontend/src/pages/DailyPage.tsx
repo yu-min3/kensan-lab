@@ -21,11 +21,14 @@ export function DailyPage() {
     retry: (count, err) => !(err instanceof ApiError && err.status === 404) && count < 2,
   });
 
-  const [draft, setDraft] = useState<string | null>(null);
+  // draft は「fork 元の mtime」と一緒に保持する。
+  // refetch が daily.data.doc.mtime を進めても、保存は必ず編集開始時点の mtime で行う
+  // （でないと外部編集を 409 にできず黙って上書きしてしまう）
+  const [draft, setDraft] = useState<{ content: string; baseMtime: string } | null>(null);
   useEffect(() => setDraft(null), [date]);
 
   const save = useMutation({
-    mutationFn: () => api.putFile(dailyPath(date), draft ?? "", daily.data!.doc.mtime),
+    mutationFn: () => api.putFile(dailyPath(date), draft!.content, draft!.baseMtime),
     onSuccess: () => {
       setDraft(null);
       qc.invalidateQueries({ queryKey: ["daily", date] });
@@ -39,7 +42,7 @@ export function DailyPage() {
 
   const notFound = daily.error instanceof ApiError && daily.error.status === 404;
   const conflict = save.error instanceof ApiError && save.error.status === 409;
-  const dirty = draft !== null && draft !== daily.data?.content;
+  const dirty = draft !== null && draft.content !== daily.data?.content;
 
   return (
     <>
@@ -88,8 +91,14 @@ export function DailyPage() {
             <CardBody>
               <textarea
                 className="w-full min-h-[28rem] resize-y bg-transparent text-sm leading-relaxed focus:outline-none font-sans"
-                value={draft ?? daily.data.content}
-                onChange={(e) => setDraft(e.target.value)}
+                value={draft?.content ?? daily.data.content}
+                onChange={(e) => {
+                  const content = e.target.value;
+                  setDraft((prev) => ({
+                    content,
+                    baseMtime: prev?.baseMtime ?? daily.data!.doc.mtime,
+                  }));
+                }}
                 aria-label="日記本文"
               />
             </CardBody>
