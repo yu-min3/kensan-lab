@@ -40,7 +40,11 @@ chmod +x bootstrap/keycloak/setup.sh
 ```
 
 冪等。Keycloak の既存リソースは skip する（既存 user のパスワードは触らない）。
-**Bitwarden は常に Keycloak の現在値に同期される**ので、再実行は secret drift（disaster recovery で realm を作り直した後など）の修復手段としても使える。
+**client secret 系の Bitwarden アイテムは常に Keycloak の現在値に同期される**ので、再実行は secret drift（disaster recovery で realm を作り直した後など）の修復手段としても使える。
+
+> **例外**: `user-yu` のパスワードは既存 user に対しては同期されない（script が勝手に
+> reset しないため）。手動で reset した場合は Bitwarden の `kensan-lab/keycloak/user-yu`
+> も**手動で**更新すること。
 
 > **注意**: client `vault` の secret が再生成された場合、Vault の `auth/oidc/config` への反映は別途必要。
 > bootstrap TF の state は廃棄済みのため `vault write auth/oidc/config ...` で直接更新する
