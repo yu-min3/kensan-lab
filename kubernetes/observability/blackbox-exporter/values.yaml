@@ -4,6 +4,16 @@
 
 fullnameOverride: blackbox-exporter
 
+# ICMP probe を非 root で動かすための sysctl (K8s safe sysctl、デフォルト許可)。
+# gid 1000 (runAsGroup) を ping_group_range に含めることで、blackbox が
+# unprivileged ICMP (SOCK_DGRAM) を使える。
+# 注: capabilities.add ["NET_RAW"] では動かない — K8s に ambient capability が
+# 無いため、非 root プロセスの effective set に capability が入らない (実機確認済み)。
+podSecurityContext:
+  sysctls:
+    - name: net.ipv4.ping_group_range
+      value: "1000 1000"
+
 securityContext:
   runAsUser: 1000
   runAsGroup: 1000
@@ -12,7 +22,6 @@ securityContext:
   allowPrivilegeEscalation: false
   capabilities:
     drop: ["ALL"]
-    add: ["NET_RAW"]  # ICMP probe に必要 (chart default はコメントアウト)
 
 config:
   modules:
