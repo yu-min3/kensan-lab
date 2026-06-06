@@ -144,10 +144,10 @@ ARM64 images **cannot run** on AMD64 nodes (`exec format error`). Two solutions:
 
 ### 3.2 Build via Makefile
 
-All `apps/kensan/` images are built via the `apps/kensan/Makefile` `k8s-*` targets, which already produce multi-arch manifest lists:
+All `apps/kensan-legacy/` images are built via the `apps/kensan-legacy/Makefile` `k8s-*` targets, which already produce multi-arch manifest lists:
 
 ```bash
-cd apps/kensan
+cd apps/kensan-legacy
 make k8s-release-dev TAG=v0.1.0      # build + push + PR (dev)
 make k8s-release-prod TAG=v0.1.0     # build + push + PR (prod)
 make k8s-release TAG=v0.1.0          # build + push + PR (both)
@@ -157,7 +157,7 @@ See `make help` for the full target list. Backstage uses its own `backstage/app/
 
 ### 3.3 Dockerfile Requirements for Multi-Arch
 
-Go services use cross-compilation via `--platform=$BUILDPLATFORM` + `GOARCH=$TARGETARCH`. The Dockerfiles under `apps/kensan/backend/services/*/Dockerfile` already follow this pattern. Reference:
+Go services use cross-compilation via `--platform=$BUILDPLATFORM` + `GOARCH=$TARGETARCH`. The Dockerfiles under `apps/kensan-legacy/backend/services/*/Dockerfile` already follow this pattern. Reference:
 
 ```dockerfile
 FROM --platform=$BUILDPLATFORM golang:1.24-alpine AS builder
@@ -179,7 +179,7 @@ docker buildx create --use
 
 ### 3.5 GitHub Actions
 
-Not currently wired up. When CI is added, use `docker/setup-qemu-action` + `docker/setup-buildx-action` + `docker/build-push-action` with `platforms: linux/amd64,linux/arm64`. See `apps/kensan/Makefile` `k8s-build-*` for the equivalent local commands.
+Not currently wired up. When CI is added, use `docker/setup-qemu-action` + `docker/setup-buildx-action` + `docker/build-push-action` with `platforms: linux/amd64,linux/arm64`. See `apps/kensan-legacy/Makefile` `k8s-build-*` for the equivalent local commands.
 
 ---
 

@@ -47,7 +47,7 @@ find kubernetes/argocd/ backstage/ apps/ -type f \( -name "*.yaml" -o -name "*.y
 |-----------|------|-------|
 | Argo CD Apps | `kubernetes/argocd/applications/**/app.yaml` | `repoURL` |
 | Root App | `kubernetes/argocd/root-apps/platform-root-app.yaml` | `repoURL` |
-| Container images | `apps/kensan/manifests/app/*.yaml` | `ghcr.io/yu-min3/...` |
+| Container images | `apps/kensan-legacy/manifests/app/*.yaml` | `ghcr.io/yu-min3/...` |
 | Backstage image | `backstage/manifests/backstage-deployment.yaml` | `ghcr.io/yu-min3/backstage` |
 
 ### 3. LoadBalancer IP Range
