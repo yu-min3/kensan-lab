@@ -31,12 +31,32 @@ func (d Dest) resolve() (file, section string, err error) {
 	case "daily":
 		t := d.Date
 		if t.IsZero() {
-			t = time.Now()
+			t = ReflectionDate(time.Now())
 		}
 		return fmt.Sprintf("daily/%04d/%02d/%02d.md", t.Year(), t.Month(), t.Day()), "完了タスク", nil
 	default:
 		return "", "", fmt.Errorf("unknown dest: %q", d.Kind)
 	}
+}
+
+// normalized は date 未指定の daily 移動に ReflectionDate を適用した Dest を返す。
+// 日付の解決はここ 1 箇所。resolve / newDailySkeleton は解決済みの Date を使うだけ。
+func (d Dest) normalized(now time.Time) Dest {
+	if d.Kind == "daily" && d.Date.IsZero() {
+		d.Date = ReflectionDate(now)
+	}
+	return d
+}
+
+// ReflectionDate は「振り返りとしての今日」を返す。
+// CLAUDE.md の /reflection 日付判定規約: 0:00〜6:00 の操作は前日分として扱う。
+// API / CLI で date 未指定の daily 移動はこの規約に従う（深夜に完了タスクを
+// 片付けたとき、翌日の daily に書かれてしまうのを防ぐ）。
+func ReflectionDate(now time.Time) time.Time {
+	if now.Hour() < 6 {
+		return now.AddDate(0, 0, -1)
+	}
+	return now
 }
 
 // Move はチェックボックス行をファイル間で移動する。
@@ -45,6 +65,10 @@ func (d Dest) resolve() (file, section string, err error) {
 // 楽観ロック: line 行目のテキストが expectText と一致しない場合は ErrLineMismatch。
 // （Claude / VSCode が同じファイルを先に編集したケースの検出）
 func Move(ws *workspace.Workspace, file string, line int, expectText string, dest Dest) (Task, error) {
+	// 移動先パスと daily 骨組みが必ず同じ日付を見るよう、最初に正規化する
+	// （resolve だけが ReflectionDate を知っていると、ファイル新規作成時の
+	// newDailySkeleton が time.Now() に落ちてパスと中身の日付がズレる）
+	dest = dest.normalized(time.Now())
 	destFile, destSection, err := dest.resolve()
 	if err != nil {
 		return Task{}, err

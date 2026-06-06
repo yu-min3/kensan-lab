@@ -143,3 +143,50 @@ func TestSetStateMarks(t *testing.T) {
 		t.Errorf("today count changed by state ops: %d", len(board.Today))
 	}
 }
+
+// CLAUDE.md の /reflection 日付判定: 0:00〜6:00 は前日扱い
+func TestReflectionDate(t *testing.T) {
+	cases := []struct {
+		now  string
+		want string
+	}{
+		{"2026-06-07T02:30:00", "2026-06-06"}, // 深夜 = 前日
+		{"2026-06-07T05:59:59", "2026-06-06"},
+		{"2026-06-07T06:00:00", "2026-06-07"}, // 6時以降 = 当日
+		{"2026-06-07T23:00:00", "2026-06-07"},
+	}
+	for _, c := range cases {
+		now, err := time.ParseInLocation("2006-01-02T15:04:05", c.now, time.Local)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if got := ReflectionDate(now).Format("2006-01-02"); got != c.want {
+			t.Errorf("ReflectionDate(%s) = %s, want %s", c.now, got, c.want)
+		}
+	}
+}
+
+// 深夜（0〜6時）に date 未指定で daily へ移動するとき、
+// 移動先パスと新規作成される骨組みの日付が必ず一致する（codex review の指摘）
+func TestNormalizedDestSkeletonConsistency(t *testing.T) {
+	night := time.Date(2026, 6, 7, 2, 30, 0, 0, time.Local)
+	d := Dest{Kind: "daily"}.normalized(night)
+
+	file, _, err := d.resolve()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if file != "daily/2026/06/06.md" {
+		t.Fatalf("path should be previous day, got %s", file)
+	}
+	skeleton := newDailySkeleton(d.Date)
+	if !strings.Contains(skeleton, "# 2026-06-06") || !strings.Contains(skeleton, "created: 2026-06-06") {
+		t.Errorf("skeleton date mismatches path:\n%s", skeleton)
+	}
+
+	// 明示指定はそのまま尊重される
+	explicit := Dest{Kind: "daily", Date: time.Date(2026, 6, 1, 0, 0, 0, 0, time.Local)}.normalized(night)
+	if f, _, _ := explicit.resolve(); f != "daily/2026/06/01.md" {
+		t.Errorf("explicit date overridden: %s", f)
+	}
+}

@@ -7,11 +7,13 @@ type Variant = "primary" | "secondary" | "outline" | "ghost" | "destructive" | "
 type Size = "sm" | "md" | "lg";
 
 const variantClass: Record<Variant, string> = {
-  primary: "bg-brand text-white hover:opacity-90",
+  // foreground も必ず semantic トークンで（dark mode では brand/destructive の
+  // 上に乗る文字色が暗色に反転する設計 — text-white 固定は NG）
+  primary: "bg-brand text-brand-foreground hover:opacity-90",
   secondary: "bg-muted text-foreground hover:bg-accent",
   outline: "border border-border-strong bg-transparent hover:bg-accent",
   ghost: "bg-transparent hover:bg-accent",
-  destructive: "bg-destructive text-white hover:opacity-90",
+  destructive: "bg-destructive text-destructive-foreground hover:opacity-90",
   link: "bg-transparent text-brand underline-offset-4 hover:underline p-0 h-auto",
 };
 
@@ -34,7 +36,7 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
       ref={ref}
       disabled={disabled || loading}
       className={clsx(
-        "ds-control inline-flex items-center justify-center rounded-lg font-medium transition-colors duration-[120ms]",
+        "ds-control inline-flex items-center justify-center rounded-lg font-medium transition-colors duration-fast",
         "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50 disabled:pointer-events-none",
         variantClass[variant],
         variant !== "link" && sizeClass[size],

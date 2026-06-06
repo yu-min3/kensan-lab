@@ -1,6 +1,13 @@
 import type { ReactNode } from "react";
 import { NavLink } from "react-router-dom";
-import { LayoutDashboard, BookOpen, StickyNote } from "lucide-react";
+import {
+  LayoutDashboard,
+  BookOpen,
+  StickyNote,
+  SquareKanban,
+  ChartSpline,
+  FileText,
+} from "lucide-react";
 import clsx from "clsx";
 
 // patterns.md 00. App Shell — Variant A: Side Nav + Main（kensan 既定）
@@ -9,14 +16,22 @@ import clsx from "clsx";
 const nav = [
   {
     group: "今日",
-    items: [{ to: "/", label: "ダッシュボード", icon: LayoutDashboard }],
+    items: [
+      { to: "/", label: "ダッシュボード", icon: LayoutDashboard },
+      { to: "/tasks", label: "タスク", icon: SquareKanban },
+    ],
   },
   {
     group: "記録",
     items: [
       { to: "/daily", label: "日記", icon: BookOpen },
       { to: "/memos", label: "メモ", icon: StickyNote },
+      { to: "/notes", label: "ノート", icon: FileText },
     ],
+  },
+  {
+    group: "振り返り",
+    items: [{ to: "/reviews", label: "レビュー", icon: ChartSpline }],
   },
 ];
 
