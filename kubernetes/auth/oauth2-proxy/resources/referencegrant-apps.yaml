@@ -1,0 +1,21 @@
+# app namespace の HTTPRoute（app-base chart の auth.gatewayOAuth2 が生成する
+# /oauth2 直送ルート）から oauth2-proxy Service への cross-namespace 参照を許可する。
+#
+# gateway-prod の allowedRoutes は `kensan-lab.platform/environment: production`
+# ラベルの ns しか受けないため、/oauth2 ルートは auth-system ではなく各 app ns に
+# 置く設計（auth-system は environment: infrastructure でラベルが異なる）。
+# 新しい app が gateway OAuth2 を使うときは from: に ns を追記する。
+apiVersion: gateway.networking.k8s.io/v1beta1
+kind: ReferenceGrant
+metadata:
+  name: allow-app-oauth2-routes
+  namespace: auth-system
+spec:
+  from:
+    - group: gateway.networking.k8s.io
+      kind: HTTPRoute
+      namespace: app-kensan
+  to:
+    - group: ""
+      kind: Service
+      name: oauth2-proxy

@@ -73,5 +73,14 @@ httproute:
     name: gateway-prod
     namespace: istio-system
 
+# gateway 層 OAuth2（oauth2-proxy ext_authz、Keycloak SSO）。
+# 有効化には PE 側の 3 点セットが必要:
+#   1. AuthorizationPolicy（gateway-prod-oauth2-authz）の hosts に host 追加
+#   2. auth-system の ReferenceGrant に ns 追加
+#   3. bootstrap/keycloak/setup.sh の GATEWAY_PROTECTED_HOSTS に host 追加 + 再実行
+auth:
+  gatewayOAuth2:
+    enabled: false
+
 # Secret/ConfigMap 更新時の自動 rollout（stakater/reloader）
 reloader: true

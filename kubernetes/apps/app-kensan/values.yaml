@@ -30,12 +30,16 @@ otel:
 
 httproute:
   enabled: true
-  # ⚠️ LAN 限定の不変条件（公開前ブロッカー、unification-plan.md 未決事項）:
-  # kensan は自前認証を持たず gateway-prod に ext_authz も無い。
-  # 公開 DNS / Cloudflare Tunnel 経路 / *.yu-mins.com hostname をここに
-  # 追加しないこと。公開するには先に認証（ext_authz 拡張 or native OIDC）を入れる。
+  # ⚠️ host 追加時の不変条件: 追加する host は必ず
+  # AuthorizationPolicy（gateway-prod-oauth2-authz）の hosts にも同時に載せること。
+  # 載せ忘れた host は ext_authz を素通りして無認証で workspace が露出する。
   hostnames:
     - kensan-preview.app.yu-min3.com # Phase 7 で kensan.app.yu-min3.com を legacy から継承
+
+# gateway 層 Keycloak SSO（ext_authz）。LAN 内でも認証必須にする
+auth:
+  gatewayOAuth2:
+    enabled: true
 
 resources:
   requests:
