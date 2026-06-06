@@ -1,0 +1,55 @@
+# blackbox probe ベースのアラート。
+# 通知は既存の Alertmanager → Slack #k8s-alerts ルートに乗る。
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: blackbox-alerts
+  namespace: monitoring
+  labels:
+    release: prometheus
+    app: kube-prometheus-stack
+spec:
+  groups:
+    - name: node-liveness
+      rules:
+        # 有線 + WiFi 両系統とも ICMP 不通 = ノードが物理的に死んでいる
+        - alert: NodeICMPUnreachable
+          expr: max by(nodename) (probe_success{job=~"icmp-(wired|wifi)"}) == 0
+          for: 5m
+          labels:
+            severity: critical
+          annotations:
+            summary: "ノード {{ $labels.nodename }} が有線・WiFi 両系統で ICMP 不通"
+            description: >-
+              5 分間どちらの系統からも応答なし。ノード本体の停止
+              (電源 / カーネル凍結) の可能性が高い。
+              m4neo の場合は監視スタックも巻き添えのため Grafana Cloud 側で確認を。
+
+        # 有線断 + WiFi 生存 = fallback 縮退運転中
+        - alert: NodeWiredLinkDown
+          expr: >-
+            probe_success{job="icmp-wired"} == 0
+            and on(nodename) probe_success{job="icmp-wifi"} == 1
+          for: 10m
+          labels:
+            severity: warning
+          annotations:
+            summary: "ノード {{ $labels.nodename }} が有線断 (WiFi fallback で稼働中)"
+            description: >-
+              有線系統 (metric 100) が 10 分間不通、WiFi 系統 (metric 600) は応答あり。
+              ケーブル / スイッチポートを確認。Cilium L2 lease timeout の前兆になり得る。
+
+    - name: platform-endpoints
+      rules:
+        # Gateway 経由のエンドツーエンド疎通断
+        - alert: PlatformEndpointDown
+          expr: probe_success{job="https-platform"} == 0
+          for: 5m
+          labels:
+            severity: warning
+          annotations:
+            summary: "platform endpoint {{ $labels.instance }} が HTTPS 不通"
+            description: >-
+              LB → Istio Gateway → 証明書 → backend のどこかが 5 分間故障。
+              Pod が Running でも発火する (経路レベルの検知)。
+              vault の場合は seal 状態 (sys/health が 503) の可能性もあり。

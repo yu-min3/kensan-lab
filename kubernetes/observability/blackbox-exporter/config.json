@@ -1,0 +1,9 @@
+{
+  "name": "blackbox-exporter",
+  "chart": "prometheus-blackbox-exporter",
+  "chartRepo": "https://prometheus-community.github.io/helm-charts",
+  "chartVersion": "11.11.0",
+  "namespace": "monitoring",
+  "hasResources": "true",
+  "createNamespace": "false"
+}
