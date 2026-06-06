@@ -58,6 +58,33 @@ prometheus:
     # Enable remote write receiver (OTel Collector → Prometheus)
     enableRemoteWriteReceiver: true
 
+    # Grafana Cloud への remote_write (cluster-health 用の厳選 series のみ)
+    # - 目的: クラスタ全停止時も外部からメトリクス閲覧 + "no data" アラート
+    #   (dead-man's switch)。設計: docs/architecture/cluster-health-monitoring.md
+    # - allowlist は Cluster Health ダッシュボードで使う系列に限定 (~1.4k series、
+    #   Grafana Cloud free tier 10k の 14%)。メトリクス追加時は keep regex に追記
+    # - 認証 secret は ESO (resources/grafana-cloud-remote-write-external-secret.yaml)
+    remoteWrite:
+      - url: https://prometheus-prod-49-prod-ap-northeast-0.grafana.net/api/prom/push
+        name: grafana-cloud
+        basicAuth:
+          username:
+            name: grafana-cloud-remote-write
+            key: username
+          password:
+            name: grafana-cloud-remote-write
+            key: password
+        writeRelabelConfigs:
+          # cluster-health ダッシュボードの系列だけ送る
+          - sourceLabels: [__name__]
+            regex: "up|kube_node_status_condition|node_uname_info|node_time_seconds|node_boot_time_seconds|node_cpu_seconds_total|node_memory_MemAvailable_bytes|node_memory_MemTotal_bytes|node_filesystem_avail_bytes|node_filesystem_size_bytes|node_hwmon_temp_celsius|node_network_carrier|node_network_receive_bytes_total|node_network_transmit_bytes_total|kube_pod_status_phase|kube_pod_container_status_restarts_total|kubelet_volume_stats_used_bytes|kubelet_volume_stats_capacity_bytes|kube_pod_info"
+            action: keep
+          # node_cpu は idle だけで使用率を計算できる (1 - idle)。
+          # RE2 は negative lookahead 非対応のため非 idle mode を列挙して drop
+          - sourceLabels: [__name__, mode]
+            regex: "node_cpu_seconds_total;(user|system|nice|iowait|irq|softirq|steal|guest|guest_nice)"
+            action: drop
+
     # Retention settings
     retention: 7d
     retentionSize: "9GB"
