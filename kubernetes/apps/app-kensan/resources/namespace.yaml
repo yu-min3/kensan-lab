@@ -1,0 +1,13 @@
+# ADR-006: app-{name} flat + 3-axis labels
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: app-kensan
+  labels:
+    environment: prod
+    team: yu
+    app: kensan
+    pod-security.kubernetes.io/enforce: restricted
+    # gateway-prod の allowedRoutes namespace selector（これが無いと HTTPRoute が
+    # NotAllowedByListeners で拒否される）
+    kensan-lab.platform/environment: production

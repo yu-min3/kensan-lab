@@ -1,0 +1,77 @@
+# app-base — 既定値。app は必要な項目だけ override する。
+# 最初の消費者: kensan（kubernetes/apps/app-kensan/values.yaml）
+
+nameOverride: "" # 省略時は Release 名
+
+image:
+  repository: ""
+  tag: ""
+  pullPolicy: IfNotPresent
+
+replicas: 1
+
+ports:
+  http: 8080
+
+# [{name: FOO, value: bar}] 形式でそのまま container env に入る
+env: []
+
+resources: {}
+
+nodeSelector: {}
+affinity: {}
+
+probes:
+  path: /healthz
+  initialDelaySeconds: 3
+
+# Pod レベル: PVC (ext4) は root 所有でマウントされるため、nonroot コンテナが
+# 書き込めるよう fsGroup を設定する（volume の group が再帰的に揃えられる）
+podSecurityContext:
+  fsGroup: 65532
+  seccompProfile:
+    type: RuntimeDefault
+
+# PSA restricted 準拠の既定。app 側で緩めない（緩めたくなったら Kyverno exception の議論へ）
+securityContext:
+  runAsNonRoot: true
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: true
+  capabilities:
+    drop: ["ALL"]
+  seccompProfile:
+    type: RuntimeDefault
+
+serviceAccount:
+  create: true
+
+# ns に ghcr-pull-secret を ExternalSecret で生成し、SA の imagePullSecrets に配線する
+# （Vault path: secret/ghcr/pull-token、ClusterSecretStore: vault-backend）
+ghcrPullSecret:
+  enabled: false
+
+# データ volume。create: false + name 指定で既存 claim にも乗れる
+pvc:
+  enabled: false
+  create: true
+  name: "" # 省略時は <release>-data
+  size: 2Gi
+  storageClass: longhorn
+  accessModes: ["ReadWriteOnce"]
+  mountPath: /data
+
+# OTel 環境変数の配線（計装自体は app の責任）
+otel:
+  enabled: false
+  endpoint: http://otel-collector-opentelemetry-collector.monitoring:4318
+  serviceName: "" # 省略時は Release 名
+
+httproute:
+  enabled: false
+  hostnames: []
+  gateway:
+    name: gateway-prod
+    namespace: istio-system
+
+# Secret/ConfigMap 更新時の自動 rollout（stakater/reloader）
+reloader: true
