@@ -30,11 +30,14 @@ Cloudflare Tunnel の token は ESO 経由（`external-secret.yaml`、Vault path
 |---------|----|
 | gateway-platform | 192.168.0.242 |
 | gateway-prod | 192.168.0.243 |
+| kensan-workspace-nfs (longhorn-system) | 192.168.0.244 |
 
 ## Gateway Architecture
 
 - `gateway-platform` (192.168.0.242) → `*.platform.yu-min3.com` / `wildcard-platform-tls` — platform UI (Backstage, ArgoCD, Grafana, Vault 等)
 - `gateway-prod` (192.168.0.243) → `*.app.yu-min3.com` / `wildcard-apps-tls` — user app
+
+**注意 — 認証なしの入口**: `kensan-workspace-nfs`（.244）は NFSv4.1/AUTH_SYS で、LAN 内の任意ホストが workspace（日記含む生活データ）を read/write できる。Gateway 層 OIDC（ADR-010）の外にある裸の入口。LAN 信頼モデル前提の設計トレードオフ（PR #365 レビュー M-3）。
 
 ホスト一覧と全体図: [`kubernetes/network/README.md`](../../kubernetes/network/README.md) / [`docs/architecture/network.md`](../../docs/architecture/network.md)
 

@@ -61,6 +61,11 @@ git worktree remove ~/kensan-lab.worktrees/<name>
 - 一行 typo fix のように main 直 commit でも安全な極小修正で、かつ並行作業が無いと確信できる場合
 - ただし迷ったら worktree を切る (cost が低いので、不要な事故より worktree のオーバーヘッドを優先)
 
+## Prune Protection
+
+- `argocd.argoproj.io/sync-options: Prune=false` は **守りたいリソース個別の manifest に付ける**。Application メタデータに付けても子リソースは守られない（PR #366 で kensan-data PVC が prune された実証）。Application 側の annotation は「root-app が Application CR 自体を prune するのを防ぐ」効果のみ
+- 個別 annotation 済み: clusterwide CCNP 4 本、longhorn の SC/RecurringJob/NFS Service、app-kensan の workspace PVC
+
 ## Change Workflow
 
 1. Worktree を切って branch を作る (上記)
