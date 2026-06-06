@@ -9,6 +9,11 @@ kind: PersistentVolumeClaim
 metadata:
   name: kensan-workspace
   namespace: app-kensan
+  annotations:
+    # リソース個別の prune 防御。Application メタデータの Prune=false は
+    # 効かない（preview の kensan-data PVC が prune された実証あり）。
+    # git からこのファイルを消しても ArgoCD は PVC を削除しない
+    argocd.argoproj.io/sync-options: Prune=false
 spec:
   accessModes: ["ReadWriteMany"]
   storageClassName: longhorn-workspace
