@@ -54,7 +54,7 @@ Backstage: `cd backstage/app && make {install,dev,all TAG=...}`
 
 ## Domain & Network
 
-- **ドメイン**: `yu-min3.com` (Cloudflare DNS)
+- **ドメイン**: `yu-min3.com`（DNS 権威は AWS Route53。Cloudflare は Tunnel での edge 公開のみで DNS 権威ではない）
 - **LB IP range**: `192.168.0.240-249`
 - **GitHub org**: `yu-min3`
 - フォーク時は [`docs/getting-started/configuration.md`](./docs/getting-started/configuration.md) でドメイン等を置換

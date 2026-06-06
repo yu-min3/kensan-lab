@@ -91,6 +91,33 @@ spec:
           port: 443
 
 ---
+## Allow DNS-01 propagation self-check egress (public recursive resolvers only)
+## controller は --dns01-recursive-nameservers=1.1.1.1:53,8.8.8.8:53 +
+## --dns01-recursive-nameservers-only で self-check 先を 2 IP に固定している
+## (kubernetes/secrets/cert-manager/values.yaml)。
+## 外部 port 53 を全開放せず、この 2 IP だけ許可する。
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-dns01-selfcheck-egress
+  namespace: cert-manager
+spec:
+  podSelector: {}
+  policyTypes:
+    - Egress
+  egress:
+    - to:
+        - ipBlock:
+            cidr: 1.1.1.1/32
+        - ipBlock:
+            cidr: 8.8.8.8/32
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
+
+---
 ## Allow webhook ingress from API server (ValidatingWebhookConfiguration)
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
