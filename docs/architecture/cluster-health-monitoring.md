@@ -95,16 +95,20 @@ Prometheus Operator の `Probe` CRD で定義（`resources/` に配置）:
 
 ダッシュボードに probe 結果の Row を追加（Phase 1 の JSON を更新）。
 
-## Phase 3 — Dead-man's switch（m4neo SPOF 対策）
+## Phase 3 — Grafana Cloud remote_write（m4neo SPOF 対策）
 
-「監視の監視」をクラスタ外部に置く。
+「監視の監視 + 障害時も見えるダッシュボード」をクラスタ外部に置く。当初案の healthchecks.io（Watchdog 転送のみ）から、**Grafana Cloud free tier への filtered remote_write** に変更 — dead-man's switch（no-data アラート）に加えて「クラスタ全停止後も直前までのメトリクスを外部から閲覧できる」が手に入るため。
 
-- **仕組み**: kube-prometheus-stack の `Watchdog` アラート（常時発火するハートビート、現在 `null` receiver に捨てている）を [healthchecks.io](https://healthchecks.io)（無料枠）へ転送。ping が途絶えたら healthchecks.io 側からメール / Slack 通知
+- **仕組み**: ローカル Prometheus の scrape は今まで通りクラスタ内で完結し、`remote_write`（外向き HTTPS push、インバウンド不要）で厳選 series だけを Grafana Cloud（Tokyo region）の Mimir に複製
+- **無料枠**: 10k active series / 14 日保持 / 3 ユーザー。allowlist 実測 ~1.4k series（14%）
 - **実装**:
-  1. healthchecks.io で check を作成（period 5m / grace 5m 程度）
-  2. ping URL を Vault static（`secret/monitoring/alertmanager/healthchecks`）に格納、ESO で Alertmanager secret に同期（既存 `alertmanager-slack-secret` と同パターン）
-  3. Alertmanager config の `Watchdog` route を `null` → `healthchecks` receiver（`webhook_configs` + `url_file`）に変更。`repeat_interval: 1m`
+  1. Grafana Cloud アカウント + stack 作成（手動、クレカ不要）。remote_write 用トークン（`metrics:write` scope）を発行し Vault static（`secret/monitoring/grafana-cloud/remote-write`）へ
+  2. ESO で `grafana-cloud-remote-write` Secret（monitoring ns）に同期
+  3. `prometheusSpec.remoteWrite` に endpoint + basicAuth + `writeRelabelConfigs`（cluster-health ダッシュボードの系列の keep + 非 idle cpu mode の drop）
+  4. Cloud 側に Cluster Health ダッシュボードを複製（datasource uid 差し替えのみ）
+  5. Cloud 側で **no-data アラート**（`up{job="node-exporter"}` が届かなくなったら通知）= dead-man's switch
 - **カバーされる障害**: m4neo ダウン、Prometheus / Alertmanager 停止、クラスタ全体停止、宅内ネットワーク / 回線断
+- **Phase 4 候補（任意）**: Cloudflare Workers cron による外部 HTTP probe + 公開 status page（宅内回線断と Gateway 障害の外部視点での切り分け）
 
 ## PR 分割
 
@@ -112,7 +116,7 @@ Prometheus Operator の `Probe` CRD で定義（`resources/` に配置）:
 |----|------|-------------|
 | 1 | 本設計 doc + Phase 1 ダッシュボード | なし（ConfigMap 追加のみ） |
 | 2 | Phase 2 blackbox-exporter + Probe + アラート + ダッシュボード更新 | 新 Pod 1（Deployment） |
-| 3 | Phase 3 Watchdog → healthchecks.io | Alertmanager config 変更 |
+| 3 | Phase 3 Grafana Cloud remote_write（ES + values.yaml） | Prometheus config reload |
 
 ## 関連
 
