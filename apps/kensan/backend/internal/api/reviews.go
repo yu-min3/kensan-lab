@@ -29,10 +29,20 @@ func (s *Server) handleReviews(w http.ResponseWriter, _ *http.Request) {
 	root := filepath.Join(s.ws.Root, "reviews")
 	var out []reviewEntry
 	_ = filepath.WalkDir(root, func(path string, d fs.DirEntry, err error) error {
-		if err != nil || d.IsDir() {
+		if err != nil {
 			return nil
 		}
 		name := d.Name()
+		if d.IsDir() {
+			// workspace.Scan と同じ意味論: 隠しディレクトリは見ない
+			if path != root && strings.HasPrefix(name, ".") {
+				return filepath.SkipDir
+			}
+			return nil
+		}
+		if d.Type()&fs.ModeSymlink != 0 {
+			return nil // symlink は辿らない（workspace.Scan と同じ）
+		}
 		if !strings.HasSuffix(name, ".html") && !strings.HasSuffix(name, ".md") {
 			return nil
 		}
@@ -74,6 +84,22 @@ func (s *Server) handleReviewContent(w http.ResponseWriter, r *http.Request) {
 	cleanRel, err := filepath.Rel(s.ws.Root, filepath.Clean(abs))
 	if err != nil || !strings.HasPrefix(filepath.ToSlash(cleanRel), "reviews/") {
 		writeError(w, http.StatusBadRequest, "path must be under reviews/")
+		return
+	}
+	// http.ServeFile は symlink を辿るため、解決後の実体も reviews/ 配下であることを検証する
+	// （reviews/evil -> /etc のような symlink 経由の workspace 外配信を防ぐ）
+	resolved, err := filepath.EvalSymlinks(abs)
+	if err != nil {
+		writeError(w, http.StatusNotFound, "not found")
+		return
+	}
+	realRoot, err := filepath.EvalSymlinks(filepath.Join(s.ws.Root, "reviews"))
+	if err != nil {
+		writeError(w, http.StatusNotFound, "not found")
+		return
+	}
+	if resolved != realRoot && !strings.HasPrefix(resolved, realRoot+string(filepath.Separator)) {
+		writeError(w, http.StatusBadRequest, "symlink escapes reviews/")
 		return
 	}
 	http.ServeFile(w, r, abs)

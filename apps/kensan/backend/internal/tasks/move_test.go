@@ -143,3 +143,25 @@ func TestSetStateMarks(t *testing.T) {
 		t.Errorf("today count changed by state ops: %d", len(board.Today))
 	}
 }
+
+// CLAUDE.md の /reflection 日付判定: 0:00〜6:00 は前日扱い
+func TestReflectionDate(t *testing.T) {
+	cases := []struct {
+		now  string
+		want string
+	}{
+		{"2026-06-07T02:30:00", "2026-06-06"}, // 深夜 = 前日
+		{"2026-06-07T05:59:59", "2026-06-06"},
+		{"2026-06-07T06:00:00", "2026-06-07"}, // 6時以降 = 当日
+		{"2026-06-07T23:00:00", "2026-06-07"},
+	}
+	for _, c := range cases {
+		now, err := time.ParseInLocation("2006-01-02T15:04:05", c.now, time.Local)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if got := ReflectionDate(now).Format("2006-01-02"); got != c.want {
+			t.Errorf("ReflectionDate(%s) = %s, want %s", c.now, got, c.want)
+		}
+	}
+}

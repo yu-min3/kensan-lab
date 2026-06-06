@@ -73,3 +73,39 @@ func TestReviews(t *testing.T) {
 		}
 	}
 }
+
+// symlink 経由の workspace 外配信と、一覧への symlink / 隠しディレクトリ混入を防ぐ
+func TestReviewsSymlinkSafety(t *testing.T) {
+	ts, root := newTestServer(t)
+	if err := os.MkdirAll(filepath.Join(root, "reviews", ".obsidian"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	// 隠しディレクトリ内の HTML は一覧に出ない
+	if err := os.WriteFile(filepath.Join(root, "reviews", ".obsidian", "cache.html"), []byte("x"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	// workspace 外を指す symlink
+	outside := filepath.Join(t.TempDir(), "secret.html")
+	if err := os.WriteFile(outside, []byte("外部ファイル"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(outside, filepath.Join(root, "reviews", "evil.html")); err != nil {
+		t.Fatal(err)
+	}
+
+	var list struct{ Total int }
+	getJSON(t, ts.URL+"/api/v1/reviews", &list)
+	if list.Total != 0 {
+		t.Errorf("symlink/hidden entries leaked into list: %d", list.Total)
+	}
+
+	resp, err := http.Get(ts.URL + "/api/v1/reviews/evil.html")
+	if err != nil {
+		t.Fatal(err)
+	}
+	body, _ := io.ReadAll(resp.Body)
+	resp.Body.Close()
+	if resp.StatusCode == 200 {
+		t.Errorf("symlink escape served content: %q", body)
+	}
+}

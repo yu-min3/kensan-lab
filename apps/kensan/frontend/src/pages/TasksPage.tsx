@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useMemo, useState, type ReactNode } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   DndContext,
@@ -47,6 +47,19 @@ export function TasksPage() {
 
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 4 } }));
 
+  // project → Task[] のグルーピングは一度だけ計算する（ドラッグ中の isOver 再レンダーで
+  // filter を毎回回さない）。project の無い stock タスクは backend 契約違反なので弾く。
+  const stockByProject = useMemo(() => {
+    const m = new Map<string, Task[]>();
+    for (const t of board.data?.stock ?? []) {
+      if (!t.project) continue;
+      const arr = m.get(t.project);
+      if (arr) arr.push(t);
+      else m.set(t.project, [t]);
+    }
+    return m;
+  }, [board.data]);
+
   function onDragEnd(e: DragEndEvent) {
     const task = e.active.data.current?.task as Task | undefined;
     const target = e.over?.id as string | undefined;
@@ -59,49 +72,30 @@ export function TasksPage() {
     }
   }
 
+  let content: ReactNode;
   if (board.isPending) {
-    return (
-      <>
-        <Header />
-        <div className="grid grid-cols-2 gap-6">
-          <Card><CardBody><SkeletonRows rows={6} /></CardBody></Card>
-          <Card><CardBody><SkeletonRows rows={6} /></CardBody></Card>
-        </div>
-      </>
+    content = (
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <Card><CardBody><SkeletonRows rows={6} /></CardBody></Card>
+        <Card><CardBody><SkeletonRows rows={6} /></CardBody></Card>
+      </div>
     );
-  }
-  if (board.isError) {
-    return (
-      <>
-        <Header />
-        <Card><CardBody><ErrorState error={board.error} onRetry={() => board.refetch()} /></CardBody></Card>
-      </>
+  } else if (board.isError) {
+    content = (
+      <Card><CardBody><ErrorState error={board.error} onRetry={() => board.refetch()} /></CardBody></Card>
     );
-  }
-
-  const today = board.data.today ?? [];
-  const stock = board.data.stock ?? [];
-  const projects = [...new Set(stock.map((t) => t.project!))];
-
-  return (
-    <>
-      <Header />
-      {lastError && (
-        <div className="mb-4 text-sm text-destructive border border-destructive/30 bg-destructive/5 rounded-md px-3 py-2">
-          {lastError}
-        </div>
-      )}
+  } else {
+    content = (
       <DndContext sensors={sensors} onDragEnd={onDragEnd}>
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
           <TodayColumn
-            tasks={today}
+            tasks={board.data.today ?? []}
             onToggle={(t) => toggle.mutate({ task: t, state: t.state === "done" ? "todo" : "done" })}
             onSendToDaily={(t) => move.mutate({ task: t, to: "daily" })}
             busy={move.isPending || toggle.isPending}
           />
           <StockColumn
-            projects={projects}
-            stock={stock}
+            stockByProject={stockByProject}
             someday={board.data.someday ?? []}
             milestones={board.data.milestones ?? []}
             onSendToToday={(t) => move.mutate({ task: t, to: "today" })}
@@ -109,17 +103,23 @@ export function TasksPage() {
           />
         </div>
       </DndContext>
-    </>
-  );
-}
+    );
+  }
 
-function Header() {
   return (
-    <PageHeader
-      eyebrow="タスク"
-      title="かんばん"
-      sub="左右のドラッグ（またはボタン）でストック ⇄ 今日を移動。実体は markdown のチェックボックス行。"
-    />
+    <>
+      <PageHeader
+        eyebrow="タスク"
+        title="かんばん"
+        sub="左右のドラッグ（またはボタン）でストック ⇄ 今日を移動。実体は markdown のチェックボックス行。"
+      />
+      {lastError && (
+        <div className="mb-4 text-sm text-destructive border border-destructive/30 bg-destructive/5 rounded-md px-3 py-2">
+          {lastError}
+        </div>
+      )}
+      {content}
+    </>
   );
 }
 
@@ -176,7 +176,7 @@ function TodayColumn({
                     size="sm"
                     iconOnly
                     aria-label="daily に片付ける"
-                    title="daily に片付ける"
+                    title="daily に片付ける（0〜6時は前日の daily へ）"
                     onClick={() => onSendToDaily(t)}
                   >
                     <ArchiveRestore size={14} />
@@ -192,15 +192,13 @@ function TodayColumn({
 }
 
 function StockColumn({
-  projects,
-  stock,
+  stockByProject,
   someday,
   milestones,
   onSendToToday,
   busy,
 }: {
-  projects: string[];
-  stock: Task[];
+  stockByProject: Map<string, Task[]>;
   someday: Task[];
   milestones: Task[];
   onSendToToday: (t: Task) => void;
@@ -211,18 +209,18 @@ function StockColumn({
       <Card>
         <CardHead title="ストック" sub="projects/*/README.md · タスク" />
         <CardBody className="ds-stack !gap-5">
-          {projects.length === 0 ? (
+          {stockByProject.size === 0 ? (
             <Empty
               icon={<Inbox />}
               title="ストックが空です"
               desc="各プロジェクトの README の ## タスク セクションに追加すると、ここに並びます。"
             />
           ) : (
-            projects.map((p) => (
+            [...stockByProject.entries()].map(([project, tasks]) => (
               <ProjectGroup
-                key={p}
-                project={p}
-                tasks={stock.filter((t) => t.project === p)}
+                key={project}
+                project={project}
+                tasks={tasks}
                 onSendToToday={onSendToToday}
                 busy={busy}
               />
@@ -272,7 +270,7 @@ function ProjectGroup({
   );
 }
 
-function TaskCard({ task, busy, children }: { task: Task; busy: boolean; children: React.ReactNode }) {
+function TaskCard({ task, busy, children }: { task: Task; busy: boolean; children: ReactNode }) {
   const { setNodeRef, attributes, listeners, transform, isDragging } = useDraggable({
     id: `${task.file}:${task.line}`,
     data: { task },

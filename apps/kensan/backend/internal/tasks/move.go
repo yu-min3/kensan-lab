@@ -31,12 +31,23 @@ func (d Dest) resolve() (file, section string, err error) {
 	case "daily":
 		t := d.Date
 		if t.IsZero() {
-			t = time.Now()
+			t = ReflectionDate(time.Now())
 		}
 		return fmt.Sprintf("daily/%04d/%02d/%02d.md", t.Year(), t.Month(), t.Day()), "完了タスク", nil
 	default:
 		return "", "", fmt.Errorf("unknown dest: %q", d.Kind)
 	}
+}
+
+// ReflectionDate は「振り返りとしての今日」を返す。
+// CLAUDE.md の /reflection 日付判定規約: 0:00〜6:00 の操作は前日分として扱う。
+// API / CLI で date 未指定の daily 移動はこの規約に従う（深夜に完了タスクを
+// 片付けたとき、翌日の daily に書かれてしまうのを防ぐ）。
+func ReflectionDate(now time.Time) time.Time {
+	if now.Hour() < 6 {
+		return now.AddDate(0, 0, -1)
+	}
+	return now
 }
 
 // Move はチェックボックス行をファイル間で移動する。

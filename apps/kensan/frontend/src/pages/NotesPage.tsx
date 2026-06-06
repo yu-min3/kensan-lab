@@ -12,7 +12,8 @@ import { Empty, ErrorState, SkeletonRows, Skeleton } from "../components/ui/stat
 // ノート閲覧 + 全文検索。patterns.md 06. List · Detail。
 // 編集はしない（ノートの編集は Claude Code / VSCode の領分。app は読む場所）。
 
-const TYPE_CHIPS = ["note", "book", "project", "memo", "review"] as const;
+// conventions.md の type のうち閲覧価値のあるもの（daily は専用ページがあるため除外）
+const TYPE_CHIPS = ["note", "book", "project", "goal", "memo", "review"] as const;
 
 export function NotesPage() {
   const [params, setParams] = useSearchParams();
@@ -26,10 +27,11 @@ export function NotesPage() {
     queryFn: () => api.files({ type }),
     placeholderData: keepPreviousData,
   });
+  // 1 文字でも検索できる（日本語 1 字のクエリは普通にある）
   const search = useQuery({
     queryKey: ["search", submitted],
     queryFn: () => api.search(submitted),
-    enabled: submitted.length > 1,
+    enabled: submitted.length > 0,
   });
   const detail = useQuery({
     queryKey: ["file", selected],
@@ -37,7 +39,7 @@ export function NotesPage() {
     enabled: !!selected,
   });
 
-  const searching = submitted.length > 1;
+  const searching = submitted.length > 0;
 
   return (
     <>
