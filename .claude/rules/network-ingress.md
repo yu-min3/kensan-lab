@@ -1,6 +1,7 @@
 ---
 description: Cilium L2, LoadBalancer IPs, Istio Gateways, domain architecture, and certificate mapping
-globs: "kubernetes/network/**, **/httproute*, **/gateway*"
+paths:
+  - "kubernetes/**"
 ---
 
 # Network & Ingress

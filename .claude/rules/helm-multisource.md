@@ -1,6 +1,7 @@
 ---
 description: Helm multi-source Application pattern for Argo CD managed components
-globs: "**/values.yaml, **/app.yaml"
+paths:
+  - "kubernetes/**"
 ---
 
 # Helm Multi-Source Application Pattern

@@ -2,6 +2,8 @@
 name: argocd-sync
 description: Check Argo CD sync status for an application — show diff, detect drift, and suggest resolution (does NOT perform sync directly)
 argument-hint: [app-name]
+context: fork
+agent: Explore
 ---
 
 # Argo CD Sync Status

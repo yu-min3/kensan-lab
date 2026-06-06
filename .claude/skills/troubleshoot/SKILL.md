@@ -2,6 +2,8 @@
 name: troubleshoot
 description: Troubleshoot a specific infrastructure component — resolve namespace, check pods, events, logs, and Argo CD sync status
 argument-hint: <component>
+context: fork
+agent: Explore
 ---
 
 # Troubleshoot Component

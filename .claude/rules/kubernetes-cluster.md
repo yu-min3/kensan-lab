@@ -1,6 +1,7 @@
 ---
 description: Cluster topology, node labels, scheduling rules, and storage constraints
-globs: "kubernetes/**"
+paths:
+  - "kubernetes/**"
 ---
 
 # Kubernetes Cluster

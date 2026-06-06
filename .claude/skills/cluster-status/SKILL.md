@@ -2,6 +2,8 @@
 name: cluster-status
 description: Quick health check of the Kubernetes cluster — nodes, Argo CD apps, unhealthy pods, gateways, and certificates
 argument-hint:
+context: fork
+agent: Explore
 ---
 
 # Cluster Status Check

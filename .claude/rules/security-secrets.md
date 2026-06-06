@@ -1,6 +1,8 @@
 ---
 description: Secret management workflows (Vault + ESO / Sealed Secrets / Reloader / cert-manager / GHCR)
-globs: "**/sealed-secret*, kubernetes/auth/**, kubernetes/secrets/**"
+paths:
+  - "kubernetes/**"
+  - "temp/**"
 ---
 
 # Security & Secrets
