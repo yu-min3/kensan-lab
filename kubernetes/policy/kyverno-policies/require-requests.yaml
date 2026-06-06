@@ -1,0 +1,52 @@
+## app tier の resource requests 必須化 — Pi クラスタの過載防止
+## (requests 無し Pod は scheduler が負荷を考慮できず、Pi node を圧迫しうる)
+##
+## scope は app tier のみ。platform 側は argocd / cert-manager / longhorn 等
+## ~50 container が requests 未設定のため対象外 — values.yaml への requests 追記
+## (Git 側修正) で個別に解消する方針 (ADR-012、mutate は使わない)
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: require-requests
+  annotations:
+    policies.kyverno.io/title: Require Resource Requests
+    policies.kyverno.io/category: Best Practices
+    policies.kyverno.io/severity: medium
+    policies.kyverno.io/description: >-
+      application tier の全 container に cpu / memory requests を必須とする。
+      Backstage template は requests を生成するため、新規 app は自然に準拠する。
+spec:
+  background: true
+  webhookConfiguration:
+    failurePolicy: Ignore
+  rules:
+    - name: require-requests
+      match:
+        any:
+          - resources:
+              kinds:
+                - Pod
+              namespaceSelector:
+                matchLabels:
+                  kensan-lab.platform/tier: application
+          - resources:
+              kinds:
+                - Pod
+              namespaces:
+                - "app-*"
+                - kensan
+      validate:
+        failureAction: Audit  # Phase 3 で Enforce へ昇格 (ADR-012)
+        message: "全 container に resources.requests.cpu / memory が必要です"
+        pattern:
+          spec:
+            =(initContainers):
+              - resources:
+                  requests:
+                    cpu: "?*"
+                    memory: "?*"
+            containers:
+              - resources:
+                  requests:
+                    cpu: "?*"
+                    memory: "?*"

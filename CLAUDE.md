@@ -63,4 +63,9 @@ Backstage: `cd backstage/app && make {install,dev,all TAG=...}`
 
 - **コマンド出力**: シェルコマンドを提示する際は `temp/` に `.sh` で書き出す（改行崩れ防止）
 - **言語**: 日本語での対話を優先
-- **コミット**: 1 行目 50 文字以内、本文不要（diff を見ればわかる）
+- **コミット**: Conventional Commits 形式で 1 行目 50 文字以内、本文・trailer 不要（diff を見ればわかる）
+  - 例: `feat(policy): Kyverno 導入`
+  - 例: `fix(argocd): overlay path bug 修正`
+  - 例: `docs(adr): ADR-012 追加`
+  - 例: `chore(helm): cilium 1.18.4 へ更新`
+  - 例: `refactor(vault): values 整理`

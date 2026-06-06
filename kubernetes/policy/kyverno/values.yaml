@@ -1,0 +1,87 @@
+## Kyverno engine (chart 3.8.1 / Kyverno v1.16 系)
+## ホームラボ制約 (Pi worker + microSD etcd master) 向けチューニング。
+## 設計の経緯・段階的ロールアウト: docs/adr/012-policy-enforcement-kyverno.md
+## ポリシー本体は kubernetes/policy/kyverno-policies/ (別 app) で管理
+
+features:
+  ## PolicyException を有効化し、受理を kyverno ns に限定する
+  ## (例外も Git 管理 — kubernetes/policy/kyverno-policies/exceptions/ のみが SoT)
+  policyExceptions:
+    enabled: true
+    namespace: kyverno
+
+  ## microSD etcd 保護: admission 毎の EphemeralReport 書き込みを止め、
+  ## violation 可視化は background scan (既定 1h) 由来の PolicyReport に一本化する
+  admissionReports:
+    enabled: false
+
+  ## validate 結果のみレポート (mutate / generate / imageVerify は未使用 — ADR-012)
+  reporting:
+    validate: true
+    mutate: false
+    mutateExisting: false
+    imageVerify: false
+    generate: false
+
+admissionController:
+  ## ホームラボなので HA 不要。単一 replica 停止時の保険は
+  ## policy 側の webhookConfiguration.failurePolicy: Ignore で取る
+  replicas: 1
+  ## webhook latency を抑えるため m4neo を優先 (Medium カテゴリの scheduling rule)
+  nodeAffinity:
+    preferredDuringSchedulingIgnoredDuringExecution:
+      - weight: 80
+        preference:
+          matchExpressions:
+            - key: hardware-class
+              operator: In
+              values:
+                - high-performance
+  container:
+    resources:
+      requests:
+        cpu: 100m
+        memory: 128Mi
+      limits:
+        memory: 384Mi
+
+backgroundController:
+  replicas: 1
+  nodeAffinity:
+    preferredDuringSchedulingIgnoredDuringExecution:
+      - weight: 80
+        preference:
+          matchExpressions:
+            - key: hardware-class
+              operator: In
+              values:
+                - high-performance
+  resources:
+    requests:
+      cpu: 50m
+      memory: 64Mi
+    limits:
+      memory: 256Mi
+
+reportsController:
+  replicas: 1
+  nodeAffinity:
+    preferredDuringSchedulingIgnoredDuringExecution:
+      - weight: 80
+        preference:
+          matchExpressions:
+            - key: hardware-class
+              operator: In
+              values:
+                - high-performance
+  resources:
+    requests:
+      cpu: 50m
+      memory: 64Mi
+    limits:
+      memory: 256Mi
+
+## CleanupPolicy / TTL cleanup は未使用のため無効化 (Pi のリソース節約)。
+## 必要になったら enabled: true に戻す
+cleanupController:
+  enabled: false

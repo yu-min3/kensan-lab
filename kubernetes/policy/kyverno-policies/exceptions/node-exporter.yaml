@@ -1,0 +1,33 @@
+## node-exporter は node metrics 収集のため host namespace / port / path を要求し
+## PSS baseline と非互換。monitoring ns 全体を privileged にせず、この workload のみ
+## 最小限の control に絞って exempt する (kubernetes/observability/namespace.yaml の
+## TODO(kyverno) で予告されていた per-workload exempt の実装)
+##
+## 実機照合 (2026-06-06): pss-baseline の scope 内で baseline に違反するのは
+## monitoring/prometheus-node-exporter (DaemonSet) のみ
+apiVersion: kyverno.io/v2
+kind: PolicyException
+metadata:
+  name: node-exporter-host-access
+  namespace: kyverno
+spec:
+  exceptions:
+    - policyName: pss-baseline
+      ruleNames:
+        - baseline
+        - autogen-baseline  # Pod controller (DaemonSet) 向けの autogen rule
+  match:
+    any:
+      - resources:
+          kinds:
+            - Pod
+            - DaemonSet
+          namespaces:
+            - monitoring
+          names:
+            - "*node-exporter*"
+  ## exempt する control を必要最小限に限定 (Privileged Containers 等は exempt しない)
+  podSecurity:
+    - controlName: Host Namespaces
+    - controlName: Host Ports
+    - controlName: HostPath Volumes

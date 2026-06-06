@@ -26,3 +26,4 @@ Each ADR follows a lightweight structure:
 | 009 | [Shared `allow-istio` NetworkPolicy](009-shared-allow-istio-network-policy.md) | Accepted |
 | 010 | [Istio Native OAuth2 (Absent)](010-istio-native-oauth2-absent.md) | Accepted |
 | 011 | [Vault Image Tag Explicit Pin](011-vault-version-pinning.md) | Accepted |
+| 012 | [Policy Enforcement with Kyverno](012-policy-enforcement-kyverno.md) | Accepted |

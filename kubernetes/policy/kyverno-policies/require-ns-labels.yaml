@@ -1,0 +1,46 @@
+## ADR-006: app-{name} ns の 3-axis labels (environment / team / app) + tier を強制。
+## ADR-006 自身が「new-namespace creation procedure must enforce it as a required
+## field」と要求しており、本ポリシーがその enforcement 機構
+##
+## 既知 violation (実機照合 2026-06-06): app-kensan が unprefixed の team / app label を
+## 使用 (ADR-006 の正準 key は kensan-lab.platform/ prefix 付き) かつ tier label 無し。
+## ns 定義は apps repo 側にあるため、Audit report を起点にそちらで remediate する
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: require-ns-labels
+  annotations:
+    policies.kyverno.io/title: Require Namespace 3-axis Labels (ADR-006)
+    policies.kyverno.io/category: Best Practices
+    policies.kyverno.io/severity: medium
+    policies.kyverno.io/description: >-
+      app-{name} namespace に ADR-006 の 3-axis labels と
+      tier=application を必須とする。Gateway allowedRoutes /
+      NetworkPolicy / AuthorizationPolicy の label selector が
+      これらに依存するため、欠落は機械処理の破綻に直結する。
+spec:
+  background: true
+  webhookConfiguration:
+    failurePolicy: Ignore
+  rules:
+    - name: require-3-axis-labels
+      match:
+        any:
+          - resources:
+              kinds:
+                - Namespace
+              names:
+                - "app-*"
+      validate:
+        failureAction: Audit  # Phase 3 で Enforce へ昇格 (ADR-012)
+        message: >-
+          ADR-006: app namespace には kensan-lab.platform/environment・
+          kensan-lab.platform/team・kensan-lab.platform/app の 3-axis labels と
+          kensan-lab.platform/tier=application が必要です
+        pattern:
+          metadata:
+            labels:
+              kensan-lab.platform/environment: "?*"
+              kensan-lab.platform/team: "?*"
+              kensan-lab.platform/app: "?*"
+              kensan-lab.platform/tier: application

@@ -1,0 +1,45 @@
+## PSS baseline を Audit 適用 — kubernetes/observability/namespace.yaml の
+## TODO(kyverno) の回収 (ADR-012)
+##
+## scope 設計:
+##   - privileged 設計の ns (kube-system / istio-system / longhorn-system) は除外。
+##     いずれも PSA `enforce: privileged` を明示した PE 管理 ns (CNI / mesh / CSI)
+##   - それ以外は PSA label の有無に関わらず baseline を監査
+##     (monitoring / reloader / sealed-secrets / cloudflare-tunnel 等の PSA 未設定 ns を回収)
+##   - 既知の正当な violation は exceptions/ の PolicyException で exempt
+##     (実機照合 2026-06-06: 該当は node-exporter のみ)
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: pss-baseline
+  annotations:
+    policies.kyverno.io/title: Pod Security Standards (Baseline)
+    policies.kyverno.io/category: Pod Security
+    policies.kyverno.io/severity: medium
+    policies.kyverno.io/description: >-
+      Pod Security Standards baseline profile を privileged 設計 ns 以外の
+      全 namespace に適用する。PSA の namespace 単位 all-or-nothing を、
+      per-workload PolicyException で補完するのが狙い。
+spec:
+  background: true
+  webhookConfiguration:
+    failurePolicy: Ignore  # admission controller (replica 1) 停止時に cluster を止めない
+  rules:
+    - name: baseline
+      match:
+        any:
+          - resources:
+              kinds:
+                - Pod
+      exclude:
+        any:
+          - resources:
+              namespaces:
+                - kube-system
+                - istio-system
+                - longhorn-system
+      validate:
+        failureAction: Audit  # Phase 3 で Enforce へ昇格 (ADR-012)
+        podSecurity:
+          level: baseline
+          version: latest

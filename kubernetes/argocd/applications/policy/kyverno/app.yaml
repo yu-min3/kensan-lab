@@ -1,0 +1,53 @@
+## Kyverno policy engine (ADR-012)
+## ポリシー本体は kyverno-policies app (Pattern B) で別管理 —
+## engine とポリシーのライフサイクルを分離するため (network-policy と同じ思想)
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: kyverno
+  namespace: argocd
+  annotations:
+    ## admission webhook は workload より前 / CNI・cert 系より後に立てる
+    argocd.argoproj.io/sync-wave: "-2"
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io  # 削除時に webhook を残骸にしない
+spec:
+  project: platform-project
+  sources:
+    - repoURL: https://kyverno.github.io/kyverno/
+      chart: kyverno
+      targetRevision: 3.8.1
+      helm:
+        releaseName: kyverno
+        valueFiles:
+          - $values/kubernetes/policy/kyverno/values.yaml
+    - repoURL: https://github.com/yu-min3/kensan-lab
+      targetRevision: main
+      ref: values
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: kyverno
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=false
+      - ServerSideApply=true  # Kyverno CRD は巨大 — annotation サイズ上限回避に必須
+    retry:
+      limit: 5
+      backoff:
+        duration: 5s
+        factor: 2
+        maxDuration: 3m
+  ## Kyverno はポリシー内容に応じて webhook の rules / caBundle を動的管理する。
+  ## external-secrets と同じパターンで drift 誤検知を除外
+  ignoreDifferences:
+    - group: admissionregistration.k8s.io
+      kind: ValidatingWebhookConfiguration
+      jqPathExpressions:
+        - .webhooks
+    - group: admissionregistration.k8s.io
+      kind: MutatingWebhookConfiguration
+      jqPathExpressions:
+        - .webhooks

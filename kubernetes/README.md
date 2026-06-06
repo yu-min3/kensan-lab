@@ -12,6 +12,7 @@ Argo CD で同期される全 platform component の Git source。
 | `auth/` | Keycloak (OIDC IdP), oauth2-proxy (Gateway ext_authz), Vault OIDC auth |
 | `secrets/` | Vault + Vault Config Operator + Vault Database/Transit engines, External Secrets, Sealed Secrets, cert-manager, Reloader |
 | `storage/` | local-path-provisioner, Longhorn |
+| `policy/` | Kyverno (policy engine + ClusterPolicy / PolicyException 群) |
 | `kube-system/` | kube-system ns の label / PSA / 共通リソース管理 |
 | `environments/` | 複数 component が同居する shared namespace の bootstrap (app-prod 等) |
 
