@@ -36,10 +36,7 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
       ref={ref}
       disabled={disabled || loading}
       className={clsx(
-        // NOTE: tokens の --duration-fast は Tailwind の duration-* が読む
-        // --transition-duration-* namespace に未配線（design-tokens 側の課題）。
-        // 配線されるまで var() 直参照でトークンを消費する
-        "ds-control inline-flex items-center justify-center rounded-lg font-medium transition-colors duration-[var(--duration-fast)]",
+        "ds-control inline-flex items-center justify-center rounded-lg font-medium transition-colors duration-fast",
         "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50 disabled:pointer-events-none",
         variantClass[variant],
         variant !== "link" && sizeClass[size],

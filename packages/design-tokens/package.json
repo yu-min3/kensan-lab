@@ -1,6 +1,6 @@
 {
   "name": "@kensan-lab/design-tokens",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "private": true,
   "description": "kensan-lab platform design tokens — colors, typography, spacing, motion. Single source of truth (theme: Whetstone).",
   "license": "UNLICENSED",

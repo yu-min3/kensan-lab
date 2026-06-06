@@ -91,6 +91,12 @@
   --duration-fast: 120ms;
   --duration-base: 200ms;
   --duration-slow: 320ms;
+  /* Tailwind v4 の duration-* ユーティリティは --transition-duration-* namespace を
+     読むため、semantic 名（duration-fast 等）で使えるよう配線する。
+     ease-* は素の --ease-* namespace なので配線不要（上の定義がそのまま効く） */
+  --transition-duration-fast: var(--duration-fast);
+  --transition-duration-base: var(--duration-base);
+  --transition-duration-slow: var(--duration-slow);
 }
 
 /* ============================================================

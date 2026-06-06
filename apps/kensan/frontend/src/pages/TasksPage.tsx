@@ -282,7 +282,7 @@ function TaskCard({ task, busy, children }: { task: Task; busy: boolean; childre
       style={transform ? { transform: `translate(${transform.x}px, ${transform.y}px)` } : undefined}
       className={clsx(
         "flex items-center gap-2 rounded-md border border-border bg-card px-2 py-1.5",
-        "hover:shadow-sm transition-shadow duration-[var(--duration-fast)]",
+        "hover:shadow-sm transition-shadow duration-fast",
         isDragging && "opacity-70 shadow-md z-10 relative",
       )}
     >

@@ -89,3 +89,4 @@ semver。**ブレイキングチェンジ**は以下に該当する変更：
 ## 由来
 
 - v1.0 "Whetstone" — 2026-05 初版。AB-1 ハイブリッド（A骨格 + B肌）から確定。
+- v1.1 — 2026-06-06。motion トークンを Tailwind v4 の `--transition-duration-*` namespace に配線（`duration-fast/base/slow` ユーティリティが利用可能に）。
