@@ -13,7 +13,6 @@ CLAUDE.local.md
 .claude/settings.local.json
 .claude/worktrees/
 GEMINI.md
-AGENTS.md
 
 # Local / IDE
 .serena

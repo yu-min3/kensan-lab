@@ -2,6 +2,8 @@
 name: cert-check
 description: Check all TLS certificates — status, expiration, ClusterIssuer health, and certificate-to-gateway mapping
 argument-hint:
+context: fork
+agent: Explore
 ---
 
 # Certificate Health Check

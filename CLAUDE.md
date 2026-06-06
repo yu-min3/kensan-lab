@@ -15,6 +15,7 @@
 3. **No rendered manifests**: Argo CD renders Helm charts natively. Never commit `helm template` output.
 4. **Secrets**: dynamic creds via Vault + External Secrets; bootstrap creds via Sealed Secrets. Raw secrets in `temp/` only — commit only sealed/encrypted YAMLs.
 5. **No .env commits**: Sensitive tokens stay out of Git.
+6. **Worktree-based development**: 開発を開始するときは `git worktree add ~/kensan-lab.worktrees/<name> -b <branch> origin/main` で worktree + branch を切る。main や並行作業中の branch で直接作業しない。詳細: [`.claude/rules/gitops-workflow.md`](./.claude/rules/gitops-workflow.md)
 
 ## Quick Reference
 
@@ -62,4 +63,4 @@ Backstage: `cd backstage/app && make {install,dev,all TAG=...}`
 
 - **コマンド出力**: シェルコマンドを提示する際は `temp/` に `.sh` で書き出す（改行崩れ防止）
 - **言語**: 日本語での対話を優先
-- **コミット**: 1 行目 50 文字以内、本文不要（diff を見ればわかる）
+- **コミット**: メッセージは一文で簡潔に（1 行目 50 文字以内、本文不要 — diff を見ればわかる）

@@ -1,6 +1,8 @@
 ---
 description: Three-layer separation model, namespace naming (ADR-006), multi-repo strategy, PE/AD responsibilities, and Backstage scaffolding
-globs: "kubernetes/environments/**, **/projects/**"
+paths:
+  - "kubernetes/**"
+  - "backstage/**"
 ---
 
 # Environment Separation
