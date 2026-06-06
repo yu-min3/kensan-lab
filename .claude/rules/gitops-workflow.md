@@ -6,11 +6,11 @@ description: GitOps principles, forbidden operations, and workflow conventions
 
 ## Core Principle
 
-ALL infrastructure changes MUST go through Git → Argo CD sync. No exceptions.
+ALL infrastructure changes MUST go through Git → Argo CD sync. 唯一の例外は下記「Verification Exception」（push 前の一時適用による動作確認）。
 
 ## Forbidden Operations
 
-- `kubectl apply` / `kubectl delete` on infrastructure namespaces (except initial bootstrapping)
+- `kubectl apply` / `kubectl delete` on infrastructure namespaces (except initial bootstrapping / 下記 Verification Exception)
 - `helm install` / `helm upgrade` directly — Argo CD renders charts natively
 - Committing rendered Helm manifests (`helm template` output) to Git
 - 画像 build に single-arch tag を push しない — multi-arch (linux/amd64 + linux/arm64) manifest list で push する (Pi5 + amd64 worker 混在のため)
@@ -65,8 +65,20 @@ git worktree remove ~/kensan-lab.worktrees/<name>
 
 1. Worktree を切って branch を作る (上記)
 2. Edit `values.yaml` or `resources/` files
-3. Commit and push to Git
-4. Argo CD auto-syncs (or manual sync via UI/CLI)
+3. 動作確認が必要な変更は push 前に一時適用して確認する (下記 Verification Exception)
+4. Commit and push to Git
+5. Argo CD auto-syncs (or manual sync via UI/CLI)
+
+## Verification Exception（push 前の一時適用による動作確認）
+
+K8s manifest の変更で動作確認が必要な場合に限り、**push 前の一時適用**を許可する。「push してから壊れる」を防ぐための例外であり、恒久的な手動運用を許すものではない。
+
+1. worktree 上で manifest を編集
+2. `kubectl apply` で一時適用して動作確認（pod 起動・ログ・疎通など）
+3. 確認 OK → commit → push → PR。Argo CD sync で正式反映され、一時適用分は Git と一致する
+4. 確認 NG / push を取りやめる場合 → Argo CD sync（または selfHeal）で必ず Git の状態に戻す
+
+**禁止**: 一時適用したまま push せず放置すること。一時適用は「直後に push する」か「sync で巻き戻す」かの 2 択で必ず収束させる。
 
 ## App of Apps Pattern
 
@@ -84,7 +96,7 @@ git worktree remove ~/kensan-lab.worktrees/<name>
 
 ## Script Output Rule
 
-When presenting shell commands for the user to copy-paste, write them to a script file in `temp/` directory (e.g., `temp/fix-xyz.sh`) instead of inline text. This prevents line-break corruption in the terminal.
+When presenting shell commands for the user to run, write them to a script file in `temp/` directory (e.g., `temp/fix-xyz.sh`) instead of inline text, and make it executable (`chmod +x`) so the user can run it directly (`./temp/fix-xyz.sh`). This prevents line-break corruption in the terminal.
 
 ## Infrastructure Dependencies (Deploy Order)
 
