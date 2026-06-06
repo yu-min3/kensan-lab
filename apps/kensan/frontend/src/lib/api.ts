@@ -111,7 +111,40 @@ export const api = {
     }),
 
   stats: () => request<Record<string, unknown>>("/stats"),
+
+  files: (params: { type?: string; tag?: string; q?: string }) => {
+    const qs = new URLSearchParams(
+      Object.fromEntries(Object.entries(params).filter(([, v]) => v)) as Record<string, string>,
+    ).toString();
+    return request<{ files: Doc[]; total: number }>(`/files${qs ? `?${qs}` : ""}`);
+  },
+
+  search: (q: string, type?: string) =>
+    request<{ hits: SearchHit[]; total: number; truncated: boolean }>(
+      `/search?q=${encodeURIComponent(q)}${type ? `&type=${type}` : ""}`,
+    ),
+
+  reviews: () => request<{ reviews: ReviewEntry[]; total: number }>("/reviews"),
 };
+
+export interface SearchHit {
+  path: string;
+  line: number;
+  snippet: string;
+}
+
+export interface ReviewEntry {
+  path: string;
+  name: string;
+  kind: "weekly" | "daily" | "monthly" | "other";
+  mtime: string;
+  size: number;
+}
+
+// iframe 用のレビュー配信 URL（path は "reviews/..." 形式）
+export function reviewContentURL(path: string): string {
+  return `/api/v1/reviews/${path.replace(/^reviews\//, "")}`;
+}
 
 export function todayISO(): string {
   const d = new Date();

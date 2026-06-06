@@ -33,6 +33,8 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("POST /api/v1/tasks/move", s.handleTaskMove)
 	mux.HandleFunc("PATCH /api/v1/tasks", s.handleTaskState)
 	mux.HandleFunc("GET /api/v1/tags", s.handleTags)
+	mux.HandleFunc("GET /api/v1/reviews", s.handleReviews)
+	mux.HandleFunc("GET /api/v1/reviews/{path...}", s.handleReviewContent)
 	mux.HandleFunc("GET /api/v1/stats", s.handleStats)
 	mux.HandleFunc("GET /api/v1/search", s.handleSearch)
 	return s.middleware(mux)
