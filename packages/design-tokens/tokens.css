@@ -1,0 +1,306 @@
+/* ============================================================
+   kensan-lab — Platform Design Tokens (Whetstone / AB-1)
+   ----------------------------------------------------------------
+   Single source of truth for color / typography / spacing / shadow
+   across ALL apps on the kensan-lab platform — not just apps/kensan.
+
+   Consumed by:
+     - apps/<app>/              (React + Tailwind v4 + shadcn/ui — drop-in)
+     - Backstage plugins        (via MUI theme generator from tokens.json)
+     - Any internal dashboard
+
+   Drop in (Tailwind+shadcn apps):
+       cp packages/design-tokens/tokens.css apps/<app>/src/styles/
+       // src/index.css:
+       @import "tailwindcss";
+       @import "./styles/tokens.css";
+
+   Naming follows shadcn convention so existing components keep working.
+
+   Three layers:
+     1. Semantic tokens (--background, --primary, --brand, ...) —
+        what app code SHOULD use, via Tailwind classes
+     2. Status tokens (--success, --warning, --destructive, --info)
+     3. Component-scoped tokens (--timeblock-*) — opt-in per app
+   ============================================================ */
+
+@theme {
+  /* ---- Color (semantic, resolved via HSL vars below) ---- */
+  --color-background: hsl(var(--background));
+  --color-foreground: hsl(var(--foreground));
+  --color-card: hsl(var(--card));
+  --color-card-foreground: hsl(var(--card-foreground));
+  --color-popover: hsl(var(--popover));
+  --color-popover-foreground: hsl(var(--popover-foreground));
+  --color-primary: hsl(var(--primary));
+  --color-primary-foreground: hsl(var(--primary-foreground));
+  --color-secondary: hsl(var(--secondary));
+  --color-secondary-foreground: hsl(var(--secondary-foreground));
+  --color-muted: hsl(var(--muted));
+  --color-muted-foreground: hsl(var(--muted-foreground));
+  --color-accent: hsl(var(--accent));
+  --color-accent-foreground: hsl(var(--accent-foreground));
+  --color-destructive: hsl(var(--destructive));
+  --color-destructive-foreground: hsl(var(--destructive-foreground));
+  --color-border: hsl(var(--border));
+  --color-border-strong: hsl(var(--border-strong));
+  --color-input: hsl(var(--input));
+  --color-ring: hsl(var(--ring));
+
+  /* Brand & status */
+  --color-brand: hsl(var(--brand));
+  --color-brand-foreground: hsl(var(--brand-foreground));
+  --color-brand-muted: hsl(var(--brand-muted));
+  --color-success: hsl(var(--success));
+  --color-success-foreground: hsl(var(--success-foreground));
+  --color-warning: hsl(var(--warning));
+  --color-warning-foreground: hsl(var(--warning-foreground));
+  --color-info: hsl(var(--info));
+  --color-info-foreground: hsl(var(--info-foreground));
+
+  /* Charts */
+  --color-chart-1: hsl(var(--chart-1));
+  --color-chart-2: hsl(var(--chart-2));
+  --color-chart-3: hsl(var(--chart-3));
+  --color-chart-4: hsl(var(--chart-4));
+  --color-chart-5: hsl(var(--chart-5));
+
+  /* ---- Radius ---- */
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+  --radius-2xl: calc(var(--radius) + 8px);
+
+  /* ---- Typography ---- */
+  --font-sans: "Inter", "Hiragino Sans", "Noto Sans JP", ui-sans-serif, system-ui, sans-serif;
+  --font-serif: "Noto Serif JP", "Hiragino Mincho ProN", "Yu Mincho", serif;
+  --font-mono: "JetBrains Mono", "SF Mono", ui-monospace, Menlo, monospace;
+
+  /* ---- Shadow (warm-tinted; quieter than slate-based shadows) ---- */
+  --shadow-xs: 0 1px 2px 0 hsl(30 20% 10% / 0.05);
+  --shadow-sm: 0 1px 3px 0 hsl(30 20% 10% / 0.08), 0 1px 2px -1px hsl(30 20% 10% / 0.04);
+  --shadow-md: 0 4px 8px -2px hsl(30 20% 10% / 0.10), 0 2px 4px -2px hsl(30 20% 10% / 0.04);
+  --shadow-lg: 0 10px 20px -3px hsl(30 20% 10% / 0.12), 0 4px 6px -4px hsl(30 20% 10% / 0.06);
+  --shadow-focus: 0 0 0 3px hsl(var(--brand) / 0.35);
+
+  /* ---- Motion ---- */
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-in-out: cubic-bezier(0.4, 0, 0.2, 1);
+  --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+  --duration-fast: 120ms;
+  --duration-base: 200ms;
+  --duration-slow: 320ms;
+}
+
+/* ============================================================
+   Density tokens — apps opt in by setting data-density on <html>
+   or a root container.
+   - "comfortable" (default): productivity apps, reading-heavy.
+   - "compact": dashboards, monitoring, dense lists.
+   Components read these tokens instead of hard-coding sizes,
+   so the same component automatically adapts.
+   ============================================================ */
+:root,
+[data-density="comfortable"] {
+  --row-h:        2.75rem;   /* 44px — table row, menu item, list row */
+  --control-h:    2.25rem;   /* 36px — button md, input default */
+  --control-h-sm: 1.875rem;  /* 30px — button sm, badge with chrome */
+  --control-h-lg: 2.625rem;  /* 42px — button lg, hero input */
+  --card-pad-y:   1.25rem;   /* 20px */
+  --card-pad-x:   1.5rem;    /* 24px */
+  --section-gap:  1.5rem;    /* 24px — between cards within a section */
+  --page-pad:     2rem;      /* 32px */
+  --text-size:    0.875rem;  /* 14px */
+  --text-lh:      1.6;
+  --text-label:   0.75rem;   /* 12px — uppercase labels */
+  --gap-inline:   0.5rem;    /* 8px — between adjacent inline controls */
+  --gap-stack:    0.75rem;   /* 12px — between vertical items in a card */
+}
+
+[data-density="compact"] {
+  --row-h:        2rem;      /* 32px */
+  --control-h:    1.875rem;  /* 30px */
+  --control-h-sm: 1.5rem;    /* 24px */
+  --control-h-lg: 2.25rem;   /* 36px */
+  --card-pad-y:   0.75rem;   /* 12px */
+  --card-pad-x:   1rem;      /* 16px */
+  --section-gap:  1rem;      /* 16px */
+  --page-pad:     1.25rem;   /* 20px */
+  --text-size:    0.8125rem; /* 13px */
+  --text-lh:      1.45;
+  --text-label:   0.6875rem; /* 11px */
+  --gap-inline:   0.375rem;  /* 6px */
+  --gap-stack:    0.5rem;    /* 8px */
+}
+
+/* ============================================================
+   LIGHT MODE — 砥石 Whetstone
+   warm off-white surfaces, sky-600 brand, serif headings via .h-serif
+   ============================================================ */
+:root {
+  --radius: 0.5rem;
+
+  /* Surfaces — warm off-white, not cold blue-white */
+  --background: 40 27% 94%;          /* #F5F2EC */
+  --foreground: 36 11% 9%;           /* #1A1714 — warm near-black */
+  --card: 40 38% 98%;                 /* #FCFAF6 — slightly brighter than bg */
+  --card-foreground: 36 11% 9%;
+  --popover: 40 38% 98%;
+  --popover-foreground: 36 11% 9%;
+
+  /* Primary = ink (high-contrast UI text on white), used for solid buttons */
+  --primary: 36 11% 9%;
+  --primary-foreground: 40 38% 98%;
+
+  /* Secondary = warm light gray for chips / muted buttons */
+  --secondary: 38 22% 88%;
+  --secondary-foreground: 36 14% 18%;
+
+  /* Muted = subtle warm gray surface; muted-foreground = sub text */
+  --muted: 40 22% 90%;
+  --muted-foreground: 32 8% 45%;     /* #7A736A */
+
+  /* Accent = warm-tinted sky for highlights (active nav, selection) */
+  --accent: 199 70% 92%;              /* #E0F1F8 */
+  --accent-foreground: 199 89% 25%;   /* #075985 sky-800 */
+
+  /* Border: hairline; -strong used for dividers between sections */
+  --border: 36 23% 85%;               /* #E3DED1 */
+  --border-strong: 36 23% 78%;        /* #D2C9B5 */
+  --input: 36 23% 85%;
+  --ring: 199 89% 40%;
+
+  /* Brand — Sky 600. Reduced saturation vs original Sky 500 for less eye strain */
+  --brand: 199 89% 40%;               /* #0284C7 */
+  --brand-foreground: 40 38% 98%;
+  --brand-muted: 199 70% 92%;         /* lighter tint for backgrounds */
+
+  /* Status */
+  --success: 145 40% 36%;             /* warm-leaning green */
+  --success-foreground: 40 38% 98%;
+  --warning: 32 80% 45%;              /* amber */
+  --warning-foreground: 40 38% 98%;
+  --destructive: 4 70% 48%;           /* warm red, not the cold #DC2626 */
+  --destructive-foreground: 40 38% 98%;
+  --info: 199 89% 40%;
+  --info-foreground: 40 38% 98%;
+
+  /* Charts (warm-friendly progression) */
+  --chart-1: 199 89% 40%;
+  --chart-2: 145 40% 42%;
+  --chart-3: 32 80% 50%;
+  --chart-4: 280 25% 50%;
+  --chart-5: 350 55% 52%;
+
+  /* Component-scoped (kept from existing implementation) */
+  --timeblock-plan-bg: #FBF8F2;
+  --timeblock-plan-border: #D8D2C2;
+  --timeblock-actual-bg: #E3DED1;
+  --timeblock-actual-border: #7A736A;
+}
+
+/* ============================================================
+   DARK MODE — 鋼 Hagane
+   warm soft-dark surfaces (not deep black), sky-400 brand
+   ============================================================ */
+.dark {
+  --background: 30 10% 13%;           /* #26221D — warm soft-dark (was 8%, too crushed) */
+  --foreground: 40 27% 94%;
+  --card: 30 10% 16%;                 /* slight elevation above bg */
+  --card-foreground: 40 27% 94%;
+  --popover: 30 10% 18%;
+  --popover-foreground: 40 27% 94%;
+
+  --primary: 40 27% 94%;
+  --primary-foreground: 30 10% 13%;
+
+  --secondary: 30 10% 22%;
+  --secondary-foreground: 40 27% 94%;
+
+  --muted: 30 10% 18%;
+  --muted-foreground: 30 8% 66%;      /* lifted for legibility on lighter bg */
+
+  --accent: 199 40% 22%;
+  --accent-foreground: 199 89% 80%;
+
+  --border: 30 10% 24%;
+  --border-strong: 30 10% 32%;
+  --input: 30 10% 26%;
+  --ring: 199 89% 60%;
+
+  --brand: 199 89% 60%;               /* sky-400 — readable on dark */
+  --brand-foreground: 30 10% 13%;
+  --brand-muted: 199 40% 25%;
+
+  --success: 145 45% 52%;
+  --success-foreground: 30 10% 13%;
+  --warning: 32 90% 62%;
+  --warning-foreground: 30 10% 13%;
+  --destructive: 4 65% 52%;
+  --destructive-foreground: 40 27% 94%;
+  --info: 199 89% 60%;
+  --info-foreground: 30 10% 13%;
+
+  --chart-1: 199 89% 60%;
+  --chart-2: 145 50% 58%;
+  --chart-3: 32 85% 62%;
+  --chart-4: 280 40% 67%;
+  --chart-5: 350 65% 64%;
+
+  --timeblock-plan-bg: #2D2820;
+  --timeblock-plan-border: #4A4232;
+  --timeblock-actual-bg: #3D372E;
+  --timeblock-actual-border: #948B79;
+}
+
+/* ============================================================
+   Base styles
+   ============================================================ */
+* {
+  border-color: hsl(var(--border));
+}
+
+body {
+  background-color: hsl(var(--background));
+  color: hsl(var(--foreground));
+  font-family: var(--font-sans);
+  font-feature-settings: "ss01", "cv11"; /* Inter humanist digits */
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+/* Headings use Mincho for "研鑽" gravitas.
+   Apply .h-serif manually to h1/h2/sectionTitles where the
+   editorial feel is wanted; keep sans for dense UI labels. */
+.h-serif {
+  font-family: var(--font-serif);
+  font-weight: 600;
+  letter-spacing: 0.01em;
+}
+
+/* Tabular numerics for any data display (stats, time, counts) */
+.tnum {
+  font-variant-numeric: tabular-nums;
+}
+
+/* ============================================================
+   Density-aware utilities — these CONSUME the density tokens above.
+   Apply on real components; they automatically follow whatever
+   data-density the nearest ancestor sets. This is what makes
+   data-density actually do something (vs. defining inert vars).
+   ============================================================ */
+.ds-page    { padding: var(--page-pad); }
+.ds-card    { padding: var(--card-pad-y) var(--card-pad-x); }
+.ds-row     { height: var(--row-h); }
+.ds-control { height: var(--control-h); }
+.ds-section { display: flex; flex-direction: column; gap: var(--section-gap); }
+.ds-stack   { display: flex; flex-direction: column; gap: var(--gap-stack); }
+.ds-inline  { display: flex; align-items: center; gap: var(--gap-inline); }
+.ds-text    { font-size: var(--text-size); line-height: var(--text-lh); }
+.ds-label {
+  font-size: var(--text-label);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: hsl(var(--muted-foreground));
+}
