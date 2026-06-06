@@ -1,0 +1,17 @@
+# kensan-workspace データツリーの本番 volume（Phase 6 cutover、unification-plan.md）。
+# chart の pvc.create ではなく raw manifest にする理由:
+#   - Application は Prune=false + finalizer なしだが、helm release の改廃から
+#     も独立させて「絶対に巻き添え削除されない」層に置く
+#   - 名前を固定し、NFS 外部公開 Service（storage/longhorn/resources）から
+#     share-manager を一意に参照できるようにする
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: kensan-workspace
+  namespace: app-kensan
+spec:
+  accessModes: ["ReadWriteMany"]
+  storageClassName: longhorn-workspace
+  resources:
+    requests:
+      storage: 10Gi

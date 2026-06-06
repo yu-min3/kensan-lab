@@ -1,0 +1,23 @@
+# kensan-workspace volume の NFS export を LAN に公開する（Phase 6、Mac の SSoT マウント用）。
+# Longhorn share-manager（RWX volume ごとに 1 pod）を Cilium L2 VIP で晒す。
+#
+# selector の volume 名は PVC app-kensan/kensan-workspace が bind した PV 名で固定。
+# PVC を作り直すと変わる点に注意（Retain + 専用 SC なので通常は永続）。
+#
+# Mac 側マウント（autofs 管理、temp/phase6-cutover.sh が設定する）:
+#   mount -t nfs -o vers=4.1,noresvport,soft 192.168.0.244:/pvc-cd6553e2-… ~/kensan-workspace
+apiVersion: v1
+kind: Service
+metadata:
+  name: kensan-workspace-nfs
+  namespace: longhorn-system
+  annotations:
+    lbipam.cilium.io/ips: "192.168.0.244"
+spec:
+  type: LoadBalancer
+  selector:
+    longhorn.io/share-manager: pvc-cd6553e2-2bd6-4b7c-b43d-18b0a600b707
+  ports:
+    - name: nfs
+      port: 2049
+      targetPort: 2049

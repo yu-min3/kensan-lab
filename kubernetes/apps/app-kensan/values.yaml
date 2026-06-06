@@ -14,14 +14,12 @@ env:
 ghcrPullSecret:
   enabled: true
 
-# Phase 5 予行: 検証用 PVC（データはコピー、SSoT はまだ Mac）。
-# Phase 6 cutover で本番 RWX volume の claim に切り替える
 pvc:
   enabled: true
-  create: true
-  size: 2Gi
-  storageClass: longhorn
-  accessModes: ["ReadWriteOnce"]
+  # 本番 volume は resources/pvc-workspace.yaml（raw manifest、Retain SC）。
+  # chart には既存 claim 名だけ渡す
+  create: false
+  name: kensan-workspace
   mountPath: /data
 
 otel:
