@@ -36,8 +36,13 @@ func main() {
 			fmt.Fprintln(os.Stderr, "error:", err)
 			os.Exit(1)
 		}
+	case "task":
+		if err := taskCmd(os.Args[2:]); err != nil {
+			fmt.Fprintln(os.Stderr, "error:", err)
+			os.Exit(1)
+		}
 	default:
-		fmt.Fprintf(os.Stderr, "unknown command: %s\nusage: kensan [serve]\n", cmd)
+		fmt.Fprintf(os.Stderr, "unknown command: %s\nusage: kensan [serve|task]\n", cmd)
 		os.Exit(2)
 	}
 }
