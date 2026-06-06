@@ -1,6 +1,10 @@
 # ノード死活の ICMP probe。有線 / WiFi の 2 系統を別 Probe にして
 # 「有線断 → WiFi fallback 縮退運転」を検知可能にする (両方断 = ノード死亡)。
-# IP → nodename の対応は .claude/rules/kubernetes-cluster.md の Node Inventory 参照。
+#
+# ⚠ SoT 二重管理の注意: IP / nodename は .claude/rules/kubernetes-cluster.md の
+# Node Inventory と手動同期。ノード追加・IP 変更時は本ファイルの
+# 「wired / wifi 両方の Probe」(static + metricRelabelings) と rule 側を必ず相互更新する。
+# 怠ると: 旧 IP への probe が永久 critical 化 / 新ノードが silent に監視対象外になる。
 apiVersion: monitoring.coreos.com/v1
 kind: Probe
 metadata:
@@ -23,19 +27,19 @@ spec:
         - 192.168.0.110
   metricRelabelings:
     - sourceLabels: [instance]
-      regex: "192.168.0.107"
+      regex: '192\.168\.0\.107'
       targetLabel: nodename
       replacement: master
     - sourceLabels: [instance]
-      regex: "192.168.0.108"
+      regex: '192\.168\.0\.108'
       targetLabel: nodename
       replacement: worker1
     - sourceLabels: [instance]
-      regex: "192.168.0.109"
+      regex: '192\.168\.0\.109'
       targetLabel: nodename
       replacement: worker2
     - sourceLabels: [instance]
-      regex: "192.168.0.110"
+      regex: '192\.168\.0\.110'
       targetLabel: nodename
       replacement: m4neo
 ---
@@ -61,18 +65,18 @@ spec:
         - 192.168.0.210
   metricRelabelings:
     - sourceLabels: [instance]
-      regex: "192.168.0.207"
+      regex: '192\.168\.0\.207'
       targetLabel: nodename
       replacement: master
     - sourceLabels: [instance]
-      regex: "192.168.0.208"
+      regex: '192\.168\.0\.208'
       targetLabel: nodename
       replacement: worker1
     - sourceLabels: [instance]
-      regex: "192.168.0.209"
+      regex: '192\.168\.0\.209'
       targetLabel: nodename
       replacement: worker2
     - sourceLabels: [instance]
-      regex: "192.168.0.210"
+      regex: '192\.168\.0\.210'
       targetLabel: nodename
       replacement: m4neo

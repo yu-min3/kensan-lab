@@ -20,6 +20,7 @@ globs: "kubernetes/**"
 - **Master IP**: 192.168.0.107, **Pod CIDR**: 10.244.0.0/16
 - **Switch**: TP-Link TL-SG116E (16-port 1GbE Easy Smart, fanless)
 - **Cabling**: 2026-05-07 wired migration. Static IP via netplan (not DHCP reservation). m4neo の `enp4s0` は予備で未設定。
+- ⚠ ノード追加・IP 変更時は `kubernetes/observability/blackbox-exporter/resources/probe-icmp-nodes.yaml`（ICMP 死活監視の対象 IP + nodename mapping、wired/wifi 両方）も必ず更新する
 
 ## Label Axes
 

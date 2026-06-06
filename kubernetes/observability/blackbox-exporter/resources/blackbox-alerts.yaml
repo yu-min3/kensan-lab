@@ -39,6 +39,21 @@ spec:
               有線系統 (metric 100) が 10 分間不通、WiFi 系統 (metric 600) は応答あり。
               ケーブル / スイッチポートを確認。Cilium L2 lease timeout の前兆になり得る。
 
+        # probe 系列そのものの消失 = 死活監視が盲目状態
+        # (blackbox-exporter 死亡、Probe scrape 断など。NodeICMPUnreachable は
+        #  no data では発火しないため、このガードで監視自体の死活を閉じる)
+        - alert: BlackboxProbeAbsent
+          expr: absent(probe_success{job="icmp-wired"})
+          for: 10m
+          labels:
+            severity: warning
+          annotations:
+            summary: "ICMP probe のメトリクスが消失 (死活監視が盲目状態)"
+            description: >-
+              probe_success{job="icmp-wired"} が 10 分間 absent。
+              blackbox-exporter Pod / Probe CRD / Prometheus scrape を確認。
+              この間ノード死活は検知できない。
+
     - name: platform-endpoints
       rules:
         # Gateway 経由のエンドツーエンド疎通断
