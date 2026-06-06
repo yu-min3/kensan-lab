@@ -94,6 +94,41 @@
 }
 
 /* ============================================================
+   Runtime mirror for non-Tailwind / browser-direct consumers.
+   Tailwind reads @theme (above) to generate utilities AND emits these to
+   :root when it processes the file. But a RAW <link> to tokens.css
+   (density-demo.html, "Plain HTML" guidance, a tokens.json-less MUI build)
+   never runs Tailwind, so @theme is ignored by the browser.
+   These declarations make font / radius / shadow / motion tokens resolve in
+   that path too. MUST stay in sync with the @theme values above.
+   (Color HSL primitives already live in :root below, so colors work either way.)
+   ============================================================ */
+:root {
+  --font-sans: "Inter", "Hiragino Sans", "Noto Sans JP", ui-sans-serif, system-ui, sans-serif;
+  --font-serif: "Noto Serif JP", "Hiragino Mincho ProN", "Yu Mincho", serif;
+  --font-mono: "JetBrains Mono", "SF Mono", ui-monospace, Menlo, monospace;
+
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+  --radius-2xl: calc(var(--radius) + 8px);
+
+  --shadow-xs: 0 1px 2px 0 hsl(30 20% 10% / 0.05);
+  --shadow-sm: 0 1px 3px 0 hsl(30 20% 10% / 0.08), 0 1px 2px -1px hsl(30 20% 10% / 0.04);
+  --shadow-md: 0 4px 8px -2px hsl(30 20% 10% / 0.10), 0 2px 4px -2px hsl(30 20% 10% / 0.04);
+  --shadow-lg: 0 10px 20px -3px hsl(30 20% 10% / 0.12), 0 4px 6px -4px hsl(30 20% 10% / 0.06);
+  --shadow-focus: 0 0 0 3px hsl(var(--brand) / 0.35);
+
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-in-out: cubic-bezier(0.4, 0, 0.2, 1);
+  --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+  --duration-fast: 120ms;
+  --duration-base: 200ms;
+  --duration-slow: 320ms;
+}
+
+/* ============================================================
    Density tokens — apps opt in by setting data-density on <html>
    or a root container.
    - "comfortable" (default): productivity apps, reading-heavy.
