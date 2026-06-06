@@ -1,0 +1,626 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: grafana-cluster-health-dashboard
+  namespace: monitoring
+  labels:
+    grafana_dashboard: "1"
+    grafana_folder: "Platform"
+data:
+  cluster-health.json: |
+    {
+      "annotations": {
+        "list": [
+          {
+            "builtIn": 1,
+            "datasource": { "type": "grafana", "uid": "-- Grafana --" },
+            "enable": true,
+            "hide": true,
+            "iconColor": "rgba(0, 211, 255, 1)",
+            "name": "Annotations & Alerts",
+            "type": "dashboard"
+          }
+        ]
+      },
+      "description": "Cluster Health: ノード死活・リソース・ネットワーク (有線/WiFi)・クラスタ概況の一望ビュー",
+      "editable": true,
+      "fiscalYearStartMonth": 0,
+      "graphTooltip": 1,
+      "id": null,
+      "links": [],
+      "panels": [
+        {
+          "collapsed": false,
+          "gridPos": { "h": 1, "w": 24, "x": 0, "y": 0 },
+          "id": 100,
+          "panels": [],
+          "title": "ノード死活",
+          "type": "row"
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "title": "Node Ready",
+          "type": "stat",
+          "gridPos": { "h": 6, "w": 6, "x": 0, "y": 1 },
+          "id": 1,
+          "fieldConfig": {
+            "defaults": {
+              "color": { "mode": "thresholds" },
+              "mappings": [
+                { "type": "value", "options": { "1": { "text": "Ready", "color": "green" }, "0": { "text": "NotReady", "color": "red" } } }
+              ],
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  { "color": "red", "value": null },
+                  { "color": "green", "value": 1 }
+                ]
+              }
+            },
+            "overrides": []
+          },
+          "options": {
+            "colorMode": "background",
+            "graphMode": "none",
+            "justifyMode": "auto",
+            "orientation": "auto",
+            "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+            "textMode": "value_and_name"
+          },
+          "targets": [
+            {
+              "datasource": { "type": "prometheus", "uid": "prometheus" },
+              "expr": "kube_node_status_condition{condition=\"Ready\",status=\"true\"}",
+              "legendFormat": "{{node}}",
+              "refId": "A"
+            }
+          ]
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "title": "Node Uptime",
+          "type": "stat",
+          "gridPos": { "h": 6, "w": 6, "x": 6, "y": 1 },
+          "id": 2,
+          "fieldConfig": {
+            "defaults": {
+              "color": { "mode": "thresholds" },
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  { "color": "yellow", "value": null },
+                  { "color": "green", "value": 3600 }
+                ]
+              },
+              "unit": "dtdurations"
+            },
+            "overrides": []
+          },
+          "options": {
+            "colorMode": "value",
+            "graphMode": "none",
+            "justifyMode": "auto",
+            "orientation": "auto",
+            "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+            "textMode": "value_and_name"
+          },
+          "targets": [
+            {
+              "datasource": { "type": "prometheus", "uid": "prometheus" },
+              "expr": "(node_time_seconds - node_boot_time_seconds) * on(instance) group_left(nodename) node_uname_info",
+              "legendFormat": "{{nodename}}",
+              "refId": "A"
+            }
+          ]
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "title": "Pressure Conditions",
+          "type": "stat",
+          "description": "MemoryPressure / DiskPressure / PIDPressure が true のノード数 (0 が正常)",
+          "gridPos": { "h": 6, "w": 4, "x": 12, "y": 1 },
+          "id": 3,
+          "fieldConfig": {
+            "defaults": {
+              "color": { "mode": "thresholds" },
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  { "color": "green", "value": null },
+                  { "color": "red", "value": 1 }
+                ]
+              }
+            },
+            "overrides": []
+          },
+          "options": {
+            "colorMode": "background",
+            "graphMode": "none",
+            "justifyMode": "auto",
+            "orientation": "auto",
+            "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+            "textMode": "value"
+          },
+          "targets": [
+            {
+              "datasource": { "type": "prometheus", "uid": "prometheus" },
+              "expr": "sum(kube_node_status_condition{condition=~\"MemoryPressure|DiskPressure|PIDPressure\",status=\"true\"})",
+              "legendFormat": "pressure",
+              "refId": "A"
+            }
+          ]
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "title": "node-exporter Up (履歴)",
+          "type": "state-timeline",
+          "gridPos": { "h": 6, "w": 8, "x": 16, "y": 1 },
+          "id": 4,
+          "fieldConfig": {
+            "defaults": {
+              "color": { "mode": "thresholds" },
+              "custom": { "fillOpacity": 70, "lineWidth": 0, "spanNulls": false },
+              "mappings": [
+                { "type": "value", "options": { "1": { "text": "Up", "color": "green" }, "0": { "text": "Down", "color": "red" } } }
+              ],
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  { "color": "red", "value": null },
+                  { "color": "green", "value": 1 }
+                ]
+              }
+            },
+            "overrides": []
+          },
+          "options": {
+            "legend": { "displayMode": "list", "placement": "bottom", "showLegend": false },
+            "rowHeight": 0.8,
+            "showValue": "never",
+            "tooltip": { "mode": "single", "sort": "none" }
+          },
+          "targets": [
+            {
+              "datasource": { "type": "prometheus", "uid": "prometheus" },
+              "expr": "up{job=\"node-exporter\"} * on(instance) group_left(nodename) node_uname_info",
+              "legendFormat": "{{nodename}}",
+              "refId": "A"
+            }
+          ]
+        },
+        {
+          "collapsed": false,
+          "gridPos": { "h": 1, "w": 24, "x": 0, "y": 7 },
+          "id": 200,
+          "panels": [],
+          "title": "リソース",
+          "type": "row"
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "title": "CPU 使用率",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 6, "x": 0, "y": 8 },
+          "id": 5,
+          "fieldConfig": {
+            "defaults": {
+              "color": { "mode": "palette-classic" },
+              "custom": {
+                "drawStyle": "line", "fillOpacity": 10, "lineWidth": 1,
+                "spanNulls": false, "stacking": { "group": "A", "mode": "none" },
+                "thresholdsStyle": { "mode": "off" }
+              },
+              "max": 1,
+              "min": 0,
+              "unit": "percentunit"
+            },
+            "overrides": []
+          },
+          "options": {
+            "legend": { "displayMode": "list", "placement": "bottom", "showLegend": true },
+            "tooltip": { "mode": "multi", "sort": "desc" }
+          },
+          "targets": [
+            {
+              "datasource": { "type": "prometheus", "uid": "prometheus" },
+              "expr": "(1 - avg by(instance) (rate(node_cpu_seconds_total{mode=\"idle\"}[5m]))) * on(instance) group_left(nodename) node_uname_info",
+              "legendFormat": "{{nodename}}",
+              "refId": "A"
+            }
+          ]
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "title": "メモリ使用率",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 6, "x": 6, "y": 8 },
+          "id": 6,
+          "fieldConfig": {
+            "defaults": {
+              "color": { "mode": "palette-classic" },
+              "custom": {
+                "drawStyle": "line", "fillOpacity": 10, "lineWidth": 1,
+                "spanNulls": false, "stacking": { "group": "A", "mode": "none" },
+                "thresholdsStyle": { "mode": "off" }
+              },
+              "max": 1,
+              "min": 0,
+              "unit": "percentunit"
+            },
+            "overrides": []
+          },
+          "options": {
+            "legend": { "displayMode": "list", "placement": "bottom", "showLegend": true },
+            "tooltip": { "mode": "multi", "sort": "desc" }
+          },
+          "targets": [
+            {
+              "datasource": { "type": "prometheus", "uid": "prometheus" },
+              "expr": "(1 - node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes) * on(instance) group_left(nodename) node_uname_info",
+              "legendFormat": "{{nodename}}",
+              "refId": "A"
+            }
+          ]
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "title": "Disk 使用率 (root)",
+          "type": "timeseries",
+          "description": "Pi の microSD 枯渇検知が主目的。80% で警告、90% で危険",
+          "gridPos": { "h": 8, "w": 6, "x": 12, "y": 8 },
+          "id": 7,
+          "fieldConfig": {
+            "defaults": {
+              "color": { "mode": "palette-classic" },
+              "custom": {
+                "drawStyle": "line", "fillOpacity": 10, "lineWidth": 1,
+                "spanNulls": false, "stacking": { "group": "A", "mode": "none" },
+                "thresholdsStyle": { "mode": "line" }
+              },
+              "max": 1,
+              "min": 0,
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  { "color": "green", "value": null },
+                  { "color": "yellow", "value": 0.8 },
+                  { "color": "red", "value": 0.9 }
+                ]
+              },
+              "unit": "percentunit"
+            },
+            "overrides": []
+          },
+          "options": {
+            "legend": { "displayMode": "list", "placement": "bottom", "showLegend": true },
+            "tooltip": { "mode": "multi", "sort": "desc" }
+          },
+          "targets": [
+            {
+              "datasource": { "type": "prometheus", "uid": "prometheus" },
+              "expr": "(1 - node_filesystem_avail_bytes{mountpoint=\"/\",fstype!~\"tmpfs|overlay\"} / node_filesystem_size_bytes{mountpoint=\"/\",fstype!~\"tmpfs|overlay\"}) * on(instance) group_left(nodename) node_uname_info",
+              "legendFormat": "{{nodename}}",
+              "refId": "A"
+            }
+          ]
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "title": "CPU 温度",
+          "type": "timeseries",
+          "description": "Pi のサーマルスロットリング監視 (80°C で throttling 開始)",
+          "gridPos": { "h": 8, "w": 6, "x": 18, "y": 8 },
+          "id": 8,
+          "fieldConfig": {
+            "defaults": {
+              "color": { "mode": "palette-classic" },
+              "custom": {
+                "drawStyle": "line", "fillOpacity": 10, "lineWidth": 1,
+                "spanNulls": false, "stacking": { "group": "A", "mode": "none" },
+                "thresholdsStyle": { "mode": "line" }
+              },
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  { "color": "green", "value": null },
+                  { "color": "yellow", "value": 70 },
+                  { "color": "red", "value": 80 }
+                ]
+              },
+              "unit": "celsius"
+            },
+            "overrides": []
+          },
+          "options": {
+            "legend": { "displayMode": "list", "placement": "bottom", "showLegend": true },
+            "tooltip": { "mode": "multi", "sort": "desc" }
+          },
+          "targets": [
+            {
+              "datasource": { "type": "prometheus", "uid": "prometheus" },
+              "expr": "max by(instance) (node_hwmon_temp_celsius{chip=~\"thermal_thermal_zone.*\"}) * on(instance) group_left(nodename) node_uname_info",
+              "legendFormat": "{{nodename}}",
+              "refId": "A"
+            }
+          ]
+        },
+        {
+          "collapsed": false,
+          "gridPos": { "h": 1, "w": 24, "x": 0, "y": 16 },
+          "id": 300,
+          "panels": [],
+          "title": "ネットワーク (有線メイン / WiFi fallback)",
+          "type": "row"
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "title": "有線リンク (carrier)",
+          "type": "state-timeline",
+          "description": "有線断 = WiFi fallback 運用中。Cilium L2 lease timeout の前兆",
+          "gridPos": { "h": 7, "w": 8, "x": 0, "y": 17 },
+          "id": 9,
+          "fieldConfig": {
+            "defaults": {
+              "color": { "mode": "thresholds" },
+              "custom": { "fillOpacity": 70, "lineWidth": 0, "spanNulls": false },
+              "mappings": [
+                { "type": "value", "options": { "1": { "text": "Link", "color": "green" }, "0": { "text": "Down", "color": "red" } } }
+              ],
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  { "color": "red", "value": null },
+                  { "color": "green", "value": 1 }
+                ]
+              }
+            },
+            "overrides": []
+          },
+          "options": {
+            "legend": { "displayMode": "list", "placement": "bottom", "showLegend": false },
+            "rowHeight": 0.8,
+            "showValue": "never",
+            "tooltip": { "mode": "single", "sort": "none" }
+          },
+          "targets": [
+            {
+              "datasource": { "type": "prometheus", "uid": "prometheus" },
+              "expr": "node_network_carrier{device=~\"eth0|eno1\"} * on(instance) group_left(nodename) node_uname_info",
+              "legendFormat": "{{nodename}} ({{device}})",
+              "refId": "A"
+            }
+          ]
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "title": "WiFi リンク (carrier)",
+          "type": "state-timeline",
+          "gridPos": { "h": 7, "w": 8, "x": 8, "y": 17 },
+          "id": 10,
+          "fieldConfig": {
+            "defaults": {
+              "color": { "mode": "thresholds" },
+              "custom": { "fillOpacity": 70, "lineWidth": 0, "spanNulls": false },
+              "mappings": [
+                { "type": "value", "options": { "1": { "text": "Link", "color": "green" }, "0": { "text": "Down", "color": "red" } } }
+              ],
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  { "color": "red", "value": null },
+                  { "color": "green", "value": 1 }
+                ]
+              }
+            },
+            "overrides": []
+          },
+          "options": {
+            "legend": { "displayMode": "list", "placement": "bottom", "showLegend": false },
+            "rowHeight": 0.8,
+            "showValue": "never",
+            "tooltip": { "mode": "single", "sort": "none" }
+          },
+          "targets": [
+            {
+              "datasource": { "type": "prometheus", "uid": "prometheus" },
+              "expr": "node_network_carrier{device=~\"wlan0|wlp3s0\"} * on(instance) group_left(nodename) node_uname_info",
+              "legendFormat": "{{nodename}} ({{device}})",
+              "refId": "A"
+            }
+          ]
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "title": "Interface トラフィック",
+          "type": "timeseries",
+          "description": "rx 正 / tx 負。WiFi 側にトラフィックが流れていたら有線断のサイン",
+          "gridPos": { "h": 7, "w": 8, "x": 16, "y": 17 },
+          "id": 11,
+          "fieldConfig": {
+            "defaults": {
+              "color": { "mode": "palette-classic" },
+              "custom": {
+                "drawStyle": "line", "fillOpacity": 10, "lineWidth": 1,
+                "spanNulls": false, "stacking": { "group": "A", "mode": "none" },
+                "thresholdsStyle": { "mode": "off" }
+              },
+              "unit": "Bps"
+            },
+            "overrides": []
+          },
+          "options": {
+            "legend": { "displayMode": "list", "placement": "bottom", "showLegend": true },
+            "tooltip": { "mode": "multi", "sort": "desc" }
+          },
+          "targets": [
+            {
+              "datasource": { "type": "prometheus", "uid": "prometheus" },
+              "expr": "rate(node_network_receive_bytes_total{device=~\"eth0|eno1|wlan0|wlp3s0\"}[5m]) * on(instance) group_left(nodename) node_uname_info",
+              "legendFormat": "{{nodename}} {{device}} rx",
+              "refId": "A"
+            },
+            {
+              "datasource": { "type": "prometheus", "uid": "prometheus" },
+              "expr": "-rate(node_network_transmit_bytes_total{device=~\"eth0|eno1|wlan0|wlp3s0\"}[5m]) * on(instance) group_left(nodename) node_uname_info",
+              "legendFormat": "{{nodename}} {{device}} tx",
+              "refId": "B"
+            }
+          ]
+        },
+        {
+          "collapsed": false,
+          "gridPos": { "h": 1, "w": 24, "x": 0, "y": 24 },
+          "id": 400,
+          "panels": [],
+          "title": "クラスタ概況",
+          "type": "row"
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "title": "異常 Pod 数",
+          "type": "stat",
+          "description": "Pending / Failed / Unknown の Pod 数 (0 が正常)",
+          "gridPos": { "h": 8, "w": 4, "x": 0, "y": 25 },
+          "id": 12,
+          "fieldConfig": {
+            "defaults": {
+              "color": { "mode": "thresholds" },
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  { "color": "green", "value": null },
+                  { "color": "red", "value": 1 }
+                ]
+              }
+            },
+            "overrides": []
+          },
+          "options": {
+            "colorMode": "background",
+            "graphMode": "area",
+            "justifyMode": "auto",
+            "orientation": "auto",
+            "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+            "textMode": "value"
+          },
+          "targets": [
+            {
+              "datasource": { "type": "prometheus", "uid": "prometheus" },
+              "expr": "sum(kube_pod_status_phase{phase=~\"Pending|Failed|Unknown\"})",
+              "legendFormat": "abnormal",
+              "refId": "A"
+            }
+          ]
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "title": "コンテナ再起動 (1h, namespace 別)",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 8, "x": 4, "y": 25 },
+          "id": 13,
+          "fieldConfig": {
+            "defaults": {
+              "color": { "mode": "palette-classic" },
+              "custom": {
+                "drawStyle": "bars", "fillOpacity": 50, "lineWidth": 1,
+                "spanNulls": false, "stacking": { "group": "A", "mode": "normal" },
+                "thresholdsStyle": { "mode": "off" }
+              },
+              "unit": "short"
+            },
+            "overrides": []
+          },
+          "options": {
+            "legend": { "displayMode": "list", "placement": "bottom", "showLegend": true },
+            "tooltip": { "mode": "multi", "sort": "desc" }
+          },
+          "targets": [
+            {
+              "datasource": { "type": "prometheus", "uid": "prometheus" },
+              "expr": "sum by(namespace) (increase(kube_pod_container_status_restarts_total[1h])) > 0",
+              "legendFormat": "{{namespace}}",
+              "refId": "A"
+            }
+          ]
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "title": "PVC 使用率",
+          "type": "bargauge",
+          "gridPos": { "h": 8, "w": 6, "x": 12, "y": 25 },
+          "id": 14,
+          "fieldConfig": {
+            "defaults": {
+              "color": { "mode": "thresholds" },
+              "max": 1,
+              "min": 0,
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  { "color": "green", "value": null },
+                  { "color": "yellow", "value": 0.8 },
+                  { "color": "red", "value": 0.9 }
+                ]
+              },
+              "unit": "percentunit"
+            },
+            "overrides": []
+          },
+          "options": {
+            "displayMode": "gradient",
+            "orientation": "horizontal",
+            "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+            "showUnfilled": true
+          },
+          "targets": [
+            {
+              "datasource": { "type": "prometheus", "uid": "prometheus" },
+              "expr": "kubelet_volume_stats_used_bytes / kubelet_volume_stats_capacity_bytes",
+              "legendFormat": "{{namespace}}/{{persistentvolumeclaim}}",
+              "refId": "A"
+            }
+          ]
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "title": "Pod 数 / ノード",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 6, "x": 18, "y": 25 },
+          "id": 15,
+          "fieldConfig": {
+            "defaults": {
+              "color": { "mode": "palette-classic" },
+              "custom": {
+                "drawStyle": "line", "fillOpacity": 10, "lineWidth": 1,
+                "spanNulls": false, "stacking": { "group": "A", "mode": "none" },
+                "thresholdsStyle": { "mode": "off" }
+              },
+              "unit": "short"
+            },
+            "overrides": []
+          },
+          "options": {
+            "legend": { "displayMode": "list", "placement": "bottom", "showLegend": true },
+            "tooltip": { "mode": "multi", "sort": "desc" }
+          },
+          "targets": [
+            {
+              "datasource": { "type": "prometheus", "uid": "prometheus" },
+              "expr": "sum by(node) (kube_pod_info)",
+              "legendFormat": "{{node}}",
+              "refId": "A"
+            }
+          ]
+        }
+      ],
+      "refresh": "1m",
+      "schemaVersion": 39,
+      "tags": ["platform", "cluster-health"],
+      "templating": { "list": [] },
+      "time": { "from": "now-6h", "to": "now" },
+      "timepicker": {},
+      "timezone": "",
+      "title": "Cluster Health",
+      "uid": "cluster-health",
+      "version": 1
+    }
