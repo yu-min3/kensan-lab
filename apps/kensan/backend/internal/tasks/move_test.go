@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/yu-min3/kensan-lab/apps/kensan-next/backend/internal/workspace"
+	"github.com/yu-min3/kensan-lab/apps/kensan/backend/internal/workspace"
 )
 
 func setupBoard(t *testing.T) (*workspace.Workspace, string) {

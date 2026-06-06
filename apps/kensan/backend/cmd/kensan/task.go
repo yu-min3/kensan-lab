@@ -8,8 +8,8 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/yu-min3/kensan-lab/apps/kensan-next/backend/internal/tasks"
-	"github.com/yu-min3/kensan-lab/apps/kensan-next/backend/internal/workspace"
+	"github.com/yu-min3/kensan-lab/apps/kensan/backend/internal/tasks"
+	"github.com/yu-min3/kensan-lab/apps/kensan/backend/internal/workspace"
 )
 
 // taskCmd は `kensan task <list|move|state>` を処理する。

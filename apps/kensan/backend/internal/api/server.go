@@ -7,7 +7,7 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/yu-min3/kensan-lab/apps/kensan-next/backend/internal/workspace"
+	"github.com/yu-min3/kensan-lab/apps/kensan/backend/internal/workspace"
 )
 
 type Server struct {

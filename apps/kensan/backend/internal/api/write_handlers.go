@@ -7,8 +7,8 @@ import (
 	"os"
 	"time"
 
-	"github.com/yu-min3/kensan-lab/apps/kensan-next/backend/internal/tasks"
-	"github.com/yu-min3/kensan-lab/apps/kensan-next/backend/internal/workspace"
+	"github.com/yu-min3/kensan-lab/apps/kensan/backend/internal/tasks"
+	"github.com/yu-min3/kensan-lab/apps/kensan/backend/internal/workspace"
 )
 
 // POST /api/v1/files {path, content}

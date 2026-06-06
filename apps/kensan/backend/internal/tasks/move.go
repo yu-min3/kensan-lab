@@ -6,7 +6,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/yu-min3/kensan-lab/apps/kensan-next/backend/internal/workspace"
+	"github.com/yu-min3/kensan-lab/apps/kensan/backend/internal/workspace"
 )
 
 // ErrLineMismatch は指定行の内容が期待と異なる場合（他クライアントが先に編集した）。

@@ -21,8 +21,8 @@ import (
 
 	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
 
-	"github.com/yu-min3/kensan-lab/apps/kensan-next/backend/internal/api"
-	"github.com/yu-min3/kensan-lab/apps/kensan-next/backend/internal/telemetry"
+	"github.com/yu-min3/kensan-lab/apps/kensan/backend/internal/api"
+	"github.com/yu-min3/kensan-lab/apps/kensan/backend/internal/telemetry"
 )
 
 func main() {
