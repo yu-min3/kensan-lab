@@ -165,3 +165,28 @@ func TestReflectionDate(t *testing.T) {
 		}
 	}
 }
+
+// 深夜（0〜6時）に date 未指定で daily へ移動するとき、
+// 移動先パスと新規作成される骨組みの日付が必ず一致する（codex review の指摘）
+func TestNormalizedDestSkeletonConsistency(t *testing.T) {
+	night := time.Date(2026, 6, 7, 2, 30, 0, 0, time.Local)
+	d := Dest{Kind: "daily"}.normalized(night)
+
+	file, _, err := d.resolve()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if file != "daily/2026/06/06.md" {
+		t.Fatalf("path should be previous day, got %s", file)
+	}
+	skeleton := newDailySkeleton(d.Date)
+	if !strings.Contains(skeleton, "# 2026-06-06") || !strings.Contains(skeleton, "created: 2026-06-06") {
+		t.Errorf("skeleton date mismatches path:\n%s", skeleton)
+	}
+
+	// 明示指定はそのまま尊重される
+	explicit := Dest{Kind: "daily", Date: time.Date(2026, 6, 1, 0, 0, 0, 0, time.Local)}.normalized(night)
+	if f, _, _ := explicit.resolve(); f != "daily/2026/06/01.md" {
+		t.Errorf("explicit date overridden: %s", f)
+	}
+}
