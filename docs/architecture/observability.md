@@ -2,6 +2,8 @@
 
 OpenTelemetry を中心に、メトリクス・トレース・ログを統一的に収集・保存・可視化する。
 
+クラスタ健全性（ノード死活・probe・dead-man's switch）の設計は [cluster-health-monitoring.md](./cluster-health-monitoring.md) を参照。
+
 ## アーキテクチャ
 
 ```
