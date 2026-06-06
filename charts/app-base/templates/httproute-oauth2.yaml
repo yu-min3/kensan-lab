@@ -1,0 +1,32 @@
+{{- if and .Values.httproute.enabled .Values.auth.gatewayOAuth2.enabled }}
+# gateway 層 OAuth2（oauth2-proxy ext_authz）の OIDC flow 用ルート。
+# /oauth2/* を auth-system の oauth2-proxy へ直送する（ext_authz check は
+# cookie 検証のみで callback 処理ができないため）。
+# 前提: auth-system 側の ReferenceGrant（allow-app-oauth2-routes）に
+# この ns が列挙されていること。
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: {{ include "app-base.name" . }}-oauth2
+  labels:
+    {{- include "app-base.labels" . | nindent 4 }}
+spec:
+  parentRefs:
+    - group: gateway.networking.k8s.io
+      kind: Gateway
+      name: {{ .Values.httproute.gateway.name }}
+      namespace: {{ .Values.httproute.gateway.namespace }}
+  hostnames:
+    {{- toYaml .Values.httproute.hostnames | nindent 4 }}
+  rules:
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /oauth2
+      backendRefs:
+        - group: ""
+          kind: Service
+          name: oauth2-proxy
+          namespace: auth-system
+          port: 4180
+{{- end }}

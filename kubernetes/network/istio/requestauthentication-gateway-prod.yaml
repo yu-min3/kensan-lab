@@ -1,0 +1,19 @@
+# gateway-prod で oauth2-proxy が付与する Bearer id_token を検証し、
+# request.auth.claims を ALLOW policy で使えるようにする
+# （requestauthentication-gateway-platform.yaml の gateway-prod 版）。
+#
+# RequestAuthentication 自体は「JWT があれば検証する」だけで強制はしない。
+# 強制は CUSTOM (ext_authz) + ALLOW (groups) の組で行う。
+apiVersion: security.istio.io/v1
+kind: RequestAuthentication
+metadata:
+  name: gateway-prod-keycloak-jwt
+  namespace: istio-system
+spec:
+  targetRef:
+    group: gateway.networking.k8s.io
+    kind: Gateway
+    name: gateway-prod
+  jwtRules:
+    - issuer: "https://auth.platform.yu-min3.com/realms/kensan"
+      jwksUri: "https://auth.platform.yu-min3.com/realms/kensan/protocol/openid-connect/certs"

@@ -1,0 +1,10 @@
+apiVersion: v2
+name: app-base
+description: >-
+  kensan-lab platform が app に提供する汎用デプロイ chart。
+  Deployment / Service / HTTPRoute / ServiceAccount / PVC / ghcr pull secret /
+  OTel 配線を values だけで構成する。「PE が chart を提供、app が values で利用」
+  パターン（vault-database と同型）の app 向け一般化。
+type: application
+version: 0.1.0
+appVersion: "0.1.0"

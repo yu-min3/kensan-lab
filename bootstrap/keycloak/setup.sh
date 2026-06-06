@@ -272,6 +272,8 @@ GATEWAY_PROTECTED_HOSTS=(
   backstage.yu-mins.com
   prometheus.yu-mins.com
   longhorn.yu-mins.com
+  # gateway-prod 側の protected host (新 kensan、ADR-010 の app 系への拡張)
+  kensan-preview.app.yu-min3.com
 )
 # Grafana は auth.generic_oauth で Keycloak 直結 (Path B)。Authorization Bearer
 # 解釈の衝突を避けるため gateway-platform は bypass、別 client で OIDC する。

@@ -17,6 +17,9 @@ spec:
     server: "https://kubernetes.default.svc"
   - namespace: app-prod
     server: "https://kubernetes.default.svc"
+  # ADR-006 の app-{name} flat namespace（新 kensan が第 1 号）
+  - namespace: app-kensan
+    server: "https://kubernetes.default.svc"
 
   # Apps own their own namespace (per-app namespace design)
   clusterResourceWhitelist:
@@ -33,6 +36,9 @@ spec:
     kind: Job
   - group: "policy"
     kind: PodDisruptionBudget
+  # Storage（app-base chart の data PVC）
+  - group: ""
+    kind: PersistentVolumeClaim
   # Networking
   - group: ""
     kind: Service

@@ -79,7 +79,10 @@ func serve() error {
 		_ = shutdown(sctx)
 	}()
 
-	handler := otelhttp.NewHandler(api.New(root, log).Handler(), "kensan-api")
+	handler := otelhttp.NewHandler(
+		api.WithStatic(api.New(root, log).Handler(), os.Getenv("KENSAN_STATIC_DIR")),
+		"kensan-api",
+	)
 	srv := &http.Server{Addr: addr, Handler: handler}
 
 	go func() {

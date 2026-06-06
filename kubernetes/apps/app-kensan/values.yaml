@@ -1,0 +1,49 @@
+# app-kensan — app-base chart の values（最初の消費者）
+# chart: charts/app-base / Application CR: kubernetes/argocd/applications/apps/app-kensan/app.yaml
+
+nameOverride: kensan
+
+image:
+  repository: ghcr.io/yu-min3/kensan
+  tag: v0.1.1
+
+env:
+  - name: KENSAN_DATA_DIR
+    value: /data
+
+ghcrPullSecret:
+  enabled: true
+
+# Phase 5 予行: 検証用 PVC（データはコピー、SSoT はまだ Mac）。
+# Phase 6 cutover で本番 RWX volume の claim に切り替える
+pvc:
+  enabled: true
+  create: true
+  size: 2Gi
+  storageClass: longhorn
+  accessModes: ["ReadWriteOnce"]
+  mountPath: /data
+
+otel:
+  enabled: true
+  serviceName: kensan
+
+httproute:
+  enabled: true
+  # ⚠️ host 追加時の不変条件: 追加する host は必ず
+  # AuthorizationPolicy（gateway-prod-oauth2-authz）の hosts にも同時に載せること。
+  # 載せ忘れた host は ext_authz を素通りして無認証で workspace が露出する。
+  hostnames:
+    - kensan-preview.app.yu-min3.com # Phase 7 で kensan.app.yu-min3.com を legacy から継承
+
+# gateway 層 Keycloak SSO（ext_authz）。LAN 内でも認証必須にする
+auth:
+  gatewayOAuth2:
+    enabled: true
+
+resources:
+  requests:
+    cpu: 50m
+    memory: 64Mi
+  limits:
+    memory: 256Mi

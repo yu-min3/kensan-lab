@@ -24,9 +24,12 @@ func Setup(ctx context.Context, service string) (func(context.Context) error, bo
 	if err != nil {
 		return noop, false, err
 	}
+	// NewSchemaless で Merge する: Default() は SDK 同梱の semconv schema を持ち、
+	// バージョン固定の semconv.SchemaURL と衝突して Merge がエラーになるため
+	// （OTEL_SERVICE_NAME 環境変数があれば Default() 側がそれを優先する）
 	res, err := sdkresource.Merge(
 		sdkresource.Default(),
-		sdkresource.NewWithAttributes(semconv.SchemaURL, semconv.ServiceName(service)),
+		sdkresource.NewSchemaless(semconv.ServiceName(service)),
 	)
 	if err != nil {
 		return noop, false, err
