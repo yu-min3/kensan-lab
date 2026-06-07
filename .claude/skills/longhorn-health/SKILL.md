@@ -26,8 +26,8 @@ replicated storage と R2 バックアップ（`s3://kensan-lab-longhorn-backup@
 3. **Node 容量とスケジューラビリティ**:
    ```bash
    kubectl get nodes.longhorn.io -n longhorn-system -o custom-columns='NAME:.metadata.name,READY:.status.conditions[?(@.type=="Ready")].status,SCHEDULABLE:.status.conditions[?(@.type=="Schedulable")].status'
-   # disk 名つきで列挙（複数 disk ノードでも対応付けが崩れない）
-   kubectl get nodes.longhorn.io -n longhorn-system -o jsonpath='{range .items[*]}{"\n"}{.metadata.name}{":"}{range $d,$s := .status.diskStatus}{"\n  "}{$d}{" available="}{$s.storageAvailable}{" scheduled="}{$s.storageScheduled}{end}{"\n"}{end}'
+   # disk 名つきで列挙（複数 disk ノードでも対応付けが崩れない）。map の key-value 走査が必要なので go-template を使う（jsonpath は不可）
+   kubectl get nodes.longhorn.io -n longhorn-system -o go-template='{{range .items}}{{.metadata.name}}:{{range $d,$s := .status.diskStatus}}{{"\n  "}}{{$d}} available={{$s.storageAvailable}} scheduled={{$s.storageScheduled}}{{end}}{{"\n"}}{{end}}'
    ```
    - Schedulable=False のノードは replica 再配置が止まる。microSD ノード（worker1/2）の容量逼迫に注意
    - storageAvailable はバイト値（÷1024³ で GiB 換算して報告）。worker1/2 は microSD で ~40GiB しかない
@@ -48,6 +48,7 @@ replicated storage と R2 バックアップ（`s3://kensan-lab-longhorn-backup@
      ```bash
      kubectl get volumes.longhorn.io <name> -n longhorn-system -o jsonpath='{.metadata.creationTimestamp}{"  group="}{.metadata.labels.recurring-job-group\.longhorn\.io/default}{"\n"}'
      ```
+     `group=enabled` が出れば default group 加入済み（label の値は group 名ではなく `enabled`）
 
 6. **RecurringJob の存在確認**:
    ```bash
