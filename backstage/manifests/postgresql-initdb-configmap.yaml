@@ -1,0 +1,29 @@
+## Backstage plugin DB の pre-create (DR / fresh cluster 用)
+##
+## Backstage は pluginDivisionMode=database で 12 DB (backstage + backstage_plugin_* x11) に
+## 分散接続する。main DB (backstage) は POSTGRES_DB env が作るが、plugin DB は通常
+## 初回起動時に app が自分で作る。動的 cred には CREATEDB を付与済み (chart の
+## grantRootOwnerMembership) なので app 側でも作れるが、DR 時の決定性のために
+## ここで明示的に pre-create する。
+##
+## /docker-entrypoint-initdb.d は PGDATA が空のときだけ実行される (稼働中は inert)。
+## 実行ユーザーは POSTGRES_USER (= backstage) なので owner は自動的に backstage role になる。
+## 一覧は 2026-06-07 時点の live 実測 (psql \l)。新 plugin 追加時はここにも 1 行足す。
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: postgresql-initdb
+  namespace: backstage
+data:
+  10-plugin-databases.sql: |
+    CREATE DATABASE backstage_plugin_app;
+    CREATE DATABASE backstage_plugin_auth;
+    CREATE DATABASE backstage_plugin_catalog;
+    CREATE DATABASE backstage_plugin_kubernetes;
+    CREATE DATABASE backstage_plugin_notifications;
+    CREATE DATABASE backstage_plugin_permission;
+    CREATE DATABASE backstage_plugin_proxy;
+    CREATE DATABASE backstage_plugin_scaffolder;
+    CREATE DATABASE backstage_plugin_search;
+    CREATE DATABASE backstage_plugin_signals;
+    CREATE DATABASE backstage_plugin_techdocs;
