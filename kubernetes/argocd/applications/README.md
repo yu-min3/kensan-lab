@@ -11,7 +11,8 @@
 
 > ⚠️ **`directory.recurse: false` を単独で明示しない**: zero value のみの `directory` ブロックは
 > API/ArgoCD が live の Application spec から落とすため、git ≠ live の恒久 OutOfSync になる
-> (PR #382 → #383 の実証。keycloak / backstage は #324 以来この drift を抱えていた)。
+> (PR #382 → #383 の実証。keycloak / backstage は #303/#304 の kustomize 撤去時 (2026-05-10) から
+> この drift を抱えていた)。
 > `directory` ブロックは `include` / `exclude` を使うときだけ書く (その場合 `recurse: false` の併記は残ってよい)。
 
 | カテゴリ | パターン | 理由 |
