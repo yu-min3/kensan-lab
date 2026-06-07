@@ -22,7 +22,7 @@
 | トピック | SoT | サマリ参照先 |
 |---|---|---|
 | Secret management (4 方式) | `docs/secret-management/index.md` | `.claude/rules/security-secrets.md`、`kubernetes/secrets/README.md` |
-| Namespace naming | `docs/adr/006-namespace-naming.md` (why) + `.claude/rules/environment-separation.md` (how) | `kubernetes/environments/README.md` |
+| Namespace naming | `docs/adr/006-namespace-naming.md` (why) + `.claude/rules/environment-separation.md` (how) | `kubernetes/namespaces/README.md` |
 | Helm multi-source 配置規約 | `kubernetes/README.md` (Pattern A/B) | `.claude/rules/helm-multisource.md` |
 | GitOps workflow | `.claude/rules/gitops-workflow.md` | `CLAUDE.md` Mandatory Constraints |
 | Network ingress (Cloudflare Tunnel + Cilium L2 + Istio Gateway) | `docs/architecture/network.md` | `.claude/rules/network-ingress.md` |

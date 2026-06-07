@@ -23,7 +23,7 @@ Scaffold `$ARGUMENTS[1]` under category `$ARGUMENTS[0]`.
      ├── values.yaml           # Helm values
      └── resources/            # chart 外の生 YAML (namespace, HTTPRoute, SealedSecret 等)
      ```
-   - **Pattern B — raw YAML only (flat)**: no Helm chart; the Argo CD app reads plain manifests. Put `.yaml` files directly in the component dir (do NOT add `resources/`). Examples: `kubernetes/kube-system/`, `kubernetes/environments/*`.
+   - **Pattern B — raw YAML only (flat)**: no Helm chart; the Argo CD app reads plain manifests. Put `.yaml` files directly in the component dir (do NOT add `resources/`). Examples: `kubernetes/kube-system/`, `kubernetes/namespaces/*`.
      ```
      kubernetes/$ARGUMENTS[0]/$ARGUMENTS[1]/
      └── *.yaml                # raw manifests, flat

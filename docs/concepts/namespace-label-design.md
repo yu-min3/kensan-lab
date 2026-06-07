@@ -26,6 +26,7 @@ This document defines a unified namespace labeling strategy across the entire pl
 | `kensan-lab.platform/component` | `keycloak`, `backstage`, `monitoring`, `service-mesh`, `core` | Component identification | Platform tier only |
 | `kensan-lab.platform/pss-level` | `privileged` \| `restricted` | Pod Security Standards level の宣言 (Kyverno が読む。無印 = baseline の床) | 床から外れる ns のみ |
 | `istio-injection` | `enabled` | Istio automatic sidecar injection | Namespaces targeted by service mesh |
+| `kensan-lab.platform/vault-managed-postgres` | `"true"` | vault-database-engine 管理の Postgres が住む ns の opt-in 宣言。CCNP `ccnp-postgres-ingress` / `cnp-vault-egress` の selector が読む | Vault dynamic cred 対象の Postgres を持つ ns のみ（例: `platform-auth-prod`, `kensan`） |
 
 ## Label Value Definitions
 
