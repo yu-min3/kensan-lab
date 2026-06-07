@@ -24,9 +24,11 @@ ADR-006 defined two things that the implementation has since walked away from:
    In reality, almost all platform namespaces use **bare names** (`vault`, `cert-manager`, `kyverno`,
    `argocd`, `external-secrets`, `longhorn-system`, ...). The only `platform-*` namespace is
    `platform-auth-prod` — which itself does not follow ADR-006's format.
-2. **3-axis labels = `environment` / `team` / `app`**. In reality the labels carried by every namespace and
-   enforced by machinery are **`environment` / `tier` / `component`** (`tier` on 29 manifests, `component`
-   on 17). `team` / `app` appear on exactly one namespace (`app-kensan`).
+2. **3-axis labels = `environment` / `team` / `app`**. In reality the labels carried across namespaces are
+   **`environment` / `tier` / `component`** (`tier` on 29 manifests, `component` on 17), while `team` /
+   `app` appear on exactly one namespace (`app-kensan`). Note that prevalence and contract grade are not
+   the same thing — only `environment` + `tier` are enforced everywhere; see Decision §2 for the exact
+   grades.
 
 Meanwhile two structural facts made the original naming convention unnecessary:
 
@@ -53,17 +55,21 @@ The `platform-{component}` convention from ADR-006 §1 is **retired**. Existing 
 (`platform-auth-prod`, `auth-system`) are grandfathered; renaming them is explicitly *not* worth the
 blast radius.
 
-### 2. Label contract (the operative "3-axis")
+### 2. Label contract (graded by enforcement, matching `ns-label-contract`)
 
-| Label | Values | Role |
+| Contract grade | Labels | Enforcement |
 |---|---|---|
-| `kensan-lab.platform/environment` | `production` / `development` / `infrastructure` | Gateway allowedRoutes selector |
-| `kensan-lab.platform/tier` | `platform` / `application` | PE vs AD responsibility boundary; `pss-level: privileged` requires `tier=platform` |
-| `kensan-lab.platform/component` | e.g. `keycloak`, `gitops`, `observability` | Component identification (platform tier) |
+| **Required on every namespace** | `kensan-lab.platform/environment`, `kensan-lab.platform/tier` | Kyverno `ns-label-contract` (`require-base-labels`) |
+| **Platform-tier convention** (applied as needed, unenforced) | `kensan-lab.platform/component` | None — convention per the label SoT ("Optional Labels") |
+| **Required on `app-*` namespaces** | `kensan-lab.platform/team`, `kensan-lab.platform/app` | Kyverno `ns-label-contract` (`require-app-3-axis`) |
 
-`team` / `app` (ADR-006 §2) are demoted to **optional extra axes for application-tier namespaces** —
-they are part of the app-namespace label set that `ns-label-contract` checks on `app-*` namespaces, but
-are not a platform-wide contract.
+Label roles: `environment` drives Gateway `allowedRoutes` selectors; `tier` marks the PE vs AD
+responsibility boundary (and gates `pss-level: privileged`, which requires `tier=platform`); `component`
+identifies platform components for humans and dashboards; `team` / `app` carry ADR-006's app-namespace
+axes, which survive **as the app-namespace contract** rather than a platform-wide one.
+
+The colloquial "3-axis" (`environment` / `tier` / `component`) describes the labels *most prevalent* on
+namespaces today — not three equally-enforced axes. The table above is the normative grading.
 
 ### 3. Single sources of truth
 

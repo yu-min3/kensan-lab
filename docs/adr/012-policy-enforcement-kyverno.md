@@ -122,7 +122,7 @@ privileged 設計 ns (現状 kube-system / istio-system / longhorn-system) は P
 ## Errata (2026-06-07)
 
 - §4 の privileged 設計 ns 列挙「現状 kube-system / istio-system / longhorn-system」は **local-path-storage が漏れている**（執筆時点から `pss-level: privileged` を持つ ns は 4 つ。`docs/concepts/policy-enforcement.md` 側の列挙が正）。本文の「name list のハードコードを避ける」設計どおり policy 自体への影響はない
-- 「3-axis labels」の定義は [ADR-014](014-namespace-naming-label-contract-v2.md) で `environment / tier / component` に正式化された（ADR-006 の team/app 定義との衝突を解消）
+- label 契約の格付けは [ADR-014](014-namespace-naming-label-contract-v2.md) で正式化された（全 ns 必須 = `environment` + `tier`、`app-*` ns 必須 = `team` + `app`、`component` は platform 慣行。ADR-006 の 3-axis 定義との衝突を解消）
 
 ## References
 

@@ -5,7 +5,8 @@
 Accepted — **Supersedes [ADR-008](008-keycloak-db-credentials.md)**
 
 > **Note on timing**: This ADR is a *retroactive record*. The migration itself was implemented at Stage 5c
-> (`keycloak-postgres-cred`, see `kubernetes/auth/keycloak/keycloak-external-secret.yaml`), but the decision
+> (`keycloak-postgres-cred`, defined by the VDBE instance
+> `kubernetes/secrets/vault-database-engine/platform-values/vault-database/keycloak-prod.yaml`), but the decision
 > that reversed ADR-008 was never written down at the time. This document reconstructs the rationale so that
 > the ADR trail matches reality. Discovered during the 2026-06-07 design review.
 
