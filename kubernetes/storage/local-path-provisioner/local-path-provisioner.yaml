@@ -3,6 +3,14 @@ kind: Namespace
 metadata:
   name: local-path-storage
   labels:
+    app.kubernetes.io/managed-by: argocd
+    kensan-lab.platform/environment: infrastructure
+    kensan-lab.platform/tier: platform
+    kensan-lab.platform/component: storage
+    ## helper pod が hostPath を使う設計 (node-local storage) のため privileged 宣言。
+    ## legacy provisioner — 廃止完了で ns ごと消滅予定 (v2 統一設計、ADR-012)
+    kensan-lab.platform/pss-level: privileged
+    ## PSA labels は PR #3 (Enforce 昇格) と同時に撤去
     pod-security.kubernetes.io/enforce: baseline
     pod-security.kubernetes.io/warn: restricted
 

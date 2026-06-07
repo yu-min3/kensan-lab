@@ -2,7 +2,7 @@
 
 ## Status
 
-**Accepted** (2026-06-06)
+**Accepted** (2026-06-06) / **v2 改訂** (2026-06-07): PSA 併用 → Kyverno 統一（末尾の改訂セクション参照）
 
 ## Date
 
@@ -96,6 +96,28 @@ privileged 設計 ns (現状 kube-system / istio-system / longhorn-system) は P
 - failurePolicy Ignore の間は、admission controller 停止中に violation が素通りする (background scan が事後検出はする)。Enforce 昇格時に Fail 化とのバランスを再検討
 - admissionReports 無効化により、violation の検出は最大で background scan 間隔 (1h) 遅延する
 - Kyverno 分のリソース消費 (~200m / 256Mi requests、3 controller)。実測でキャパシティに問題ないことを確認済み
+
+## v2 改訂 (2026-06-07): PSA 併用 → Kyverno 統一
+
+### 改訂の経緯
+
+初版は PSA を「Kyverno (replica 1 + failurePolicy Ignore) 停止中の in-process backstop」として併用する設計だったが、運用設計のレビューで以下が明らかになり **Kyverno 一本化** に改めた:
+
+1. **backstop の実価値 ≈ ε**: クラスタへの書き込み経路は Argo CD (Git / PR レビュー済み) のみ。Kyverno 停止中に再作成される Pod は既検証の同一 spec であり、新規違反が入り込む現実的経路がない。すり抜けても background scan が 1h 以内に PolicyReport へ記録する
+2. **ゾーン分けの認知コストが実在**: 「PSA enforce ゾーン / Kyverno 専任ゾーン / privileged ゾーン」の 3 区分は、運用者が「この ns はどちらに弾かれるか」を常に考えることを強いる。例外の非互換 (PSA enforce が上流で先に拒否するため PolicyException が無力化する) がゾーン分けを要求する根因だった
+3. **業界多数派との一致**: Giant Swarm (PSA を RFC で明示的に却下) / DoD Big Bang (Kyverno-only enforcing) など、Kyverno を本格採用する組織は PSA を併用しない。Gatekeeper がデフォルト failurePolicy Ignore + Audit 補完で大量運用されている事実も、Ignore 運用が異端でないことの傍証
+
+### v2 の設計
+
+- **PSA は label 撤去で不活性化** (in-tree のため削除作業は不要 — label がなければ何もしない)
+- **ns の PSS level は Kyverno 専用 label `kensan-lab.platform/pss-level` で宣言**: 無印 = `pss-baseline` の床 / `privileged` = 床から除外 (tier=platform のみ、`ns-label-contract` rule 3 が強制) / `restricted` = `pss-restricted` policy が適用 (opt-in)。PSA の label key を流用しない (流用すると PSA 本体が再活性化する)
+- **`ns-label-contract`** (require-ns-labels を吸収): label の契約 (required labels / 3-axis / privileged 宣言条件) を policy として強制 — OpenShift の label syncer と同じ「label の真実性を機械が守る」思想の validate 版
+- **移行順序 (強制の空白を作らない)**: PR #2 で pss-level label を追加 (PSA label と併存・全 policy Audit) → Phase 3 の Enforce 昇格と**同じ PR で PSA label を撤去** (atomic swap)
+
+### v2 で受け入れるトレードオフ
+
+- Kyverno 停止中は PSS 強制が完全にゼロになる窓ができる (初版では PSA が床を維持していた)。上記 1 の ε 評価に基づき受け入れる
+- 統一後は Kyverno が唯一の強制層になるため、Enforce 安定後の failurePolicy `Fail` 昇格の価値が上がる。昇格条件: ① Enforce で violation ゼロが数週間継続 ② `admissionController.replicas: 2` (m4neo + worker 分散) ③ `config.webhooks` で kube-system を webhook レベルで除外 (停電復旧時の CNI デッドロック予防) ④ Fail にするのは app-tier policy のみ (per-policy 設定)。なお master / etcd の SPOF には HA も Fail も無力なので、「昇格しない」も常に正当な選択
 
 ## References
 
