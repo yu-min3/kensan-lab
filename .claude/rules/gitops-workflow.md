@@ -26,6 +26,11 @@ ALL infrastructure changes MUST go through Git → Argo CD sync. 例外は initi
 ~/kensan-lab.worktrees/<short-feature-name>
 ```
 
+⚠️ **kensan-workspace の同期対象内（projects/ 等）に worktree / 一時 checkout を作らない**。
+workspace は Syncthing でクラスタと双方向同期されており、checkout を中に作ると
+数 GB の hash 計算と同期ノイズが発生する（pr-*-review checkout で実際に発生）。
+レビュー用の一時 checkout も `~/kensan-lab.worktrees/` か `/tmp` に置く。
+
 例: `~/kensan-lab.worktrees/vault-transit-chartify`, `~/kensan-lab.worktrees/longhorn-phase1`
 
 ### Workflow
