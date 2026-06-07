@@ -84,6 +84,8 @@ plugins:
           - architecture/*.md
         Concepts:
           - concepts/*.md
+        Design system:
+          - design/*.md
         Bootstrapping:
           - bootstrapping/*.md
         Secret management & auth:
@@ -155,11 +157,18 @@ nav:
       - secrets/: architecture/secrets.md
       - network/: architecture/network.md
       - observability/: architecture/observability.md
+      - Cluster health monitoring: architecture/cluster-health-monitoring.md
   - Concepts:
       - Documentation Layout: concepts/doc-layout.md
       - Namespace Label Design: concepts/namespace-label-design.md
       - Network Policy: concepts/network-policy-guide.md
+      - Policy Enforcement: concepts/policy-enforcement.md
       - Kustomize Guidelines (deprecated): concepts/kustomize-guidelines.md
+  - Design System:
+      - Overview: design/DESIGN_SYSTEM.md
+      - Components: design/components.md
+      - Patterns: design/patterns.md
+      - Adoption Status: design/adoption-status.md
   - Operations:
       - Secret Management: secret-management/index.md
       - Auth integration:
@@ -167,6 +176,7 @@ nav:
           - Gateway OIDC (Path A): auth/gateway-oidc.md
           - oauth2-proxy: auth/oauth2-proxy.md
       - Runbooks:
+          - runbooks/index.md
           - Vault Raft auto-join: runbooks/vault-raft-join.md
           - Cilium WiFi stability: runbooks/cilium-wifi-stability.md
           - Cilium update strategy: runbooks/cilium-update-strategy.md
@@ -176,6 +186,9 @@ nav:
           - kensan dev cleanup: operations/kensan-dev-cleanup.md
           - Keycloak dev cleanup: operations/keycloak-dev-cleanup.md
           - Vault role & gateway cleanup: operations/vault-dev-role-and-gateway-cleanup.md
+      - Recovery:
+          - Workspace volume recovery: operations/kensan-workspace-volume-recovery.md
+          - Syncthing pairing recovery: operations/syncthing-pairing-recovery.md
       - Guides:
           - Raspberry Pi WiFi stabilization: guides/wifi-stabilization.md
   - Architecture Decisions:
@@ -196,6 +209,7 @@ nav:
       - 014 — Namespace Naming & Label Contract v2: adr/014-namespace-naming-label-contract-v2.md
       - 015 — VCO + Setup-Script Hybrid: adr/015-vco-setup-script-hybrid.md
   - Incidents:
+      - incidents/index.md
       - 2026-03-02 system-infra Sync Blocked: incidents/2026-03-02-system-infra-sync-blocked.md
   - Roadmap:
       - Storage (local-path → Longhorn): roadmap/storage-longhorn.md

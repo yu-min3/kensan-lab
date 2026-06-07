@@ -35,9 +35,9 @@ This site is the **single source of truth** for the current state of kensan-lab.
 |---|---|
 | Understand the platform | [Architecture](#architecture) above, then [ADRs](adr/index.md) |
 | Bring up a similar cluster | [Installation](getting-started/installation.md) → [Configuration](getting-started/configuration.md) → [Bootstrapping](bootstrapping/index.md) |
-| Operate it day-to-day | [Secret Management](secret-management/index.md), [Runbooks](runbooks/longhorn-restore-test.md) |
+| Operate it day-to-day | [Secret Management](secret-management/index.md), [Runbooks](runbooks/index.md) |
 | Read the back-stories | [Articles](articles.md) — Zenn / dev.to deep-dive index |
-| See what broke and why | [Incidents](incidents/2026-03-02-system-infra-sync-blocked.md) |
+| See what broke and why | [Incidents](incidents/index.md) |
 
 ## Tech Stack & Hardware
 

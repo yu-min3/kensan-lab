@@ -1,3 +1,8 @@
+---
+description: Whetstone design system — tokens, component variants, typography, and density rules for all platform UIs
+globs: "apps/**, packages/design-tokens/**, backstage/**, docs/design/**"
+---
+
 # Design System (Whetstone)
 
 プラットフォーム上の **全 UI（apps/*, Backstage plugin, 内部ダッシュボード）** が従う視覚言語。
@@ -33,7 +38,7 @@ shadcn の `components.json` は `"baseColor": "slate"` / `"cssVariables": true`
 ## アプリ採用状況
 
 まだ Whetstone を採用したアプリは無い（このコミットは design system 本体のみ）。
-`apps/kensan-legacy/`（旧 kensan）と `apps/kensan-next/`（新 / frontend は未着手）が対象候補。
+`apps/kensan-legacy/`（旧 kensan、凍結）と `apps/kensan/`（新 / 現行）が対象候補。
 採用する app は **`src/index.css` 内に `--background` 等の色トークンを再定義せず**、
 `packages/design-tokens/tokens.css` を import する（package が唯一の真実）。
 コンポーネント実装の正は各 app の `components/ui/`（shadcn）。新しい共通 UI も `components.md` の仕様に従う。

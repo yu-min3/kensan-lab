@@ -1,7 +1,7 @@
 # Patterns — kensan-lab Design System
 
 > 部品（Components）の上のレイヤー。「タスク一覧」「設定」「監視」のような画面を、毎回ゼロから考えずに済むようにするための共通の組み方の辞書。
-> ビジュアル一覧は [`Patterns.html`](../../Patterns.html)。
+> 密度（density）トークンの視覚リファレンスは [`density-demo.html`](./density-demo.html)。
 
 ---
 
