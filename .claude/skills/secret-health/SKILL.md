@@ -16,7 +16,8 @@ argument-hint:
    kubectl exec -n vault vault-0 -- vault status
    ```
    - `Sealed: false` を確認。**sealed なら以降の ESO / dynamic creds は全滅する**ので最優先で報告
-   - HA 構成でない点に注意（vault-0 の単一障害点）
+   - 3-replica raft HA + awskms auto-unseal 構成。`vault status` の `HA Mode: active` の pod が現リーダー
+   - auto-unseal の前提は `vault-aws-kms-credentials`（SealedSecret、vault ns）— これが壊れると再起動時に unseal できない
 
 2. **ClusterSecretStore（ESO ↔ Vault の接続）**:
    ```bash
@@ -30,28 +31,35 @@ argument-hint:
    ```
    - `SecretSynced` / `True` 以外を列挙。`SecretSyncedError` は Vault path の存在・token 権限を疑う
    - refreshInterval 既定 1h — 直近の Vault 値変更が未反映なだけの場合は経過時間も添える
+   - `STORE` が `<none>` の行は異常ではなく **generator 参照**（`dataFrom.sourceRef.generatorRef`、下記 step 4）の ExternalSecret
+   - 注意: `conditions[0]` は配列順序依存。判定が怪しい場合は素の `kubectl get externalsecret -A`（READY/STATUS 列）と突き合わせる
 
-4. **VaultDynamicSecret / dynamic creds（DB credential 系）**:
+4. **Dynamic creds（ESO generator 方式、DB credential 系）**:
    ```bash
-   kubectl get vaultdynamicsecret -A 2>/dev/null
-   kubectl get vaultauth,vaultconnection -A 2>/dev/null
+   # このクラスタは VSO ではなく ESO generator (generators.external-secrets.io) を採用
+   kubectl get vaultdynamicsecret.generators.external-secrets.io -A
+   kubectl get externalsecret -A -o custom-columns='NS:.metadata.namespace,NAME:.metadata.name,GEN:.spec.dataFrom[0].sourceRef.generatorRef.name' | grep -v '<none>'
    ```
-   - VSO 系 CR がある場合は同期状態を確認（Keycloak / Polaris の Postgres creds など。ADR-008 参照）
+   - generator 自体は status を持たない。健全性は対応する ExternalSecret の Ready と消費 pod の起動可否で判断する（Keycloak / Polaris の Postgres creds など。ADR-008 参照）
+   - dynamic role の権限不足（GRANT / OWNER）は ExternalSecret が Synced でも消費側が落ちる（例: `must be owner of table` 42501）。これは secret 配布ではなく Vault DB role 定義側の問題として切り分ける
 
 5. **SealedSecret 復号状態**:
    ```bash
    kubectl get sealedsecret -A
-   kubectl logs -n sealed-secrets -l app.kubernetes.io/name=sealed-secrets --tail=50 | grep -iE "error|unable" || echo "no decryption errors"
+   # controller は kube-system に居る（sealed-secrets ns ではない）
+   kubectl logs -n kube-system -l app.kubernetes.io/name=sealed-secrets --tail=50 | grep -iE "error|unable" || echo "no decryption errors"
    ```
+   - 注意: namespace / label が外れると logs が 0 件 → `|| echo` が誤って正常表示する。先に `kubectl get pods -A -l app.kubernetes.io/name=sealed-secrets` でヒットを確認すること
    - SealedSecret があるのに対応する Secret が生成されていないものを列挙
    - 復号エラーは「別クラスタ / 再 bootstrap 後の鍵不一致」が典型。`/sealed-secret` で再封緘を提案
 
 6. **Secret 消費側の整合**:
    ```bash
    kubectl get pods -A --field-selector=status.phase=Pending -o wide 2>/dev/null
-   kubectl get events -A --field-selector=reason=FailedMount --types=Warning 2>/dev/null | head -20
+   kubectl get events -A --field-selector reason=FailedMount,type=Warning 2>/dev/null | head -20
    ```
    - Secret 未生成による `CreateContainerConfigError` / FailedMount を検出
+   - ExternalSecret の `spec.target.name` は ES 名と異なることがある（例: ES `postgres-polaris` → Secret `postgres-polaris-cred`）。Secret 不在の判定は target 名で行う
 
 7. **Reloader の生存確認**（rotation の最終工程）:
    ```bash

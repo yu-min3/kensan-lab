@@ -26,9 +26,11 @@ replicated storage と R2 バックアップ（`s3://kensan-lab-longhorn-backup@
 3. **Node 容量とスケジューラビリティ**:
    ```bash
    kubectl get nodes.longhorn.io -n longhorn-system -o custom-columns='NAME:.metadata.name,READY:.status.conditions[?(@.type=="Ready")].status,SCHEDULABLE:.status.conditions[?(@.type=="Schedulable")].status'
-   kubectl get nodes.longhorn.io -n longhorn-system -o jsonpath='{range .items[*]}{.metadata.name}{": storageAvailable="}{.status.diskStatus.*.storageAvailable}{"\n"}{end}'
+   # disk 名つきで列挙（複数 disk ノードでも対応付けが崩れない）
+   kubectl get nodes.longhorn.io -n longhorn-system -o jsonpath='{range .items[*]}{"\n"}{.metadata.name}{":"}{range $d,$s := .status.diskStatus}{"\n  "}{$d}{" available="}{$s.storageAvailable}{" scheduled="}{$s.storageScheduled}{end}{"\n"}{end}'
    ```
    - Schedulable=False のノードは replica 再配置が止まる。microSD ノード（worker1/2）の容量逼迫に注意
+   - storageAvailable はバイト値（÷1024³ で GiB 換算して報告）。worker1/2 は microSD で ~40GiB しかない
 
 4. **バックアップターゲット（R2）の疎通**:
    ```bash
@@ -40,9 +42,12 @@ replicated storage と R2 バックアップ（`s3://kensan-lab-longhorn-backup@
    ```bash
    kubectl get backupvolumes.longhorn.io -n longhorn-system -o custom-columns='NAME:.metadata.name,LAST-BACKUP:.status.lastBackupName,AT:.status.lastBackupAt'
    ```
-   - RecurringJob は **backup-weekly + backup-monthly**（`kubernetes/storage/longhorn/resources/recurring-jobs.yaml`）
+   - RecurringJob は **snapshot-daily + backup-weekly + backup-monthly**（`kubernetes/storage/longhorn/resources/recurring-jobs.yaml`）
    - **lastBackupAt が 8 日以上前の volume は ⚠️**（weekly が 1 回飛んでいる）。15 日以上は ❌
-   - longhorn-SC の volume は全て default group で自動加入のはず — backup 対象外の volume があれば selector 漏れとして報告
+   - longhorn-SC の volume は全て default group で自動加入のはず。attached なのに backupvolume が無い volume は、**まず creationTimestamp を直近 weekly 実行時刻と比較する** — weekly 後に作られた新規 volume なら未バックアップは正常（次回 weekly 待ち）。weekly より古いのに無ければ真の selector 漏れとして ❌:
+     ```bash
+     kubectl get volumes.longhorn.io <name> -n longhorn-system -o jsonpath='{.metadata.creationTimestamp}{"  group="}{.metadata.labels.recurring-job-group\.longhorn\.io/default}{"\n"}'
+     ```
 
 6. **RecurringJob の存在確認**:
    ```bash
