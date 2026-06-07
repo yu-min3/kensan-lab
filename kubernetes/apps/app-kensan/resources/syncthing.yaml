@@ -52,6 +52,35 @@ spec:
         # 同一 runAsUser/runAsGroup (65532) で成立している
         fsGroup: 65532
         seccompProfile: { type: RuntimeDefault }
+      initContainers:
+        # LAN-only 不変条件を Git 側から強制する config-guard（PR #371 事後レビュー対応）。
+        # global discovery / relay / NAT traversal は Syncthing default が有効のため、
+        # config PVC が空（fresh bootstrap / 再作成）でも、手動設定が drift しても、
+        # pod 起動のたびにここで無効化される。device ペアリング等の機能設定は
+        # runbook（docs/operations/syncthing-pairing-recovery.md）のまま。
+        - name: config-guard
+          image: syncthing/syncthing:2.1.1
+          command:
+            - /bin/sh
+            - -c
+            - |
+              set -e
+              H=/var/syncthing/config
+              [ -f "$H/config.xml" ] || syncthing generate --home="$H" --no-default-folder
+              for k in globalAnnounceEnabled relaysEnabled natEnabled; do
+                if grep -q "<$k>" "$H/config.xml"; then
+                  sed -i "s|<$k>true</$k>|<$k>false</$k>|" "$H/config.xml"
+                else
+                  sed -i "s|<options>|<options><$k>false</$k>|" "$H/config.xml"
+                fi
+              done
+              echo "LAN-only invariant enforced (discovery/relay/NAT disabled)"
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities: { drop: ["ALL"] }
+          volumeMounts:
+            - { name: config, mountPath: /var/syncthing/config }
       containers:
         - name: syncthing
           image: syncthing/syncthing:2.1.1
