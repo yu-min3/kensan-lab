@@ -12,6 +12,6 @@ metadata:
     ## Kyverno pss-baseline の床から除外する宣言 (v2 統一設計、ADR-012)。
     ## tier=platform でないと ns-label-contract が拒否する
     kensan-lab.platform/pss-level: privileged
-    ## PSA labels は PR #3 (Kyverno Enforce 昇格) と同時に撤去する — 強制の空白を作らないため
+    ## PSA labels は Phase 3 (Kyverno Enforce 昇格) と同時に撤去する — 強制の空白を作らないため
     pod-security.kubernetes.io/enforce: privileged
     pod-security.kubernetes.io/warn: baseline

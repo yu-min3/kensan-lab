@@ -18,5 +18,5 @@ metadata:
     kensan-lab.platform/app: kensan
     kensan-lab.platform/tier: application
     ## Kyverno pss-restricted の対象宣言 (旧 PSA enforce=restricted の引き継ぎ、v2 統一設計)。
-    ## PSA label (enforce: restricted) は PR #3 (Enforce 昇格) と同時に撤去
+    ## PSA label (enforce: restricted) は Phase 3 (Enforce 昇格) と同時に撤去
     kensan-lab.platform/pss-level: restricted

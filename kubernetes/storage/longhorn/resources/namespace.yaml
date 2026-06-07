@@ -10,7 +10,7 @@ metadata:
     # Longhorn は privileged 相当のコンポーネント (CSI plugin, instance-manager) を含む
     ## Kyverno pss-baseline の床から除外する宣言 (v2 統一設計、ADR-012)
     kensan-lab.platform/pss-level: privileged
-    ## PSA labels は PR #3 (Enforce 昇格) と同時に撤去
+    ## PSA labels は Phase 3 (Enforce 昇格) と同時に撤去
     pod-security.kubernetes.io/enforce: privileged
     pod-security.kubernetes.io/warn: privileged
     # istio-injection は付けない: Longhorn の gRPC sync 通信に sidecar を挟むと
