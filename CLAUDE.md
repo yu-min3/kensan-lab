@@ -51,6 +51,7 @@ Backstage: `cd backstage/app && make {install,dev,all TAG=...}`
 | `security-secrets.md` | Vault + ESO, Sealed Secrets, Reloader, cert-manager, GHCR |
 | `environment-separation.md` | PE/AD roles, multi-repo, namespaces (ADR-006) |
 | `design-system.md` | Whetstone UI tokens/components — 全 app の UI を書く前に読む |
+| `collaboration.md` | PR 運用（独断マージ禁止・本文規約）、設計/状況報告は HTML 図示、script 出力 |
 
 ## Domain & Network
 
