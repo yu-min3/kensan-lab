@@ -66,6 +66,12 @@ git worktree remove ~/kensan-lab.worktrees/<name>
 - `argocd.argoproj.io/sync-options: Prune=false` は **守りたいリソース個別の manifest に付ける**。Application メタデータに付けても子リソースは守られない（PR #366 で kensan-data PVC が prune された実証）。Application 側の annotation は「root-app が Application CR 自体を prune するのを防ぐ」効果のみ
 - 個別 annotation 済み: clusterwide CCNP 4 本、longhorn の SC/RecurringJob/NFS Service、app-kensan の workspace PVC
 
+## Pull Request Rules
+
+- **PR 作成後に独断でマージしない** — 別エージェントによるレビューがあるため、マージは必ずレビュー完了 + Yu の指示を待つ
+- **PR 本文にアーキテクチャの変更をわかりやすく記載する** — 何がどう変わるか（構成図・データフロー・依存関係の変化など）を、diff を読まなくても把握できるレベルで書く
+- **レビューエージェントに必要な情報を記載する** — 変更の背景・意図、影響範囲、検証方法（確認済みなら結果も）、関連 ADR / issue / PR へのリンクを PR 本文に含める
+
 ## Change Workflow
 
 1. Worktree を切って branch を作る (上記)
