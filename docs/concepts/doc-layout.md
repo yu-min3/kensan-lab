@@ -26,7 +26,7 @@
 | Helm multi-source 配置規約 | `kubernetes/README.md` (Pattern A/B) | `.claude/rules/helm-multisource.md` |
 | GitOps workflow | `.claude/rules/gitops-workflow.md` | `CLAUDE.md` Mandatory Constraints |
 | Network ingress (Cloudflare Tunnel + Cilium L2 + Istio Gateway) | `docs/architecture/network.md` | `.claude/rules/network-ingress.md` |
-| Storage (Longhorn + local-path) | `docs/architecture/infrastructure.md` (予定) | `.claude/rules/kubernetes-cluster.md` |
+| Storage (Longhorn + local-path) | `kubernetes/storage/README.md` | `.claude/rules/kubernetes-cluster.md`、`docs/architecture/infrastructure.md` (R2 backup 等の横断的詳細) |
 | Cluster topology (node, label, scheduling) | `.claude/rules/kubernetes-cluster.md` | `kubernetes/README.md` |
 | Tech stack | Top `README.md` | `docs/index.md` |
 

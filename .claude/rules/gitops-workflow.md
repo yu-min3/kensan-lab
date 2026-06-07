@@ -70,7 +70,7 @@ git worktree remove ~/kensan-lab.worktrees/<name>
 ## Prune Protection
 
 - `argocd.argoproj.io/sync-options: Prune=false` は **守りたいリソース個別の manifest に付ける**。Application メタデータに付けても子リソースは守られない（PR #366 で kensan-data PVC が prune された実証）。Application 側の annotation は「root-app が Application CR 自体を prune するのを防ぐ」効果のみ
-- 個別 annotation 済み: clusterwide CCNP 4 本、longhorn の SC/RecurringJob/NFS Service、app-kensan の workspace PVC
+- 個別 annotation 済み: clusterwide CCNP 4 本、longhorn の SC/RecurringJob、app-kensan の workspace PVC + syncthing-config PVC（Syncthing device 鍵保護）
 
 ## Change Workflow
 
