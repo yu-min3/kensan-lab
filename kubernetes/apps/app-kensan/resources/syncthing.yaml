@@ -47,15 +47,19 @@ spec:
         runAsNonRoot: true
         runAsUser: 65532
         runAsGroup: 65532
-        # workspace PVC は app pod と同じ fsGroup（書き込み権限の共有）
+        # fsGroup は config PVC (RWO block) の chown 用。workspace PVC は
+        # RWX=NFS で fsGroup が適用されないため、app pod との書き込み共有は
+        # 同一 runAsUser/runAsGroup (65532) で成立している
         fsGroup: 65532
         seccompProfile: { type: RuntimeDefault }
       containers:
         - name: syncthing
-          image: syncthing/syncthing:1.29.2
+          image: syncthing/syncthing:2.1.1
           env:
             - name: STHOMEDIR
               value: /var/syncthing/config
+            - name: STNODEFAULTFOLDER
+              value: "true"
           ports:
             - { name: sync, containerPort: 22000, protocol: TCP }
             - { name: gui, containerPort: 8384, protocol: TCP }
