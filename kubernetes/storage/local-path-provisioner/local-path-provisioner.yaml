@@ -1,22 +1,7 @@
-apiVersion: v1
-kind: Namespace
-metadata:
-  name: local-path-storage
-  labels:
-    app.kubernetes.io/managed-by: argocd
-    kensan-lab.platform/environment: infrastructure
-    kensan-lab.platform/tier: platform
-    kensan-lab.platform/component: storage
-    ## helper pod が hostPath を使う設計 (node-local storage) のため privileged 宣言。
-    ## legacy provisioner — 廃止完了で ns ごと消滅予定 (v2 統一設計、ADR-012)
-    ## NOTE: 旧 PSA label (enforce: baseline) は hostPath helper pod と構造的に非互換
-    ## だったため撤去済み (latent bug — もし適用されると provision/delete が止まる)。
-    ## また本ファイルは現在 Argo CD Application が存在せず live には未適用 (legacy、
-    ## bootstrap 期の kubectl apply 由来)。live の bare ns は ns-label-contract rule 1 の
-    ## violation として cpolr に出る — 廃止完了による ns 削除が本筋の解消
-    kensan-lab.platform/pss-level: privileged
-
----
+## NOTE: 本ファイルは Argo CD Application が存在せず live には未適用 (legacy、
+## bootstrap 期の kubectl apply 由来)。provisioner ごと段階的廃止中。
+## Namespace 定義は kubernetes/environments/local-path-storage/namespace.yaml に移管した
+## (local-path-storage-namespace app が ns object だけを adopt して label を管理する)
 apiVersion: v1
 kind: ServiceAccount
 metadata:

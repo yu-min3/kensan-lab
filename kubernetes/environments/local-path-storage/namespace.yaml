@@ -1,0 +1,16 @@
+## local-path-storage ns の lifecycle 管理 (Kyverno Phase 2: bare ns remediation)
+## provisioner 本体は legacy (kubernetes/storage/local-path-provisioner/ — Argo CD 管理外、
+## bootstrap 期の kubectl apply 由来) で段階的廃止中。workload には触らず、
+## ns object だけをこの app で adopt して contract 準拠の label を付与する。
+## 廃止完了で ns ごと削除する (このファイルと app も同時に消す)
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: local-path-storage
+  labels:
+    app.kubernetes.io/managed-by: argocd
+    kensan-lab.platform/environment: infrastructure
+    kensan-lab.platform/tier: platform
+    kensan-lab.platform/component: storage
+    ## helper pod が hostPath を使う設計 (node-local storage) のため privileged 宣言
+    kensan-lab.platform/pss-level: privileged

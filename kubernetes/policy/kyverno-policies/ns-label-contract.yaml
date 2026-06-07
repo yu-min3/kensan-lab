@@ -24,8 +24,8 @@ spec:
     failurePolicy: Ignore
   rules:
     ## rule 1: 全 ns に required labels (environment + tier。tier は値域も検査)。
-    ## 既知の violation (Audit で cpolr に出る想定): reloader / sealed-secrets /
-    ## cilium-secrets — remediation は follow-up (policy-enforcement.md 残課題)
+    ## bare ns (reloader / sealed-secrets / local-path-storage) は ns lifecycle app
+    ## (kubernetes/environments/) で remediate 済み — Phase 2
     - name: require-base-labels
       match:
         any:
@@ -37,10 +37,16 @@ spec:
           - resources:
               kinds:
                 - Namespace
-              names:  # K8s 組み込み ns のみ除外
+              names:
+                ## K8s 組み込み ns
                 - default
                 - kube-public
                 - kube-node-lease
+                ## cilium chart が render する ns (cilium app が tracking 済み)。
+                ## chart の secretsNamespace は create/name のみで label 注入に非対応、
+                ## かつ同一 ns を別 app で管理すると Argo CD の ownership 競合になるため
+                ## contract 側で除外する (chart が labels 対応したら外す)
+                - cilium-secrets
       validate:
         failureAction: Audit  # Phase 3 で Enforce へ昇格 (ADR-012)
         message: >-
