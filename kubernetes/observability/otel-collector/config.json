@@ -4,6 +4,6 @@
   "chartRepo": "https://open-telemetry.github.io/opentelemetry-helm-charts",
   "chartVersion": "0.97.1",
   "namespace": "monitoring",
-  "hasResources": "false",
+  "hasResources": "true",
   "createNamespace": "false"
 }
