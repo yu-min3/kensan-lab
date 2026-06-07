@@ -5,7 +5,7 @@ metadata:
   namespace: argocd
   annotations:
     argocd.argoproj.io/sync-wave: "2" # Deploy after Istio (depends on HTTPRoute)
-    argocd.argoproj.io/sync-options: Prune=false  # disaster recovery: platform-auth-prod の Postgres PV (Keycloak realm 設定) 保護
+    argocd.argoproj.io/sync-options: Prune=false  # root-app からの Application CR prune 防止 (子リソースには効かない: PR #366。PV は volumeClaimTemplates 由来で ArgoCD 管理外)
   # NOTE: resources-finalizer 不在 — Application 削除で realm/postgres 蒸発を防ぐ
 spec:
   project: platform-project

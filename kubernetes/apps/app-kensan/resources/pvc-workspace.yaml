@@ -15,6 +15,10 @@ metadata:
     # git からこのファイルを消しても ArgoCD は PVC を削除しない
     argocd.argoproj.io/sync-options: Prune=false
 spec:
+  # bind の決定性: この PV 以外に bind しない（誤って新 volume が provision
+  # される事故防止 + NFS Service selector との対応を固定）。復旧手順:
+  # docs/operations/kensan-workspace-volume-recovery.md
+  volumeName: pvc-cd6553e2-2bd6-4b7c-b43d-18b0a600b707
   accessModes: ["ReadWriteMany"]
   storageClassName: longhorn-workspace
   resources:

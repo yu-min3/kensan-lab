@@ -11,6 +11,10 @@
 apiVersion: longhorn.io/v1beta2
 kind: RecurringJob
 metadata:
+  annotations:
+    # リソース個別の prune 防御（PR #366 の実証: Application メタデータの
+    # Prune=false は子リソースを守らない）。git から消しても ArgoCD は削除しない
+    argocd.argoproj.io/sync-options: Prune=false
   name: snapshot-daily
   namespace: longhorn-system
 spec:
@@ -24,6 +28,10 @@ spec:
 apiVersion: longhorn.io/v1beta2
 kind: RecurringJob
 metadata:
+  annotations:
+    # リソース個別の prune 防御（PR #366 の実証: Application メタデータの
+    # Prune=false は子リソースを守らない）。git から消しても ArgoCD は削除しない
+    argocd.argoproj.io/sync-options: Prune=false
   name: backup-weekly
   namespace: longhorn-system
 spec:
@@ -37,6 +45,10 @@ spec:
 apiVersion: longhorn.io/v1beta2
 kind: RecurringJob
 metadata:
+  annotations:
+    # リソース個別の prune 防御（PR #366 の実証: Application メタデータの
+    # Prune=false は子リソースを守らない）。git から消しても ArgoCD は削除しない
+    argocd.argoproj.io/sync-options: Prune=false
   name: backup-monthly
   namespace: longhorn-system
 spec:
