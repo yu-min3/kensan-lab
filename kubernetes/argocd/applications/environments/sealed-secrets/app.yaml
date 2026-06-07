@@ -1,5 +1,10 @@
 ## sealed-secrets namespace 管理専用 app (kyverno-namespace と同パターン)
 ## NOTE: app 名は controller 本体の app (sealed-secrets) と衝突するため -namespace suffix
+##
+## disaster recovery: この ns には sealing key Secret が住んでおり、消えるとリポジトリ内の
+## 全 SealedSecret が復号不能になる。ns lifecycle app の責務は「label を貼る」ことであって
+## 「ns を消せる」ことではないため、finalizer なし + Prune=false で削除経路を持たせない
+## (PR #374 レビュー指摘)
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
@@ -7,8 +12,8 @@ metadata:
   namespace: argocd
   annotations:
     argocd.argoproj.io/sync-wave: "-4"
-  finalizers:
-    - resources-finalizer.argocd.argoproj.io
+    argocd.argoproj.io/sync-options: Prune=false  # root app からの prune も防止
+  # NOTE: resources-finalizer 不在 — Application 削除で sealing key を蒸発させない
 spec:
   project: platform-project
   source:
@@ -20,7 +25,7 @@ spec:
     namespace: sealed-secrets
   syncPolicy:
     automated:
-      prune: true
+      prune: false  # sealing key 保護 (header コメント参照)
       selfHeal: true
     syncOptions:
       - CreateNamespace=false
