@@ -39,6 +39,7 @@ Backstage: `cd backstage/app && make {install,dev,all TAG=...}`
 | `/troubleshoot <component>` | Diagnose component issues |
 | `/cert-check` | Certificate health & expiry check |
 | `/argocd-sync [app]` | Check sync status & drift |
+| `/codex <依頼>` | OpenAI Codex へ委譲（レビュー・セカンドオピニオン・別解生成） |
 
 ## Domain Rules (`.claude/rules/`)
 
