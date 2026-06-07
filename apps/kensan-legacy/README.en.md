@@ -1,3 +1,5 @@
+> ⚠️ **This app is frozen.** The current app is `apps/kensan/` (the file-based unified version). This directory is kept running only until the Phase 7 cutover is complete; the documentation below is no longer maintained.
+
 # Kensan
 
 <p align="center">

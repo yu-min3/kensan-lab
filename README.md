@@ -76,6 +76,7 @@ The platform uses Cilium LoadBalancer with L2 announcements for local network ac
 |  <img src="docs/assets/logos/cert-manager.svg" width="32">  | [cert-manager](https://cert-manager.io/)                                                            | Automated TLS certificates (Let's Encrypt)                                  |
 | <img src="docs/assets/logos/sealed-secrets.png" width="32"> | [Sealed Secrets](https://sealed-secrets.netlify.app/)                                               | Bootstrap-only secrets, encrypted in Git (Vault-independent)                |
 |   <img src="docs/assets/logos/cloudflare.svg" width="32">   | [Cloudflare Tunnel](https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/) | Zero Trust internet exposure                                                |
+|                                                             | [Kyverno](https://kyverno.io/)                                                                      | Policy engine — admission control, per-workload Pod Security exceptions     |
 
 ## Hardware
 
@@ -94,7 +95,7 @@ The platform uses Cilium LoadBalancer with L2 announcements for local network ac
 | I/O Heavy     | `requiredDuringScheduling: hardware-class=high-performance` | Prometheus, Loki, Tempo, Keycloak |
 | Medium        | `preferredDuringScheduling: high-performance` (weight: 80)  | OTel Collector                    |
 | Light         | No affinity                                                 | Grafana, Hubble UI                |
-| AMD64-only    | `required: kubernetes.io/arch=amd64`                        | Backstage                         |
+| AMD64-only    | `required: kubernetes.io/arch=amd64`                        | kensan, Backstage                 |
 
 </details>
 
@@ -107,11 +108,15 @@ kubernetes/                    # Core platform (GitOps-managed)
 ├── observability/                # Prometheus, Grafana, Loki, Tempo, OTel Collector
 ├── auth/                         # Keycloak, oauth2-proxy, Vault OIDC auth
 ├── secrets/                      # Vault, External Secrets, Sealed Secrets, cert-manager, Reloader
+├── policy/                       # Kyverno + cluster policies (PSS baseline/restricted, exceptions)
 ├── storage/                      # Longhorn, local-path-provisioner
+├── apps/                         # Per-app deploy definitions (e.g. app-kensan: values + raw resources)
 ├── environments/                 # Shared-namespace bootstrap (app-prod)
 └── kube-system/                  # Namespace labels, Pod Security Standards
+charts/                           # Platform-provided Helm charts (app-base: generic app deploy chart)
+packages/                         # Shared frontend packages (design-tokens — Whetstone design system)
 backstage/                        # Developer portal (app/ + manifests/)
-apps/                             # Applications deployed on the platform (kensan)
+apps/                             # Application source (kensan = current unified app, kensan-legacy = frozen)
 bootstrap/                        # Vault & Keycloak bootstrap (Terraform + scripts)
 docs/                             # ADRs, architecture, guides (MkDocs site)
 ```
@@ -122,11 +127,15 @@ docs/                             # ADRs, architecture, guides (MkDocs site)
 | ------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **Docs site**       | **[https://yu-min3.github.io/kensan-lab/](https://yu-min3.github.io/kensan-lab/)** — full documentation site |
 | **Getting Started** | [Installation](./docs/getting-started/installation.md) / [Configuration](./docs/getting-started/configuration.md) / [Bootstrapping](./docs/bootstrapping/index.md) _(in progress)_ / [Secret Management](./docs/secret-management/index.md) |
-| **Architecture**    | [Namespace Labels](./docs/concepts/namespace-label-design.md) / [ADRs](./docs/adr/) / [Kustomize Guidelines](./docs/concepts/kustomize-guidelines.md)                                                                        |
+| **Architecture**    | [Namespace Labels](./docs/concepts/namespace-label-design.md) / [ADRs](./docs/adr/) / [Kustomize Guidelines](./docs/concepts/kustomize-guidelines.md) _(deprecated — Kustomize removed from `kubernetes/`)_                                                                        |
 
 ## Application: kensan
 
-The `apps/kensan-legacy/` directory contains a full-stack application running on this platform — a personal productivity tool built with React, Go microservices, Python AI agents, and an Iceberg data lakehouse (Dagster + Polaris). It serves as both a real workload and a reference for what the platform supports: multi-service deployments, database management, CI/CD via Argo CD, and full observability integration with OpenTelemetry instrumentation across all services.
+A real application runs on this platform as a reference workload. It currently exists in two lineages mid-cutover:
+
+- **`apps/kensan`** — the current unified app: a file-based knowledge & goal manager. Markdown files are the single source of truth, served by a single Go service (REST API + bundled SPA, Whetstone design system) shipped as one container image. See [apps/kensan/README.md](./apps/kensan/README.md).
+- **`apps/kensan-legacy`** — the previous full-stack app (React + Go microservices + Python AI agents + an Iceberg data lakehouse with Dagster & Polaris). **Frozen**, kept running only until Phase 7 cutover. It still demonstrates what the platform supports: multi-service deployments, dynamic DB credentials, Argo CD CI/CD, and OpenTelemetry instrumentation across services.
+- **`kubernetes/apps/app-kensan`** — the deploy definition for the current app (Argo CD `Application` consuming the `charts/app-base` chart via multi-source, plus raw resources: per-app namespace, workspace PVC, and LAN-only Syncthing sync).
 
 ## Acknowledgments
 
