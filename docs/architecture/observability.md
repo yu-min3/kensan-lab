@@ -107,7 +107,7 @@ probe ベースのアラート (`kubernetes/observability/blackbox-exporter/reso
 
 ### OpenTelemetry Collector
 
-テレメトリーの中央集約・処理・転送。Deployment 1 replica、`monitoring` ns、`otel/opentelemetry-collector-contrib:0.93.0`。
+テレメトリーの中央集約・処理・転送。Deployment 1 replica、`monitoring` ns、`opentelemetry-collector` chart（image は chart の appVersion に追従。版数の SoT は `kubernetes/observability/otel-collector/config.json` の `chartVersion`）。
 
 3 つのパイプライン:
 
@@ -144,7 +144,7 @@ exporters: [loki]
 
 ### Grafana Tempo
 
-分散トレーシングバックエンド。Single Binary mode、`monitoring` ns、`grafana/tempo:2.3.1`、10Gi PVC。
+分散トレーシングバックエンド。Single Binary mode、`monitoring` ns、`tempo` chart（image は chart の appVersion に追従。版数の SoT は `kubernetes/observability/tempo/config.json` の `chartVersion`）、10Gi PVC。
 
 - OTLP gRPC: `tempo.monitoring.svc:4317`
 - OTLP HTTP: `tempo.monitoring.svc:4318`
@@ -154,9 +154,15 @@ exporters: [loki]
 
 ### Grafana Loki
 
-ログ集約。SingleBinary mode、`monitoring` ns、`grafana/loki:3.5.7`、10Gi PVC、TSDB v13 schema、保持 7 日。
+ログ集約。SingleBinary mode、`monitoring` ns、`loki` chart（image は chart の appVersion に追従。版数の SoT は `kubernetes/observability/loki/config.json` の `chartVersion`）、10Gi PVC、TSDB v13 schema、保持 7 日。
 
 受信: `http://loki.monitoring.svc:3100/loki/api/v1/push`
+
+### blackbox-exporter
+
+外形監視（能動監視・層 ②）。`prometheus-blackbox-exporter` chart、`monitoring` ns（版数の SoT は `kubernetes/observability/blackbox-exporter/config.json` の `chartVersion`）。Probe CRD でノード ICMP（有線 + WiFi 両系統）と platform エンドポイントの HTTPS を外から叩き、応答性を確認する。アラートは `resources/blackbox-alerts.yaml`（上記「アラートパイプライン」参照）。
+
+詳細: [`kubernetes/observability/blackbox-exporter/`](https://github.com/yu-min3/kensan-lab/tree/main/kubernetes/observability/blackbox-exporter)
 
 ### Grafana
 
