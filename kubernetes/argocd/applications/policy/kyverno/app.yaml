@@ -1,0 +1,45 @@
+## Kyverno policy engine (ADR-012)
+## ポリシー本体は kyverno-policies app (Pattern B) で別管理 —
+## engine とポリシーのライフサイクルを分離するため (network-policy と同じ思想)
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: kyverno
+  namespace: argocd
+  annotations:
+    ## admission webhook は workload より前 / CNI・cert 系より後に立てる
+    argocd.argoproj.io/sync-wave: "-2"
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io  # 削除時に webhook を残骸にしない
+spec:
+  project: platform-project
+  sources:
+    - repoURL: https://kyverno.github.io/kyverno/
+      chart: kyverno
+      targetRevision: 3.8.1
+      helm:
+        releaseName: kyverno
+        valueFiles:
+          - $values/kubernetes/policy/kyverno/values.yaml
+    - repoURL: https://github.com/yu-min3/kensan-lab
+      targetRevision: main
+      ref: values
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: kyverno
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=false
+      - ServerSideApply=true  # Kyverno CRD は巨大 — annotation サイズ上限回避に必須
+    retry:
+      limit: 5
+      backoff:
+        duration: 5s
+        factor: 2
+        maxDuration: 3m
+  ## NOTE: resource/policy webhook config は chart が render せず Kyverno が runtime で
+  ## 生成・管理する (= Argo CD 管理外。helm template で render 結果ゼロを確認済み)。
+  ## そのため webhook 向けの ignoreDifferences は不要

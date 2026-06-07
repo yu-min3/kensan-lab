@@ -11,7 +11,7 @@ Scaffold `$ARGUMENTS[1]` under category `$ARGUMENTS[0]`.
 ## Steps
 
 1. **Validate category**:
-   - Must be one of: `observability`, `network`, `security`, `environments`, `storage`, `gitops`
+   - Must be one of: `observability`, `network`, `security`, `environments`, `storage`, `gitops`, `policy`
    - If invalid, suggest closest match
 
 2. **Create component directory**:

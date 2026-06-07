@@ -34,3 +34,10 @@ spec:
           mc mb --ignore-existing local/kensan-lakehouse-dev
           mc mb --ignore-existing local/kensan-lakehouse-prod
           echo "MinIO bucket initialization complete."
+        resources:
+          requests:
+            cpu: 50m
+            memory: 64Mi
+          limits:
+            cpu: 200m
+            memory: 128Mi

@@ -1,0 +1,76 @@
+## app tier の image tag 規律 — mutable tag による silent upgrade 事故の再発防止
+## (ADR-011: Vault が :latest で major 跨ぎ silent upgrade した事故の教訓を AD tenant にも適用)
+##
+## scope: tier=application label の ns ∪ ns 名 (app-* / kensan)。label が SoT で、
+##   name match は label 欠落 ns が静かに scope 外へ落ちるのを防ぐ defense-in-depth
+##   (label 欠落自体は require-ns-labels が Audit で検出する)。
+##   scope 定義は require-requests.yaml と docs/concepts/policy-enforcement.md に
+##   複製があるため、変更時は 3 ヶ所を同期すること
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: disallow-latest-tag
+  annotations:
+    policies.kyverno.io/title: Disallow Latest Tag
+    policies.kyverno.io/category: Best Practices
+    policies.kyverno.io/severity: medium
+    policies.kyverno.io/description: >-
+      ':latest' / tag 省略の image は何が動いているか追跡できず、
+      意図しない rollout を引き起こす。immutable な version tag を必須とする。
+spec:
+  background: true
+  webhookConfiguration:
+    failurePolicy: Ignore
+  rules:
+    - name: require-image-tag
+      match:
+        any:
+          - resources:
+              kinds:
+                - Pod
+              namespaceSelector:
+                matchLabels:
+                  kensan-lab.platform/tier: application
+          - resources:
+              kinds:
+                - Pod
+              namespaces:
+                - "app-*"
+                - kensan
+      validate:
+        failureAction: Audit  # Phase 3 で Enforce へ昇格 (ADR-012)
+        message: "image には明示的な tag が必要です (tag 省略は禁止)"
+        pattern:
+          spec:
+            =(ephemeralContainers):
+              - image: "*:*"
+            =(initContainers):
+              - image: "*:*"
+            containers:
+              - image: "*:*"
+    - name: disallow-latest-tag
+      match:
+        any:
+          - resources:
+              kinds:
+                - Pod
+              namespaceSelector:
+                matchLabels:
+                  kensan-lab.platform/tier: application
+          - resources:
+              kinds:
+                - Pod
+              namespaces:
+                - "app-*"
+                - kensan
+      validate:
+        failureAction: Audit  # Phase 3 で Enforce へ昇格 (ADR-012)
+        message: "':latest' tag は禁止です (immutable な version tag を使う)"
+        pattern:
+          spec:
+            =(ephemeralContainers):
+              - image: "!*:latest"
+            =(initContainers):
+              - image: "!*:latest"
+            containers:
+              - image: "!*:latest"
