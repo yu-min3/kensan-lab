@@ -1,0 +1,39 @@
+## local-path-storage namespace 管理専用 app (kyverno-namespace と同パターン)
+## legacy provisioner の workload は Argo CD 管理外のまま (manifest も git から削除済み、
+## cluster 上の残骸のみ)、ns object だけを adopt する。
+## Prune=false: app 削除時に ns ごと消して legacy PVC を巻き込む事故を防ぐ
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: local-path-storage-namespace
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "-4"
+    argocd.argoproj.io/sync-options: Prune=false
+  # NOTE: resources-finalizer 不在 — Application 削除で ns (+ 中の legacy PVC) を蒸発させない
+spec:
+  project: platform-project
+  source:
+    repoURL: https://github.com/yu-min3/kensan-lab
+    targetRevision: main
+    ## ns manifest はコンポーネント本体ディレクトリに同居させ、include で抜く (統一パターン)
+    path: kubernetes/storage/local-path-provisioner
+    directory:
+      recurse: false
+      include: 'namespace.yaml'
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: local-path-storage
+  syncPolicy:
+    automated:
+      prune: false
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=false
+      - ServerSideApply=true
+    retry:
+      limit: 5
+      backoff:
+        duration: 5s
+        factor: 2
+        maxDuration: 3m
