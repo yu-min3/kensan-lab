@@ -39,6 +39,7 @@ git worktree add ~/kensan-lab.worktrees/<name> -b <branch-name> origin/main
 
 # 3. その worktree dir で作業 / commit
 cd ~/kensan-lab.worktrees/<name>
+ln -s CLAUDE.md AGENTS.md   # Codex 用 symlink (gitignored) を再作成。忘れると codex review が規約なしで走る
 # ... edit, commit ...
 
 # 4. push + PR (worktree dir から)

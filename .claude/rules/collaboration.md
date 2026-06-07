@@ -18,7 +18,7 @@ description: Agent collaboration rules — PR conventions, design/status reporti
 
 - 配置: `temp/` 配下（例: `temp/design-<topic>.html`、git-ignored）
 - 図示: 構成図・データフロー・シーケンス・before/after 比較などを SVG / Mermaid 等で描く。diff やテキストを貼るだけにしない
-- 作成後に `open temp/<file>.html` でブラウザ表示まで実行する
+- 作成後に `open temp/<file>.html` でブラウザ表示まで実行する（macOS 前提。headless / scheduled セッション等でブラウザが開けない場合はファイルパスの提示のみでよい）
 
 ## Multi-Agent Setup（Codex 等の他エージェント）
 
