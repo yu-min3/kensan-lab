@@ -1,4 +1,6 @@
 # Syncthing の GUI/REST (8384) をクラスタ内ネットワークから遮断する（PR #371 レビュー指摘 1）。
+# 配置: app 固有の netpol なので app-kensan の resources/ に置く（per-app-namespace 設計、
+# 中央の kubernetes/network/network-policy/ は clusterwide/platform 用）。
 #
 # GUI は 0.0.0.0:8384 で listen しており、無防備だと侵害された pod から
 # device 追加 → workspace 全データ exfiltrate が可能になる。

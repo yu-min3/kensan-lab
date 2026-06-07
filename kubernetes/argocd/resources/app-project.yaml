@@ -42,6 +42,8 @@ spec:
   # Networking
   - group: ""
     kind: Service
+  - group: "networking.k8s.io"
+    kind: NetworkPolicy
   - group: "gateway.networking.k8s.io"
     kind: HTTPRoute
   # Configuration & Identity
