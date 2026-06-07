@@ -19,7 +19,12 @@ spec:
   source:
     repoURL: https://github.com/yu-min3/kensan-lab
     targetRevision: main
-    path: kubernetes/environments/sealed-secrets
+    ## ns manifest はコンポーネント本体ディレクトリに同居させ、include で抜く (統一パターン)
+    ## include 必須: 同居する controller.yaml は controller app (sealed-secrets) が管理する
+    path: kubernetes/secrets/sealed-secrets
+    directory:
+      recurse: false
+      include: 'namespace.yaml'
   destination:
     server: https://kubernetes.default.svc
     namespace: sealed-secrets

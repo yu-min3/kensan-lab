@@ -1,6 +1,6 @@
 ## local-path-storage ns の lifecycle 管理 (Kyverno Phase 2: bare ns remediation)
-## provisioner 本体は legacy (kubernetes/storage/local-path-provisioner/ — Argo CD 管理外、
-## bootstrap 期の kubectl apply 由来) で段階的廃止中。workload には触らず、
+## provisioner 本体は legacy (Argo CD 管理外・bootstrap 期の kubectl apply 由来。manifest は
+## git から削除済みで cluster 上の残骸のみ) で段階的廃止中。workload には触らず、
 ## ns object だけをこの app で adopt して contract 準拠の label を付与する。
 ## 廃止完了時の削除は手動: Prune=false + finalizer なしのため、ファイルを消しても
 ## Application / ns は自動では消えない。Application を手動削除 → kubectl delete ns →

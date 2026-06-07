@@ -15,7 +15,7 @@ Argo CD で同期される全 platform component の Git source。
 | `storage/` | local-path-provisioner, Longhorn |
 | `policy/` | Kyverno (policy engine + ClusterPolicy / PolicyException 群) |
 | `kube-system/` | kube-system ns の label / PSA / 共通リソース管理 |
-| `environments/` | 複数 component が同居する shared namespace の bootstrap (app-prod 等) |
+| `namespaces/` | shared namespace の bootstrap (app-prod landing zone)。ns-lifecycle app 群は `argocd/applications/namespaces/` |
 
 ## コンポーネントのレイアウト規則
 

@@ -3,6 +3,10 @@ kind: Application
 metadata:
   name: gateway-api
   namespace: argocd
+  annotations:
+    ## Gateway API CRDs は istio 系 (-3〜-1) が依存する。DR full-sync 時の順序を明示する
+    ## (既存の最小 wave -4 より先の -5 に置く)
+    argocd.argoproj.io/sync-wave: "-5"
   finalizers:
     - resources-finalizer.argocd.argoproj.io
 spec:
@@ -12,6 +16,8 @@ spec:
     repoURL: https://github.com/yu-min3/kensan-lab
     targetRevision: main
     path: kubernetes/network/gateway-api
+    directory:
+      recurse: false
 
   destination:
     server: https://kubernetes.default.svc

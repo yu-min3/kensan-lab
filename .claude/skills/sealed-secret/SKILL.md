@@ -12,7 +12,7 @@ Create sealed secret `$ARGUMENTS[0]` in namespace `$ARGUMENTS[1]`.
 
 1. **Determine target location**:
    - Find the component that manages namespace `$ARGUMENTS[1]`
-   - Target: `kubernetes/<category>/<component>/resources/` or `kubernetes/environments/<env>/`
+   - Target: `kubernetes/<category>/<component>/resources/` or `kubernetes/namespaces/<ns>/`
 
 2. **Collect secret data**:
    - Ask the user what key-value pairs to include

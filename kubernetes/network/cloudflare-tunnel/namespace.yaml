@@ -7,4 +7,3 @@ metadata:
     kensan-lab.platform/environment: infrastructure
     kensan-lab.platform/tier: platform
     kensan-lab.platform/component: cloudflare-tunnel
-    kensan-lab.platform/category: network

@@ -14,7 +14,12 @@ spec:
   source:
     repoURL: https://github.com/yu-min3/kensan-lab
     targetRevision: main
-    path: kubernetes/environments/reloader
+    ## ns manifest はコンポーネント本体ディレクトリに同居させ、include で抜く (統一パターン)
+    ## include 必須: 同居する values.yaml (helm values) を directory source が拾わないように
+    path: kubernetes/secrets/reloader
+    directory:
+      recurse: false
+      include: 'namespace.yaml'
   destination:
     server: https://kubernetes.default.svc
     namespace: reloader
