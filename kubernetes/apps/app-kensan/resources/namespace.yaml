@@ -4,10 +4,10 @@ kind: Namespace
 metadata:
   name: app-kensan
   labels:
-    # 旧 unprefixed labels — 既存 selector 互換のため残置（参照が無くなり次第削除候補）
-    environment: prod
-    team: yu
-    app: kensan
+    ## 旧 unprefixed labels (environment / team / app) は削除済み (Phase 2)。
+    ## 根拠: live の全 namespaceSelector 保有リソース (CCNP / CNP / NetworkPolicy /
+    ## Gateway allowedRoutes / AuthorizationPolicy / webhook configs) を網羅確認し、
+    ## unprefixed key を参照するものがゼロであることを実測 (2026-06-07)
     pod-security.kubernetes.io/enforce: restricted
     # gateway-prod の allowedRoutes namespace selector（これが無いと HTTPRoute が
     # NotAllowedByListeners で拒否される）

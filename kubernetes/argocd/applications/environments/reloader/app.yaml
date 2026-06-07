@@ -1,0 +1,33 @@
+## reloader namespace 管理専用 app (kyverno-namespace と同パターン)
+## 既存の bare ns を SSA で adopt して contract 準拠の label を付与する
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: reloader-namespace
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "-4"
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: platform-project
+  source:
+    repoURL: https://github.com/yu-min3/kensan-lab
+    targetRevision: main
+    path: kubernetes/environments/reloader
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: reloader
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=false
+      - ServerSideApply=true
+    retry:
+      limit: 5
+      backoff:
+        duration: 5s
+        factor: 2
+        maxDuration: 3m
