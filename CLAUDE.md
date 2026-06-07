@@ -68,6 +68,7 @@ Backstage: `cd backstage/app && make {install,dev,all TAG=...}`
 ## Domain & Network
 
 - **ドメイン**: `yu-min3.com`（DNS 権威は AWS Route53。Cloudflare は Tunnel での edge 公開のみで DNS 権威ではない）
+- **第 2 ドメイン**: `yu-mins.com`（Cloudflare Tunnel での外部公開用。`*.yu-mins.com` で argocd/grafana/prometheus/longhorn/backstage を edge 終端 TLS で公開）
 - **LB IP range**: `192.168.0.240-249`
 - **GitHub org**: `yu-min3`
 - フォーク時は [`docs/getting-started/configuration.md`](./docs/getting-started/configuration.md) でドメイン等を置換
