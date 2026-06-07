@@ -3,6 +3,10 @@ kind: Application
 metadata:
   name: cilium
   namespace: argocd
+  annotations:
+    ## CNI は全ての前提。通常運用では収束済みのため無風だが、DR full-sync 時の順序を明示する
+    ## (istio 系の -4 より先)
+    argocd.argoproj.io/sync-wave: "-5"
   finalizers:
     - resources-finalizer.argocd.argoproj.io
 spec:
