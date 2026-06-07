@@ -29,10 +29,12 @@ The Grafana admin credentials are no longer a hand-sealed Secret. They are manag
   - Pulls `secret/monitoring/grafana/admin` from Vault via the `vault-backend` ClusterSecretStore and creates `grafana-admin-secret` in `monitoring`.
 - OIDC client secret: `kubernetes/observability/grafana/resources/external-secret-oidc.yaml`
 
-Prerequisites (see the ExternalSecret comments for the authoritative list):
+Prerequisites:
 
-- VCO `grafana-read` policy + `grafana` KubernetesAuthEngineRole applied
-  (`kubernetes/secrets/vault-config-operator/resources/grafana.yaml`)
+- The shared ClusterSecretStore `vault-backend` is healthy
+  (`kubernetes/secrets/external-secrets/resources/cluster-secret-store.yaml` — ESO reads Vault via the
+  shared `external-secrets` role / `external-secrets-read` policy created by the bootstrap Terraform;
+  no per-app Vault role is needed for Grafana)
 - The KV entry `secret/monitoring/grafana/admin` is populated
   (`bootstrap/vault/migrate-secret.sh`)
 

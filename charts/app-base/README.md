@@ -5,7 +5,7 @@ kensan-lab platform が application に提供する汎用デプロイ chart。
 
 ## 目的
 
-この chart が生成するのは `Deployment` / `Service` / `ServiceAccount` と、任意で `HTTPRoute`（+ oauth2 用）/ `PVC` / `ghcr pull secret`（ExternalSecret）/ OTel 配線。最大の役割は **secure default の強制**で、app 側で緩められない既定を焼き込んでいる:
+この chart が生成するのは `Deployment` / `Service` / `ServiceAccount` と、任意で `HTTPRoute`（+ oauth2 用）/ `PVC` / `ghcr pull secret`（ExternalSecret）/ OTel 配線。最大の役割は **secure default の提供**。緩めない運用とする既定を chart に焼き込んでいる（values で機械的には上書き可能。機械強制は Kyverno 層が担う）:
 
 - `runAsNonRoot: true`、`allowPrivilegeEscalation: false`
 - `readOnlyRootFilesystem: true`
