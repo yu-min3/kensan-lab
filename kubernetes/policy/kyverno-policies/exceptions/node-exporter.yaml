@@ -29,8 +29,13 @@ spec:
           selector:
             matchLabels:
               app.kubernetes.io/name: prometheus-node-exporter
-  ## exempt する control を必要最小限に限定 (Privileged Containers 等は exempt しない)
+  ## exempt する control を必要最小限に限定 (Privileged Containers 等は exempt しない)。
+  ## NOTE: container レベルの control (Host Ports 等) は controlName だけでは exempt
+  ## されず images 指定が必須 (pod レベルの Host Namespaces / HostPath Volumes は不要)。
+  ## kyverno CLI のオフライン評価で skip になることを検証済み (2026-06-07)
   podSecurity:
     - controlName: Host Namespaces
     - controlName: Host Ports
+      images:
+        - quay.io/prometheus/node-exporter*
     - controlName: HostPath Volumes
