@@ -30,7 +30,7 @@ Cloudflare Tunnel の token は ESO 経由（`external-secret.yaml`、Vault path
 |---------|----|
 | gateway-platform | 192.168.0.242 |
 | gateway-prod | 192.168.0.243 |
-| kensan-workspace-nfs (longhorn-system) | 192.168.0.244 |
+| syncthing-sync (app-kensan) | 192.168.0.245 |
 
 ## Gateway Architecture
 

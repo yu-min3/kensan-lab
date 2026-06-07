@@ -1,0 +1,23 @@
+# Syncthing の GUI/REST (8384) をクラスタ内ネットワークから遮断する（PR #371 レビュー指摘 1）。
+# 配置: app 固有の netpol なので app-kensan の resources/ に置く（per-app-namespace 設計、
+# 中央の kubernetes/network/network-policy/ は clusterwide/platform 用）。
+#
+# GUI は 0.0.0.0:8384 で listen しており、無防備だと侵害された pod から
+# device 追加 → workspace 全データ exfiltrate が可能になる。
+# この policy は syncthing pod への ingress を 22000 (sync, TLS + device 認証) のみに
+# 制限する。8384 は不許可 = 設定操作は kubectl exec 経由のみ。
+# kubelet の liveness/readiness probe は Cilium が host 由来として自動許可するため影響なし。
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: syncthing-guard
+  namespace: app-kensan
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: syncthing
+  policyTypes: ["Ingress"]
+  ingress:
+    - ports:
+        - port: 22000
+          protocol: TCP
