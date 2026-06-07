@@ -16,8 +16,6 @@ spec:
     repoURL: https://github.com/yu-min3/kensan-lab
     targetRevision: main
     path: kubernetes/network/gateway-api
-    directory:
-      recurse: false
 
   destination:
     server: https://kubernetes.default.svc

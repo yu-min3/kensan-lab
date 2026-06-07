@@ -9,6 +9,11 @@
 残りは全て個別 Application（namespaces を含む）。詳細は [ADR-003](../../../docs/adr/003-applicationset-migration-strategy.md) と
 その Addendum (2026-06-07) を参照。
 
+> ⚠️ **`directory.recurse: false` を単独で明示しない**: zero value のみの `directory` ブロックは
+> API/ArgoCD が live の Application spec から落とすため、git ≠ live の恒久 OutOfSync になる
+> (PR #382 → #383 の実証。keycloak / backstage は #324 以来この drift を抱えていた)。
+> `directory` ブロックは `include` / `exclude` を使うときだけ書く (その場合 `recurse: false` の併記は残ってよい)。
+
 | カテゴリ | パターン | 理由 |
 |---------|---------|------|
 | **observability/** | ApplicationSet | Helm multi-source で構造が均一。Git File Generator (`kubernetes/observability/*/config.json`) でパラメータ化。リファレンス実装 |

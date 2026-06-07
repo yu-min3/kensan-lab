@@ -14,8 +14,6 @@ spec:
     repoURL: https://github.com/yu-min3/kensan-lab
     targetRevision: main
     path: kubernetes/network/network-policy
-    directory:
-      recurse: false
 
   destination:
     server: https://kubernetes.default.svc
