@@ -11,9 +11,13 @@ features:
     namespace: kyverno
 
   ## microSD etcd 保護: admission 毎の EphemeralReport 書き込みを止め、
-  ## violation 可視化は background scan (既定 1h) 由来の PolicyReport に一本化する
+  ## violation 可視化は background scan 由来の PolicyReport に一本化する
   admissionReports:
     enabled: false
+
+  ## scan 間隔は設計値として明示 pin (chart bump による silent change 防止 — ADR-011 の教訓)
+  backgroundScan:
+    backgroundScanInterval: 1h
 
   ## validate 結果のみレポート (mutate / generate / imageVerify は未使用 — ADR-012)
   reporting:
@@ -28,7 +32,7 @@ admissionController:
   ## policy 側の webhookConfiguration.failurePolicy: Ignore で取る
   replicas: 1
   ## webhook latency を抑えるため m4neo を優先 (Medium カテゴリの scheduling rule)
-  nodeAffinity:
+  nodeAffinity: &hp-node-affinity
     preferredDuringSchedulingIgnoredDuringExecution:
       - weight: 80
         preference:
@@ -45,35 +49,15 @@ admissionController:
       limits:
         memory: 384Mi
 
+## background-controller の担当は generate / mutateExisting rule の処理のみで、
+## PolicyReport 生成の background scan は reports-controller の仕事。
+## validate-only 構成 (ADR-012 §2) では恒久 idle になるため無効化
 backgroundController:
-  replicas: 1
-  nodeAffinity:
-    preferredDuringSchedulingIgnoredDuringExecution:
-      - weight: 80
-        preference:
-          matchExpressions:
-            - key: hardware-class
-              operator: In
-              values:
-                - high-performance
-  resources:
-    requests:
-      cpu: 50m
-      memory: 64Mi
-    limits:
-      memory: 256Mi
+  enabled: false
 
 reportsController:
   replicas: 1
-  nodeAffinity:
-    preferredDuringSchedulingIgnoredDuringExecution:
-      - weight: 80
-        preference:
-          matchExpressions:
-            - key: hardware-class
-              operator: In
-              values:
-                - high-performance
+  nodeAffinity: *hp-node-affinity
   resources:
     requests:
       cpu: 50m

@@ -2,8 +2,10 @@
 ## TODO(kyverno) の回収 (ADR-012)
 ##
 ## scope 設計:
-##   - privileged 設計の ns (kube-system / istio-system / longhorn-system) は除外。
-##     いずれも PSA `enforce: privileged` を明示した PE 管理 ns (CNI / mesh / CSI)
+##   - privileged 設計 ns は ns 側の PSA 宣言 (`pod-security.kubernetes.io/enforce:
+##     privileged`) を SoT として label selector で除外 (現状: kube-system /
+##     istio-system / longhorn-system)。新しい privileged ns (CSI / CNI 等) を
+##     追加してもこの policy の編集は不要
 ##   - それ以外は PSA label の有無に関わらず baseline を監査
 ##     (monitoring / reloader / sealed-secrets / cloudflare-tunnel 等の PSA 未設定 ns を回収)
 ##   - 既知の正当な violation は exceptions/ の PolicyException で exempt
@@ -34,10 +36,11 @@ spec:
       exclude:
         any:
           - resources:
-              namespaces:
-                - kube-system
-                - istio-system
-                - longhorn-system
+              kinds:
+                - Pod
+              namespaceSelector:
+                matchLabels:
+                  pod-security.kubernetes.io/enforce: privileged
       validate:
         failureAction: Audit  # Phase 3 で Enforce へ昇格 (ADR-012)
         podSecurity:

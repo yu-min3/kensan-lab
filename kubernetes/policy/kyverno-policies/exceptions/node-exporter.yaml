@@ -24,8 +24,11 @@ spec:
             - DaemonSet
           namespaces:
             - monitoring
-          names:
-            - "*node-exporter*"
+          ## name glob ではなく workload の実 label に紐付ける
+          ## (名前を寄せた別 Pod が例外を継承するのを防ぐ。実機照合済みの label)
+          selector:
+            matchLabels:
+              app.kubernetes.io/name: prometheus-node-exporter
   ## exempt する control を必要最小限に限定 (Privileged Containers 等は exempt しない)
   podSecurity:
     - controlName: Host Namespaces

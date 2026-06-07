@@ -56,22 +56,24 @@ mutate は Argo CD の reconciliation loop と競合する (CNCF "GitOps and mut
 | 項目 | 設定 | 理由 |
 |---|---|---|
 | `features.admissionReports` | **無効化** | master の etcd は microSD。admission 毎の EphemeralReport 書き込みを止め、violation 可視化は background scan (1h) 由来の PolicyReport に一本化 |
+| `backgroundScanInterval` | `1h` を明示 pin | 設計値を chart default 任せにしない (ADR-011 と同型の silent change 防止) |
 | `features.reporting` | validate のみ | mutate / generate / imageVerify は未使用 |
 | 各 controller replicas | 1 | homelab に HA 不要 |
 | webhook `failurePolicy` | `Ignore` (policy 側で指定) | admission controller (replica 1) 停止時に cluster 全体の Pod 作成を止めない。Enforce 安定後に `Fail` 昇格を判断 |
 | `cleanupController` | 無効化 | CleanupPolicy 未使用。Pi のリソース節約 |
+| `backgroundController` | 無効化 | 担当は generate / mutateExisting のみで validate-only 構成では恒久 idle (background scan の PolicyReport 生成は reports-controller の担当) |
 | nodeAffinity | preferred `hardware-class=high-performance` (weight 80) | webhook latency 抑制。Medium カテゴリの scheduling rule に準拠 |
 
 ### 4. 初期ポリシーと scope
 
 | ポリシー | scope | 初期 mode |
 |---|---|---|
-| `pss-baseline` | privileged 設計 ns (kube-system / istio-system / longhorn-system) **以外の全 ns** | Audit |
+| `pss-baseline` | PSA `enforce=privileged` label の ns **以外の全 ns** (label selector 除外) | Audit |
 | `disallow-latest-tag` | app tier (`tier=application` label ∪ `app-*` / `kensan` ns 名) | Audit |
 | `require-requests` | 同上 | Audit |
-| `require-ns-labels` | `app-*` ns (ADR-006) | Audit |
+| `require-ns-labels` | `app-*` ns (ADR-006)。app-prod は env-shared landing zone のため exclude | Audit |
 
-privileged 設計の 3 ns は PSA `enforce: privileged` を明示済みの PE 専管領域なので Kyverno の scope 外とする。これにより必要な PolicyException は **node-exporter 1 件のみ** (実機照合 2026-06-06)。
+privileged 設計 ns (現状 kube-system / istio-system / longhorn-system) は PSA `enforce: privileged` を明示済みの PE 専管領域なので、**ns 側の PSA 宣言を SoT とした label selector** で scope 外とする (name list のハードコードを避け、4 つ目の privileged ns 追加時にこの policy の編集を不要にする)。これにより必要な PolicyException は **node-exporter 1 件のみ** (実機照合 2026-06-06。kensan の hook Job 2 件に requests 欠落があったが、本 PR で requests を追記して解消)。
 
 ### 5. 段階的ロールアウト
 

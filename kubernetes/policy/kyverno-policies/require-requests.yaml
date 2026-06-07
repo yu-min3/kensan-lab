@@ -3,7 +3,9 @@
 ##
 ## scope は app tier のみ。platform 側は argocd / cert-manager / longhorn 等
 ## ~50 container が requests 未設定のため対象外 — values.yaml への requests 追記
-## (Git 側修正) で個別に解消する方針 (ADR-012、mutate は使わない)
+## (Git 側修正) で個別に解消する方針 (ADR-012、mutate は使わない)。
+## scope 定義 (label ∪ name の match block) は disallow-latest-tag.yaml と
+## docs/concepts/policy-enforcement.md に複製があるため、変更時は 3 ヶ所を同期すること
 apiVersion: kyverno.io/v1
 kind: ClusterPolicy
 metadata:

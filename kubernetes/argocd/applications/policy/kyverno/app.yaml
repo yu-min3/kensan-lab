@@ -40,14 +40,6 @@ spec:
         duration: 5s
         factor: 2
         maxDuration: 3m
-  ## Kyverno はポリシー内容に応じて webhook の rules / caBundle を動的管理する。
-  ## external-secrets と同じパターンで drift 誤検知を除外
-  ignoreDifferences:
-    - group: admissionregistration.k8s.io
-      kind: ValidatingWebhookConfiguration
-      jqPathExpressions:
-        - .webhooks
-    - group: admissionregistration.k8s.io
-      kind: MutatingWebhookConfiguration
-      jqPathExpressions:
-        - .webhooks
+  ## NOTE: resource/policy webhook config は chart が render せず Kyverno が runtime で
+  ## 生成・管理する (= Argo CD 管理外。helm template で render 結果ゼロを確認済み)。
+  ## そのため webhook 向けの ignoreDifferences は不要

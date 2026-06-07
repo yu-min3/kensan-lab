@@ -24,6 +24,13 @@ spec:
             sleep 5
           done
           echo "Polaris is ready."
+        resources:
+          requests:
+            cpu: 10m
+            memory: 16Mi
+          limits:
+            cpu: 100m
+            memory: 64Mi
       containers:
       - name: polaris-init
         image: ghcr.io/yu-min3/kensan-dagster:v0.0.2

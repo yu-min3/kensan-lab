@@ -4,6 +4,7 @@ kind: Namespace
 metadata:
   name: app-kensan
   labels:
+    # 旧 unprefixed labels — 既存 selector 互換のため残置（参照が無くなり次第削除候補）
     environment: prod
     team: yu
     app: kensan
@@ -11,3 +12,8 @@ metadata:
     # gateway-prod の allowedRoutes namespace selector（これが無いと HTTPRoute が
     # NotAllowedByListeners で拒否される）
     kensan-lab.platform/environment: production
+    # ADR-006 正準の prefixed 3-axis + tier。tier=application は Kyverno app-tier
+    # policy (disallow-latest-tag / require-requests) の scope selector でもある
+    kensan-lab.platform/team: yu
+    kensan-lab.platform/app: kensan
+    kensan-lab.platform/tier: application
