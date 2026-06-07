@@ -51,6 +51,8 @@ func Load() *Config {
 			Host:     getEnv("DB_HOST", "localhost"),
 			Port:     getEnvAsInt("DB_PORT", 5432),
 			User:     getEnv("DB_USER", "kensan"),
+			// local-dev default (intentional); in-cluster the real random
+			// password is injected via ESO, so this grants nothing in prod
 			Password: getEnv("DB_PASSWORD", "kensan"),
 			DBName:   getEnv("DB_NAME", "kensan"),
 			SSLMode:  getEnv("DB_SSLMODE", "disable"),
