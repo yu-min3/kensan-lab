@@ -189,7 +189,8 @@ commit-deploy:
 	@echo "Committing manifest change..."
 	cd .. && git add manifests/backstage-deployment.yaml
 	cd .. && git commit -m "Deploy Backstage $(TAG)"
-	cd .. && git push
+	## fresh worktree branch には upstream が無いため -u + HEAD で明示 push
+	cd .. && git push -u origin HEAD
 	@echo "✅ Committed and pushed"
 	@echo "Argo CD will sync automatically or run: argocd app sync backstage"
 

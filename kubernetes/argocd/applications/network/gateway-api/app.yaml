@@ -4,7 +4,8 @@ metadata:
   name: gateway-api
   namespace: argocd
   annotations:
-    ## Gateway API CRDs は istio (-4 以降) が依存する。DR full-sync 時の順序を明示する
+    ## Gateway API CRDs は istio 系 (-3〜-1) が依存する。DR full-sync 時の順序を明示する
+    ## (既存の最小 wave -4 より先の -5 に置く)
     argocd.argoproj.io/sync-wave: "-5"
   finalizers:
     - resources-finalizer.argocd.argoproj.io

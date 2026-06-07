@@ -5,7 +5,7 @@ metadata:
   namespace: argocd
   annotations:
     ## CNI は全ての前提。通常運用では収束済みのため無風だが、DR full-sync 時の順序を明示する
-    ## (istio 系の -4 より先)
+    ## (既存の最小 wave -4 = ns-lifecycle / network-policy より先。istio 系は -3〜-1)
     argocd.argoproj.io/sync-wave: "-5"
   finalizers:
     - resources-finalizer.argocd.argoproj.io
