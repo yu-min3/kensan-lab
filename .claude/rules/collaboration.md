@@ -29,3 +29,5 @@ description: Agent collaboration rules — PR conventions, design/status reporti
 ## Script Output Rule
 
 When presenting shell commands for the user to run, write them to a script file in `temp/` directory (e.g., `temp/fix-xyz.sh`) instead of inline text, and make it executable (`chmod +x`) so the user can run it directly (`./temp/fix-xyz.sh`). This prevents line-break corruption in the terminal.
+
+- **スクリプトを渡すときは概要を必ず説明する**: 何をするか・どこを変更するか・前提条件（要ログイン、要 docker 等）・失敗した場合に何が起きるかを、実行を促す前にチャットで要約する。スクリプト冒頭コメントにも同じ概要を書く
