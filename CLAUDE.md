@@ -34,7 +34,9 @@ Backstage: `cd backstage/app && make {install,dev,all TAG=...}`
 |---------|---------|
 | `/sealed-secret <name> <ns>` | Create and seal a new secret |
 | `/helm-upgrade <component> <ver>` | Upgrade Helm chart version |
+| `/helm-outdated` | 全 chart の鮮度一括チェック（/helm-upgrade の前段） |
 | `/new-component <category> <name>` | Scaffold new infra component |
+| `/longhorn-health` | Longhorn volume / R2 バックアップ鮮度の一括診断 |
 | `/cluster-status` | Quick cluster health check |
 | `/troubleshoot <component>` | Diagnose component issues |
 | `/cert-check` | Certificate health & expiry check |
