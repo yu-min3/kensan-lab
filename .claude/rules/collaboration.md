@@ -20,6 +20,12 @@ description: Agent collaboration rules — PR conventions, design/status reporti
 - 図示: 構成図・データフロー・シーケンス・before/after 比較などを SVG / Mermaid 等で描く。diff やテキストを貼るだけにしない
 - 作成後に `open temp/<file>.html` でブラウザ表示まで実行する
 
+## Multi-Agent Setup（Codex 等の他エージェント）
+
+- repo 規約の SoT は `CLAUDE.md`。Codex 等の AGENTS.md 系エージェントには **`AGENTS.md` → `CLAUDE.md` の symlink**（gitignored、ローカルのみ）で同じ内容を読ませる
+- 新しい clone / worktree で Codex を使う場合は symlink を再作成する: `ln -s CLAUDE.md AGENTS.md`
+- レビュー観点の優先度基準は `CLAUDE.md` の `## Review Guidelines` に定義（`codex exec review` が自動適用）
+
 ## Script Output Rule
 
 When presenting shell commands for the user to run, write them to a script file in `temp/` directory (e.g., `temp/fix-xyz.sh`) instead of inline text, and make it executable (`chmod +x`) so the user can run it directly (`./temp/fix-xyz.sh`). This prevents line-break corruption in the terminal.

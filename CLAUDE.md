@@ -53,6 +53,14 @@ Backstage: `cd backstage/app && make {install,dev,all TAG=...}`
 | `design-system.md` | Whetstone UI tokens/components — 全 app の UI を書く前に読む |
 | `collaboration.md` | PR 運用（独断マージ禁止・本文規約）、設計/状況報告は HTML 図示、script 出力 |
 
+## Review Guidelines（エージェントレビュー観点）
+
+レビューエージェント（Claude `/code-review`、Codex `codex exec review` — 後者は `AGENTS.md` symlink 経由で本ファイルを読む）は以下の優先度で指摘する:
+
+- **P0 (block)**: 生 secret の commit（`temp/*-raw.yaml`・`.env`・token / credential 平文）/ rendered Helm manifest（`helm template` 出力）の commit / GitOps バイパス（`kubectl apply` 前提の変更）
+- **P1 (warn)**: single-arch image 指定（multi-arch manifest list 必須）/ chart version を Application CR の `targetRevision` 以外で管理 / 新規 PVC での `local-path` 指定（default は `longhorn`）/ 保護が必要なリソースへの `Prune=false` annotation 漏れ
+- **P2 (info)**: doc-layout 規約違反 / namespace 命名（`app-{name}`）違反 / HTTPRoute の `parentRefs` と Gateway の不整合
+
 ## Domain & Network
 
 - **ドメイン**: `yu-min3.com`（DNS 権威は AWS Route53。Cloudflare は Tunnel での edge 公開のみで DNS 権威ではない）
@@ -62,6 +70,6 @@ Backstage: `cd backstage/app && make {install,dev,all TAG=...}`
 
 ## User Preferences
 
-- **コマンド出力**: `temp/` に `.sh` + 実行権限で書き出す（詳細: `.claude/rules/gitops-workflow.md` の Script Output Rule が SoT）
+- **コマンド出力**: `temp/` に `.sh` + 実行権限で書き出す（詳細: `.claude/rules/collaboration.md` の Script Output Rule が SoT）
 - **言語**: 日本語での対話を優先
 - **コミット**: 簡潔に 1 文。1 行目 50 文字以内、本文不要（diff を見ればわかる）
