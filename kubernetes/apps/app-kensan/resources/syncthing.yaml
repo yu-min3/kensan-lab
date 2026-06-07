@@ -1,0 +1,97 @@
+# kensan-workspace のローカルファースト同期（Phase 6 改訂版アーキテクチャ）。
+#
+# Mac のローカル workspace ⇄ クラスタ volume を Syncthing で双方向同期する。
+# NFS マウント案から転換した経緯と比較: kensan-workspace の
+# projects/kensan-workspace/phase6-nfs-vs-syncthing.html
+#
+# - data: workspace PVC（app と共有、RWX）を /var/syncthing/data に
+# - config: 専用 PVC（device 鍵・index DB。消えると再ペアリングが必要）
+# - 同期ポート 22000 を L2 VIP 192.168.0.245 で LAN へ（Mac が direct 接続）
+# - GUI(8384) は公開しない。設定は kubectl exec + syncthing cli / port-forward
+# - git 操作は Mac のみの規律（.git は同期するが cluster 側は読むだけ）
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: syncthing-config
+  namespace: app-kensan
+  annotations:
+    argocd.argoproj.io/sync-options: Prune=false # device 鍵保護
+spec:
+  accessModes: ["ReadWriteOnce"]
+  storageClassName: longhorn
+  resources:
+    requests:
+      storage: 1Gi
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: syncthing
+  namespace: app-kensan
+  labels:
+    app.kubernetes.io/name: syncthing
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate # config PVC が RWO のため
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: syncthing
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: syncthing
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65532
+        runAsGroup: 65532
+        # workspace PVC は app pod と同じ fsGroup（書き込み権限の共有）
+        fsGroup: 65532
+        seccompProfile: { type: RuntimeDefault }
+      containers:
+        - name: syncthing
+          image: syncthing/syncthing:1.29.2
+          env:
+            - name: STHOMEDIR
+              value: /var/syncthing/config
+          ports:
+            - { name: sync, containerPort: 22000, protocol: TCP }
+            - { name: gui, containerPort: 8384, protocol: TCP }
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities: { drop: ["ALL"] }
+          volumeMounts:
+            - { name: config, mountPath: /var/syncthing/config }
+            - { name: data, mountPath: /var/syncthing/data }
+          livenessProbe:
+            httpGet: { path: /rest/noauth/health, port: gui }
+            initialDelaySeconds: 10
+          readinessProbe:
+            httpGet: { path: /rest/noauth/health, port: gui }
+            initialDelaySeconds: 5
+          resources:
+            requests: { cpu: 50m, memory: 128Mi }
+            limits: { memory: 512Mi }
+      volumes:
+        - name: config
+          persistentVolumeClaim: { claimName: syncthing-config }
+        - name: data
+          persistentVolumeClaim: { claimName: kensan-workspace }
+---
+# Mac からの直接同期接続用（LAN 限定、Syncthing は TLS + device 認証を自前で持つ）
+apiVersion: v1
+kind: Service
+metadata:
+  name: syncthing-sync
+  namespace: app-kensan
+  annotations:
+    lbipam.cilium.io/ips: "192.168.0.245"
+spec:
+  type: LoadBalancer
+  selector:
+    app.kubernetes.io/name: syncthing
+  ports:
+    - { name: sync, port: 22000, targetPort: sync, protocol: TCP }
