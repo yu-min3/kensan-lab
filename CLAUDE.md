@@ -38,6 +38,7 @@ Backstage: `cd backstage/app && make {install,dev,all TAG=...}`
 | `/cluster-status` | Quick cluster health check |
 | `/troubleshoot <component>` | Diagnose component issues |
 | `/cert-check` | Certificate health & expiry check |
+| `/secret-health` | Secret 4 方式（Vault/ESO/SealedSecret）の一括健全性チェック |
 | `/argocd-sync [app]` | Check sync status & drift |
 | `/codex <依頼>` | OpenAI Codex へ委譲（レビュー・セカンドオピニオン・別解生成） |
 
