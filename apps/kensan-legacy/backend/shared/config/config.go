@@ -51,12 +51,14 @@ func Load() *Config {
 			Host:     getEnv("DB_HOST", "localhost"),
 			Port:     getEnvAsInt("DB_PORT", 5432),
 			User:     getEnv("DB_USER", "kensan"),
+			// local-dev default (intentional); in-cluster the real random
+			// password is injected via ESO, so this grants nothing in prod
 			Password: getEnv("DB_PASSWORD", "kensan"),
 			DBName:   getEnv("DB_NAME", "kensan"),
 			SSLMode:  getEnv("DB_SSLMODE", "disable"),
 		},
 		JWT: JWTConfig{
-			Secret:     getEnv("JWT_SECRET", "your-secret-key-change-in-production"),
+			Secret:     mustGetEnv("JWT_SECRET"),
 			Issuer:     getEnv("JWT_ISSUER", "kensan"),
 			ExpireHour: getEnvAsInt("JWT_EXPIRE_HOUR", 720),
 		},
@@ -65,6 +67,15 @@ func Load() *Config {
 			CollectorURL: getEnv("OTEL_COLLECTOR_URL", "localhost:4318"),
 		},
 	}
+}
+
+// mustGetEnv returns the value of a required environment variable.
+// Secrets must not have hardcoded fallbacks (fail-closed); panics if unset or empty.
+func mustGetEnv(key string) string {
+	if value, exists := os.LookupEnv(key); exists && value != "" {
+		return value
+	}
+	panic("required environment variable not set: " + key)
 }
 
 func getEnv(key, defaultValue string) string {

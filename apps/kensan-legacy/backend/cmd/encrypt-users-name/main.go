@@ -67,6 +67,8 @@ func run(dryRun, force bool, batchSize int) error {
 	ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer cancel()
 
+	// config.Load requires JWT_SECRET (fail-closed) even though only cfg.Database
+	// is used here. Set JWT_SECRET=dummy when running this CLI outside the cluster.
 	cfg := config.Load()
 
 	pool, err := database.NewPostgresPool(ctx, cfg.Database)

@@ -7,7 +7,8 @@ data:
   KC_DB: postgres
   KC_DB_URL_HOST: postgresql
   KC_DB_URL_DATABASE: keycloak
-  KC_DB_USERNAME: keycloak
+  ## KC_DB_USERNAME / KC_DB_PASSWORD は keycloak-postgres-cred (Vault dynamic) が供給。
+  ## ここに静的値を残すと envFrom の順序次第で動的 cred と食い違うため定義しない。
   KC_HOSTNAME: auth.platform.yu-min3.com
   KC_HOSTNAME_ADMIN: auth.platform.yu-min3.com
   KC_HOSTNAME_STRICT: "true"
