@@ -108,6 +108,20 @@ The first-choice adoption architecture is **using istio-csr to make Vault the Is
 - If audit/compliance requirements come later, istio-csr adoption effort is incurred
 - If there is a learning motivation to try Vault PKI, it cannot be experimented with inside kensan-lab; a separate test cluster would be required
 
+## Addendum (2026-06-07)
+
+Two factual corrections from the design review; **the decision (no Vault PKI) stands**:
+
+1. The Context table's premise "`PeerAuthentication: STRICT`" is ahead of the implementation: the mesh-wide
+   policy is currently **PERMISSIVE** (`kubernetes/network/istio/peer-authentication.yaml`), as a deliberate
+   first step while some namespaces (monitoring / cert-manager / kube-system / argocd) run without sidecars
+   and speak plaintext. The "no gap left for Vault PKI" argument is therefore *weaker* than written until
+   STRICT migration completes — but the gap is an Istio-rollout matter, not one Vault PKI would fill, so the
+   conclusion is unaffected.
+2. ADR-008 is no longer a live counterpart: Keycloak DB credentials have since moved to Vault dynamic
+   ([ADR-013](013-keycloak-db-credentials-vault-dynamic.md)). The "do not move everything to Vault"
+   principle survives per-case judgment rather than as a fixed pair of exceptions.
+
 ## References
 
 - ADR-001: TLS Termination Pattern (external -> Gateway TLS termination)

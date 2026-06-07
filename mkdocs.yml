@@ -191,6 +191,10 @@ nav:
       - 009 — Shared Allow-Istio NetworkPolicy: adr/009-shared-allow-istio-network-policy.md
       - 010 — Istio Native OAuth2 (Absent): adr/010-istio-native-oauth2-absent.md
       - 011 — Vault Version Pinning: adr/011-vault-version-pinning.md
+      - 012 — Policy Enforcement with Kyverno: adr/012-policy-enforcement-kyverno.md
+      - 013 — Keycloak DB Credentials → Vault Dynamic: adr/013-keycloak-db-credentials-vault-dynamic.md
+      - 014 — Namespace Naming & Label Contract v2: adr/014-namespace-naming-label-contract-v2.md
+      - 015 — VCO + Setup-Script Hybrid: adr/015-vco-setup-script-hybrid.md
   - Incidents:
       - 2026-03-02 system-infra Sync Blocked: incidents/2026-03-02-system-infra-sync-blocked.md
   - Roadmap:

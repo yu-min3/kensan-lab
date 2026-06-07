@@ -2,7 +2,7 @@
 
 ## Status
 
-**Re-evaluation Required (2026-05-05)** — superseded in part by [ADR-010](010-istio-native-oauth2-absent.md).
+**Superseded by [ADR-010](010-istio-native-oauth2-absent.md)** (2026-05-05; status line aligned with the ADR index on 2026-06-07).
 
 This ADR's *premise* — that "Istio 1.27 has shipped a stable Gateway API + native `oauth2` extension provider" — is incorrect. The `MeshConfig.ExtensionProvider` proto in Istio 1.27 (and master) does not include any OAuth2/OIDC provider type; the available `oneof` cases are `envoy_ext_authz_http`, `envoy_ext_authz_grpc`, telemetry providers, log providers, and `sds`. See ADR-010 for the verification, the option matrix (Path A: oauth2-proxy via ext_authz / Path B: EnvoyFilter wrapping `envoy.filters.http.oauth2` / Path C: per-service OIDC), and the recommended path.
 
