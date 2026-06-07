@@ -56,7 +56,7 @@ metadata:
 ## GHCR Pull Secrets
 
 - `ghcr-pull-secret`（`.dockerconfigjson`）は Vault static (ESO) で配布。Vault path: `secret/ghcr/pull-token`
-- 各 app ns（`app-prod`、`backstage`、`kensan`）が `ExternalSecret` で受け取り、ServiceAccount が `imagePullSecrets: [ghcr-pull-secret]` で参照
+- 各 app ns（`app-prod`、`backstage`、`kensan`、`app-kensan`）が `ExternalSecret` で受け取り、ServiceAccount が `imagePullSecrets: [ghcr-pull-secret]` で参照（`app-kensan` は app-base chart の `externalsecret-ghcr.yaml` 経由）
 
 ## Keycloak Authentication
 

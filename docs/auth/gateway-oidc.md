@@ -8,8 +8,10 @@
 
 | 認証方式 | どの host が該当 | gateway 層での扱い |
 |---|---|---|
-| **app-native auth** (app が自前で OIDC や独自認証を持つ) | Vault, ArgoCD, Keycloak, oauth2-proxy 自身 | **bypass** (gateway は素通し) |
-| **gateway-enforced OIDC** (app は認証を持たない or proxy header を信頼) | Backstage, Grafana, Prometheus, Hubble, Longhorn | **CUSTOM (oauth2-proxy ext_authz) + ALLOW (group claim 検査)** |
+| **app-native auth** (app が自前で OIDC や独自認証を持つ) | Vault, ArgoCD, Keycloak, oauth2-proxy 自身, **Grafana** | **bypass** (gateway は素通し) |
+| **gateway-enforced OIDC** (app は認証を持たない or proxy header を信頼) | Backstage, Prometheus, Hubble, Longhorn | **CUSTOM (oauth2-proxy ext_authz) + ALLOW (group claim 検査)** |
+
+> **Grafana が bypass な理由**: oauth2-proxy が付与する `Authorization: Bearer ...` を Grafana が自前の API key と誤解釈して 403 を返すため、gateway 層では素通しし、Grafana 自身の Keycloak OIDC (`auth.generic_oauth`) に認証を委ねる。実装は `authorizationpolicy-gateway-platform-allow.yaml` の Category 1。
 
 判定軸は「**アプリが自前で auth を持ってるか**」だけ。CLI/UI の区別ではない。Vault は CLI も UI も同じ host を共有しており、Vault 自身が両方を認証する。
 
@@ -24,9 +26,9 @@
             ┌──────────┴──────────┐
             ▼                     ▼
      [bypass hosts]         [protected hosts]
-     vault / argocd /        backstage / grafana /
-     auth / oauth2-proxy     prometheus / hubble /
-            │               longhorn
+     vault / argocd /        backstage / prometheus /
+     auth / oauth2-proxy /   hubble / longhorn
+     grafana                       │
             │                     │
             │                     ▼
             │             ext_authz CUSTOM
@@ -57,8 +59,8 @@
 | `oauth2-proxy.platform.yu-min3.com` | 1: bypass | (claim 検査なし) | callback 専用、保護対象外 |
 | `vault.platform.yu-min3.com` | 1: bypass | (claim 検査なし) | Vault native OIDC + Vault token |
 | `argocd.platform.yu-min3.com` | 1: bypass | (claim 検査なし) | ArgoCD native OIDC + 自前 JWT |
+| `grafana.platform.yu-min3.com` | 1: bypass | (claim 検査なし) | Grafana native OIDC (`auth.generic_oauth`)。Bearer 誤解釈回避のため bypass |
 | `backstage.platform.yu-min3.com` | 2: admin + dev | `platform-admin`, `platform-dev` | oauth2-proxy 強制 |
-| `grafana.platform.yu-min3.com` | 2: admin + dev | `platform-admin`, `platform-dev` | oauth2-proxy 強制 |
 | `prometheus.platform.yu-min3.com` | 2: admin + dev | `platform-admin`, `platform-dev` | oauth2-proxy 強制 |
 | `hubble.platform.yu-min3.com` | 3: admin only | `platform-admin` | oauth2-proxy 強制 |
 | `longhorn.platform.yu-min3.com` | 3: admin only | `platform-admin` | oauth2-proxy 強制 |
@@ -82,7 +84,7 @@
 1. `authorizationpolicy-gateway-platform-allow.yaml` の Category 2 rule の `hosts:` に追記
 2. `authorizationpolicy-gateway-platform-oauth2.yaml` の `hosts:` にも追記 (CUSTOM の対象に入れる)
 3. HTTPRoute をアプリ側に追加 (`gateway-platform` を parentRef)
-4. アプリの認証は **header trust モード** に設定 (oauth2-proxy が `X-Auth-Request-User` 等を付ける)。Grafana なら `auth.proxy`、Backstage なら proxy auth provider 等。
+4. アプリの認証は **header trust モード** に設定 (oauth2-proxy が `X-Auth-Request-User` 等を付ける)。Backstage なら proxy auth provider 等。(注: Grafana は Bearer 誤解釈のため bypass + native OIDC 側。Case B を参照)
 
 ### Case B: 新自前-auth app (Vault/ArgoCD と同類)
 
@@ -103,10 +105,10 @@
 
 朝 Yu が初めて何らかの UI を開く:
 
-1. `grafana.platform.yu-min3.com` (例) → oauth2-proxy が cookie なし検出 → Keycloak へ 302
+1. `backstage.platform.yu-min3.com` (例) → oauth2-proxy が cookie なし検出 → Keycloak へ 302
 2. Keycloak login (Yu / password)
 3. oauth2-proxy が cookie set (cookie_domain `.platform.yu-min3.com`)
-4. その後、`backstage.platform...` `prometheus.platform...` `hubble.platform...` 全部 cookie 1 個で透過
+4. その後、`prometheus.platform...` `hubble.platform...` `longhorn.platform...` 全部 cookie 1 個で透過 (Grafana は別途 native OIDC だが同じ Keycloak session を共有)
 
 `vault.platform...` を開くと:
 1. Vault UI が「Login with OIDC」に飛ばす
@@ -158,7 +160,7 @@ kubectl -n auth-system get pod,svc,endpoints
 kubectl -n auth-system logs -l app.kubernetes.io/name=oauth2-proxy -c oauth2-proxy --tail=50
 ```
 
-`failOpen: false` の設計なので oauth2-proxy 落下 → Category 2/3 の UI は全部 503。bypass host (Vault/ArgoCD/Keycloak) は影響なし。
+`failOpen: false` の設計なので oauth2-proxy 落下 → Category 2/3 の UI は全部 503。bypass host (Vault/ArgoCD/Keycloak/Grafana) は影響なし。
 
 ### 症状: `vault login -method=oidc` が失敗するようになった
 

@@ -6,7 +6,7 @@ This directory contains Backstage templates for creating new applications with G
 
 Part of the kensan-lab GitOps architecture:
 - **kensan-lab**: Platform infrastructure and Backstage application (managed by Platform Engineers)
-  - `backstage-app/templates/`: Application templates (this directory)
+  - `backstage/app/templates/`: Application templates (this directory)
 - **app-\<name\>**: Generated application repositories (managed by Application Developers)
 
 ## Available Templates
@@ -128,7 +128,7 @@ fastapi-template/
 
 - [Platform Repository](https://github.com/yu-min3/kensan-lab)
 - [Architecture Documentation](../../docs/architecture/)
-- [Backstage Documentation](../README.platform.md)
+- [Backstage Documentation](../README.md)
 
 ## Contributing
 

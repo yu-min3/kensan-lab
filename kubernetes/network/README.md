@@ -45,7 +45,9 @@ flowchart TB
 | Gateway | LB IP | 用途 | TLS |
 |---|---|---|---|
 | `gateway-platform` | 192.168.0.242 | platform UI (Backstage, Grafana, ArgoCD, Keycloak, Vault) | `wildcard-platform-tls` (`*.platform.yu-min3.com`) |
-| `gateway-prod` | 192.168.0.243（.244 は kensan-workspace-nfs / longhorn-system が使用） | app workload (kensan, 他 user app) | `wildcard-apps-tls` (`*.app.yu-min3.com`) |
+| `gateway-prod` | 192.168.0.243 | app workload (kensan, 他 user app) | `wildcard-apps-tls` (`*.app.yu-min3.com`) |
+
+LB VIP の現状割当（pool `192.168.0.240-249`）: `.242` = gateway-platform、`.243` = gateway-prod、`.245` = `syncthing-sync`（`app-kensan` ns、workspace 同期）。`.244` は未使用（旧 kensan-workspace-nfs Service は廃止済み）。詳細は [`.claude/rules/network-ingress.md`](../../.claude/rules/network-ingress.md)。
 
 ## NetworkPolicy 戦略
 

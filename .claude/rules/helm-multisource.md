@@ -15,6 +15,8 @@ Each infrastructure component consists of:
 | **values.yaml** | `kubernetes/<category>/<component>/values.yaml` | Helm values customization |
 | **resources/** | `kubernetes/<category>/<component>/resources/` | Additional raw manifests (HTTPRoutes, SealedSecrets, etc.) |
 
+例外: **observability**（ApplicationSet + `config.json` 量産、個別 app.yaml なし）と **vault-database/transit-engine**（自作 chart + `platform-values/` + ApplicationSet）はこのパターンに従わない。詳細は [`kubernetes/README.md`](../../kubernetes/README.md) の例外節。
+
 ## Common Operations
 
 ### Change Configuration

@@ -1,74 +1,73 @@
-# Argo CD Application マニフェスト管理
+# Argo CD Application マニフェスト（apps カテゴリ）
 
-このディレクトリには、Backstageテンプレートから作成された全アプリケーションのArgo CD Application CRが格納されます。
-
-## ⚠️ 重要: リポジトリ命名規則
-
-**全てのアプリケーションリポジトリは `kensan-lab-apps-` プレフィックスを持つ必要があります。**
-
-- **正しい例**: `kensan-lab-apps-my-app`, `kensan-lab-apps-api-server`
-- **誤った例**: `my-app`, `api-server`, `app-my-app`
-
-このプレフィックスは：
-- Backstageテンプレートで自動的に付与されます
-- **変更しないでください** - Argo CDの追跡に使用されます
-- 将来的にApplicationSetでの自動検出に対応予定
+このディレクトリには、プラットフォーム上で動く **application** の Argo CD `Application` CR を置く。
+各アプリは専用サブディレクトリを持ち、その中の `app.yaml` が単一の `Application` を定義する。
 
 ## ディレクトリ構造
 
-各アプリケーションは専用のサブディレクトリを持ち、単一の Application CR を含みます (dev/prod 廃止後):
-
 ```
 apps/
-├── my-app/
-│   └── argocd-apps.yaml    # app-my-app を含む
-│                           # リポジトリ: kensan-lab-apps-my-app
-├── api-server/
-│   └── argocd-apps.yaml    # app-api-server
-│                           # リポジトリ: kensan-lab-apps-api-server
-├── kensan/                 # kensan アプリ専用 (single ns: kensan)
+├── app-kensan/
+│   └── app.yaml    # 現行 kensan（in-repo chart + per-app ns、3-source）
+├── kensan/
+│   └── app.yaml    # 旧 kensan（apps/kensan-legacy/manifests、ns: kensan）凍結・稼働維持のみ
 └── README.md
 ```
 
-## アプリケーション追加フロー
+> ⚠️ ファイル名は `app.yaml`（過去ドキュメントの `argocd-apps.yaml` は実体と異なる）。
 
-1. **開発者**がBackstageのSoftware Templatesから新規アプリケーションを作成
-   - アプリケーション名入力: `my-app`
-2. **Backstage**が自動的に以下を生成：
-   - アプリケーションリポジトリ: `github.com/yu-min3/kensan-lab-apps-my-app`
-   - このリポジトリ（platform-config）へのPull Request（Application CRを含む）
-3. **Platform Engineer**がPRをレビューしてマージ
-4. **Argo CD**が自動的に新しいApplicationを検出してsync
+## 実在パターン: in-repo app（app-kensan）
 
-## Application CR フォーマット
-
-各`argocd-apps.yaml`は単一の Application を含みます:
+現行の app は外部 repo を持たず、この monorepo 内で完結する。`app-kensan/app.yaml` は
+PE 提供の汎用 chart `charts/app-base` を **multi-source** で参照する 3-source 構成:
 
 ```yaml
----
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
-  name: app-<app-name>
+  name: app-kensan
   namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-options: Prune=false   # Application CR の prune 防止
 spec:
   project: app-project
-  source:
-    repoURL: https://github.com/yu-min3/kensan-lab-apps-<app-name>.git
-    targetRevision: main
-    path: manifests
-    directory:
-      recurse: false
+  sources:
+    # 1. PE 所有の汎用 chart
+    - repoURL: https://github.com/yu-min3/kensan-lab
+      targetRevision: main
+      path: charts/app-base
+      helm:
+        releaseName: app-kensan
+        valueFiles:
+          - $values/kubernetes/apps/app-kensan/values.yaml
+    # 2. values 参照用 ref
+    - repoURL: https://github.com/yu-min3/kensan-lab
+      targetRevision: main
+      ref: values
+    # 3. 生マニフェスト（namespace, PVC, syncthing 等）
+    - repoURL: https://github.com/yu-min3/kensan-lab
+      targetRevision: main
+      path: kubernetes/apps/app-kensan/resources
+      directory:
+        recurse: true
   destination:
-    namespace: app-prod
+    server: https://kubernetes.default.svc
+    namespace: app-kensan           # per-app ns（ADR-006）
   syncPolicy:
-    automated:
-      prune: true
-      selfHeal: true
+    automated: { prune: true, selfHeal: true }
+    syncOptions:
+      - CreateNamespace=false       # namespace.yaml（labels 付き）で管理
+      - ServerSideApply=true
 ```
 
-## メリット
+`charts/app-base` の利用方法は [charts/app-base/README.md](../../../../charts/app-base/README.md) を参照。
+app 固有の値は `kubernetes/apps/app-<name>/values.yaml` に置く。
 
-- ファイル名衝突なし: 各アプリが専用ディレクトリを持つ
-- 簡単な追跡: 1ディレクトリ = 1アプリケーション
-- 数百のアプリケーションでもスケール可能
+`kensan/app.yaml`（凍結中の旧アプリ）は単一 source（`apps/kensan-legacy/manifests` を `directory.recurse`、ns: `kensan`）。Phase 7 cutover 完了時に撤去予定。
+
+## 将来フロー（予定）: Backstage scaffolded app
+
+外部 app repo を Backstage Software Template で量産する将来フローでは、テンプレートが
+app repo（命名規則 `kensan-lab-apps-<name>`）と、この repo への PR（`Application` CR を含む）を生成し、
+PE がレビュー & マージ → Argo CD が自動 sync、という流れを想定している。
+この自動化はまだ実装段階であり、現状で稼働しているのは上記の in-repo パターンのみ。

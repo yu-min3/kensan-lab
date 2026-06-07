@@ -1,5 +1,7 @@
 # CLAUDE.md
 
+> ⚠️ **このアプリは凍結済みです。** 現行のアプリは `apps/kensan/`（ファイルベースの統合版）。本ディレクトリは Phase 7 cutover 完了まで稼働維持のみで、以下の記述は更新されません。
+
 Kensan - エンジニア向けパーソナル生産性アプリ（時間管理、タスク管理、学習記録、AI週次レビュー）。
 React/TypeScript SPA + Go マイクロサービス + PostgreSQL 16。
 

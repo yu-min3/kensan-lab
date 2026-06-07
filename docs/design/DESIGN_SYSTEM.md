@@ -74,7 +74,7 @@ UI を書く / 直す前に **必ず守る** 5 つだけ：
 
 ## 3. トークン使用ルール
 
-詳細は [`packages/design-tokens/README.md`](../../packages/design-tokens/README.md)（実装の真実）。要点：
+詳細は [`packages/design-tokens/README.md`](https://github.com/yu-min3/kensan-lab/blob/main/packages/design-tokens/README.md)（実装の真実）。要点：
 
 ### 3.1 色 — Semantic クラス一覧
 
@@ -221,11 +221,11 @@ UI を書く / 直す前に **必ず守る** 5 つだけ：
 
 ## 9. 参考リンク
 
-- [`packages/design-tokens/`](../../packages/design-tokens/) — 実装の真実
+- [`packages/design-tokens/`](https://github.com/yu-min3/kensan-lab/tree/main/packages/design-tokens) — 実装の真実
 - [`docs/design/components.md`](./components.md) — コンポーネント詳細仕様
 - [`docs/design/patterns.md`](./patterns.md) — 画面パターン
 - [`docs/design/brand/`](./brand/) — ロゴ・ファビコン・OGP
-- [`.claude/rules/design-system.md`](../../.claude/rules/design-system.md) — Claude Code 向けルール
+- [`.claude/rules/design-system.md`](https://github.com/yu-min3/kensan-lab/blob/main/.claude/rules/design-system.md) — Claude Code 向けルール
 - [`docs/design/density-demo.html`](./density-demo.html) — 密度切替の視覚リファレンス
 
 ---

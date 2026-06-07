@@ -1,5 +1,11 @@
 # Storage roadmap: local-path → Longhorn
 
+> **✅ 完了 (2026-05)** — Longhorn 移行は完了済み。現行のストレージ構成・StorageClass・R2 backup は `kubernetes/storage/README.md` が SoT。本ページは計画当時のロードマップを残すアーカイブ文書。
+>
+> 実装上の差分: 当時想定した `longhorn-single` という StorageClass は採用せず、**`longhorn`（default、replicated block）と `longhorn-workspace`** の 2 つとして実現した。以降「`longhorn-single`」への言及は実装では `longhorn` / `longhorn-workspace` に読み替えること。
+
+以下は計画当時の歴史的記述（実態は上記の通り）。
+
 現状 PV は全て `local-path-provisioner` (node-local) で運用している。HA stateful workload (Vault raft, Keycloak PostgreSQL) は **形式上 HA** だが、PVC が作成ノードに張り付くため node 障害時の data 喪失リスクを許容している状態。
 
 Longhorn 導入で分散ストレージに切り替える計画。
