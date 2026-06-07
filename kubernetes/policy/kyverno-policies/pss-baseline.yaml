@@ -1,13 +1,12 @@
-## PSS baseline を Audit 適用 — kubernetes/observability/namespace.yaml の
-## TODO(kyverno) の回収 (ADR-012)
+## PSS baseline の「床」— pss-level=privileged 宣言の ns 以外、全 ns に無条件適用
+## (v2 統一設計: PSA は不活性化し、PSS 強制は Kyverno に一本化 — ADR-012 改訂)
 ##
 ## scope 設計:
-##   - privileged 設計 ns は ns 側の PSA 宣言 (`pod-security.kubernetes.io/enforce:
-##     privileged`) を SoT として label selector で除外 (現状: kube-system /
-##     istio-system / longhorn-system)。新しい privileged ns (CSI / CNI 等) を
-##     追加してもこの policy の編集は不要
-##   - それ以外は PSA label の有無に関わらず baseline を監査
-##     (monitoring / reloader / sealed-secrets / cloudflare-tunnel 等の PSA 未設定 ns を回収)
+##   - 床からの離脱は ns 側の `kensan-lab.platform/pss-level: privileged` 宣言が SoT
+##     (現状: kube-system / istio-system / longhorn-system / local-path-storage)。
+##     この宣言を名乗れる条件 (tier=platform) は ns-label-contract rule が強制する
+##   - pss-level 未宣言 / 未知の値の ns はすべて床に落ちる (安全側フォールバック)
+##   - より厳しい level は pss-restricted.yaml (pss-level=restricted) が担当
 ##   - 既知の正当な violation は exceptions/ の PolicyException で exempt
 ##     (実機照合 2026-06-06: 該当は node-exporter のみ)
 apiVersion: kyverno.io/v1
@@ -19,9 +18,9 @@ metadata:
     policies.kyverno.io/category: Pod Security
     policies.kyverno.io/severity: medium
     policies.kyverno.io/description: >-
-      Pod Security Standards baseline profile を privileged 設計 ns 以外の
-      全 namespace に適用する。PSA の namespace 単位 all-or-nothing を、
-      per-workload PolicyException で補完するのが狙い。
+      Pod Security Standards baseline profile の床。pss-level=privileged を
+      宣言した ns 以外の全 namespace に適用する。例外は per-workload の
+      PolicyException で管理する (Kyverno 統一設計)。
 spec:
   background: true
   webhookConfiguration:
@@ -40,7 +39,7 @@ spec:
                 - Pod
               namespaceSelector:
                 matchLabels:
-                  pod-security.kubernetes.io/enforce: privileged
+                  kensan-lab.platform/pss-level: privileged
       validate:
         failureAction: Audit  # Phase 3 で Enforce へ昇格 (ADR-012)
         podSecurity:

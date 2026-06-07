@@ -24,6 +24,7 @@ This document defines a unified namespace labeling strategy across the entire pl
 | Label Key | Example Values | Description | Target |
 |-----------|---------------|------|----------|
 | `kensan-lab.platform/component` | `keycloak`, `backstage`, `monitoring`, `service-mesh`, `core` | Component identification | Platform tier only |
+| `kensan-lab.platform/pss-level` | `privileged` \| `restricted` | Pod Security Standards level の宣言 (Kyverno が読む。無印 = baseline の床) | 床から外れる ns のみ |
 | `istio-injection` | `enabled` | Istio automatic sidecar injection | Namespaces targeted by service mesh |
 
 ## Label Value Definitions
@@ -42,6 +43,20 @@ This document defines a unified namespace labeling strategy across the entire pl
 |-------|------|--------|-----------------|
 | `platform` | Platform infrastructure tier | Platform Engineer (PE) | `istio-system`, `backstage`, `platform-auth-prod` |
 | `application` | Application tier | Application Developer (AD) | `app-prod`, `app-dev`, `app-prod-<name>` |
+
+### `kensan-lab.platform/pss-level`
+
+Pod Security Standards の level 宣言。**Kyverno だけが読む** (PSA は不活性化 — v2 統一設計、[ADR-012](../adr/012-policy-enforcement-kyverno.md) 改訂)。
+旧 `pod-security.kubernetes.io/*` (PSA) label は Kyverno Enforce 昇格と同時に撤去する。
+
+| Value | Description | Example Namespaces |
+|-------|------|-----------------|
+| (未設定) | `pss-baseline` の床が適用される (デフォルト) | 大多数の ns |
+| `privileged` | 床から除外。**`tier=platform` の ns のみ宣言可** (`ns-label-contract` が強制) | `kube-system`, `istio-system`, `longhorn-system` |
+| `restricted` | 床より厳格な PSS restricted を適用 (opt-in) | `app-kensan` |
+
+この label の契約 (必須 label・宣言条件) は Kyverno `ns-label-contract` policy が機械的に強制する。
+詳細: [`policy-enforcement.md`](policy-enforcement.md)
 
 ### `kensan-lab.platform/component`
 

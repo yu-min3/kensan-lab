@@ -1,0 +1,36 @@
+## PSS restricted — `kensan-lab.platform/pss-level: restricted` を宣言した ns に適用
+## (旧 PSA `enforce: restricted` の引き継ぎ。v2 統一設計 — ADR-012 改訂)
+##
+## restricted は baseline の上位互換なので、対象 ns には pss-baseline (床) と
+## 本 policy の両方が match する (二重報告にはならない — rule 単位で評価されるため)。
+## 現状の対象: app-kensan のみ
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: pss-restricted
+  annotations:
+    policies.kyverno.io/title: Pod Security Standards (Restricted, opt-in)
+    policies.kyverno.io/category: Pod Security
+    policies.kyverno.io/severity: medium
+    policies.kyverno.io/description: >-
+      pss-level=restricted を宣言した namespace に PSS restricted profile を
+      適用する。床 (pss-baseline) より厳しい level の opt-in 機構。
+spec:
+  background: true
+  webhookConfiguration:
+    failurePolicy: Ignore  # admission controller (replica 1) 停止時に cluster を止めない
+  rules:
+    - name: restricted
+      match:
+        any:
+          - resources:
+              kinds:
+                - Pod
+              namespaceSelector:
+                matchLabels:
+                  kensan-lab.platform/pss-level: restricted
+      validate:
+        failureAction: Audit  # Phase 3 で Enforce へ昇格 (ADR-012)
+        podSecurity:
+          level: restricted
+          version: latest

@@ -3,7 +3,7 @@
 ##
 ## scope: tier=application label の ns ∪ ns 名 (app-* / kensan)。label が SoT で、
 ##   name match は label 欠落 ns が静かに scope 外へ落ちるのを防ぐ defense-in-depth
-##   (label 欠落自体は require-ns-labels が Audit で検出する)。
+##   (label 欠落自体は ns-label-contract が Audit で検出する)。
 ##   scope 定義は require-requests.yaml と docs/concepts/policy-enforcement.md に
 ##   複製があるため、変更時は 3 ヶ所を同期すること
 apiVersion: kyverno.io/v1
