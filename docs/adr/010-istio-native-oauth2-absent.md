@@ -116,7 +116,10 @@ Keep gateway-level Authorization at host/IP level (or none). Each service does i
 - Services without OIDC support (Hubble / Prometheus / Longhorn UI) need ad-hoc protection
 - The "Istio + Keycloak で SSO 完結" homelab differentiator is lost
 
-## Decision (Pending)
+## Decision
+
+*(Heading originally read "Decision (Pending)"; resolved as **Decided: Path A** on 2026-05-05 — see Status.
+The text below is preserved as written at decision time.)*
 
 **Recommended: Path A.** Rationale:
 - Path B's Envoy filter stability disclaimer ("under active development") is a real concern for any production-aligned setup, even a homelab
@@ -136,6 +139,20 @@ After Path A was selected, this PR delivers the **deploy-layer** only:
 4. ADR-010 (this file) status updated to Decided: Path A. ADR-005 marked Re-evaluation Required.
 
 `RequestAuthentication` and the three-tier `AuthorizationPolicy` set (deny-all + ALLOW + CUSTOM) are intentionally deferred to follow-up PRs. Because no AuthZ policy binds the provider in this PR, runtime behavior is unchanged.
+
+## Addendum (2026-06-07)
+
+Everything described above as "deferred to follow-up PRs" has since been **implemented and bound**:
+
+- `requestauthentication-gateway-platform.yaml` plus the AuthorizationPolicy set
+  (`authorizationpolicy-gateway-platform-{allow,oauth2}.yaml`, and the gateway-prod counterparts) are live
+  under `kubernetes/network/istio/`
+- The `meshConfig.extensionProviders` entry in `kubernetes/network/istio/istiod/values.yaml` is active
+  (no longer a commented-out draft)
+- oauth2-proxy runs in `auth-system` with replicaCount 2 + PDB as designed
+
+One path detail differs from the Consequences section: the OIDC foundation YAML lives flat under
+`kubernetes/network/istio/` (no `resources/` subdirectory was created).
 
 ## Consequences
 

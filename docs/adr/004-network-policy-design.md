@@ -2,7 +2,16 @@
 
 ## Status
 
-Accepted
+**Partially superseded by [ADR-009](009-shared-allow-istio-network-policy.md)** (noted 2026-06-07)
+
+> The per-namespace policy model and the File Placement table (§5) no longer reflect the implementation:
+> per-ns `default-deny` / `allow-dns` / `allow-istio` / `allow-prometheus-scrape` were consolidated into
+> CiliumClusterwideNetworkPolicies under `kubernetes/network/network-policy/`, and the `kensan-{prod,dev,data}`
+> namespaces were merged into a single `kensan` ns. See ADR-009 and `kubernetes/network/README.md` for the
+> current model. The body is preserved unchanged as the historical record.
+> (This note fulfils ADR-009's migration-plan step 4.)
+
+Originally: Accepted
 
 ## Date
 

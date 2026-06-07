@@ -119,6 +119,11 @@ privileged 設計 ns (現状 kube-system / istio-system / longhorn-system) は P
 - Kyverno 停止中は PSS 強制が完全にゼロになる窓ができる (初版では PSA が床を維持していた)。上記 1 の ε 評価に基づき受け入れる
 - 統一後は Kyverno が唯一の強制層になるため、Enforce 安定後の failurePolicy `Fail` 昇格の価値が上がる。昇格条件: ① Enforce で violation ゼロが数週間継続 ② `admissionController.replicas: 2` (m4neo + worker 分散) ③ `config.webhooks` で kube-system を webhook レベルで除外 (停電復旧時の CNI デッドロック予防) ④ Fail にするのは app-tier policy のみ (per-policy 設定)。なお master / etcd の SPOF には HA も Fail も無力なので、「昇格しない」も常に正当な選択
 
+## Errata (2026-06-07)
+
+- §4 の privileged 設計 ns 列挙「現状 kube-system / istio-system / longhorn-system」は **local-path-storage が漏れている**（執筆時点から `pss-level: privileged` を持つ ns は 4 つ。`docs/concepts/policy-enforcement.md` 側の列挙が正）。本文の「name list のハードコードを避ける」設計どおり policy 自体への影響はない
+- label 契約の格付けは [ADR-014](014-namespace-naming-label-contract-v2.md) で正式化された（全 ns 必須 = `environment` + `tier`、`app-*` ns 必須 = `team` + `app`、`component` は platform 慣行。ADR-006 の 3-axis 定義との衝突を解消）
+
 ## References
 
 - [ADR-006](006-namespace-naming.md): Namespace Naming (3-axis labels)

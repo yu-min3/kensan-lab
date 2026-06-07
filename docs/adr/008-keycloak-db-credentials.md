@@ -2,7 +2,13 @@
 
 ## Status
 
-Accepted
+**Superseded by [ADR-013](013-keycloak-db-credentials-vault-dynamic.md)** (2026-06-07)
+
+> The "permanent exception / Do not perform" decision below was reversed at Stage 5c, when Keycloak moved
+> to Vault dynamic credentials (`keycloak-postgres-cred`). The body of this ADR is preserved unchanged as
+> the historical record; see ADR-013 for why the cascade-failure analysis no longer applied.
+
+Originally: Accepted
 
 ## Date
 

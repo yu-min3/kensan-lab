@@ -2,7 +2,7 @@
 
 ## Status
 
-Proposed
+Accepted (status aligned with the ADR index on 2026-06-07; implementation complete — see Addendum)
 
 ## Date
 
@@ -109,6 +109,14 @@ CCNP wins on simplicity (one file, one source of truth) and aligns with how Cili
 2. Verify Vault / ESO / VCO / Keycloak / kensan-* / backstage all stay healthy.
 3. Remove per-namespace `allow-istio` from each component's `resources/network-policy.yaml` (one PR per component or batch).
 4. Update ADR-004 with a note pointing to ADR-009.
+
+## Addendum (2026-06-07)
+
+The medium-term migration plan above is **fully implemented**: the clusterwide policies
+(`clusterwide-{default-deny,allow-dns,allow-istio,allow-prometheus-scrape}-for-mesh-ns.yaml`) live under
+`kubernetes/network/network-policy/` with `Prune=false` per resource, and all per-namespace `allow-istio`
+policies have been removed. Step 4 was completed late, via the supersede note added to ADR-004 in the
+2026-06-07 ADR housekeeping.
 
 ## Related
 
