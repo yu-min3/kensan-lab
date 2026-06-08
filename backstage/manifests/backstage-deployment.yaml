@@ -12,6 +12,10 @@ spec:
     metadata:
       labels:
         app: backstage
+      annotations:
+        ## Stakater Reloader: postgres-backstage-cred (Vault dynamic cred, 12h rotation)
+        ## が rotate されたら Pod を rolling restart して新 env を取り込む。
+        reloader.stakater.com/search: "true"
     spec:
       affinity:
         nodeAffinity:
@@ -34,20 +38,20 @@ spec:
           value: postgresql
         - name: POSTGRES_PORT
           value: "5432"
-        ## 意図的に static (postgresql-secret) を参照する。dynamic 化 (postgres-backstage-cred) は
-        ## 一度試みて revert 済み: Backstage は 12 DB (backstage + backstage_plugin_* x11) に接続するが
-        ## VDBE creationStatements は dbName しか GRANT せず plugin DB で permission denied になる。
-        ## 再 cutover の前提条件は docs/secret-management/index.md の「据置」を参照
-        ## (initdbScripts で plugin DB pre-create + dynamic role を backstage group member にする戦略)。
+        ## Vault dynamic cred (vault-database-engine: postgres-backstage) を参照する。
+        ## 旧・据置だった「12 DB (backstage_plugin_* x11) で permission denied」問題は
+        ## chart の grantRootOwnerMembership (動的 user を backstage role の member 化 +
+        ## SET ROLE + CREATEDB) で解消済み (2026-06-07 cutover)。
+        ## postgresql-secret (静的) は Postgres StatefulSet の boot + VDBE root cred 専用として残る。
         - name: POSTGRES_USER
           valueFrom:
             secretKeyRef:
-              name: postgresql-secret
+              name: postgres-backstage-cred
               key: POSTGRES_USER
         - name: POSTGRES_PASSWORD
           valueFrom:
             secretKeyRef:
-              name: postgresql-secret
+              name: postgres-backstage-cred
               key: POSTGRES_PASSWORD
         - name: GITHUB_TOKEN
           valueFrom:
