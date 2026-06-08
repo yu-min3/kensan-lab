@@ -66,8 +66,11 @@ config:
     cookie_samesite                = "lax"
     cookie_secure                  = true
     cookie_httponly                = true
-    cookie_expire                  = "10h"
-    cookie_refresh                 = "1h"
+    # cookie_expire は Keycloak SSO Session Max (12h) に合わせる。
+    # cookie_refresh は SSO Session Idle (12h) より十分短くし、refresh token で
+    # access token をサイレント更新し続ける (= idle がリセットされ session 延命)。
+    cookie_expire                  = "12h"
+    cookie_refresh                 = "20m"
 
     whitelist_domains              = [".platform.yu-min3.com", ".app.yu-min3.com", ".yu-mins.com"]
 
