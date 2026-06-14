@@ -1,0 +1,309 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>kensan-lab SDD — 全体像</title>
+<script src="https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js"></script>
+<style>
+  :root{
+    --sky:#0284C7; --sky-dark:#075985; --sky-soft:#E0F2FE;
+    --paper:#F5F2EC; --ink:#1C1917; --mut:#57534E; --line:#E7E2D8;
+    --ok:#15803D; --ok-soft:#DCFCE7; --warn:#B45309; --warn-soft:#FEF3C7;
+    --code:#0F172A;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--paper);color:var(--ink);
+    font-family:-apple-system,"Hiragino Kaku Gothic ProN","Noto Sans JP",sans-serif;
+    line-height:1.75;font-size:15px}
+  .wrap{max-width:980px;margin:0 auto;padding:48px 24px 96px}
+  h1,h2,h3{font-family:"Noto Serif JP",Georgia,serif;line-height:1.35;letter-spacing:.01em}
+  h1{font-size:30px;margin:0 0 6px}
+  .sub{color:var(--mut);font-size:15px;margin:0 0 28px}
+  h2{font-size:22px;margin:52px 0 14px;padding-bottom:8px;border-bottom:2px solid var(--line)}
+  h2 .n{display:inline-block;min-width:1.7em;color:var(--sky);font-size:.8em}
+  h3{font-size:17px;margin:28px 0 8px;color:var(--sky-dark)}
+  p{margin:10px 0}
+  code{font-family:"JetBrains Mono",ui-monospace,Menlo,monospace;font-size:.86em;
+    background:#fff;border:1px solid var(--line);border-radius:5px;padding:1px 6px;color:var(--code)}
+  .hero{background:linear-gradient(135deg,var(--sky) 0%,var(--sky-dark) 100%);
+    color:#fff;border-radius:16px;padding:30px 32px;margin:0 0 8px;
+    box-shadow:0 8px 28px -12px rgba(2,132,199,.55)}
+  .hero h1{color:#fff;margin:0 0 8px}
+  .hero p{margin:0;color:#E0F2FE}
+  .hero .pill{display:inline-block;background:rgba(255,255,255,.16);border:1px solid rgba(255,255,255,.3);
+    border-radius:999px;padding:3px 12px;font-size:12px;margin-top:14px;font-family:"JetBrains Mono",monospace}
+  .card{background:#fff;border:1px solid var(--line);border-radius:12px;padding:4px 22px;margin:16px 0;
+    box-shadow:0 1px 3px rgba(28,25,23,.04)}
+  .mermaid{margin:8px 0;text-align:center}
+  table{border-collapse:collapse;width:100%;margin:14px 0;font-size:13.5px;background:#fff;
+    border:1px solid var(--line);border-radius:10px;overflow:hidden}
+  th,td{text-align:left;padding:9px 12px;border-bottom:1px solid var(--line);vertical-align:top}
+  th{background:var(--sky-soft);color:var(--sky-dark);font-weight:700;font-size:12.5px}
+  tr:last-child td{border-bottom:none}
+  td code{white-space:nowrap}
+  .note{border-left:4px solid var(--sky);background:var(--sky-soft);border-radius:0 10px 10px 0;
+    padding:12px 16px;margin:16px 0}
+  .crit{border-left:4px solid var(--warn);background:var(--warn-soft);border-radius:0 10px 10px 0;
+    padding:12px 16px;margin:16px 0}
+  .crit b{color:var(--warn)}
+  pre{background:var(--code);color:#E2E8F0;border-radius:10px;padding:14px 16px;overflow:auto;
+    font-family:"JetBrains Mono",monospace;font-size:12.5px;line-height:1.6}
+  pre .c{color:#94A3B8}
+  ul{margin:10px 0;padding-left:22px}
+  li{margin:5px 0}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+  @media(max-width:680px){.grid2{grid-template-columns:1fr}}
+  .tag{display:inline-block;font-family:"JetBrains Mono",monospace;font-size:11px;
+    padding:2px 8px;border-radius:6px;background:var(--sky-soft);color:var(--sky-dark);margin-right:4px}
+  .tag.ok{background:var(--ok-soft);color:var(--ok)}
+  .tag.warn{background:var(--warn-soft);color:var(--warn)}
+  .foot{margin-top:60px;padding-top:20px;border-top:1px solid var(--line);color:var(--mut);font-size:13px}
+  a{color:var(--sky-dark)}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="hero">
+    <h1>kensan-lab × SDD</h1>
+    <p>仕様を書き上げたら AI が worktree で自律実装し、<b>必ず検証フェーズを通してから</b>引き渡す。<br>
+       GitHub spec-kit / Martin Fowler "SDD with 3 tools" を参照しつつ、ネイティブ skill で再構築。</p>
+    <span class="pill">第1弾 — infra (GitOps) フロー</span>
+  </div>
+  <p class="sub">この HTML は <code>specs/sdd-overview.html</code>。ブラウザで開くと図が描画されます。</p>
+
+  <h2><span class="n">0.</span> なにを作ったか（要約）</h2>
+  <div class="card">
+    <p>root <code>.claude/</code> に <b>4 つのスキル</b>と <code>specs/</code> 一式を追加。spec-kit の
+    <code>specify → plan → tasks → implement</code> を、このリポジトリの GitOps 文脈に合わせて作り直したもの。</p>
+    <table>
+      <tr><th>コマンド</th><th>フェーズ</th><th>入力 → 出力</th></tr>
+      <tr><td><code>/sdd-spec &lt;name&gt;</code></td><td>1 要件</td><td>対話 → <code>specs/NNN-slug/spec.md</code>（what/why）</td></tr>
+      <tr><td><code>/sdd-plan &lt;name&gt;</code></td><td>2 設計</td><td>spec.md → <code>plan.md</code>（how / Helm パターン）</td></tr>
+      <tr><td><code>/sdd-tasks &lt;name&gt;</code></td><td>3 分解</td><td>plan.md → <code>tasks.md</code>（依存順 + 必須検証）</td></tr>
+      <tr><td><code>/sdd-impl [name]</code></td><td>4 実装</td><td>tasks.md → worktree 実装 + <b>検証</b> → <b>draft PR</b></td></tr>
+    </table>
+    <p>spec-kit の <code>constitution.md</code> は<b>作っていない</b>。憲法の役割は既存の
+    <code>CLAUDE.md</code> + <code>.claude/rules/</code> がそのまま担う（後述）。</p>
+    <p><b><code>sdd-</code> 接頭辞</b>は、Claude Code 組み込みの <code>/goal</code>（"set a goal Claude checks before stopping"）や他プラグインとの衝突回避。<code>/goal</code> は別物（停止前にゴールを確認する番人）で、<code>/sdd-impl</code> と<b>併用</b>する（§6）。</p>
+  </div>
+
+  <h2><span class="n">1.</span> SDD とは / なぜこの形にしたか</h2>
+  <p>SDD（Spec-Driven Development）は「<b>コードの前に構造化された仕様を書き、それを single source of truth にして AI に実装させる</b>」やり方。
+  狙いは、要件を前倒しで形式化し、広いコンテキストウィンドウを活かして AI と協働する土台を作ること。</p>
+  <p>一方 Fowler の批判（markdown レビュー負担が増える / AI が詳細指示を無視する / 過剰なファイル構造が「制御している錯覚」を生む）も踏まえ、<b>軽量さ</b>を最優先した:</p>
+  <div class="grid2">
+    <div class="card"><h3>取り入れた点</h3><ul>
+      <li>フェーズ分離（spec→plan→tasks→impl）で各段にレビュー可能な成果物を残す</li>
+      <li>仕様 = chat ではなくファイルが正</li>
+      <li>「必ずテストして確認する」最終フェーズ</li>
+    </ul></div>
+    <div class="card"><h3>あえて避けた点</h3><ul>
+      <li>専用 CLI（specify init / .specify/）依存 → ネイティブ skill のみ</li>
+      <li>constitution.md の新規作成 → 既存 rules を参照</li>
+      <li>巨大テンプレ → 各テンプレは 1 画面程度</li>
+    </ul></div>
+  </div>
+
+  <h2><span class="n">2.</span> 4 フェーズ・パイプライン</h2>
+  <p>各フェーズは独立したコマンドで、間に<b>人間のレビュー</b>が挟まる。下流（plan/tasks）は上流が変われば作り直す。</p>
+  <div class="card">
+  <div class="mermaid">
+flowchart TD
+    U([機能アイデア]) --> S
+    subgraph P1[" "]
+      S["/sdd-spec &lt;name&gt;<br/><b>phase 1 · 要件</b>"]:::sky
+      S -->|"2〜4 問の対話<br/>what/why のみ"| SO[["spec.md"]]:::doc
+    end
+    SO -.->|人間レビュー| PL
+    subgraph P2[" "]
+      PL["/sdd-plan &lt;name&gt;<br/><b>phase 2 · 設計</b>"]:::sky
+      PL -->|"kubernetes/ を探索<br/>chart·ns·secrets 決定"| PLO[["plan.md"]]:::doc
+    end
+    PLO -.->|人間レビュー| TK
+    subgraph P3[" "]
+      TK["/sdd-tasks &lt;name&gt;<br/><b>phase 3 · 分解</b>"]:::sky
+      TK -->|"依存順 + 必須検証タスク"| TKO[["tasks.md"]]:::doc
+    end
+    TKO -.->|人間レビュー| GL
+    subgraph P4[" "]
+      GL["/sdd-impl [name]<br/><b>phase 4 · 自律実装</b>"]:::go
+      GL -->|"worktree で実装<br/>+ 検証フェーズ"| OUT([検証緑 → draft PR<br/>を作成して停止]):::stop
+    end
+    classDef sky fill:#0284C7,stroke:#075985,color:#fff,font-weight:bold;
+    classDef go fill:#15803D,stroke:#14532D,color:#fff,font-weight:bold;
+    classDef doc fill:#fff,stroke:#0284C7,color:#075985;
+    classDef stop fill:#FEF3C7,stroke:#B45309,color:#7C2D12,font-weight:bold;
+  </div>
+  </div>
+  <div class="note"><b>所有権の線引き</b>: phase 1〜3 は仕様を固める人間主導の往復。phase 4 だけが「自律実装」。
+  <code>/sdd-impl</code> は検証緑なら <b>draft PR まで</b>作る — ただし <b>ready 化・merge は常に人間</b>の判断。</div>
+
+  <h2><span class="n">3.</span> 成果物のレイアウト</h2>
+  <p>1 機能 = 1 ディレクトリ。<code>NNN-slug</code> はそのまま branch / worktree 名に流用する。</p>
+  <pre><span class="c"># root（= infra スコープ）</span>
+specs/
+├── README.md                       <span class="c"># ワークフロー入口</span>
+├── sdd-overview.html               <span class="c"># ← この図解</span>
+├── _templates/{spec,plan,tasks}.md <span class="c"># 各スキルが読む雛形</span>
+└── 001-foo-exporter/               <span class="c"># 1 機能 1 ディレクトリ</span>
+    ├── spec.md   <span class="c"># what / why</span>
+    ├── plan.md   <span class="c"># how（Helm パターン・chart・ns・secrets）</span>
+    └── tasks.md  <span class="c"># 依存順タスク + 必須検証</span>
+
+.claude/skills/{spec,spec-plan,spec-tasks,goal}/SKILL.md</pre>
+
+  <h2><span class="n">4.</span> 設計のキモ① — ディレクトリスコープで infra / app を分離</h2>
+  <p>「infra と app はフローが別物」「app は <code>apps/</code> 配下で完結」という方針を、<b>Claude Code のスキルが cwd でスコープされる</b>性質で実現。
+  同名コマンドを両層に置いても、有効になるのは現在地の側だけなので衝突しない。</p>
+  <div class="card">
+  <div class="mermaid">
+flowchart LR
+    subgraph ROOT["📁 リポジトリ root（= infra 文脈）"]
+      RC[".claude/skills/<br/>sdd-spec · sdd-plan · sdd-tasks · sdd-impl"]:::sky
+      RS["specs/"]:::doc
+      RC -. 検証 .-> RV["静的ゲート<br/>helm template · kubeconform<br/>kubectl dry-run · yamllint"]:::v
+    end
+    subgraph APP["📁 apps/kensan/（= app 文脈・後日）"]
+      AC[".claude/skills/<br/>sdd-spec · sdd-plan · sdd-tasks · sdd-impl"]:::sky2
+      AS["specs/"]:::doc
+      AC -. 検証 .-> AV["実テスト<br/>make test · npm build<br/>Playwright"]:::v
+    end
+    ROOT -. 同名・別スコープ<br/>衝突しない .- APP
+    classDef sky fill:#0284C7,stroke:#075985,color:#fff;
+    classDef sky2 fill:#7DD3FC,stroke:#0284C7,color:#075985;
+    classDef doc fill:#fff,stroke:#0284C7,color:#075985;
+    classDef v fill:#DCFCE7,stroke:#15803D,color:#14532D;
+  </div>
+  </div>
+  <div class="note">既にこのリポジトリは root <code>.claude/</code> と <code>apps/kensan/.claude/</code> の二層構成（後者は <code>build-check</code> / <code>go-test</code> 等を持つ）。
+  今回はその<b>既存パターンに乗せただけ</b>で、新しい運用制約は増えていない。前提は「infra は root、app は <code>apps/kensan/</code> に cd して作業」。</div>
+
+  <h2><span class="n">5.</span> 設計のキモ② — 憲法は複製しない</h2>
+  <p>spec-kit は統治原則を <code>constitution.md</code> に新規生成する。だがこのリポジトリには既に階層化された統治ルールがある。
+  そこで plan.md の <code>## Constitution check</code> で<b>リンク参照</b>するだけにし、二重管理を避けた。</p>
+  <table>
+    <tr><th>spec-kit の概念</th><th>kensan-lab での実体</th></tr>
+    <tr><td><code>constitution.md</code></td><td><code>CLAUDE.md</code>（Mandatory Constraints）+ <code>.claude/rules/*.md</code></td></tr>
+    <tr><td>GitOps / worktree 原則</td><td><code>gitops-workflow.md</code></td></tr>
+    <tr><td>コンポーネント構造</td><td><code>helm-multisource.md</code>（3-file パターン）</td></tr>
+    <tr><td>secrets の作法</td><td><code>security-secrets.md</code></td></tr>
+    <tr><td>ネットワーク / 公開</td><td><code>network-ingress.md</code></td></tr>
+  </table>
+
+  <h2><span class="n">6.</span> 設計のキモ③ — <code>/sdd-impl</code> の自律実装 + 必須検証ループ</h2>
+  <p>ここが「<b>最後に必ずテストして確認するフェーズ</b>」という要求の中核。
+  <code>/sdd-impl</code> は worktree で実装した後、検証ゲートが<b>全緑になるまで完了を宣言しない</b>。</p>
+  <div class="note"><b>完了の定義 (DoD) は spec が持つ</b>: <code>/sdd-impl</code> は開始時に <code>spec.md</code> の <code>## Acceptance criteria</code> ＋ <code>tasks.md</code> の <code>## Verification</code> を DoD として取り込み、それを満たすまで完了にしない。<b>作った spec がそのまま停止ゲートの中身になる。</b><br>組み込み <code>/goal</code> は同じ停止前確認の harness 層だが<b>スキルからは自動セット不可</b>なので、<code>/sdd-impl</code> は貼れる <code>/goal</code> 文字列を提示する（ユーザー任意）。</div>
+  <div class="card">
+  <div class="mermaid">
+flowchart TD
+    A["① 仕様を選択<br/>tasks.md 必須"]:::step --> B["② worktree 作成<br/>~/kensan-lab.worktrees/NNN-slug<br/>git worktree add -b feat/NNN-slug"]:::step
+    B --> C["③ tasks.md を順に実装<br/>3-file パターン · secrets<br/>論理単位で commit"]:::step
+    C --> D{{"④ 検証フェーズ"}}:::gate
+
+    D --> SA["<b>4-A 静的ゲート</b>（常時）<br/>yamllint<br/>helm template (render·commitしない)<br/>kubeconform -ignore-missing-schemas<br/>kubectl apply --dry-run=client<br/>secret漏れ / version固定 check"]:::static
+    SA --> Q{全緑?}:::q
+    Q -->|No| FIX["4-C ソースを修正<br/>（握り潰し禁止·最大3回）"]:::fix
+    FIX --> SA
+    Q -->|Yes| LIVE{cluster 到達?}:::q
+    LIVE -->|Yes| LB["<b>4-B ライブ検証</b><br/>kubectl apply --dry-run=server<br/>(実API+CRD+admission)<br/>必要時 scratch ns へ一時apply→即delete"]:::live
+    LIVE -->|No| SKIP["未到達を明示<br/>runbook に委譲"]:::skip
+    LB --> DONE
+    SKIP --> DONE
+    DONE["⑤ draft PR を作成<br/>push → gh pr create --draft<br/>PR body に検証サマリ + runbook<br/>(ready化・merge は人間)"]:::stop
+
+    classDef step fill:#fff,stroke:#0284C7,color:#075985;
+    classDef gate fill:#0284C7,stroke:#075985,color:#fff,font-weight:bold;
+    classDef static fill:#E0F2FE,stroke:#0284C7,color:#075985;
+    classDef live fill:#DCFCE7,stroke:#15803D,color:#14532D;
+    classDef q fill:#FEF3C7,stroke:#B45309,color:#7C2D12;
+    classDef fix fill:#FEE2E2,stroke:#B91C1C,color:#7F1D1D;
+    classDef skip fill:#F1F5F9,stroke:#94A3B8,color:#334155;
+    classDef stop fill:#FEF3C7,stroke:#B45309,color:#7C2D12,font-weight:bold;
+  </div>
+  </div>
+  <div class="crit"><b>偽 pass を許さない 3 つの不変条件</b> ——
+  ❶ 静的ゲートが全緑になるまで「完了」と言わない。
+  ❷ cluster 未到達でライブ検証を飛ばす時は<b>黙ってスキップせず明示</b>し runbook に委ねる。
+  ❸ ゲートを通すために検証を握り潰さない（直せなければ人間にフラグ）。</div>
+
+  <h2><span class="n">7.</span> なぜ infra の検証は「2 段階」なのか</h2>
+  <p>infra にはアプリのような <code>make test</code> が無く、<b>本番の正しさは merge 後の Argo CD が決める</b>。
+  そこで「merge 前にローカルで掴めるもの」と「merge 後にしか分からないもの」を切り分けた。</p>
+  <table>
+    <tr><th>段階</th><th>いつ</th><th>何を</th><th>掴めること</th></tr>
+    <tr><td><span class="tag ok">静的ゲート</span></td><td>merge 前・ローカル・常時</td>
+      <td>yamllint / helm template / kubeconform / dry-run=client / 安全 check</td>
+      <td>構文・スキーマ・レンダリング・version 固定・secret 漏れ</td></tr>
+    <tr><td><span class="tag">server dry-run</span></td><td>merge 前・cluster 到達時</td>
+      <td>kubectl apply --dry-run=server</td>
+      <td>実 API・CRD 存在・admission webhook（非破壊）</td></tr>
+    <tr><td><span class="tag warn">Argo CD</span></td><td>merge 後</td>
+      <td><code>/argocd-sync</code> / <code>/cluster-status</code> / <code>/cert-check</code></td>
+      <td>Synced+Healthy・pod 起動・cert 発行・mTLS 等（実デプロイ）</td></tr>
+  </table>
+  <div class="note"><b>ユーザー許可済みの一時適用</b>: 検証目的に限り <code>kubectl --dry-run=server</code> や scratch namespace への一時 apply→即 delete を許容。
+  ただし「GitOps only（デプロイは Git 経由）」の原則は不変 — あくまで<b>検証のため</b>であり、これがデプロイ手段になることはない。</div>
+
+  <h2><span class="n">8.</span> 一回の流れ（例）</h2>
+  <pre><span class="c"># 1. 要件を対話で固める</span>
+/sdd-spec loki-ruler "Loki に alert ルール評価を足したい"
+   <span class="c">→ specs/001-loki-ruler/spec.md（質問に答えながら確定）</span>
+
+<span class="c"># 2. 技術設計</span>
+/sdd-plan loki-ruler
+   <span class="c">→ plan.md（chart·version·namespace·Gateway·secrets·Affected paths）</span>
+
+<span class="c"># 3. タスク分解</span>
+/sdd-tasks loki-ruler
+   <span class="c">→ tasks.md（依存順 + 末尾に必須検証タスク）</span>
+
+<span class="c"># 任意: 組み込み /goal を番人としてセット</span>
+/goal 001 の静的ゲート全緑 + 受入基準充足 + draft PR
+
+<span class="c"># 4. 自律実装 + 検証 + draft PR（worktree 内）</span>
+/sdd-impl loki-ruler
+   <span class="c">→ ~/kensan-lab.worktrees/001-loki-ruler で実装</span>
+   <span class="c">→ 静的ゲート緑 → push → gh pr create --draft → PR URL 提示</span>
+
+<span class="c"># 5. 人間が PR レビュー → ready 化 → merge</span>
+<span class="c"># merge 後</span>
+/argocd-sync loki-ruler   &&   /cluster-status</pre>
+
+  <h2><span class="n">9.</span> 追加 / 変更したファイル</h2>
+  <table>
+    <tr><th>パス</th><th>種別</th><th>役割</th></tr>
+    <tr><td><code>.claude/skills/sdd-spec/SKILL.md</code></td><td>新規</td><td>phase 1 要件 authoring（対話）</td></tr>
+    <tr><td><code>.claude/skills/sdd-plan/SKILL.md</code></td><td>新規</td><td>phase 2 技術設計</td></tr>
+    <tr><td><code>.claude/skills/sdd-tasks/SKILL.md</code></td><td>新規</td><td>phase 3 タスク分解</td></tr>
+    <tr><td><code>.claude/skills/sdd-impl/SKILL.md</code></td><td>新規</td><td>phase 4 自律実装 + 必須検証 + draft PR（<code>disable-model-invocation</code>）</td></tr>
+    <tr><td><code>specs/_templates/{spec,plan,tasks}.md</code></td><td>新規</td><td>infra 向け雛形</td></tr>
+    <tr><td><code>specs/README.md</code></td><td>新規</td><td>ワークフロー入口ドキュメント</td></tr>
+    <tr><td><code>specs/sdd-overview.html</code></td><td>新規</td><td>この図解</td></tr>
+    <tr><td><code>CLAUDE.md</code></td><td>編集</td><td>Skills テーブルに SDD セクション追加</td></tr>
+  </table>
+
+  <h2><span class="n">10.</span> 次の一手</h2>
+  <ul>
+    <li><b>ドライラン</b>: 小さなダミー infra 機能で <code>/sdd-spec → /sdd-plan → /sdd-tasks → /sdd-impl</code> を一周し、生成物と検証ループ・draft PR を実地確認。</li>
+    <li><b>app フロー</b>: 同じ骨格を <code>apps/kensan/.claude/skills/</code> + <code>apps/kensan/specs/</code> に複製し、検証を <code>make test</code> / <code>npm run build</code> / Playwright に差し替え。</li>
+    <li><b>任意</b>: <code>yamllint</code> をリポジトリの開発依存に追加（現在は config だけ存在し本体は未インストール）。</li>
+  </ul>
+
+  <div class="foot">
+    kensan-lab Spec-Driven Development · infra フロー 第1弾 ·
+    参照: <a href="https://github.com/github/spec-kit">github/spec-kit</a> /
+    <a href="https://martinfowler.com/articles/exploring-gen-ai/sdd-3-tools.html">Fowler "SDD with 3 tools"</a>
+  </div>
+
+</div>
+<script>
+  mermaid.initialize({startOnLoad:true, theme:'base', themeVariables:{
+    fontFamily:'JetBrains Mono, ui-monospace, monospace', fontSize:'13px',
+    lineColor:'#94A3B8', primaryColor:'#E0F2FE', primaryBorderColor:'#0284C7', primaryTextColor:'#075985'
+  }});
+</script>
+</body>
+</html>

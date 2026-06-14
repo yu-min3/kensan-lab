@@ -44,6 +44,20 @@ Backstage: `cd backstage/app && make {install,dev,all TAG=...}`
 | `/argocd-sync [app]` | Check sync status & drift |
 | `/codex <依頼>` | OpenAI Codex へ委譲（レビュー・セカンドオピニオン・別解生成） |
 
+### SDD (Spec-Driven Development) — infra フロー
+
+仕様を書き上げたら AI が worktree で自律実装し、必須の検証フェーズを通してから draft PR を作る。詳細: [`specs/README.md`](./specs/README.md)。
+
+| Command | Phase | Purpose |
+|---------|-------|---------|
+| `/sdd-spec <name> [概要]` | 1 | 要件 (what/why) を対話的に作成 → `specs/NNN-<slug>/spec.md` |
+| `/sdd-plan <name>` | 2 | 技術設計 (how) → `plan.md`（Helm パターン・chart・namespace 等） |
+| `/sdd-tasks <name>` | 3 | 依存順タスク分解 → `tasks.md` |
+| `/sdd-impl [name]` | 4 | worktree で自律実装 + 必須検証（静的ゲート + cluster 到達時ライブ検証）→ draft PR を作成 |
+
+> `sdd-` 接頭辞は組み込み `/goal`（"set a goal Claude checks before stopping"）等との衝突回避。`/goal` は「停止前にゴールを確認する番人」で `/sdd-impl` と併用可。
+> app 向け SDD は `apps/kensan/` 配下に同じ骨格で別途用意する方針（cwd スコープで同名コマンドが衝突しない）。
+
 ## Domain Rules (`.claude/rules/`)
 
 | Rule File | Scope |
