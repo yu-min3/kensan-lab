@@ -33,29 +33,39 @@ if ! vault token lookup >/dev/null 2>&1; then
 fi
 
 echo "==> Setting auth/oidc/config default_role=default"
-# config の他 field (oidc_discovery_url 等) を上書きしないよう、
-# JSON patch 的に default_role だけ送る。Vault は merge update なので OK。
-vault write auth/oidc/config default_role=default
+# 重要: auth/oidc/config エンドポイントは:
+# - vault write は HTTP PUT で full-replace (指定しない field は消える)
+# - vault patch は HTTP PATCH 405 Method Not Allowed (実機検証 2026-05-06)
+# したがって全 field を毎回明示する full-write しか選択肢なし。
+# oidc_client_secret は Bitwarden から runtime 取得 (script 内に平文残さない)。
+if ! command -v bw >/dev/null 2>&1; then
+  echo "ERROR: bw CLI not found (Bitwarden CLI が必要)"; exit 1
+fi
+if [ "$(bw status 2>/dev/null | jq -r '.status' 2>/dev/null)" != "unlocked" ]; then
+  echo "ERROR: bw が unlock 状態じゃない (export BW_SESSION=\$(bw unlock --raw))"; exit 1
+fi
+VAULT_OIDC_CLIENT_SECRET=$(bw get item kensan-lab/keycloak/oidc-client-vault | jq -r '.login.password')
+if [ -z "$VAULT_OIDC_CLIENT_SECRET" ] || [ "$VAULT_OIDC_CLIENT_SECRET" = "null" ]; then
+  echo "ERROR: BW から vault client_secret 取得失敗"; exit 1
+fi
+vault write auth/oidc/config \
+  oidc_discovery_url="https://auth.platform.yu-min3.com/realms/kensan" \
+  oidc_client_id="vault" \
+  oidc_client_secret="$VAULT_OIDC_CLIENT_SECRET" \
+  default_role="default"
 echo "    OK"
 
 echo ""
-echo "==> Setting UI default login method = oidc (root namespace)"
-# ルール名は任意。namespace_path 空文字 = root namespace。
-# backup_auth_types は空 (token method は常に裏に居るので)。
-vault write sys/config/ui/login/default-auth/oidc-default \
-  namespace_path="" \
-  default_auth_type="oidc" \
-  disable_inheritance=false \
-  backup_auth_types=""
-echo "    OK"
+echo "==> UI default-auth はスキップ (Vault Enterprise 専用 endpoint、OSS では 404)"
+echo "    OSS 代替: ブックマーク URL で OIDC method を pre-select する:"
+echo "      https://vault.platform.yu-min3.com/ui/vault/auth?with=oidc/"
+echo "    開いたら Role 欄空のまま Sign in (default_role=default で通る)"
 
 echo ""
 echo "==> Verify"
 echo "  - auth/oidc/config:"
 vault read auth/oidc/config 2>&1 | grep -E "default_role|oidc_discovery_url" | sed 's/^/      /'
-echo ""
-echo "  - sys/config/ui/login/default-auth/oidc-default:"
-vault read sys/config/ui/login/default-auth/oidc-default 2>&1 | grep -E "default_auth_type|namespace_path" | sed 's/^/      /'
 
 echo ""
-echo "==> Done. UI を開くと OIDC method 既定 + Role 空欄で Sign in 可能になる。"
+echo "==> Done. ブラウザで下記を開けば 1-click login:"
+echo "    https://vault.platform.yu-min3.com/ui/vault/auth?with=oidc/"
