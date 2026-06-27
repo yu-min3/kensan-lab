@@ -82,10 +82,12 @@ func TestCollect(t *testing.T) {
 		t.Fatal(err)
 	}
 	if len(b.Today) != 2 {
-		t.Errorf("today: want 2 (## Now のみ), got %d: %+v", len(b.Today), b.Today)
+		t.Errorf("today: want 2 (todo.md ## Now), got %d: %+v", len(b.Today), b.Today)
 	}
-	if len(b.Stock) != 3 {
-		t.Errorf("stock: want 3 (## タスク のみ、_archive 除外), got %d: %+v", len(b.Stock), b.Stock)
+	// ストック = project の ## タスク のうち未完了かつ today でないもの
+	// （原稿レビュー依頼 のみ。アブストラクト確定=done / 没ネタ調査=skipped は除外、_archive も除外）
+	if len(b.Stock) != 1 {
+		t.Errorf("stock: want 1 (未完了の ## タスク のみ), got %d: %+v", len(b.Stock), b.Stock)
 	}
 	if len(b.Milestones) != 2 || len(b.Someday) != 1 {
 		t.Errorf("milestones/someday: got %d/%d", len(b.Milestones), len(b.Someday))
@@ -94,6 +96,51 @@ func TestCollect(t *testing.T) {
 		if task.Project != "demo" {
 			t.Errorf("stock task must carry project, got %+v", task)
 		}
+	}
+}
+
+func TestParseInline(t *testing.T) {
+	tg := parseInline("README を英語化 @today @due(2026-06-14) @ms(v1-public) @p(1500)")
+	if tg.Display != "README を英語化" {
+		t.Errorf("display should strip tags: %q", tg.Display)
+	}
+	if !tg.Today {
+		t.Error("@today not detected")
+	}
+	if tg.Due != "2026-06-14" {
+		t.Errorf("due: %q", tg.Due)
+	}
+	if tg.Milestone != "v1-public" {
+		t.Errorf("ms: %q", tg.Milestone)
+	}
+	if tg.Priority != 1500 {
+		t.Errorf("priority: %d", tg.Priority)
+	}
+
+	// タグ無しはそのまま
+	p := parseInline("ただのタスク")
+	if p.Display != "ただのタスク" || p.Today || p.Due != "" || p.Milestone != "" || p.Priority != 0 {
+		t.Errorf("plain task misparsed: %+v", p)
+	}
+}
+
+// @due が今日以前なら today 扱い、未来なら stock 扱い
+func TestCollectDueSurfacing(t *testing.T) {
+	root := t.TempDir()
+	mustWrite(t, filepath.Join(root, "projects", "demo", "README.md"), `---
+type: project
+---
+## タスク
+
+- [ ] 期限切れ @due(2026-01-01)
+- [ ] まだ先 @due(2099-12-31)
+`)
+	b, _ := collect(root, "2026-06-14")
+	if len(b.Today) != 1 || b.Today[0].Display != "期限切れ" {
+		t.Errorf("due<=today should surface in today: %+v", b.Today)
+	}
+	if len(b.Stock) != 1 || b.Stock[0].Display != "まだ先" {
+		t.Errorf("future due should stay in stock: %+v", b.Stock)
 	}
 }
 

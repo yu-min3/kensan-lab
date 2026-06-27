@@ -10,6 +10,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/yu-min3/kensan-lab/apps/kensan/backend/internal/goals"
+	"github.com/yu-min3/kensan-lab/apps/kensan/backend/internal/projects"
 	"github.com/yu-min3/kensan-lab/apps/kensan/backend/internal/tasks"
 	"github.com/yu-min3/kensan-lab/apps/kensan/backend/internal/workspace"
 )
@@ -118,6 +120,35 @@ func (s *Server) handleTasks(w http.ResponseWriter, _ *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, board)
+}
+
+// GET /api/v1/projects — プロジェクト一覧（サマリ: status/締切/目標/進捗）
+func (s *Server) handleProjects(w http.ResponseWriter, _ *http.Request) {
+	writeJSON(w, http.StatusOK, map[string]any{"projects": projects.Summaries(s.ws.Root)})
+}
+
+// GET /api/v1/projects/{name} — プロジェクト詳細（目標/マイルストーン/タスク/ログ/関連ノート）
+func (s *Server) handleProjectDetail(w http.ResponseWriter, r *http.Request) {
+	d, err := projects.Load(s.ws.Root, r.PathValue("name"))
+	if err != nil {
+		if os.IsNotExist(err) {
+			writeError(w, http.StatusNotFound, "project not found")
+			return
+		}
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	writeJSON(w, http.StatusOK, d)
+}
+
+// GET /api/v1/goals — goals.md の North Star + 今期のフォーカス（ダッシュボード表示用）
+func (s *Server) handleGoals(w http.ResponseWriter, _ *http.Request) {
+	g, err := goals.Load(s.ws.Root)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	writeJSON(w, http.StatusOK, g)
 }
 
 // GET /api/v1/tags — タグ集計

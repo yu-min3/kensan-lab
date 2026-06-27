@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="100" height="100" role="img" aria-label="kensan">
+  <title>kensan</title>
+  <!-- 砥石 -->
+  <rect x="15" y="61" width="70" height="17" rx="2.5" fill="#7A6E5D"/>
+  <!-- 刃 / 山（brand blue） -->
+  <path d="M18,58 Q38,50 55,38 Q72,24 82,12 L82,58 Z" fill="#0284C7"/>
+  <!-- 研ぐ煌めき -->
+  <path d="M88,8 L90,3 L92,8 L97,10 L92,12 L90,17 L88,12 L83,10 Z" fill="#0284C7" fill-opacity="0.6"/>
+</svg>

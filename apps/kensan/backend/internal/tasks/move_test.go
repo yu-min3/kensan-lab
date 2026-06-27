@@ -19,39 +19,42 @@ func setupBoard(t *testing.T) (*workspace.Workspace, string) {
 	return workspace.New(root), root
 }
 
-// ストック → 今日 → daily の一巡（/morning と /reflection の操作に相当）
-func TestMoveRoundTrip(t *testing.T) {
+// ストック → 今日（@today 付与）→ 完了 → daily の一巡
+func TestTodayToggleAndArchive(t *testing.T) {
 	ws, root := setupBoard(t)
 
 	board, _ := Collect(root)
-	// 「アブストラクト確定」は README にのみ存在するテキスト（todo.md との重複なし）
+	// 「原稿レビュー依頼」は demo の ## タスク にある未完了 = ストック
 	var src Task
 	for _, task := range board.Stock {
-		if task.Text == "アブストラクト確定" {
+		if task.Display == "原稿レビュー依頼" {
 			src = task
 		}
 	}
 	if src.Text == "" {
-		t.Fatal("fixture task not found")
+		t.Fatalf("fixture stock task not found: %+v", board.Stock)
 	}
 
-	// ストック → 今日
-	moved, err := Move(ws, src.File, src.Line, src.Text, Dest{Kind: "today"})
+	// ストック → 今日（@today タグを付与。ファイルは project のまま）
+	moved, err := SetToday(ws, src.File, src.Line, src.Text, true)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if moved.File != "todo.md" {
-		t.Fatalf("want todo.md, got %+v", moved)
+	if !moved.Today || moved.File != src.File {
+		t.Fatalf("want @today on same file, got %+v", moved)
 	}
 	board, _ = Collect(root)
-	if len(board.Stock) != 2 {
-		t.Errorf("stock should shrink to 2, got %d", len(board.Stock))
+	inToday := false
+	for _, task := range board.Today {
+		if task.Display == "原稿レビュー依頼" && task.Project == "demo" {
+			inToday = true
+		}
 	}
-	if len(board.Today) != 3 {
-		t.Errorf("today should grow to 3, got %d: %+v", len(board.Today), board.Today)
+	if !inToday {
+		t.Errorf("task should surface in today: %+v", board.Today)
 	}
 
-	// 完了にして daily へ
+	// 完了にして daily へ退避
 	done, err := SetState(ws, moved.File, moved.Line, moved.Text, "done")
 	if err != nil {
 		t.Fatal(err)
@@ -64,21 +67,34 @@ func TestMoveRoundTrip(t *testing.T) {
 	if final.File != "daily/2026/06/06.md" {
 		t.Fatalf("unexpected daily path: %+v", final)
 	}
-	// daily は無かったので骨組みごと作られている
-	content, err := os.ReadFile(filepath.Join(root, "daily", "2026", "06", "06.md"))
+	content, _ := os.ReadFile(filepath.Join(root, "daily", "2026", "06", "06.md"))
+	if !strings.Contains(string(content), "### 完了タスク") || !strings.Contains(string(content), "原稿レビュー依頼") {
+		t.Errorf("daily missing archived task:\n%s", content)
+	}
+}
+
+// @today の付け外しが行内タグの付与/除去になっている
+func TestSetTodayToggle(t *testing.T) {
+	ws, root := setupBoard(t)
+	board, _ := Collect(root)
+	src := board.Stock[0]
+
+	on, err := SetToday(ws, src.File, src.Line, src.Text, true)
 	if err != nil {
 		t.Fatal(err)
 	}
-	s := string(content)
-	if !strings.Contains(s, "type: daily") || !strings.Contains(s, "### 完了タスク") ||
-		!strings.Contains(s, "- [x] アブストラクト確定") {
-		t.Errorf("daily skeleton missing parts:\n%s", s)
+	if !strings.HasSuffix(on.Text, "@today") {
+		t.Errorf("@today not appended: %q", on.Text)
 	}
-
-	// 元の todo.md からは消えている
-	todoContent, _ := os.ReadFile(filepath.Join(root, "todo.md"))
-	if strings.Contains(string(todoContent), "アブストラクト確定") {
-		t.Error("task not removed from todo.md")
+	off, err := SetToday(ws, on.File, on.Line, on.Text, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(off.Text, "@today") || off.Today {
+		t.Errorf("@today not removed: %q", off.Text)
+	}
+	if off.Display != src.Display {
+		t.Errorf("display changed across toggle: %q vs %q", off.Display, src.Display)
 	}
 }
 
@@ -87,7 +103,7 @@ func TestMoveLineMismatch(t *testing.T) {
 	ws, root := setupBoard(t)
 	before, _ := os.ReadFile(filepath.Join(root, "todo.md"))
 
-	_, err := Move(ws, "todo.md", 5, "存在しないテキスト", Dest{Kind: "stock", Project: "demo"})
+	_, err := Move(ws, "todo.md", 5, "存在しないテキスト", Dest{Kind: "daily"})
 	if !errors.Is(err, ErrLineMismatch) {
 		t.Fatalf("want ErrLineMismatch, got %v", err)
 	}
@@ -97,27 +113,158 @@ func TestMoveLineMismatch(t *testing.T) {
 	}
 }
 
-// 今日 → ストック（project 必須）
-func TestMoveTodayToStock(t *testing.T) {
-	ws, root := setupBoard(t)
-	board, _ := Collect(root)
-	src := board.Today[0]
+// @p(N) の設定とストックの優先度ソート
+func TestSetPriorityAndSort(t *testing.T) {
+	root := t.TempDir()
+	mustWrite(t, filepath.Join(root, "projects", "demo", "README.md"), `---
+type: project
+---
+## タスク
 
-	if _, err := Move(ws, src.File, src.Line, src.Text, Dest{Kind: "stock"}); err == nil {
-		t.Fatal("stock without project should fail")
+- [ ] あ
+- [ ] い
+- [ ] う
+`)
+	ws := workspace.New(root)
+	board, _ := Collect(root)
+	if len(board.Stock) != 3 {
+		t.Fatalf("want 3 stock, got %d", len(board.Stock))
 	}
-	moved, err := Move(ws, src.File, src.Line, src.Text, Dest{Kind: "stock", Project: "demo"})
+
+	// 「う」に @p(10)、「あ」に @p(20) を付ける → う, あ, (い 未設定) の順
+	var a, u Task
+	for _, t2 := range board.Stock {
+		switch t2.Display {
+		case "あ":
+			a = t2
+		case "う":
+			u = t2
+		}
+	}
+	if _, err := SetPriority(ws, u.File, u.Line, u.Text, 10); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := SetPriority(ws, a.File, a.Line, a.Text, 20); err != nil {
+		t.Fatal(err)
+	}
+	board, _ = Collect(root)
+	order := []string{board.Stock[0].Display, board.Stock[1].Display, board.Stock[2].Display}
+	if order[0] != "う" || order[1] != "あ" || order[2] != "い" {
+		t.Errorf("priority sort wrong: %v", order)
+	}
+	if board.Stock[0].Priority != 10 {
+		t.Errorf("priority not parsed: %+v", board.Stock[0])
+	}
+
+	// @p を 0 で除去すると未設定に戻る
+	off, err := SetPriority(ws, board.Stock[0].File, board.Stock[0].Line, board.Stock[0].Text, 0)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if moved.Project != "demo" || moved.Section != "タスク" {
-		t.Fatalf("unexpected move result: %+v", moved)
+	if off.Priority != 0 || strings.Contains(off.Text, "@p(") {
+		t.Errorf("@p not removed: %+v", off)
 	}
-	// ## タスク セクションの末尾に入っている（## ルーティン より前）
+}
+
+// 作成: project の ## タスク に追加（タグ付き）
+func TestCreateTask(t *testing.T) {
+	ws, root := setupBoard(t)
+	out, err := CreateTask(ws, "demo", "新規タスク", true, "2026-06-20", "v1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if out.File != "projects/demo/README.md" || !out.Today || out.Due != "2026-06-20" || out.Milestone != "v1" {
+		t.Fatalf("unexpected: %+v", out)
+	}
 	content, _ := os.ReadFile(filepath.Join(root, "projects", "demo", "README.md"))
-	s := string(content)
-	if strings.Index(s, src.Text) > strings.Index(s, "## ルーティン") {
-		t.Errorf("inserted outside ## タスク section:\n%s", s)
+	if !strings.Contains(string(content), "- [ ] 新規タスク @today @due(2026-06-20) @ms(v1)") {
+		t.Errorf("line not created:\n%s", content)
+	}
+	// project 空 → todo.md ## Now
+	out2, err := CreateTask(ws, "", "即席タスク", false, "", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if out2.File != "todo.md" {
+		t.Fatalf("empty project should go to todo.md: %+v", out2)
+	}
+}
+
+// 編集でプロジェクトを変えるとファイル間移動になり、@p は引き継がれる
+func TestEditTaskReproject(t *testing.T) {
+	root := t.TempDir()
+	mustWrite(t, filepath.Join(root, "projects", "a", "README.md"), "---\ntype: project\n---\n## タスク\n\n- [ ] 移動するタスク @p(1500)\n")
+	mustWrite(t, filepath.Join(root, "projects", "b", "README.md"), "---\ntype: project\n---\n## タスク\n\n- [ ] 既存\n")
+	ws := workspace.New(root)
+	board, _ := Collect(root)
+	var src Task
+	for _, x := range board.Stock {
+		if x.Display == "移動するタスク" {
+			src = x
+		}
+	}
+	out, err := EditTask(ws, src.File, src.Line, src.Text, "b", "移動するタスク", false, "", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if out.File != "projects/b/README.md" || out.Priority != 1500 {
+		t.Fatalf("reproject/keep-priority failed: %+v", out)
+	}
+	a, _ := os.ReadFile(filepath.Join(root, "projects", "a", "README.md"))
+	if strings.Contains(string(a), "移動するタスク") {
+		t.Errorf("not removed from source:\n%s", a)
+	}
+	bb, _ := os.ReadFile(filepath.Join(root, "projects", "b", "README.md"))
+	if !strings.Contains(string(bb), "- [ ] 移動するタスク @p(1500)") {
+		t.Errorf("not inserted into dest:\n%s", bb)
+	}
+}
+
+// インライン編集は本文だけ差し替え、行内タグを維持する
+func TestSetText(t *testing.T) {
+	root := t.TempDir()
+	mustWrite(t, filepath.Join(root, "projects", "demo", "README.md"), `---
+type: project
+---
+## タスク
+
+- [ ] 元のタスク @today @due(2026-06-20) @p(1000)
+`)
+	ws := workspace.New(root)
+	board, _ := Collect(root)
+	src := board.Today[0]
+	if src.Display != "元のタスク" {
+		t.Fatalf("unexpected fixture: %+v", src)
+	}
+
+	out, err := SetText(ws, src.File, src.Line, src.Text, "新しい本文")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if out.Display != "新しい本文" || !out.Today || out.Due != "2026-06-20" || out.Priority != 1000 {
+		t.Errorf("tags not preserved across edit: %+v", out)
+	}
+	content, _ := os.ReadFile(filepath.Join(root, src.File))
+	if !strings.Contains(string(content), "- [ ] 新しい本文 @today @due(2026-06-20) @p(1000)") {
+		t.Errorf("line not rewritten as expected:\n%s", content)
+	}
+}
+
+func TestDeleteLine(t *testing.T) {
+	ws, root := setupBoard(t)
+	board, _ := Collect(root)
+	src := board.Stock[0]
+
+	if err := DeleteLine(ws, src.File, src.Line, src.Text); err != nil {
+		t.Fatal(err)
+	}
+	content, _ := os.ReadFile(filepath.Join(root, src.File))
+	if strings.Contains(string(content), src.Text) {
+		t.Errorf("task line not removed:\n%s", content)
+	}
+	// 不一致は ErrLineMismatch
+	if err := DeleteLine(ws, src.File, src.Line, "存在しない"); !errors.Is(err, ErrLineMismatch) {
+		t.Errorf("want ErrLineMismatch, got %v", err)
 	}
 }
 
