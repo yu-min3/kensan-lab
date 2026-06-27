@@ -179,9 +179,10 @@ func TestTaskMoveAPI(t *testing.T) {
 	// board API から実際の位置を取得（手で行番号を数えない）
 	var board struct {
 		Stock []struct {
-			File string `json:"file"`
-			Line int    `json:"line"`
-			Text string `json:"text"`
+			File    string `json:"file"`
+			Line    int    `json:"line"`
+			Text    string `json:"text"`
+			Project string `json:"project"`
 		} `json:"stock"`
 	}
 	getJSON(t, ts.URL+"/api/v1/tasks", &board)
@@ -190,34 +191,54 @@ func TestTaskMoveAPI(t *testing.T) {
 	}
 	srcLine := board.Stock[0].Line
 
-	// ストック → 今日
+	// ストック → 今日（@today タグ付与。project ファイルのまま）
 	var res struct {
 		Task struct {
-			File string `json:"file"`
-			Line int    `json:"line"`
-			Text string `json:"text"`
+			File    string `json:"file"`
+			Line    int    `json:"line"`
+			Text    string `json:"text"`
+			Today   bool   `json:"today"`
+			Project string `json:"project"`
 		} `json:"task"`
 	}
-	code := doJSON(t, "POST", ts.URL+"/api/v1/tasks/move", map[string]any{
-		"file": "projects/demo/README.md", "line": srcLine, "text": "タスクB", "to": "today",
+	code := doJSON(t, "POST", ts.URL+"/api/v1/tasks/today", map[string]any{
+		"file": "projects/demo/README.md", "line": srcLine, "text": "タスクB", "on": true,
 	}, &res)
 	if code != 200 {
-		t.Fatalf("move: %d", code)
+		t.Fatalf("today: %d", code)
 	}
-	if res.Task.File != "todo.md" {
-		t.Fatalf("unexpected dest: %+v", res.Task)
+	if res.Task.File != "projects/demo/README.md" || !res.Task.Today {
+		t.Fatalf("expected @today on same file: %+v", res.Task)
 	}
 
-	// 完了 → daily へ
+	// 今日やるレーンに浮上している
+	var board2 struct {
+		Today []struct {
+			Display string `json:"display"`
+			Project string `json:"project"`
+		} `json:"today"`
+	}
+	getJSON(t, ts.URL+"/api/v1/tasks", &board2)
+	found := false
+	for _, task := range board2.Today {
+		if task.Display == "タスクB" && task.Project == "demo" {
+			found = true
+		}
+	}
+	if !found {
+		t.Errorf("task should surface in today: %+v", board2.Today)
+	}
+
+	// 完了 → daily へ退避（text は @today 込みの生テキスト）
 	code = doJSON(t, "PATCH", ts.URL+"/api/v1/tasks", map[string]any{
-		"file": res.Task.File, "line": res.Task.Line, "text": "タスクB", "state": "done",
+		"file": res.Task.File, "line": res.Task.Line, "text": res.Task.Text, "state": "done",
 	}, nil)
 	if code != 200 {
 		t.Fatalf("state: %d", code)
 	}
 	code = doJSON(t, "POST", ts.URL+"/api/v1/tasks/move", map[string]any{
-		"file": res.Task.File, "line": res.Task.Line, "text": "タスクB", "to": "daily", "date": "2026-06-06",
-	}, &res)
+		"file": res.Task.File, "line": res.Task.Line, "text": res.Task.Text, "date": "2026-06-06",
+	}, nil)
 	if code != 200 {
 		t.Fatalf("move to daily: %d", code)
 	}
@@ -226,21 +247,21 @@ func TestTaskMoveAPI(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !bytes.Contains(content, []byte("- [x] タスクB")) {
+	if !bytes.Contains(content, []byte("タスクB")) {
 		t.Errorf("daily missing completed task:\n%s", content)
 	}
 
 	// 既に動いた行への stale な操作は 409
-	code = doJSON(t, "POST", ts.URL+"/api/v1/tasks/move", map[string]any{
-		"file": "projects/demo/README.md", "line": srcLine, "text": "タスクB", "to": "today",
+	code = doJSON(t, "POST", ts.URL+"/api/v1/tasks/today", map[string]any{
+		"file": "projects/demo/README.md", "line": srcLine, "text": "タスクB", "on": true,
 	}, nil)
 	if code != 409 {
-		t.Errorf("stale move: want 409, got %d", code)
+		t.Errorf("stale today: want 409, got %d", code)
 	}
 
-	// frontmatter の updated が触られている
-	todo, _ := os.ReadFile(filepath.Join(root, "todo.md"))
-	if !bytes.Contains(todo, []byte("updated: 20")) || bytes.Contains(todo, []byte("updated: 2026-01-01")) {
-		t.Errorf("updated not touched:\n%s", todo)
+	// タスクは project README から daily へ抜けている（元ファイルから消えている）
+	readme, _ := os.ReadFile(filepath.Join(root, "projects", "demo", "README.md"))
+	if bytes.Contains(readme, []byte("タスクB")) {
+		t.Errorf("task not removed from project README:\n%s", readme)
 	}
 }

@@ -7,8 +7,12 @@ import {
   SquareKanban,
   ChartSpline,
   FileText,
+  FolderKanban,
+  FlaskConical,
+  Sparkles,
 } from "lucide-react";
 import clsx from "clsx";
+import { FloatingMemoButton } from "./FloatingMemoButton";
 
 // patterns.md 00. App Shell — Variant A: Side Nav + Main（kensan 既定）
 // active は bg-accent + text-accent-foreground（border の左帯は使わない）
@@ -19,6 +23,7 @@ const nav = [
     items: [
       { to: "/", label: "ダッシュボード", icon: LayoutDashboard },
       { to: "/tasks", label: "タスク", icon: SquareKanban },
+      { to: "/projects", label: "プロジェクト", icon: FolderKanban },
     ],
   },
   {
@@ -31,7 +36,10 @@ const nav = [
   },
   {
     group: "振り返り",
-    items: [{ to: "/reviews", label: "レビュー", icon: ChartSpline }],
+    items: [
+      { to: "/reviews", label: "レビュー", icon: ChartSpline },
+      { to: "/editor-lab", label: "エディタ比較", icon: FlaskConical },
+    ],
   },
 ];
 
@@ -46,6 +54,20 @@ export function AppShell({ children }: { children: ReactNode }) {
           </div>
         </div>
         <nav className="flex-1 px-2 ds-stack !gap-4">
+          <NavLink
+            to="/life"
+            className={({ isActive }) =>
+              clsx(
+                "ds-row flex items-center gap-2 px-2 rounded-md text-sm",
+                isActive
+                  ? "bg-brand-muted text-accent-foreground font-semibold"
+                  : "text-brand hover:bg-accent/60 font-medium",
+              )
+            }
+          >
+            <Sparkles size={16} />
+            人生でやりたいこと
+          </NavLink>
           {nav.map((g) => (
             <div key={g.group}>
               <div className="px-2 pb-1 text-[10px] uppercase tracking-[0.12em] text-muted-foreground">
@@ -80,6 +102,7 @@ export function AppShell({ children }: { children: ReactNode }) {
         </footer>
       </aside>
       <main className="ds-page min-w-0">{children}</main>
+      <FloatingMemoButton />
     </div>
   );
 }

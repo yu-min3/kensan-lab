@@ -3,6 +3,7 @@ package tasks
 import (
 	"errors"
 	"fmt"
+	"strconv"
 	"strings"
 	"time"
 
@@ -12,22 +13,15 @@ import (
 // ErrLineMismatch は指定行の内容が期待と異なる場合（他クライアントが先に編集した）。
 var ErrLineMismatch = errors.New("line content mismatch (file changed by another client?)")
 
-// Dest はタスク行の移動先。かんばんの列に対応する。
+// Dest はタスク行の移動先。今は完了タスクの daily 退避（/reflection）にのみ使う。
+// 今日やる ⇄ ストックは「場所の移動」ではなく @today タグの切替（SetToday）で表現する。
 type Dest struct {
-	Kind    string // today | stock | daily
-	Project string // Kind=stock のとき必須
-	Date    time.Time
+	Kind string // daily
+	Date time.Time
 }
 
 func (d Dest) resolve() (file, section string, err error) {
 	switch d.Kind {
-	case "today":
-		return "todo.md", "Now", nil
-	case "stock":
-		if d.Project == "" {
-			return "", "", errors.New("project is required for dest=stock")
-		}
-		return fmt.Sprintf("projects/%s/README.md", d.Project), "タスク", nil
 	case "daily":
 		t := d.Date
 		if t.IsZero() {
@@ -127,8 +121,335 @@ func Move(ws *workspace.Workspace, file string, line int, expectText string, des
 	m := checkboxRe.FindStringSubmatch(taskLine)
 	return Task{
 		Text: strings.TrimSpace(m[2]), State: stateOf(m[1]),
-		File: destFile, Line: newLine, Project: dest.Project, Section: destSection,
+		File: destFile, Line: newLine, Section: destSection,
 	}, nil
+}
+
+// SetToday は行の @today タグを付け外しする（今日やる ⇄ ストックの切替）。
+// 行はその場（= project ファイル）で書き換わるので project 紐付きは保たれる。
+func SetToday(ws *workspace.Workspace, file string, line int, expectText string, on bool) (Task, error) {
+	var out Task
+	err := ws.Mutate(file, func(content []byte, exists bool) ([]byte, error) {
+		if !exists {
+			return nil, fmt.Errorf("file not found: %s", file)
+		}
+		lines := strings.Split(string(content), "\n")
+		if line < 1 || line > len(lines) {
+			return nil, fmt.Errorf("%w: line %d out of range", ErrLineMismatch, line)
+		}
+		m := checkboxRe.FindStringSubmatch(lines[line-1])
+		if m == nil || strings.TrimSpace(m[2]) != strings.TrimSpace(expectText) {
+			return nil, fmt.Errorf("%w: %s:%d", ErrLineMismatch, file, line)
+		}
+		newText := toggleToday(strings.TrimSpace(m[2]), on)
+		out = rewriteLine(lines, line, m[1], newText, file)
+		return []byte(workspaceTouch(strings.Join(lines, "\n"))), nil
+	})
+	return out, err
+}
+
+// projectTarget は project 名から書き込み先（ファイル, セクション）を返す。
+// project が空なら todo.md ## Now（project 外の即席 today）。
+func projectTarget(project string) (file, section string) {
+	if project == "" {
+		return "todo.md", "Now"
+	}
+	return fmt.Sprintf("projects/%s/README.md", project), "タスク"
+}
+
+// buildBody は表示テキストに行内タグを固定順で付けた「- [mark] 」以降の本文を作る。
+func buildBody(display string, today bool, due, ms, pTag string) string {
+	parts := []string{strings.TrimSpace(display)}
+	if today {
+		parts = append(parts, "@today")
+	}
+	if due != "" {
+		parts = append(parts, "@due("+due+")")
+	}
+	if ms != "" {
+		parts = append(parts, "@ms("+ms+")")
+	}
+	if pTag != "" {
+		parts = append(parts, pTag) // pTag は "@p(1000)" 形式
+	}
+	return strings.Join(parts, " ")
+}
+
+func taskFromBody(mark, body, file string, line int, project string) Task {
+	tg := parseInline(body)
+	return Task{
+		Text: body, Display: tg.Display, State: stateOf(mark), File: file, Line: line, Project: project,
+		Today: tg.Today, Due: tg.Due, Milestone: tg.Milestone, Priority: tg.Priority,
+	}
+}
+
+// AddLine は file の指定セクション末尾にチェックボックス行を 1 件追加する（マイルストーン追加など）。
+func AddLine(ws *workspace.Workspace, file, section, display string) (Task, error) {
+	if strings.TrimSpace(display) == "" {
+		return Task{}, fmt.Errorf("display must not be empty")
+	}
+	body := strings.TrimSpace(display)
+	var out Task
+	err := ws.Mutate(file, func(content []byte, exists bool) ([]byte, error) {
+		if !exists {
+			return nil, fmt.Errorf("file not found: %s", file)
+		}
+		text, ln := insertIntoSection(string(content), section, "- [ ] "+body)
+		out = taskFromBody(" ", body, file, ln, "")
+		return []byte(workspaceTouch(text)), nil
+	})
+	return out, err
+}
+
+// CreateTask は project（空なら todo.md ## Now）にタスクを 1 件追加する。
+func CreateTask(ws *workspace.Workspace, project, display string, today bool, due, ms string) (Task, error) {
+	if strings.TrimSpace(display) == "" {
+		return Task{}, fmt.Errorf("display must not be empty")
+	}
+	destFile, destSection := projectTarget(project)
+	body := buildBody(display, today, due, ms, "")
+	var out Task
+	err := ws.Mutate(destFile, func(content []byte, exists bool) ([]byte, error) {
+		if !exists {
+			return nil, fmt.Errorf("destination not found: %s", destFile)
+		}
+		text, ln := insertIntoSection(string(content), destSection, "- [ ] "+body)
+		out = taskFromBody(" ", body, destFile, ln, project)
+		return []byte(workspaceTouch(text)), nil
+	})
+	return out, err
+}
+
+// EditTask はタスクを編集する。project が変わる場合はファイル間移動になる。
+// 既存の @p（優先度）は引き継ぐ。本文・@today・@due・@ms はフォームの値で置換。
+func EditTask(ws *workspace.Workspace, file string, line int, expectText, project, display string, today bool, due, ms string) (Task, error) {
+	if strings.TrimSpace(display) == "" {
+		return Task{}, fmt.Errorf("display must not be empty")
+	}
+	destFile, destSection := projectTarget(project)
+
+	// 同一ファイル: その場で書き換え
+	if destFile == file {
+		var out Task
+		err := ws.Mutate(file, func(content []byte, exists bool) ([]byte, error) {
+			if !exists {
+				return nil, fmt.Errorf("file not found: %s", file)
+			}
+			lines := strings.Split(string(content), "\n")
+			if line < 1 || line > len(lines) {
+				return nil, fmt.Errorf("%w: line %d out of range", ErrLineMismatch, line)
+			}
+			m := checkboxRe.FindStringSubmatch(lines[line-1])
+			if m == nil || strings.TrimSpace(m[2]) != strings.TrimSpace(expectText) {
+				return nil, fmt.Errorf("%w: %s:%d", ErrLineMismatch, file, line)
+			}
+			body := buildBody(display, today, due, ms, pRe.FindString(strings.TrimSpace(m[2])))
+			out = rewriteLine(lines, line, m[1], body, file)
+			out.Project = project
+			return []byte(workspaceTouch(strings.Join(lines, "\n"))), nil
+		})
+		return out, err
+	}
+
+	// project 変更: 移動元から削除 → 移動先へ挿入（@p 引き継ぎ）
+	var body, mark string
+	err := ws.Mutate(file, func(content []byte, exists bool) ([]byte, error) {
+		if !exists {
+			return nil, fmt.Errorf("source not found: %s", file)
+		}
+		lines := strings.Split(string(content), "\n")
+		if line < 1 || line > len(lines) {
+			return nil, fmt.Errorf("%w: line %d out of range", ErrLineMismatch, line)
+		}
+		m := checkboxRe.FindStringSubmatch(lines[line-1])
+		if m == nil || strings.TrimSpace(m[2]) != strings.TrimSpace(expectText) {
+			return nil, fmt.Errorf("%w: %s:%d", ErrLineMismatch, file, line)
+		}
+		mark = m[1]
+		body = buildBody(display, today, due, ms, pRe.FindString(strings.TrimSpace(m[2])))
+		out := append(lines[:line-1:line-1], lines[line:]...)
+		return []byte(workspaceTouch(strings.Join(out, "\n"))), nil
+	})
+	if err != nil {
+		return Task{}, err
+	}
+	newLineText := "- [" + mark + "] " + body
+	var newLine int
+	err = ws.Mutate(destFile, func(content []byte, exists bool) ([]byte, error) {
+		if !exists {
+			return nil, fmt.Errorf("destination not found: %s", destFile)
+		}
+		text, ln := insertIntoSection(string(content), destSection, newLineText)
+		newLine = ln
+		return []byte(workspaceTouch(text)), nil
+	})
+	if err != nil {
+		// 挿入失敗時は移動元へ復元（行消失を防ぐ）
+		_ = ws.Mutate(file, func(content []byte, exists bool) ([]byte, error) {
+			if !exists {
+				return nil, nil
+			}
+			return []byte(strings.TrimRight(string(content), "\n") + "\n" + newLineText + "\n"), nil
+		})
+		return Task{}, err
+	}
+	return taskFromBody(mark, body, destFile, newLine, project), nil
+}
+
+// SetText はタスクの表示テキストを書き換える（インライン編集）。
+// 行内タグ（@today/@due/@ms/@p）は維持し、本文だけ差し替える。
+func SetText(ws *workspace.Workspace, file string, line int, expectText, newDisplay string) (Task, error) {
+	var out Task
+	err := ws.Mutate(file, func(content []byte, exists bool) ([]byte, error) {
+		if !exists {
+			return nil, fmt.Errorf("file not found: %s", file)
+		}
+		lines := strings.Split(string(content), "\n")
+		if line < 1 || line > len(lines) {
+			return nil, fmt.Errorf("%w: line %d out of range", ErrLineMismatch, line)
+		}
+		m := checkboxRe.FindStringSubmatch(lines[line-1])
+		if m == nil || strings.TrimSpace(m[2]) != strings.TrimSpace(expectText) {
+			return nil, fmt.Errorf("%w: %s:%d", ErrLineMismatch, file, line)
+		}
+		nd := strings.TrimSpace(newDisplay)
+		if nd == "" {
+			return nil, fmt.Errorf("display must not be empty")
+		}
+		if suffix := tagSuffix(strings.TrimSpace(m[2])); suffix != "" {
+			nd += " " + suffix
+		}
+		out = rewriteLine(lines, line, m[1], nd, file)
+		return []byte(workspaceTouch(strings.Join(lines, "\n"))), nil
+	})
+	return out, err
+}
+
+// tagSuffix は行テキストに含まれる行内タグを固定順（today→due→ms→p）で 1 文字列にまとめる。
+func tagSuffix(raw string) string {
+	var parts []string
+	if todayRe.MatchString(raw) {
+		parts = append(parts, "@today")
+	}
+	if s := dueRe.FindString(raw); s != "" {
+		parts = append(parts, s)
+	}
+	if s := msRe.FindString(raw); s != "" {
+		parts = append(parts, s)
+	}
+	if s := pRe.FindString(raw); s != "" {
+		parts = append(parts, s)
+	}
+	return strings.Join(parts, " ")
+}
+
+// SetDue は行の @due(YYYY-MM-DD) タグを設定する（空文字で除去）。
+func SetDue(ws *workspace.Workspace, file string, line int, expectText, due string) (Task, error) {
+	var out Task
+	err := ws.Mutate(file, func(content []byte, exists bool) ([]byte, error) {
+		if !exists {
+			return nil, fmt.Errorf("file not found: %s", file)
+		}
+		lines := strings.Split(string(content), "\n")
+		if line < 1 || line > len(lines) {
+			return nil, fmt.Errorf("%w: line %d out of range", ErrLineMismatch, line)
+		}
+		m := checkboxRe.FindStringSubmatch(lines[line-1])
+		if m == nil || strings.TrimSpace(m[2]) != strings.TrimSpace(expectText) {
+			return nil, fmt.Errorf("%w: %s:%d", ErrLineMismatch, file, line)
+		}
+		out = rewriteLine(lines, line, m[1], setDueTag(strings.TrimSpace(m[2]), due), file)
+		return []byte(workspaceTouch(strings.Join(lines, "\n"))), nil
+	})
+	return out, err
+}
+
+// setDueTag は行テキストの @due(...) を差し替える（空文字で除去）。タグは行末に置く。
+func setDueTag(text, due string) string {
+	t := dueRe.ReplaceAllString(text, "")
+	t = strings.TrimSpace(multiSpace.ReplaceAllString(t, " "))
+	if due != "" {
+		return t + " @due(" + due + ")"
+	}
+	return t
+}
+
+// SetPriority は行の @p(N) タグを設定する（n<=0 で除去）。ストックの並べ替えに使う。
+func SetPriority(ws *workspace.Workspace, file string, line int, expectText string, n int) (Task, error) {
+	var out Task
+	err := ws.Mutate(file, func(content []byte, exists bool) ([]byte, error) {
+		if !exists {
+			return nil, fmt.Errorf("file not found: %s", file)
+		}
+		lines := strings.Split(string(content), "\n")
+		if line < 1 || line > len(lines) {
+			return nil, fmt.Errorf("%w: line %d out of range", ErrLineMismatch, line)
+		}
+		m := checkboxRe.FindStringSubmatch(lines[line-1])
+		if m == nil || strings.TrimSpace(m[2]) != strings.TrimSpace(expectText) {
+			return nil, fmt.Errorf("%w: %s:%d", ErrLineMismatch, file, line)
+		}
+		out = rewriteLine(lines, line, m[1], setPriorityTag(strings.TrimSpace(m[2]), n), file)
+		return []byte(workspaceTouch(strings.Join(lines, "\n"))), nil
+	})
+	return out, err
+}
+
+// rewriteLine は line 行目を「- [mark] newText」で書き換え、解析済み Task を返す。
+func rewriteLine(lines []string, line int, mark, newText, file string) Task {
+	indent := lines[line-1][:strings.Index(lines[line-1], "- [")]
+	lines[line-1] = indent + "- [" + mark + "] " + newText
+	tg := parseInline(newText)
+	return Task{
+		Text: newText, Display: tg.Display, State: stateOf(mark), File: file, Line: line,
+		Today: tg.Today, Due: tg.Due, Milestone: tg.Milestone, Priority: tg.Priority,
+	}
+}
+
+// toggleToday は行テキストの末尾の @today を付け外しする。
+func toggleToday(text string, on bool) string {
+	has := todayRe.MatchString(text)
+	if on {
+		if has {
+			return text
+		}
+		return strings.TrimRight(text, " ") + " @today"
+	}
+	if !has {
+		return text
+	}
+	t := todayRe.ReplaceAllString(text, "")
+	return strings.TrimSpace(multiSpace.ReplaceAllString(t, " "))
+}
+
+// setPriorityTag は行テキストの @p(N) を差し替える（n<=0 で除去）。タグは行末に置く。
+func setPriorityTag(text string, n int) string {
+	t := pRe.ReplaceAllString(text, "")
+	t = strings.TrimSpace(multiSpace.ReplaceAllString(t, " "))
+	if n > 0 {
+		return t + " @p(" + strconv.Itoa(n) + ")"
+	}
+	return t
+}
+
+// DeleteLine はチェックボックス行を 1 行削除する（楽観ロック付き）。
+func DeleteLine(ws *workspace.Workspace, file string, line int, expectText string) error {
+	return ws.Mutate(file, func(content []byte, exists bool) ([]byte, error) {
+		if !exists {
+			return nil, fmt.Errorf("file not found: %s", file)
+		}
+		lines := strings.Split(string(content), "\n")
+		if line < 1 || line > len(lines) {
+			return nil, fmt.Errorf("%w: line %d out of range", ErrLineMismatch, line)
+		}
+		m := checkboxRe.FindStringSubmatch(lines[line-1])
+		if m == nil || strings.TrimSpace(m[2]) != strings.TrimSpace(expectText) {
+			return nil, fmt.Errorf("%w: %s:%d", ErrLineMismatch, file, line)
+		}
+		// full slice expression で元 slice の clobber を防ぐ
+		out := append(lines[:line-1:line-1], lines[line:]...)
+		return []byte(workspaceTouch(strings.Join(out, "\n"))), nil
+	})
 }
 
 // SetState はチェックボックスの状態を書き換える（todo / done / skipped）。

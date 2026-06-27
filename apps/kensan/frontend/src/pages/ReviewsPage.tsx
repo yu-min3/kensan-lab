@@ -19,6 +19,28 @@ const KIND_LABEL: Record<ReviewEntry["kind"], string> = {
   other: "他",
 };
 
+// ファイル名（W24.html / 14.html / 04-monthly.md）を人が読める表示にする。
+// 年・月日は path から拾う（日次の "14.html" だけでは何月か分からないため）。
+function reviewLabel(r: ReviewEntry): string {
+  const bare = r.name.replace(/\.[^.]+$/, "");
+  const year = r.path.match(/(?:^|\/)(\d{4})(?:\/|$)/)?.[1];
+  if (r.kind === "weekly") {
+    const w = bare.match(/W0*(\d+)/i)?.[1];
+    return w ? `${year ? `${year} ` : ""}第${w}週` : bare;
+  }
+  if (r.kind === "monthly") {
+    const mo = bare.match(/0*(\d{1,2})-monthly/)?.[1];
+    return mo ? `${year ? `${year}年` : ""}${mo}月` : bare;
+  }
+  if (r.kind === "daily") {
+    const md = r.path.match(/(\d{4})\/(\d{2})\/(\d{2})/);
+    if (md) return `${Number(md[2])}/${Number(md[3])}`;
+    const d = bare.match(/0*(\d{1,2})/)?.[1];
+    return d ? `${d}日` : bare;
+  }
+  return bare;
+}
+
 export function ReviewsPage() {
   const [params, setParams] = useSearchParams();
   const selected = params.get("path");
@@ -56,7 +78,7 @@ export function ReviewsPage() {
                       )}
                     >
                       <Badge variant={r.kind === "weekly" ? "brand" : "muted"}>{KIND_LABEL[r.kind]}</Badge>
-                      <span className="flex-1 truncate font-mono tnum text-xs">{r.name}</span>
+                      <span className="flex-1 truncate text-sm" title={r.name}>{reviewLabel(r)}</span>
                     </button>
                   </li>
                 ))}

@@ -19,12 +19,17 @@ export interface Doc {
 }
 
 export interface Task {
-  text: string;
+  text: string; // 行内タグ込みの生テキスト（state/today/archive の照合に使う）
+  display: string; // タグを除いた表示用テキスト
   state: "todo" | "done" | "skipped";
   file: string;
   line: number;
   project?: string;
   section?: string;
+  today: boolean; // @today
+  due?: string; // @due(YYYY-MM-DD)
+  milestone?: string; // @ms(slug)
+  priority?: number; // @p(N)（小さいほど上。0/未指定は末尾）
 }
 
 export interface Board {
@@ -32,6 +37,62 @@ export interface Board {
   stock: Task[] | null;
   someday: Task[] | null;
   milestones: Task[] | null;
+}
+
+export interface Focus {
+  title: string;
+  detail: string;
+}
+
+export interface Goals {
+  northStar: string;
+  focus: Focus[] | null;
+}
+
+export interface TaskSaveInput {
+  file?: string; // 編集時の locator（作成時は省略）
+  line?: number;
+  text?: string;
+  project: string; // "" = todo.md ## Now（今日やる・project 外）
+  display: string;
+  today: boolean;
+  due: string; // "" = なし
+  milestone: string; // "" = なし
+}
+
+export interface ProjectSummary {
+  name: string;
+  status: string;
+  deadline?: string;
+  goal: string;
+  milestonesDone: number;
+  milestonesTotal: number;
+  openTasks: number;
+}
+
+export interface LogEntry {
+  date?: string;
+  text: string;
+}
+
+export interface NoteRef {
+  group?: string;
+  target?: string; // app で開ける .md パス。無ければ外部テキスト
+  label: string;
+  desc?: string;
+}
+
+export interface ProjectDetail {
+  name: string;
+  status: string;
+  deadline?: string;
+  repo?: string;
+  overview: string;
+  goal: string;
+  milestones: Task[] | null;
+  tasks: Task[] | null;
+  log: LogEntry[] | null;
+  notes: NoteRef[] | null;
 }
 
 export class ApiError extends Error {
@@ -77,16 +138,81 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 export const api = {
   board: () => request<Board>("/tasks"),
 
+  goals: () => request<Goals>("/goals"),
+
   setTaskState: (t: Task, state: Task["state"]) =>
     request<{ task: Task }>("/tasks", {
       method: "PATCH",
       body: JSON.stringify({ file: t.file, line: t.line, text: t.text, state }),
     }),
 
-  moveTask: (t: Task, to: "today" | "stock" | "daily", project?: string) =>
+  // 今日やる ⇄ ストックは @today タグの切替（行はその場 = project ファイルのまま）
+  setToday: (t: Task, on: boolean) =>
+    request<{ task: Task }>("/tasks/today", {
+      method: "POST",
+      body: JSON.stringify({ file: t.file, line: t.line, text: t.text, on }),
+    }),
+
+  // 完了タスクを daily へ退避（/reflection 相当）
+  archiveToDaily: (t: Task) =>
     request<{ task: Task }>("/tasks/move", {
       method: "POST",
-      body: JSON.stringify({ file: t.file, line: t.line, text: t.text, to, project }),
+      body: JSON.stringify({ file: t.file, line: t.line, text: t.text }),
+    }),
+
+  // プロジェクト一覧（サマリ: status/締切/目標/進捗）
+  projects: () => request<{ projects: ProjectSummary[] | null }>("/projects"),
+
+  // プロジェクト詳細（目標/マイルストーン/タスク/ログ/関連ノート）
+  projectDetail: (name: string) => request<ProjectDetail>(`/projects/${encodeURIComponent(name)}`),
+
+  // 行の @due(YYYY-MM-DD) を設定（空文字で除去）
+  setDue: (t: Task, due: string) =>
+    request<{ task: Task }>("/tasks/due", { method: "POST", body: JSON.stringify({ file: t.file, line: t.line, text: t.text, due }) }),
+
+  // 指定セクション末尾にチェックボックス行を追加（マイルストーン追加など）
+  addLine: (file: string, section: string, display: string) =>
+    request<{ task: Task }>("/tasks/add", { method: "POST", body: JSON.stringify({ file, section, display }) }),
+
+  // プロジェクトのメタ更新（status / deadline / goal）
+  updateProject: (name: string, input: { status: string; deadline: string; goal: string }) =>
+    request<ProjectDetail>(`/projects/${encodeURIComponent(name)}`, { method: "PATCH", body: JSON.stringify(input) }),
+
+  // 新規プロジェクト作成（テンプレート付き）
+  createProject: (name: string) =>
+    request<{ name: string }>("/projects", { method: "POST", body: JSON.stringify({ name }) }),
+
+  // タスクの作成・編集（共通）。locator（file/line/text）があれば編集、無ければ作成。
+  // project を変えると編集はファイル間移動になる。
+  saveTask: (input: TaskSaveInput) =>
+    request<{ task: Task }>("/tasks/save", { method: "POST", body: JSON.stringify(input) }),
+
+  // タスク本文のインライン編集（行内タグは維持）
+  setText: (t: Task, display: string) =>
+    request<{ task: Task }>("/tasks/text", {
+      method: "POST",
+      body: JSON.stringify({ file: t.file, line: t.line, text: t.text, display }),
+    }),
+
+  // タスク行を削除
+  deleteTask: (t: Task) =>
+    request<{ status: string }>("/tasks/delete", {
+      method: "POST",
+      body: JSON.stringify({ file: t.file, line: t.line, text: t.text }),
+    }),
+
+  // ストックの 1 タスクに @p(N) を設定（ドラッグ並べ替えの 1 手）
+  setPriority: (t: Task, priority: number) =>
+    request<{ task: Task }>("/tasks/priority", {
+      method: "POST",
+      body: JSON.stringify({ file: t.file, line: t.line, text: t.text, priority }),
+    }),
+
+  // ストック全体の @p(N) 一括再採番（中間値の隙間が尽きたときのフォールバック）
+  reorderTasks: (items: { file: string; line: number; text: string; priority: number }[]) =>
+    request<{ status: string }>("/tasks/reorder", {
+      method: "POST",
+      body: JSON.stringify({ items }),
     }),
 
   daily: (date?: string) =>
@@ -125,7 +251,22 @@ export const api = {
     ),
 
   reviews: () => request<{ reviews: ReviewEntry[]; total: number }>("/reviews"),
+
+  // git 履歴（読み取り専用）。コミット一覧（新しい順）。
+  history: (path: string) =>
+    request<{ commits: Commit[] }>(`/history/${encodeURI(path)}`),
+
+  // 指定コミット時点のファイル内容。
+  historyAt: (path: string, rev: string) =>
+    request<{ rev: string; content: string }>(`/history/${encodeURI(path)}?rev=${rev}`),
 };
+
+export interface Commit {
+  hash: string;
+  short: string;
+  date: string; // RFC3339（author date）
+  subject: string;
+}
 
 export interface SearchHit {
   path: string;

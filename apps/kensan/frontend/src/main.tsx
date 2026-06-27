@@ -7,8 +7,11 @@ import { Dashboard } from "./pages/Dashboard";
 import { DailyPage } from "./pages/DailyPage";
 import { MemoPage } from "./pages/MemoPage";
 import { TasksPage } from "./pages/TasksPage";
+import { ProjectsPage } from "./pages/ProjectsPage";
 import { ReviewsPage } from "./pages/ReviewsPage";
 import { NotesPage } from "./pages/NotesPage";
+import { LifeGoalsPage } from "./pages/LifeGoalsPage";
+import { EditorLabPage } from "./pages/EditorLabPage";
 import "./index.css";
 
 const queryClient = new QueryClient({
@@ -25,10 +28,13 @@ createRoot(document.getElementById("root")!).render(
           <Routes>
             <Route path="/" element={<Dashboard />} />
             <Route path="/tasks" element={<TasksPage />} />
+            <Route path="/projects" element={<ProjectsPage />} />
             <Route path="/daily" element={<DailyPage />} />
             <Route path="/memos" element={<MemoPage />} />
             <Route path="/notes" element={<NotesPage />} />
+            <Route path="/life" element={<LifeGoalsPage />} />
             <Route path="/reviews" element={<ReviewsPage />} />
+            <Route path="/editor-lab" element={<EditorLabPage />} />
           </Routes>
         </AppShell>
       </BrowserRouter>
