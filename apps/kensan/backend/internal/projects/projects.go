@@ -64,6 +64,10 @@ type Detail struct {
 }
 
 func readme(root, name string) (string, error) {
+	// name は GET 詳細でユーザ入力になり得るため検証（path traversal の defense-in-depth）
+	if !nameRe.MatchString(name) {
+		return "", fmt.Errorf("invalid project name: %q", name)
+	}
 	b, err := os.ReadFile(filepath.Join(root, "projects", name, "README.md"))
 	return string(b), err
 }

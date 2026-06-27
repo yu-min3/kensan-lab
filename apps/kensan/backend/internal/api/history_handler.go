@@ -17,6 +17,10 @@ var revRe = regexp.MustCompile(`^[0-9a-fA-F]{7,40}$`)
 // アプリは git に書き込まない（commit は通常の作業フロー）。ここは読むだけ。
 func (s *Server) handleHistory(w http.ResponseWriter, r *http.Request) {
 	rel := r.PathValue("path")
+	if rel == "" {
+		writeError(w, http.StatusBadRequest, "path is required")
+		return
+	}
 	if _, err := s.ws.Abs(rel); err != nil {
 		writeError(w, http.StatusBadRequest, "invalid path: "+rel)
 		return

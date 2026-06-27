@@ -13,8 +13,18 @@ export function MilkdownEditor({ defaultValue, onChange }: { defaultValue: strin
   useEffect(() => {
     if (!ref.current) return;
     const crepe = new Crepe({ root: ref.current, defaultValue });
+    // Crepe は create 時に正規化済みの初回 markdownUpdated を発火する。これを onChange に
+    // 流すと「開いただけ」で dirty 判定 → 自動保存が走り本文がリフォーマットされ得る
+    // （git で版管理する文書では特に困る）。初回 1 回だけスキップする。
+    let initialEmit = true;
     crepe.on((listener) => {
-      listener.markdownUpdated((_ctx, markdown) => cbRef.current?.(markdown));
+      listener.markdownUpdated((_ctx, markdown) => {
+        if (initialEmit) {
+          initialEmit = false;
+          return;
+        }
+        cbRef.current?.(markdown);
+      });
     });
     crepe.create();
     return () => {
