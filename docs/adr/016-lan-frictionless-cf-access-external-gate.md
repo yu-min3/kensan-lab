@@ -1,13 +1,21 @@
-# ADR-016: LAN-Frictionless Sessions + Cloudflare Access as the External Gate
+# ADR-016: LAN-Frictionless Sessions + External-Gate Model (gate decision deferred)
 
 ## Status
 
-Accepted
+**Accepted in part.**
+
+- **Decided & shipping (PR #390):** the inner identity session is extended to 30 days so the LAN
+  is frictionless (log in once per device, then stay signed in).
+- **Deferred:** the *external-gate model* — whether internet traffic is controlled by Cloudflare
+  Access or simply passes through to the internal Gateway's Keycloak auth. See "Deferred decision".
+- **Interim state (safe):** Cloudflare Access is already configured with **OTP** in front of
+  `*.yu-mins.com`. That remains a genuine second factor, so external access is protected while the
+  model decision is open.
 
 > Builds on [ADR-010](010-istio-native-oauth2-absent.md) (oauth2-proxy as the Gateway-level
 > `ext_authz` OIDC front). This ADR does not change *how* identity is established inside the
-> cluster — it changes *how often* a user must re-authenticate, and adds an outer gate for
-> traffic that originates outside the LAN.
+> cluster — it changes *how often* a user must re-authenticate, and frames how external traffic is
+> gated.
 
 ## Date
 
@@ -23,35 +31,21 @@ Platform UIs are reachable by two ingress paths that land on the same Istio Gate
 | **LAN** | `*.platform.yu-min3.com` | Cilium L2 LoadBalancer (`.242`) |
 | **External** | `*.yu-mins.com` | Cloudflare Tunnel (`cloudflared`, outbound-only) |
 
-Today both paths are gated identically: the `gateway-platform` `AuthorizationPolicy` (CUSTOM)
-forces every host through oauth2-proxy `ext_authz`, and the oauth2-proxy session is pinned to
-**12h** (`cookie_expire = "12h"`, deliberately matched to Keycloak's `SSO Session Max = 12h`).
+Today both paths are gated identically by oauth2-proxy `ext_authz`, and the oauth2-proxy session is
+pinned to **12h** (`cookie_expire = "12h"`, deliberately matched to Keycloak `SSO Session Max = 12h`).
 
 Two problems with treating both paths the same:
 
-1. **LAN is needlessly high-friction.** On a trusted home network, being bounced to a login
-   every 12h adds friction with little security benefit — the threat model on the LAN is "a
-   device already inside the house", not "an anonymous internet client".
-2. **External is *not* stricter than LAN**, even though it should be. Internet exposure wants a
-   harder gate (re-auth cadence, MFA, edge bot/DDoS filtering) that a 12h cookie does not provide.
+1. **LAN is needlessly high-friction.** On a trusted home network, a forced login every 12h adds
+   friction with little benefit — the LAN threat model is "a device already inside the house".
+2. **External is not meaningfully stricter than LAN**, even though internet exposure warrants a
+   harder gate.
 
 ### The core tension
 
-The naive framing is "no auth on LAN, auth on external". But **"no auth" and "know who the user
-is" are contradictory** — identity *requires* authentication. The real lever is therefore not
-auth on/off but **session lifetime + step-up**:
-
-- LAN → authenticate **once per device**, then a long-lived (effectively permanent) session →
-  frictionless *and* identified.
-- External → a separate, shorter outer gate that re-challenges independently of the inner session.
-
-### Why the double-prompt happens today (and how to avoid it)
-
-External users currently meet **two separate identity providers**: Cloudflare Access (OTP) and
-then oauth2-proxy (Keycloak). Two IdPs ⇒ two logins. The fix is to **unify the IdP on Keycloak**:
-point Cloudflare Access's login method at Keycloak via OIDC instead of OTP. Then the user enters
-credentials once (at the CF Access → Keycloak hop); when oauth2-proxy subsequently redirects to
-Keycloak, the Keycloak SSO session already exists and the second hop is a **silent redirect**.
+"No auth on LAN" and "still know who the user is" are contradictory — identity *requires*
+authentication. The real lever is **session lifetime + step-up**, not auth on/off: LAN
+authenticates once then runs a long session; external gets a separate, shorter challenge.
 
 ### Constraint discovered in the existing config
 
@@ -60,44 +54,59 @@ Keycloak, the Keycloak SSO session already exists and the second hop is a **sile
 proxy is needed. But `cookie_expire` is **global** — one instance cannot give the LAN domain a
 longer cookie than the external domain. And oauth2-proxy can only keep a session alive as long as
 **Keycloak's refresh token / `SSO Session Max`** allows; the current 12h is a Keycloak-side cap,
-not just a cookie setting.
+not merely a cookie setting.
 
 ## Decision
 
-Adopt a **two-layer model**: a long-lived inner identity session (frictionless on LAN) plus an
-external-only outer gate (Cloudflare Access). Concretely:
+### Decided now (shipping)
 
-1. **Inner identity layer — oauth2-proxy session extended to 30 days.**
-   Set `cookie_expire = "720h"` with `cookie_refresh` keeping the access token fresh. This makes
-   LAN frictionless: log in once per device, stay signed in for ~30 days. A single global value is
-   acceptable because external strictness is supplied by the outer gate, not by this cookie
-   (see point 3). 30 days (not 90) is chosen as a conventional "remember-me" ceiling that still
-   bounds the blast radius of a stolen, already-unlocked LAN device.
+1. **Inner identity session → 30 days.** Set `cookie_expire = "720h"` with `cookie_refresh` keeping
+   the access token fresh. LAN becomes frictionless: one login per device, ~30 days signed in.
+   30 days (not 90) bounds the blast radius of a stolen, already-unlocked LAN device.
 
-2. **Keycloak session raised to match.** `cookie_expire` alone does not deliver 30 days — Keycloak
-   caps it. The `kensan` realm's `SSO Session Idle` / `SSO Session Max` (and refresh-token lifetime
-   for the oauth2-proxy client) must be raised to ~30 days, otherwise refresh fails and the user is
-   bounced regardless of the cookie. **This is configured in the Keycloak admin console, not in
+2. **Keycloak session must be raised to match (follow-up).** `cookie_expire` alone does not deliver
+   30 days — Keycloak caps it. The `kensan` realm's `SSO Session Idle` / `SSO Session Max` (and the
+   oauth2-proxy client's refresh-token lifetime) must be raised to ~30 days. **Until then the 720h
+   cookie simply degrades to the effective Keycloak max (12h) — no regression**, just the LAN-
+   frictionless benefit isn't active yet. This is configured in the Keycloak admin console, **not in
    Git** (the realm is not yet managed as code) — a drift surface, tracked as a follow-up.
 
-3. **External outer gate — Cloudflare Access in front of `*.yu-mins.com`.**
-   Because external traffic *only* exists on the Cloudflare Tunnel path, putting an Access
-   application on `*.yu-mins.com` automatically makes "external" the stricter path with **no
-   per-source logic in Istio**. The LAN path never traverses Cloudflare. Access session TTL is set
-   to **24h** and may enforce MFA. The 30-day inner cookie does not weaken external posture: CF
-   Access re-challenges every 24h independently, so external re-auth cadence = 24h.
-
-4. **Single IdP — Cloudflare Access logs in via Keycloak (OIDC), not OTP.** This eliminates the
-   double prompt (the second hop becomes a silent SSO redirect) and keeps **one user store** in
-   Keycloak. User management — who may access externally — is expressed as Keycloak users/groups,
-   surfaced to CF Access through the OIDC claims.
-
-5. **Inner authz unchanged.** oauth2-proxy remains the single source of in-cluster identity
+3. **Inner authz unchanged.** oauth2-proxy stays the single source of in-cluster identity
    (`Authorization: Bearer <id_token>` + `X-Auth-Request-*`), so existing `AuthorizationPolicy`
-   `when claims[groups]` rules and app-side header trust are untouched. We deliberately **keep**
-   oauth2-proxy on the external (`*.yu-mins.com`) hosts rather than dropping it in favour of
-   verifying the CF Access JWT — that alternative would introduce a second identity-token shape and
-   force per-host authz/plumbing changes (see Alternatives).
+   `when claims[groups]` rules and app header-trust are untouched.
+
+### Deferred decision — the external-gate model
+
+How internet traffic (`*.yu-mins.com`) is gated is **left open**. The honest framing:
+**DDoS absorption and TLS termination come from the Cloudflare Tunnel and are identical in all
+options below** — they are not a differentiator. The options:
+
+| Option | External auth | CF Access role | Trade-off |
+|---|---|---|---|
+| **A. Keep CF Access OTP** *(current)* | CF Access OTP **+** Keycloak at gateway | Independent **2nd factor** (different IdP) | Real 2FA; **double prompt** (UX cost) |
+| **B. CF Access → Keycloak OIDC** | Keycloak (once), silent 2nd hop | **Edge gate, not a 2nd factor** | Single prompt; value = attack-surface defense-in-depth + a separate external 24h re-auth cadence |
+| **C. Pass-through (drop CF Access)** | Keycloak at gateway only | none | Simplest; **functionally equivalent auth** + same DDoS/TLS; loses defense-in-depth and the separate external cadence; exposes the gateway auth layer to anonymous internet traffic |
+
+**What actually separates B from C** (both authenticate via the same Keycloak):
+
+- **Attack surface / defense-in-depth.** With Access, unauthenticated requests die at Cloudflare's
+  edge and never enter the Tunnel; with pass-through they reach the in-cluster Gateway / Envoy /
+  oauth2-proxy before being bounced. App backends are not anonymously reachable either way (assuming
+  `ext_authz` is correctly applied to every route), and Keycloak's login page is exposed in both
+  (it is the IdP). So the protected delta is narrow: **a bug/0-day/misconfig in *our own* Istio /
+  oauth2-proxy / AuthorizationPolicy does not become exposure when Access fronts it.**
+- **Decoupled external re-auth cadence.** Access can force a 24h external re-challenge independent of
+  the 30-day inner cookie. A single global `cookie_expire` cannot express "external 24h, internal
+  30d"; Access is the mechanism that delivers it.
+
+The decision therefore hinges on two questions, to be answered later:
+**(a)** is a separate external 24h re-auth cadence a requirement? **(b)** how much do we want defense-
+in-depth against our own gateway-auth config? If both are "no", **C (pass-through) is the honest,
+simplest choice**. If either is "yes", keep Access (B for single-prompt UX, or A to retain an
+independent second factor).
+
+Optional refinement for whichever keeps Access: enabling **MFA in Keycloak** gives a strong single
+login (with MFA) under option B, recovering a second factor without the OTP double prompt.
 
 ## Consequences
 
@@ -105,45 +114,35 @@ external-only outer gate (Cloudflare Access). Concretely:
 
 - LAN: one login per device, then ~30 days frictionless — while every request still carries a
   Keycloak identity (groups claim intact for authz).
-- External: a genuinely stronger gate (24h re-auth + optional MFA + Cloudflare edge filtering)
-  layered *in front of* the same identity, cleanly orthogonal to the inner session.
-- No second oauth2-proxy and no Istio source-IP logic: external strictness falls out of topology
-  (CF only sits on the tunnel path).
-- One user store (Keycloak) for both the outer gate and inner identity; no split allowlists.
+- The 720h change is safe to ship independently: it degrades to the current 12h until Keycloak is
+  raised, with no regression and no dependency on the deferred gate decision.
 
 ### Trade-offs / watch-outs
 
-- **A stolen, unlocked device on the LAN stays signed in for up to 30 days.** Acceptable for a
-  homelab; revisit if the threat model changes (the lever is `cookie_expire` + Keycloak session max).
-- **Keycloak realm session settings are imperative (admin console), not GitOps.** They will drift
-  unless the realm is managed as code. Tracked as a follow-up; until then, the 30-day values live
-  only in the running Keycloak.
-- **Cloudflare Access config (application, session TTL, Keycloak OIDC IdP) is dashboard-managed**,
-  outside Git — another non-GitOps surface to document and remember.
-- Two redirect hops remain on the external path (CF Access → Keycloak, then oauth2-proxy →
-  Keycloak), but only **one** credential entry; the second hop is a silent SSO redirect.
+- A stolen, unlocked device on the LAN stays signed in up to 30 days (acceptable for a homelab; the
+  lever is `cookie_expire` + Keycloak session max).
+- **Keycloak realm session settings are imperative (admin console), not GitOps** — they will drift
+  unless the realm is managed as code. Tracked as a follow-up.
+- The external double-prompt persists while option **A (OTP)** stays in place; that is the accepted
+  interim cost of leaving the gate decision open.
 
-## Alternatives considered
+## Follow-ups
 
-### B. Drop oauth2-proxy on the external path; verify the CF Access JWT in Istio
+- [ ] **Keycloak** `kensan` realm: raise `SSO Session Idle` / `SSO Session Max` + oauth2-proxy
+  client refresh-token lifetime to ~30 days (admin console — activates the 720h cookie).
+- [ ] **Decide the external-gate model** (A / B / C above). Until decided, CF Access OTP stays
+  (already configured, safe).
+- [ ] (Stretch) Manage the Keycloak realm as code to remove the session-setting drift surface.
 
-Have Istio `RequestAuthentication` validate the `Cf-Access-Jwt-Assertion` against Cloudflare's
-JWKS and bypass oauth2-proxy for `*.yu-mins.com`. Fewer hops, but the cluster would then carry
-**two identity-token shapes** (CF JWT externally, Keycloak `id_token` internally), forcing
-per-host `AuthorizationPolicy` and app header changes. Rejected: complexity not worth it for a
-homelab whose authz is uniformly Keycloak-groups-based.
+> Note: creating a CF Access application is **not** a follow-up — Access is already configured (OTP).
 
-### C. Second oauth2-proxy instance with a shorter external cookie
+## Alternatives considered (rejected during design)
 
-Run a dedicated external oauth2-proxy with a short `cookie_expire`, selected by host. Achieves
-per-path session length without Cloudflare, but adds a proxy + ext_authz provider + policy rule and
-still lacks an edge gate (MFA, bot/DDoS filtering). Rejected in favour of CF Access doing the outer
-gate with a single inner proxy.
-
-### D. Bypass auth entirely on LAN (source-IP / hostname allow)
-
-Genuinely "no auth" on LAN — but then LAN requests carry **no identity**, breaking the "still know
-who the user is" requirement and the groups-based authz. Rejected.
+- **Second oauth2-proxy instance** with a short external cookie, selected by host — achieves per-path
+  session length without Cloudflare, but adds a proxy + ext_authz provider + policy rule and still
+  lacks an edge gate. Rejected in favour of a single inner proxy + (optional) Access as the gate.
+- **Bypass auth entirely on LAN** (source-IP / hostname allow) — genuinely "no auth", but LAN
+  requests would carry no identity, breaking groups-based authz. Rejected.
 
 ## References
 
