@@ -30,3 +30,4 @@ Each ADR follows a lightweight structure:
 | 013 | [Keycloak DB Credentials → Vault Dynamic](013-keycloak-db-credentials-vault-dynamic.md) | Accepted |
 | 014 | [Namespace Naming & Label Contract v2](014-namespace-naming-label-contract-v2.md) | Accepted |
 | 015 | [VCO + Setup-Script Hybrid](015-vco-setup-script-hybrid.md) | Accepted |
+| 016 | [LAN-Frictionless Sessions + Cloudflare Access External Gate](016-lan-frictionless-cf-access-external-gate.md) | Accepted |

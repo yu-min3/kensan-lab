@@ -208,6 +208,7 @@ nav:
       - 013 — Keycloak DB Credentials → Vault Dynamic: adr/013-keycloak-db-credentials-vault-dynamic.md
       - 014 — Namespace Naming & Label Contract v2: adr/014-namespace-naming-label-contract-v2.md
       - 015 — VCO + Setup-Script Hybrid: adr/015-vco-setup-script-hybrid.md
+      - 016 — LAN-Frictionless + Cloudflare Access Gate: adr/016-lan-frictionless-cf-access-external-gate.md
   - Incidents:
       - incidents/index.md
       - 2026-03-02 system-infra Sync Blocked: incidents/2026-03-02-system-infra-sync-blocked.md
