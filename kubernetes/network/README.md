@@ -25,8 +25,6 @@ flowchart TB
     LB --> GW[Istio Gateway<br/>gateway-platform / gateway-prod]
 
     GW -->|HTTPRoute| App[App Pod<br/>+ Istio sidecar]
-    App <-->|mTLS PERMISSIVE| App2[App Pod]
-    App <-->|policy: default-deny<br/>+ allow-intra-namespace| App3[Other ns Pod]
 
     subgraph Cilium
       LB
@@ -34,11 +32,57 @@ flowchart TB
     subgraph "Istio Mesh"
       GW
       App
-      App2
     end
 
     classDef ext fill:#f59e0b,color:#000
     class Internet,LAN,CF ext
+```
+
+到達経路はここまで。これとは別に、メッシュ全体へ 2 つの規則がかかる（次節）。
+
+## ゼロトラスト 2 層
+
+到達経路とは別に、メッシュ全体へ 2 つの規則がかかる。性質が違う軸なので分けて捉える。
+
+| 規則 | 何の話か | 横断する軸 |
+|---|---|---|
+| **default-deny** (CCNP) | 到達性（届くか） | **ns 境界** — 横断は許可制 |
+| **mTLS PERMISSIVE** | 暗号化 / identity（どう守るか） | **pod 間** — ns に依らず自動 |
+
+### default-deny ― ns 横断は許可制
+
+> 同一 ns は通る / ns 横断は許可しないと通らない。
+
+```mermaid
+flowchart LR
+    subgraph nsA["ns A"]
+        A1[Pod] <==>|"✓ 同一 ns"| A2[Pod]
+    end
+    subgraph nsB["ns B"]
+        B1[Pod]
+    end
+    A2 -->|"✗ default-deny<br/>許可が要る"| B1
+```
+
+### mTLS PERMISSIVE ― pod 間に自動
+
+> sidecar 同士は自動で mTLS。平文も受理する（＝強制はしない。STRICT なら拒否）。
+
+```mermaid
+flowchart LR
+    subgraph P1["Pod A（sidecar 注入済）"]
+        App1[app] --- SC1[istio-proxy]
+    end
+    subgraph P2["Pod B（sidecar 注入済）"]
+        SC2[istio-proxy] --- App2[app]
+    end
+    Out["mesh 外 / sidecar 無し"]
+
+    SC1 <==>|"🔒 mTLS を Istio が自動で張る<br/>（設定不要・相互認証）"| SC2
+    Out -.->|"平文も受理（PERMISSIVE）<br/>※ STRICT なら拒否"| SC2
+
+    classDef plain stroke:#6b7280,stroke-dasharray:4
+    class Out plain
 ```
 
 ## 設計の要点
