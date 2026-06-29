@@ -29,12 +29,16 @@ spec:
         - operation:
             hosts:
               - kensan-preview.app.yu-min3.com
+              - kensan.yu-mins.com # Cloudflare Tunnel 経由の外部公開。同じ platform-admin 認可を当てる
       when:
         - key: request.auth.claims[groups]
           values:
             - platform-admin
-    # それ以外の host（legacy kensan 等）は従来どおり制限なし
+    # それ以外の host（legacy kensan 等）は従来どおり制限なし。
+    # ⚠️ protected host を増やしたら必ずこの notHosts にも足すこと
+    #    （足さないと catch-all の無認証素通しに落ちて workspace が露出する）
     - to:
         - operation:
             notHosts:
               - kensan-preview.app.yu-min3.com
+              - kensan.yu-mins.com

@@ -28,6 +28,7 @@ spec:
         - operation:
             hosts:
               - kensan-preview.app.yu-min3.com
+              - kensan.yu-mins.com # Cloudflare Tunnel 経由の外部公開（gateway-prod http-tunnel listener）
             notPaths:
               - /oauth2
               - /oauth2/*

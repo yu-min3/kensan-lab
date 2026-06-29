@@ -27,6 +27,7 @@ httproute:
   # 載せ忘れた host は ext_authz を素通りして無認証で workspace が露出する。
   hostnames:
     - kensan-preview.app.yu-min3.com # Phase 7 で kensan.app.yu-min3.com を legacy から継承
+    - kensan.yu-mins.com # Cloudflare Tunnel 経由の外部公開（gateway-prod http-tunnel listener）
 # gateway 層 Keycloak SSO（ext_authz）。LAN 内でも認証必須にする
 auth:
   gatewayOAuth2:
