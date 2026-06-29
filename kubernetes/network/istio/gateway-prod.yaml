@@ -24,10 +24,27 @@ spec:
           matchLabels:
             kensan-lab.platform/environment: production
 
-  # Cloudflare Tunnel 経由の外部公開（HTTP のみ、TLS は Cloudflare Edge が終端）。
-  # Cloudflare ゾーンは yu-mins.com のみ（yu-min3.com は未登録）なので、外部公開 host は
-  # yu-mins.com 系。kensan アプリの外部 URL = kensan.yu-mins.com。
+  # HTTP:80 listener。legacy kensan が kensan.yu-min3.com をここで公開中
+  # （apps/kensan-legacy/manifests/httproute.yaml、ArgoCD app `kensan` が同期、
+  # Phase 7 cutover まで稼働維持）。Cloudflare ゾーンは yu-mins.com のみで yu-min3.com は
+  # 未登録のため、この host への外部到達は無く LAN 経由のみ。撤去は legacy cutover とセット。
   - name: http-tunnel
+    protocol: HTTP
+    port: 80
+    hostname: "kensan.yu-min3.com"
+    allowedRoutes:
+      namespaces:
+        from: Selector
+        selector:
+          matchLabels:
+            kensan-lab.platform/environment: production
+
+  # 新 kensan アプリの外部公開 host（Cloudflare Tunnel → gateway-prod, TLS は CF Edge 終端）。
+  # ⚠️ cloudflared(token tunnel, dashboard 管理) の kensan.yu-mins.com ingress は
+  #    gateway-prod(192.168.0.243):80 を向けること。platform UI の *.yu-mins.com は
+  #    gateway-platform-svc(.241) 行きなので、同じ backend に乗せると gateway-platform の
+  #    `*.yu-mins.com` wildcard に吸われて 404 になる（別 backend が必須）。
+  - name: http-tunnel-yumins
     protocol: HTTP
     port: 80
     hostname: "kensan.yu-mins.com"
