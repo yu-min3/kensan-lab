@@ -64,12 +64,16 @@ not merely a cookie setting.
    the access token fresh. LAN becomes frictionless: one login per device, ~30 days signed in.
    30 days (not 90) bounds the blast radius of a stolen, already-unlocked LAN device.
 
-2. **Keycloak session must be raised to match (follow-up).** `cookie_expire` alone does not deliver
-   30 days — Keycloak caps it. The `kensan` realm's `SSO Session Idle` / `SSO Session Max` (and the
-   oauth2-proxy client's refresh-token lifetime) must be raised to ~30 days. **Until then the 720h
-   cookie simply degrades to the effective Keycloak max (12h) — no regression**, just the LAN-
-   frictionless benefit isn't active yet. This is configured in the Keycloak admin console, **not in
-   Git** (the realm is not yet managed as code) — a drift surface, tracked as a follow-up.
+2. **Keycloak session raised to match — `SSO Session Max = 30d`, `SSO Session Idle = 3d`.**
+   `cookie_expire` alone does not deliver 30 days — Keycloak caps it. The `kensan` realm's
+   `SSO Session Max` is set to 30 days (the frictionless ceiling), while `SSO Session Idle` is kept
+   at **3 days** rather than 30. This is **idle-strict / active-tolerant**: an in-use session never
+   trips idle (oauth2-proxy refreshes the token on traffic, resetting the idle timer), so Idle is
+   not the binding limit while the device is used — it only culls sessions left untouched for 3 days.
+   Net effect: a device in daily use stays frictionless up to the 30-day Max; a stolen or forgotten
+   device that sits unused dies in 3 days, tightening the blast radius beyond a flat 30-day idle.
+   Configured in the Keycloak admin console, **not in Git** (the realm is not yet managed as code) —
+   a drift surface, tracked as a follow-up.
 
 3. **Inner authz unchanged.** oauth2-proxy stays the single source of in-cluster identity
    (`Authorization: Bearer <id_token>` + `X-Auth-Request-*`), so existing `AuthorizationPolicy`
@@ -119,8 +123,9 @@ login (with MFA) under option B, recovering a second factor without the OTP doub
 
 ### Trade-offs / watch-outs
 
-- A stolen, unlocked device on the LAN stays signed in up to 30 days (acceptable for a homelab; the
-  lever is `cookie_expire` + Keycloak session max).
+- A stolen, unlocked device on the LAN that is *actively used* stays signed in up to 30 days
+  (`SSO Session Max`); one left *unused* dies in 3 days (`SSO Session Idle`). Acceptable for a
+  homelab; the levers are `cookie_expire` + Keycloak `SSO Session Max` / `Idle`.
 - **Keycloak realm session settings are imperative (admin console), not GitOps** — they will drift
   unless the realm is managed as code. Tracked as a follow-up.
 - The external double-prompt persists while option **A (OTP)** stays in place; that is the accepted
@@ -128,8 +133,8 @@ login (with MFA) under option B, recovering a second factor without the OTP doub
 
 ## Follow-ups
 
-- [ ] **Keycloak** `kensan` realm: raise `SSO Session Idle` / `SSO Session Max` + oauth2-proxy
-  client refresh-token lifetime to ~30 days (admin console — activates the 720h cookie).
+- [x] **Keycloak** `kensan` realm: `SSO Session Max = 30d`, `SSO Session Idle = 3d` (admin console —
+  activates the 720h cookie; idle-strict / active-tolerant). _Applied 2026-06-30._
 - [ ] **Decide the external-gate model** (A / B / C above). Until decided, CF Access OTP stays
   (already configured, safe).
 - [ ] (Stretch) Manage the Keycloak realm as code to remove the session-setting drift surface.
