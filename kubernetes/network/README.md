@@ -58,19 +58,19 @@ default-deny and mTLS are **two independent axes**, not one knob. Each spans a d
 | **default-deny** (CCNP) | reachability — can A reach B? | **namespace boundary** — crossing requires an explicit allow |
 | **mTLS PERMISSIVE** | encryption / identity — how traffic is protected | **pod-to-pod** — automatic, regardless of namespace |
 
-### default-deny — crossing namespaces requires an allow
+### default-deny — traffic requires an explicit allow
 
-> Same namespace: traffic flows. Across namespaces: denied unless explicitly allowed.
+> Same-namespace traffic flows only when the namespace has an explicit `allow-intra-namespace` policy. Cross-namespace traffic requires explicit allows on the relevant side(s).
 
 ```mermaid
 flowchart LR
     subgraph nsA["ns A"]
-        A1[Pod] <==>|"✓ same ns"| A2[Pod]
+        A1[Pod] <==>|"✓ allow-intra-namespace"| A2[Pod]
     end
     subgraph nsB["ns B"]
         B1[Pod]
     end
-    A2 -->|"✗ default-deny<br/>needs an allow"| B1
+    A2 -->|"✗ cross-ns default-deny<br/>needs explicit allow(s)"| B1
 
     classDef default fill:#FCFAF6,stroke:#D2C9B5,color:#1A1714
     linkStyle 0 stroke:#377A50,color:#377A50
@@ -109,7 +109,7 @@ flowchart LR
 
 1. **eBPF-native, consolidated.** Cilium alone covers kube-proxy replacement, L2 LB, NetworkPolicy, and Hubble observability — no MetalLB, no kube-proxy. Fewer moving parts.
 2. **Split L3/4 from L7.** Reachability (who can reach whom) is Cilium; identity and ingress auth are Istio. Layers stay unmixed and each responsibility stays simple.
-3. **Deny by default (zero-trust baseline).** Start from CCNP default-deny and allow only what's needed; identity is mTLS on every hop; ingress is authenticated at the Gateway. The `istio-injection` label is the selector, so new namespaces are enrolled automatically (ADR-004 / 009).
+3. **Deny by default (zero-trust baseline).** Start from CCNP default-deny and allow only what's needed; identity is mTLS on injected mesh-to-mesh hops; ingress is authenticated at the Gateway. The `istio-injection` label is the selector, so new namespaces are enrolled automatically (ADR-004 / 009).
 
 Concrete choices:
 

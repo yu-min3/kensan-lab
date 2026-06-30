@@ -4,6 +4,8 @@
 
 Accepted
 
+> **Addendum (2026-06-30):** The edge-termination decision still stands for Gateway certificate ownership and backend HTTP mode. The intra-cluster trust model has since evolved from "physically isolated and mostly trusted" toward a zero-trust baseline: Cilium enforces default-deny reachability, Istio provides PERMISSIVE mTLS for injected mesh-to-mesh traffic, and Gateway-level auth centralizes ingress control. See `kubernetes/network/README.md` for the current network model.
+
 ## Date
 
 2025-11-07
