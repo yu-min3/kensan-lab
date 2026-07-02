@@ -9,7 +9,7 @@
 # - hosts は opt-in 列挙。ここに無い host（legacy kensan 等）は従来どおり素通し
 # - /oauth2/* は notPaths で除外し、app-base chart が生成する oauth2 HTTPRoute が
 #   oauth2-proxy へ直送する（callback の code 交換を ext_authz に通さない）
-# - kensan.app.yu-min3.com は Phase 7 cutover 時にここへ追記する
+# - kensan.app.yu-min3.com は Phase 7 cutover で追記済み（legacy から継承した本番 host）
 apiVersion: security.istio.io/v1
 kind: AuthorizationPolicy
 metadata:
@@ -27,6 +27,7 @@ spec:
     - to:
         - operation:
             hosts:
+              - kensan.app.yu-min3.com # Phase 7 で legacy から継承した本番 host
               - kensan-preview.app.yu-min3.com
               - kensan.yu-mins.com # Cloudflare Tunnel 経由の外部公開（gateway-prod http-tunnel listener）
             notPaths:

@@ -28,6 +28,7 @@ spec:
     - to:
         - operation:
             hosts:
+              - kensan.app.yu-min3.com # Phase 7 で legacy から継承した本番 host
               - kensan-preview.app.yu-min3.com
               - kensan.yu-mins.com # Cloudflare Tunnel 経由の外部公開。同じ platform-admin 認可を当てる
       when:
@@ -40,5 +41,6 @@ spec:
     - to:
         - operation:
             notHosts:
+              - kensan.app.yu-min3.com # Phase 7 で protected 化。ここに無いと無認証素通しに落ちる
               - kensan-preview.app.yu-min3.com
               - kensan.yu-mins.com

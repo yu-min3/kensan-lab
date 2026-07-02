@@ -1,4 +1,6 @@
-> ⚠️ **このアプリは凍結済みです。** 現行のアプリは `apps/kensan/`（ファイルベースの統合版）です。本ディレクトリは Phase 7 cutover 完了まで稼働維持のみを目的とし、以下のドキュメントは更新されません。
+> ⚠️ **このアプリは廃止済み（アーカイブ）です。** 現行のアプリは `apps/kensan/`（ファイルベースの統合版）です。
+> 2026-07 の Phase 7 cutover で本番 host `kensan.app.yu-min3.com` を `apps/kensan` へ移管し、本 legacy はクラスタから撤去しました（ArgoCD Application `kensan` / namespace `kensan` を削除）。
+> データは撤去前に pg_dump でバックアップ済み。本ディレクトリは**過去実装の参照用**としてコードのみ残しており、デプロイ対象ではありません（ArgoCD Application は存在しません）。以下のドキュメントは更新されません。
 
 # Kensan（研鑽）
 
