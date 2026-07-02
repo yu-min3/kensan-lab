@@ -8,7 +8,7 @@
 #   2. groups "platform-admin", "platform-dev" 作成
 #   3. user "yu" (email: ymisaki00@gmail.com) 作成 → platform-admin に assign
 #   4. OIDC client "vault" 作成 (Vault Stage 1 Bootstrap TF が使う)
-#   5. client_secret + user password を Bitwarden に保存
+#   5. client_secret + user password を Bitwarden に保存 (既存アイテムは現在値で更新)
 #
 # 前提:
 #   - kubectl context が kensan-lab cluster
@@ -22,7 +22,8 @@
 #   - kcadm は pod 内で `~/.keycloak/kcadm.config` に session を保存するので、
 #     login は 1 回だけで以降の exec は同じ session を使える。
 #
-# 冪等性: 既に存在するリソースは skip。再実行しても安全。
+# 冪等性: Keycloak リソースは既存なら skip (user password は触らない)。
+# Bitwarden は常に Keycloak の現在値に同期 (再実行 = secret drift の修復手段)。
 
 set -euo pipefail
 
@@ -65,12 +66,16 @@ read -r
 
 # === Bitwarden 既存 item チェック ===
 if bw get item "$BW_CLIENT_ITEM" &> /dev/null; then
-  echo "WARNING: Bitwarden に '$BW_CLIENT_ITEM' が既に存在"
-  echo "  上書きしたい場合は manual で archive:"
-  echo "    bw delete item \$(bw get item \"$BW_CLIENT_ITEM\" | jq -r .id)"
+  echo "NOTE: Bitwarden に '$BW_CLIENT_ITEM' が既に存在"
+  echo "  再実行時は Keycloak の現在値で Bitwarden を更新する (旧値は password history に残る)"
+  echo "  ※ client 'vault' の secret が変わった場合、Vault の auth/oidc/config への"
+  echo "    反映が別途必要 (bootstrap TF の state は廃棄済みのため vault write で直接):"
+  echo "    vault write auth/oidc/config \\"
+  echo "      oidc_discovery_url=\"https://auth.platform.yu-min3.com/realms/$REALM\" \\"
+  echo "      oidc_client_id=\"$CLIENT_ID\" \\"
+  echo "      oidc_client_secret=\"\$(bw get password '$BW_CLIENT_ITEM')\""
   echo ""
-  echo "==> 続行する? (既存 secret はそのまま、新しい secret は表示するだけになる)"
-  echo "    続行=Enter, 中止=Ctrl-C"
+  echo "==> 続行する? 続行=Enter, 中止=Ctrl-C"
   read -r
 fi
 
@@ -145,7 +150,8 @@ USER_ID=$(kcadm get users -r "$REALM" --query "username=$USER_NAME" --fields id 
 
 if [ -n "$USER_ID" ] && [ "$USER_ID" != "null" ]; then
   echo "    user '$USER_NAME' already exists (id: $USER_ID), skip create"
-  echo "    NOTE: パスワード再設定は手動で。BW に古い PW が残ってる可能性あり"
+  echo "    NOTE: 既存 user のパスワードは変更しない (勝手な reset 防止)。"
+  echo "          手動で reset した場合は Bitwarden '$BW_USER_ITEM' も忘れずに更新すること"
   USER_PW=""  # 既存の場合は BW に save しない
 else
   kcadm create users -r "$REALM" \
@@ -266,6 +272,9 @@ GATEWAY_PROTECTED_HOSTS=(
   backstage.yu-mins.com
   prometheus.yu-mins.com
   longhorn.yu-mins.com
+  # gateway-prod 側の protected host (新 kensan、ADR-010 の app 系への拡張)
+  kensan-preview.app.yu-min3.com
+  kensan.yu-mins.com # kensan アプリの外部公開 (Cloudflare Tunnel → gateway-prod)
 )
 # Grafana は auth.generic_oauth で Keycloak 直結 (Path B)。Authorization Bearer
 # 解釈の衝突を避けるため gateway-platform は bypass、別 client で OIDC する。
@@ -342,14 +351,37 @@ fi
 echo "    client_secret 取得 OK (${CLIENT_SECRET:0:8}...)"
 
 # === Bitwarden 保存 ===
+# 既存 item は現在値で更新する (bw edit)。旧値は Bitwarden の password history に残る。
+#
+# 背景 (2026-06-06 incident): 旧実装は既存 item を skip していたため、5/12 の
+# 災害復旧で realm を再構築した際、再生成された client secret が Bitwarden に
+# 反映されず、Bitwarden を SoT とする Vault TF / 手動ログインが 3 週間
+# 静かに壊れていた。再実行 = 「Keycloak の現在値を SoT 連鎖に伝播する」操作にする。
 save_bw() {
   local item_name="$1"
   local username="$2"
   local password="$3"
   local notes="$4"
 
-  if bw get item "$item_name" &> /dev/null; then
-    echo "    skip: '$item_name' は既に Bitwarden にある"
+  local item_id
+  item_id=$(bw get item "$item_name" 2>/dev/null | jq -r '.id // empty' || true)
+
+  if [ -n "$item_id" ]; then
+    local current_pw
+    current_pw=$(bw get item "$item_name" | jq -r '.login.password // empty')
+    if [ "$current_pw" = "$password" ]; then
+      echo "    unchanged: '$item_name' (値が一致)"
+      return 0
+    fi
+    bw get item "$item_name" | jq \
+      --arg notes "$notes" \
+      --arg user "$username" \
+      --arg pw "$password" \
+      '.notes = $notes
+       | .login.username = $user
+       | .login.password = $pw' \
+      | bw encode | bw edit item "$item_id" > /dev/null
+    echo "    updated: '$item_name' (旧値は password history 参照)"
     return 0
   fi
 

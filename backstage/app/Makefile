@@ -46,10 +46,10 @@ help:
 	@echo "  make clean         - Remove local Docker image"
 	@echo ""
 	@echo "GitOps Deployment (for kensan-lab):"
-	@echo "  make update-image  - Build, push, and update kustomization.yaml"
-	@echo "  make deploy        - Create PR for deployment (build, push, branch, commit)"
-	@echo "  make commit-deploy - Commit kustomization.yaml changes only"
-	@echo "  make preview       - Preview Kustomize manifests"
+	@echo "  make update-image  - Build, push, and update manifests/backstage-deployment.yaml"
+	@echo "  make commit-deploy - Commit the manifest change (run inside a worktree)"
+	@echo "  make preview       - Show current image in the manifest"
+	@echo "  (deploy 手順: worktree を切る → update-image → commit-deploy → gh pr create)"
 	@echo ""
 	@echo "Environment Variables (set in ../.env):"
 	@echo "  GITHUB_USER        - GitHub username"
@@ -154,61 +154,49 @@ clean:
 # GitOps Deployment (kensan-lab specific)
 #==============================================================================
 
+## Flat manifest 運用 (kustomize overlays は retired)。image tag は
+## ../manifests/backstage-deployment.yaml を直接書き換える。
+MANIFEST := ../manifests/backstage-deployment.yaml
+
 .PHONY: update-image
 update-image: build push
-	@echo "Updating Kustomize overlay with tag: $(TAG)..."
-	cd ../kubernetes/backstage/overlays/prod && \
-		kustomize edit set image ghcr.io/$(GITHUB_USER)/backstage:$(TAG)
+	@echo "Updating manifest with tag: $(TAG)..."
+	sed -i.bak -E 's|(image: ghcr\.io/$(GITHUB_USER)/backstage:).*|\1$(TAG)|' $(MANIFEST)
+	rm -f $(MANIFEST).bak
 	@echo ""
-	@echo "✅ Image built, pushed, and kustomization.yaml updated"
+	@echo "✅ Image built, pushed, and manifest updated"
 	@echo "   Image: $(FULL_IMAGE)"
 	@echo ""
 	@echo "Next steps:"
-	@echo "  - Review changes: git diff ../kubernetes/backstage/overlays/prod/kustomization.yaml"
-	@echo "  - Deploy via GitOps: make deploy TAG=$(TAG)"
-	@echo "  - Or commit manually: make commit-deploy TAG=$(TAG)"
+	@echo "  - Review changes: git diff $(MANIFEST)"
+	@echo "  - Commit & push (inside a worktree): make commit-deploy TAG=$(TAG)"
 
+## NOTE: 旧 deploy target は inner repo で直接 `git checkout -b` していたが、
+## worktree 必須ルール (.claude/rules/gitops-workflow.md) と衝突するため廃止。
+## build/push + manifest 更新は update-image、commit/push は worktree 内で commit-deploy を使う。
 .PHONY: deploy
-deploy: update-image
-	@echo "Creating deployment branch..."
-	cd .. && git checkout -b deploy-backstage-$(TAG)
-	@echo "Committing change to Git..."
-	cd .. && git add kubernetes/backstage/overlays/prod/kustomization.yaml
-	cd .. && git commit -m "Deploy Backstage $(TAG)"
-	@echo "Pushing to remote..."
-	cd .. && git push origin deploy-backstage-$(TAG)
+deploy:
+	@echo "❌ 'make deploy' は廃止 (inner repo での直接 checkout は worktree ルール違反)"
 	@echo ""
-	@echo "✅ Deployment branch created and pushed: deploy-backstage-$(TAG)"
-	@echo ""
-	@echo "Next steps:"
-	@echo "  1. Create a Pull Request:"
-	@echo "     gh pr create --base main --head deploy-backstage-$(TAG) --title 'Deploy Backstage $(TAG)' --body 'Update Backstage image to $(TAG)'"
-	@echo ""
-	@echo "  2. Merge the PR:"
-	@echo "     - Review and approve the PR on GitHub"
-	@echo "     - Merge to main"
-	@echo "     - Argo CD will automatically sync the changes"
-	@echo ""
-	@echo "  3. Monitor deployment after merge:"
-	@echo "     kubectl get pods -n backstage -w"
+	@echo "代わりに:"
+	@echo "  1. worktree を切る:  git worktree add ~/kensan-lab.worktrees/deploy-backstage-\$$TAG -b deploy-backstage-\$$TAG origin/main"
+	@echo "  2. その worktree の backstage/app で:  make update-image TAG=<tag>"
+	@echo "  3. 同 worktree で:  make commit-deploy TAG=<tag> && gh pr create"
+	@exit 1
 
 .PHONY: commit-deploy
 commit-deploy:
-	@echo "Committing Kustomize overlay change..."
-	cd .. && git add kubernetes/backstage/overlays/prod/kustomization.yaml
+	@echo "Committing manifest change..."
+	cd .. && git add manifests/backstage-deployment.yaml
 	cd .. && git commit -m "Deploy Backstage $(TAG)"
-	cd .. && git push
+	## fresh worktree branch には upstream が無いため -u + HEAD で明示 push
+	cd .. && git push -u origin HEAD
 	@echo "✅ Committed and pushed"
 	@echo "Argo CD will sync automatically or run: argocd app sync backstage"
 
 .PHONY: preview
 preview:
-	@echo "Previewing deployment with tag: $(TAG)..."
-	@cd ../kubernetes/backstage/overlays/prod && \
-		kustomize edit set image ghcr.io/$(GITHUB_USER)/backstage:$(TAG)
+	@echo "Current image in manifest:"
+	@grep -n "image: ghcr.io/$(GITHUB_USER)/backstage" $(MANIFEST)
 	@echo ""
-	@echo "Generated Deployment (image section):"
-	@kubectl kustomize ../kubernetes/backstage/overlays/prod | grep -A10 "kind: Deployment" | grep -A5 "containers:" || echo "  (Could not extract container section)"
-	@echo ""
-	@echo "Full manifests:"
-	@echo "  kubectl kustomize ../kubernetes/backstage/overlays/prod"
+	@echo "With TAG=$(TAG): ghcr.io/$(GITHUB_USER)/backstage:$(TAG)"

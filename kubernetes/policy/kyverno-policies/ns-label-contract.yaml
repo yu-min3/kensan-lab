@@ -1,0 +1,117 @@
+## Namespace Label Contract — label の貼り方そのものを Kyverno が強制する
+## (v2 統一設計の土台 — ADR-012 改訂、SoT: docs/concepts/namespace-label-design.md + ADR-014)
+##
+## 「label を読む側」(pss-baseline の除外 / pss-restricted の opt-in /
+##  app-tier policy の selector) の前提を本 policy が保証する。
+## 契約の SoT が「ドキュメント + 善意」から「policy (Git 管理)」に移る。
+##
+## 旧 require-ns-labels.yaml を吸収 (rule 2)。
+## Phase 3 では本 policy を最初に Enforce する (他 policy の土台のため)。
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: ns-label-contract
+  annotations:
+    policies.kyverno.io/title: Namespace Label Contract
+    policies.kyverno.io/category: Best Practices
+    policies.kyverno.io/severity: medium
+    policies.kyverno.io/description: >-
+      namespace-label-design.md の required labels、ADR-014 の app-namespace contract、
+      pss-level=privileged の宣言条件を namespace の作成/変更時に強制する。
+spec:
+  background: true
+  webhookConfiguration:
+    failurePolicy: Ignore
+  rules:
+    ## rule 1: 全 ns に required labels (environment + tier。tier は値域も検査)。
+    ## bare ns (reloader / sealed-secrets / local-path-storage) は ns lifecycle app
+    ## (applications/namespaces/) で remediate 済み — Phase 2
+    - name: require-base-labels
+      match:
+        any:
+          - resources:
+              kinds:
+                - Namespace
+      exclude:
+        any:
+          - resources:
+              kinds:
+                - Namespace
+              names:
+                ## K8s 組み込み ns
+                - default
+                - kube-public
+                - kube-node-lease
+                ## cilium chart が render する ns (cilium app が tracking 済み)。
+                ## chart の secretsNamespace は create/name のみで label 注入に非対応、
+                ## かつ同一 ns を別 app で管理すると Argo CD の ownership 競合になるため
+                ## contract 側で除外する (chart が labels 対応したら外す)
+                - cilium-secrets
+      validate:
+        failureAction: Audit  # Phase 3 で Enforce へ昇格 (ADR-012)
+        message: >-
+          全 namespace に kensan-lab.platform/environment と
+          kensan-lab.platform/tier (platform | application) が必要です
+          (docs/concepts/namespace-label-design.md)
+        anyPattern:
+          - metadata:
+              labels:
+                kensan-lab.platform/environment: "?*"
+                kensan-lab.platform/tier: platform
+          - metadata:
+              labels:
+                kensan-lab.platform/environment: "?*"
+                kensan-lab.platform/tier: application
+    ## rule 2: app-{name} ns は ADR-014 の app-namespace contract (team/app) + tier=application
+    ## (app-prod は env-shared landing zone のため除外 — 単一の team/app を割当不能)
+    - name: require-app-3-axis
+      match:
+        any:
+          - resources:
+              kinds:
+                - Namespace
+              names:
+                - "app-*"
+      exclude:
+        any:
+          - resources:
+              kinds:
+                - Namespace
+              names:
+                - app-prod
+      validate:
+        failureAction: Audit  # Phase 3 で Enforce へ昇格 (ADR-012)
+        message: >-
+          ADR-014: app namespace には kensan-lab.platform/environment・
+          kensan-lab.platform/team・kensan-lab.platform/app の 3-axis labels と
+          kensan-lab.platform/tier=application が必要です
+        pattern:
+          metadata:
+            labels:
+              kensan-lab.platform/environment: "?*"
+              kensan-lab.platform/team: "?*"
+              kensan-lab.platform/app: "?*"
+              kensan-lab.platform/tier: application
+    ## rule 3: pss-baseline の床から離脱 (pss-level=privileged) を宣言できるのは
+    ## tier=platform の ns のみ — 「label 1 枚で防御が切れる」経路を契約で閉じる。
+    ## なお pss-level の未知の値は何にも match せず床に落ちるだけ (安全側) なので
+    ## 値域の検査は不要
+    - name: restrict-privileged-pss-level
+      match:
+        any:
+          - resources:
+              kinds:
+                - Namespace
+              selector:
+                matchLabels:
+                  kensan-lab.platform/pss-level: privileged
+      validate:
+        failureAction: Audit  # Phase 3 で Enforce へ昇格 (ADR-012)
+        message: >-
+          kensan-lab.platform/pss-level=privileged を宣言できるのは
+          tier=platform の namespace のみです (PSS baseline の床からの離脱は
+          PE 専管 — ADR-012)
+        pattern:
+          metadata:
+            labels:
+              kensan-lab.platform/tier: platform

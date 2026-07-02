@@ -1,0 +1,39 @@
+# platform エンドポイントの HTTPS エンドツーエンド probe。
+# LB (192.168.0.242) → Istio Gateway → 証明書 → ルーティング → backend の
+# 全段を毎分踏むことで「Pod は Running だが経路が壊れてる」を検知する。
+#
+# 対象の選定 (HTTPRoute を持つ platform ホスト全 8 つをカバー):
+# - grafana /api/health, argocd /healthz: 認証不要の health endpoint
+# - vault /v1/sys/health?standbyok=true: unsealed=200 / sealed=503 (seal 検知込み)
+# - backstage, prometheus, hubble, longhorn (root): oauth2-proxy → Keycloak login
+#   への redirect を follow して 200 = Gateway 認証チェーン込みの疎通確認
+# - auth OIDC discovery: 認証基盤の死活。2026-06-06 incident
+#   (vault-oidc-incident: 認証経路の故障が 3 週間潜伏) の再発防止
+#
+# DNS 前提: *.platform.yu-min3.com は public DNS に存在しないため、cluster 内からの
+# 解決は CoreDNS hosts plugin の pin に依存する。対象を追加したら
+# kubernetes/network/coredns/corefile-configmap.yaml にも FQDN を追加すること。
+apiVersion: monitoring.coreos.com/v1
+kind: Probe
+metadata:
+  name: platform-https
+  namespace: monitoring
+  labels:
+    release: prometheus
+spec:
+  jobName: https-platform
+  module: http_2xx
+  interval: 60s
+  prober:
+    url: blackbox-exporter.monitoring.svc:9115
+  targets:
+    staticConfig:
+      static:
+        - https://grafana.platform.yu-min3.com/api/health
+        - https://argocd.platform.yu-min3.com/healthz
+        - https://vault.platform.yu-min3.com/v1/sys/health?standbyok=true
+        - https://backstage.platform.yu-min3.com/
+        - https://prometheus.platform.yu-min3.com/
+        - https://hubble.platform.yu-min3.com/
+        - https://longhorn.platform.yu-min3.com/
+        - https://auth.platform.yu-min3.com/realms/kensan/.well-known/openid-configuration

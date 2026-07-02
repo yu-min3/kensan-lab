@@ -1,0 +1,26 @@
+# kensan-workspace データツリーの本番 volume（Phase 6 cutover、unification-plan.md）。
+# chart の pvc.create ではなく raw manifest にする理由:
+#   - Application は Prune=false + finalizer なしだが、helm release の改廃から
+#     も独立させて「絶対に巻き添え削除されない」層に置く
+#   - 名前を固定し、NFS 外部公開 Service（storage/longhorn/resources）から
+#     share-manager を一意に参照できるようにする
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: kensan-workspace
+  namespace: app-kensan
+  annotations:
+    # リソース個別の prune 防御。Application メタデータの Prune=false は
+    # 効かない（preview の kensan-data PVC が prune された実証あり）。
+    # git からこのファイルを消しても ArgoCD は PVC を削除しない
+    argocd.argoproj.io/sync-options: Prune=false
+spec:
+  # bind の決定性: この PV 以外に bind しない（誤って新 volume が provision
+  # される事故防止 + NFS Service selector との対応を固定）。復旧手順:
+  # docs/operations/kensan-workspace-volume-recovery.md
+  volumeName: pvc-cd6553e2-2bd6-4b7c-b43d-18b0a600b707
+  accessModes: ["ReadWriteMany"]
+  storageClassName: longhorn-workspace
+  resources:
+    requests:
+      storage: 10Gi

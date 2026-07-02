@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 100" width="320" height="100" role="img" aria-label="kensan-lab">
+  <title>kensan-lab</title>
+  
+  <g>
+    <rect x="15" y="61" width="70" height="17" rx="2.5" fill="#7A6E5D"></rect>
+    <path d="M18,58 Q38,50 55,38 Q72,24 82,12 L82,58 Z" fill="#0284C7"></path>
+    <path d="M88,8 L90,3 L92,8 L97,10 L92,12 L90,17 L88,12 L83,10 Z" fill="#0284C7" fill-opacity="0.6"></path>
+  </g>
+  
+  <text x="120" y="62" font-family="&#39;Noto Serif JP&#39;, &#39;Hiragino Mincho ProN&#39;, &#39;Yu Mincho&#39;, serif" font-size="34" font-weight="600" fill="#171411" letter-spacing="0.5">kensan-lab</text>
+  
+  <text x="120" y="82" font-family="&#39;Inter&#39;, &#39;Hiragino Sans&#39;, sans-serif" font-size="10" font-weight="500" fill="#7A6E5D" letter-spacing="2.4">PLATFORM DESIGN SYSTEM</text>
+</svg>

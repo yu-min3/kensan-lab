@@ -1,254 +1,218 @@
-import { useState, useEffect, useRef } from 'react'
-import { Link, useSearchParams } from 'react-router-dom'
-import { Button } from '@/components/ui/button'
-import { Sheet, SheetContent } from '@/components/ui/sheet'
-import { TaskDetailPanel } from '@/components/task/TaskDetailPanel'
-import { useTaskDetailPanel } from '@/hooks/useTaskDetailPanel'
-import { DailySummary } from '@/components/daily/DailySummary'
-import { TimeBlockSection } from '@/components/daily/TimeBlockSection'
-import { TaskListWidget, type TaskDragData } from '@/components/daily/TaskListWidget'
-import { PageMemo } from '@/components/common/PageMemo'
-import { AIAdviceCard } from '@/components/daily/AIAdviceCard'
-import { calculateTimeFromYWithDuration } from '@/components/common/TimeBlockTimeline'
-import { useSettingsStore } from '@/stores/useSettingsStore'
-import { useTimeBlockStore } from '@/stores/useTimeBlockStore'
-import { formatDateJa, formatDateIso } from '@/lib/dateFormat'
-import { PageGuide } from '@/components/guide/PageGuide'
-import {
-  Sun,
-  Moon,
-  BookOpen,
-  BookMarked,
-} from 'lucide-react'
-import {
-  DndContext,
-  DragOverlay,
-  useSensor,
-  useSensors,
-  PointerSensor,
-  type DragStartEvent,
-  type DragMoveEvent,
-  type DragEndEvent,
-} from '@dnd-kit/core'
+import { useState, useEffect, useRef } from "react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useSearchParams } from "react-router-dom";
+import { BookOpen, ChevronLeft, ChevronRight } from "lucide-react";
+import { api, ApiError, todayISO, dailyPath, dailySkeleton } from "../lib/api";
+import { PageHeader } from "../components/PageHeader";
+import { Card, CardBody, CardFoot } from "../components/ui/card";
+import { Button } from "../components/ui/button";
+import { MarkdownEditor } from "../components/MarkdownEditor";
+import { DailyCalendar } from "../components/DailyCalendar";
+import { Empty, ErrorState, Skeleton } from "../components/ui/states";
+import { SaveStatus, type SaveState } from "../components/ui/save-status";
 
+const WEEKDAYS = ["日", "月", "火", "水", "木", "金", "土"];
+
+// "YYYY-MM-DD" を delta 日ずらす（カレンダー外の前後日ナビ用）
+function shiftDate(date: string, delta: number): string {
+  const [y, m, d] = date.split("-").map(Number);
+  const t = new Date(y, m - 1, d + delta);
+  return `${t.getFullYear()}-${String(t.getMonth() + 1).padStart(2, "0")}-${String(t.getDate()).padStart(2, "0")}`;
+}
+
+function weekdayLabel(date: string): string {
+  const [y, m, d] = date.split("-").map(Number);
+  return WEEKDAYS[new Date(y, m - 1, d).getDay()];
+}
+
+// frontmatter（--- ... ---）と本文を分ける。本文だけ編集し、保存時に前置して戻す。
+function splitFm(content: string): { fm: string; body: string } {
+  const m = content.match(/^---\n[\s\S]*?\n---\n?/);
+  if (m) return { fm: m[0].replace(/\n*$/, "\n"), body: content.slice(m[0].length).replace(/^\n+/, "") };
+  return { fm: "", body: content };
+}
+
+// 日記ページ。書いてる途中で保存を忘れて飛ぶのが悲しい、を解消するため自動保存。
+// 800ms デバウンス + フォーカスアウトで保存。保存は編集開始時点の mtime で楽観ロックし、
+// Claude / VSCode の外部編集は 409 で素直に伝える。
 export function DailyPage() {
-  const { userName } = useSettingsStore()
-  const { addTimeBlock } = useTimeBlockStore()
-  const taskDetailPanel = useTaskDetailPanel()
-  const [searchParams] = useSearchParams()
+  const [params, setParams] = useSearchParams();
+  const date = params.get("date") ?? todayISO();
+  const isToday = date === todayISO();
+  const qc = useQueryClient();
 
-  // 選択中の日付（URLパラメータ or 今日）
-  const [selectedDate, setSelectedDate] = useState<Date>(() => {
-    const dateParam = searchParams.get('date')
-    if (dateParam && /^\d{4}-\d{2}-\d{2}$/.test(dateParam)) {
-      const d = new Date(dateParam + 'T00:00:00')
-      if (!isNaN(d.getTime())) return d
-    }
-    return new Date()
-  })
-  const selectedDateIso = formatDateIso(selectedDate)
-  const isToday = formatDateIso(new Date()) === selectedDateIso
+  // 日付を切り替える。今日なら ?date を落として素の /daily に戻す。
+  function goDate(next: string) {
+    flush(); // 離脱前に未保存分を保存
+    if (next === todayISO()) setParams({}, { replace: false });
+    else setParams({ date: next }, { replace: false });
+  }
 
-  // ドラッグ&ドロップ状態
-  const [isDraggingTask, setIsDraggingTask] = useState(false)
-  const [dragOverY, setDragOverY] = useState<number | null>(null)
-  const [activeDragData, setActiveDragData] = useState<TaskDragData | null>(null)
+  const daily = useQuery({
+    queryKey: ["daily", date],
+    queryFn: () => api.daily(date),
+    retry: (count, err) => !(err instanceof ApiError && err.status === 404) && count < 2,
+  });
 
-  // ネイティブポインター位置を追跡（@dnd-kit の delta はスクロール補正を含むため、
-  // getBoundingClientRect() と組み合わせるとスクロール量が二重カウントされる）
-  const pointerYRef = useRef<number | null>(null)
+  // frontmatter は隠して本文だけ編集（created/updated/tags/type は自動・外部管理）。
+  const [body, setBody] = useState<string | null>(null);
+  const baseMtime = useRef<string>("");
+  const fm = useRef<string>(""); // frontmatter（保存時に本文へ前置）
+  const savedBody = useRef<string>(""); // 最後に保存した本文（dirty 判定）
+  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  // 日付が変わったら編集状態をリセット
   useEffect(() => {
-    if (!isDraggingTask) {
-      pointerYRef.current = null
-      return
+    setBody(null);
+    baseMtime.current = "";
+  }, [date]);
+
+  // サーバ値が来たら（未編集なら）frontmatter を分離して本文だけ取り込む
+  useEffect(() => {
+    if (daily.data && body === null) {
+      const p = splitFm(daily.data.content);
+      fm.current = p.fm;
+      savedBody.current = p.body;
+      baseMtime.current = daily.data.doc.mtime;
+      setBody(p.body);
     }
-    const handlePointerMove = (e: PointerEvent) => {
-      pointerYRef.current = e.clientY
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [daily.data]);
+
+  const save = useMutation({
+    mutationFn: (next: string) => api.putFile(dailyPath(date), fm.current + next, baseMtime.current),
+    onSuccess: (res, next) => {
+      baseMtime.current = res.doc.mtime;
+      savedBody.current = next;
+    },
+  });
+
+  const create = useMutation({
+    mutationFn: () => api.createFile(dailyPath(date), dailySkeleton(date)),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["daily", date] });
+      qc.invalidateQueries({ queryKey: ["dailyList"] });
+    },
+  });
+
+  function flush() {
+    if (timer.current) {
+      clearTimeout(timer.current);
+      timer.current = null;
     }
-    window.addEventListener('pointermove', handlePointerMove)
-    return () => window.removeEventListener('pointermove', handlePointerMove)
-  }, [isDraggingTask])
-
-  // DnD sensors
-  const sensors = useSensors(
-    useSensor(PointerSensor, {
-      activationConstraint: {
-        distance: 8,
-      },
-    })
-  )
-
-  const hour = new Date().getHours()
-  const isEvening = hour >= 17
-
-  // 時間帯に応じた挨拶（今日の場合のみ）
-  const Icon = isEvening ? Moon : Sun
-  const iconColor = isEvening ? 'text-indigo-400' : 'text-slate-500'
-  const greeting = isToday
-    ? isEvening
-      ? `お疲れさまです、${userName}さん`
-      : `おはようございます、${userName}さん`
-    : formatDateJa(selectedDate)
-
-  // ドラッグ開始
-  const handleDragStart = (event: DragStartEvent) => {
-    const data = event.active.data.current as TaskDragData | undefined
-    if (data?.type === 'task') {
-      setIsDraggingTask(true)
-      setActiveDragData(data)
-    }
+    if (body !== null && body !== savedBody.current) save.mutate(body);
   }
 
-  // ドラッグ中
-  const handleDragMove = (event: DragMoveEvent) => {
-    if (!isDraggingTask) return
-
-    // ドロップ先がタイムラインの場合のみY座標を更新
-    if (event.over?.id === 'timeblock-timeline-droppable') {
-      // ネイティブ pointer の clientY を使用。@dnd-kit の delta はスクロール補正を
-      // 含むため、getBoundingClientRect() と合わせるとズレる。
-      if (pointerYRef.current !== null) {
-        setDragOverY(pointerYRef.current)
-      }
-    } else {
-      setDragOverY(null)
-    }
+  function onChange(next: string) {
+    setBody(next);
+    if (timer.current) clearTimeout(timer.current);
+    timer.current = setTimeout(() => save.mutate(next), 800);
   }
 
-  // ドラッグ終了
-  const handleDragEnd = async (event: DragEndEvent) => {
-    const { over } = event
+  // 最新の flush をアンマウント時に呼ぶ（ref 経由で stale closure を避ける）
+  const flushRef = useRef(flush);
+  flushRef.current = flush;
+  useEffect(() => () => flushRef.current(), []);
 
-    if (over?.id === 'timeblock-timeline-droppable' && activeDragData && dragOverY !== null) {
-      // タイムライン上にドロップされた場合
-      const timelineElement = document.querySelector('[data-timeline-container]')
-      if (timelineElement) {
-        const rect = timelineElement.getBoundingClientRect()
-        // TimeBlockTimelineの実際の表示範囲を読み取る（動的に変わるため）
-        const actualStartHour = parseInt(timelineElement.getAttribute('data-start-hour') || '6', 10)
-        const actualEndHour = parseInt(timelineElement.getAttribute('data-end-hour') || '24', 10)
-        const durationMinutes = activeDragData.estimatedMinutes || 60
-        const { startTime, endTime } = calculateTimeFromYWithDuration(dragOverY, rect, actualStartHour, actualEndHour, durationMinutes, 15)
-
-        // タイムブロックを作成（選択中の日付を使用）
-        await addTimeBlock(selectedDateIso, startTime, selectedDateIso, endTime, {
-          taskId: activeDragData.taskId,
-          taskName: activeDragData.taskName,
-          milestoneId: activeDragData.milestoneId,
-          milestoneName: activeDragData.milestoneName,
-          goalId: activeDragData.goalId,
-          goalName: activeDragData.goalName,
-          goalColor: activeDragData.goalColor,
-        })
-      }
-    }
-
-    // 状態をリセット
-    setIsDraggingTask(false)
-    setDragOverY(null)
-    setActiveDragData(null)
-  }
-
-  // ドラッグキャンセル
-  const handleDragCancel = () => {
-    setIsDraggingTask(false)
-    setDragOverY(null)
-    setActiveDragData(null)
-  }
+  const notFound = daily.error instanceof ApiError && daily.error.status === 404;
+  const conflict = save.error instanceof ApiError && save.error.status === 409;
+  const dirty = body !== null && body !== savedBody.current;
+  const saveState: SaveState = conflict
+    ? "conflict"
+    : save.isError
+      ? "error"
+      : save.isPending
+        ? "saving"
+        : dirty
+          ? "dirty"
+          : daily.data
+            ? "saved"
+            : "idle";
 
   return (
-    <DndContext
-      sensors={sensors}
-      onDragStart={handleDragStart}
-      onDragMove={handleDragMove}
-      onDragEnd={handleDragEnd}
-      onDragCancel={handleDragCancel}
-    >
-      <div className="space-y-6">
-        <PageGuide pageId="daily" />
-
-        {/* ヘッダー + サマリー（インライン） */}
-        <div className="flex items-center justify-between gap-4 flex-wrap" data-guide="daily-header">
-          <div className="flex items-center gap-3">
-            <Icon className={`h-8 w-8 ${iconColor}`} />
-            <div>
-              <h1 className="text-2xl font-bold">{greeting}</h1>
-              {isToday && <p className="text-muted-foreground">{formatDateJa(new Date())}</p>}
-            </div>
-          </div>
-          <DailySummary mode="compact" selectedDate={selectedDateIso} />
-        </div>
-
-        {/* メモ */}
-        <PageMemo
-          pageId="daily"
-          title="今日のメモ"
-          placeholder="今日の予定、気づき、やることなど..."
-        />
-
-        {/* タイムブロック + タスクリスト */}
-        <div className="grid gap-4 lg:grid-cols-3">
-          <div className="lg:col-span-2" data-guide="daily-timeblocks">
-            <TimeBlockSection
-              showAddButtons={true}
-              isDraggingTask={isDraggingTask}
-              dragOverY={dragOverY}
-              dragDurationMinutes={activeDragData?.estimatedMinutes || 60}
-              selectedDate={selectedDate}
-              onDateChange={setSelectedDate}
-            />
-          </div>
-
-          {/* 右サイド: タスクリスト */}
-          <div className="hidden lg:block" data-guide="daily-tasks">
-            <TaskListWidget onTaskClick={taskDetailPanel.openTask} />
-          </div>
-        </div>
-
-        {/* AI Planning（今日の場合のみ） */}
-        {isToday && <div data-guide="daily-ai"><AIAdviceCard selectedDate={selectedDateIso} /></div>}
-
-        {/* 記録 */}
-        <section className="space-y-4">
-          <h2 className="text-sm font-medium text-muted-foreground uppercase tracking-wide">記録</h2>
-          <div className="flex gap-2">
-            <Link to="/notes/new?type=learning">
-              <Button variant="outline" className="gap-2">
-                <BookOpen className="h-4 w-4" />
-                学習記録を作成
+    <>
+      <PageHeader
+        eyebrow={`記録 · ${dailyPath(date)}`}
+        title={`${date}（${weekdayLabel(date)}）の日記`}
+        sub="その日の出来事・感想・学び。自動保存（離脱時も保存）。完了タスクは /reflection がここに移してくる。"
+        actions={
+          <div className="ds-inline">
+            {daily.data && <SaveStatus state={saveState} />}
+            <Button variant="outline" size="sm" iconOnly aria-label="前日" onClick={() => goDate(shiftDate(date, -1))}>
+              <ChevronLeft size={16} />
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              iconOnly
+              aria-label="翌日"
+              disabled={isToday}
+              onClick={() => goDate(shiftDate(date, 1))}
+            >
+              <ChevronRight size={16} />
+            </Button>
+            {!isToday && (
+              <Button variant="ghost" size="sm" onClick={() => goDate(todayISO())}>
+                今日
               </Button>
-            </Link>
-            <Link to="/notes/new?type=diary">
-              <Button variant="outline" className="gap-2">
-                <BookMarked className="h-4 w-4" />
-                日記を書く
-              </Button>
-            </Link>
+            )}
           </div>
-        </section>
-
-        {/* Task Detail Panel */}
-        <Sheet open={taskDetailPanel.isOpen} onOpenChange={open => { if (!open) taskDetailPanel.closeTask() }}>
-          <SheetContent>
-            <TaskDetailPanel
-              taskId={taskDetailPanel.selectedTaskId}
-              createContext={taskDetailPanel.newTaskContext}
-              onCreated={taskDetailPanel.switchToCreatedTask}
-              onClose={taskDetailPanel.closeTask}
+        }
+      />
+      <div className="grid gap-5 lg:grid-cols-[1fr_300px] items-start">
+      <Card>
+        {daily.isPending ? (
+          <CardBody>
+            <Skeleton className="h-64 w-full" />
+          </CardBody>
+        ) : notFound ? (
+          <CardBody>
+            <Empty
+              icon={<BookOpen />}
+              title={`${date} の日記はまだありません`}
+              desc="骨組み（日記セクション付き）を作成して書き始められます。"
+              actions={
+                <Button variant="primary" loading={create.isPending} onClick={() => create.mutate()}>
+                  日記を作成
+                </Button>
+              }
             />
-          </SheetContent>
-        </Sheet>
-
-        {/* ドラッグオーバーレイ */}
-        <DragOverlay>
-          {activeDragData ? (
-            <div className="px-3 py-2 bg-background border border-primary rounded-md shadow-lg text-sm font-medium max-w-48 truncate">
-              {activeDragData.taskName}
-            </div>
-          ) : null}
-        </DragOverlay>
+          </CardBody>
+        ) : daily.isError ? (
+          <CardBody>
+            <ErrorState error={daily.error} onRetry={() => daily.refetch()} />
+          </CardBody>
+        ) : conflict ? (
+          <CardBody>
+            <ErrorState
+              error={
+                new ApiError(409, "他のクライアント（Claude Code / VSCode）が先に保存しました。再読込してから編集し直してください。")
+              }
+              onRetry={() => {
+                save.reset();
+                setBody(null);
+                daily.refetch();
+              }}
+            />
+          </CardBody>
+        ) : (
+          <CardBody>
+            <MarkdownEditor
+              value={body ?? ""}
+              onChange={onChange}
+              minHeight="28rem"
+              placeholder="今日のこと・学び・みのりちゃん/なぎちゃんへ…"
+            />
+          </CardBody>
+        )}
+        {save.isError && !conflict && (
+          <CardFoot>
+            <ErrorState error={save.error} onRetry={() => flush()} />
+          </CardFoot>
+        )}
+      </Card>
+        <DailyCalendar selected={date} onSelect={goDate} />
       </div>
-    </DndContext>
-  )
+    </>
+  );
 }

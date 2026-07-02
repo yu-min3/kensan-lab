@@ -3,5 +3,7 @@ kind: Namespace
 metadata:
   name: cloudflare-tunnel
   labels:
+    app.kubernetes.io/managed-by: argocd
+    kensan-lab.platform/environment: infrastructure
+    kensan-lab.platform/tier: platform
     kensan-lab.platform/component: cloudflare-tunnel
-    kensan-lab.platform/category: network

@@ -22,7 +22,7 @@ kubernetes/secrets/vault-transit-engine/
 ├── platform-values/
 │   └── vault-transit/                       # capability convention dir
 │       └── kensan-users.yaml                # 1 consumer ぶん、AD が触る
-└── temp/
+└── bootstrap/
     └── setup-transit-keys.sh                # 1 度きり: transit/keys/<name> 作成 (VCO 未対応)
 ```
 
@@ -91,7 +91,7 @@ spec:
             name: transit-<consumer>-config   # VAULT_ADDR / VAULT_AUTH_ROLE / VAULT_TRANSIT_KEY
 ```
 
-key (`transit/keys/my-pii-column`) は **1 度きり手動作成**。`temp/setup-transit-keys.sh` を参考に新 key 名で実行する (VCO 未対応のため。後述「設計判断」参照)。
+key (`transit/keys/my-pii-column`) は **1 度きり手動作成**。`bootstrap/setup-transit-keys.sh` を参考に新 key 名で実行する (VCO 未対応のため。後述「設計判断」参照)。
 
 ## 設計判断: なぜ key 作成だけ手動か
 
@@ -127,4 +127,4 @@ Vault audit device は bootstrap TF で enable 済み (`/vault/audit/audit.log`)
 
 - 全体方針: [docs/secret-management/index.md](../../../docs/secret-management/index.md)
 - 同パターンの先行例: [vault-database-engine/README.md](../vault-database-engine/README.md)
-- 実装サンプル (Go shared/vault): `apps/kensan/backend/shared/vault/`
+- 実装サンプル (Go shared/vault): `apps/kensan-legacy/backend/shared/vault/`

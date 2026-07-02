@@ -2,7 +2,15 @@
 
 ## Status
 
-Accepted
+**Partially superseded by [ADR-014](014-namespace-naming-label-contract-v2.md)** (2026-06-07)
+
+> Superseded parts: the `platform-{component}` naming convention (Decision §1, lower half) and the 3-axis
+> label table (Decision §2 — the platform-wide contract became `environment` + `tier` with `component` as
+> an unenforced platform-tier convention; `team` / `app` survive as the app-namespace contract enforced on
+> `app-*` namespaces). Still in force: `app-{name}` flat naming and the label-based Gateway
+> selector strategy. The body is preserved unchanged as the historical record.
+
+Originally: Accepted
 
 ## Date
 

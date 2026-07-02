@@ -5,7 +5,7 @@ metadata:
   namespace: argocd
   annotations:
     argocd.argoproj.io/sync-wave: "0"
-    argocd.argoproj.io/sync-options: Prune=false  # disaster recovery: 全 stateful workload の bedrock。誤削除絶対回避
+    argocd.argoproj.io/sync-options: Prune=false  # root-app からの Application CR prune 防止 (子リソースには効かない: PR #366。SC/RecurringJob/NFS Service はリソース個別 annotation で防御)
   # NOTE: resources-finalizer 不在 — Application 削除で longhorn-system ns + 全 PV 蒸発を防ぐ
 spec:
   project: platform-project

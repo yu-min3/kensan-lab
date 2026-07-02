@@ -1,0 +1,44 @@
+# gateway-prod の protected host の認可（gateway-platform-allow の gateway-prod 版）。
+#
+# kensan は個人 workspace（日記含む）なので「Keycloak 認証済み」では不十分で、
+# platform-admin group まで要求する。/oauth2/* は OIDC flow 自体の path なので
+# claim 検査なしで通す（oauth2-proxy が code 交換・cookie set を行うため）。
+#
+# 非 protected host（legacy kensan 等、CUSTOM policy の hosts に無いもの）は
+# 最初の rule で従来どおり素通しする。
+apiVersion: security.istio.io/v1
+kind: AuthorizationPolicy
+metadata:
+  name: gateway-prod-allow
+  namespace: istio-system
+spec:
+  targetRef:
+    group: gateway.networking.k8s.io
+    kind: Gateway
+    name: gateway-prod
+  action: ALLOW
+  rules:
+    # OIDC flow path は無条件で通す（ext_authz 側でも notPaths 除外済み）
+    - to:
+        - operation:
+            paths:
+              - /oauth2
+              - /oauth2/*
+    # protected host は platform-admin group 必須
+    - to:
+        - operation:
+            hosts:
+              - kensan-preview.app.yu-min3.com
+              - kensan.yu-mins.com # Cloudflare Tunnel 経由の外部公開。同じ platform-admin 認可を当てる
+      when:
+        - key: request.auth.claims[groups]
+          values:
+            - platform-admin
+    # それ以外の host（legacy kensan 等）は従来どおり制限なし。
+    # ⚠️ protected host を増やしたら必ずこの notHosts にも足すこと
+    #    （足さないと catch-all の無認証素通しに落ちて workspace が露出する）
+    - to:
+        - operation:
+            notHosts:
+              - kensan-preview.app.yu-min3.com
+              - kensan.yu-mins.com

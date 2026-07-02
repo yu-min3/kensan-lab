@@ -2,6 +2,8 @@
 
 このリポジトリのドキュメントは **層ごとに役割が分かれている**。新しい情報を書くときに「どこに書けばいいか」が機械的に決まるよう、各層の責務を以下に固定する。**同じ事実を複数の場所に書かない** のが基本ルール。
 
+> **人間向け / AI 向けは「2 ゾーン」ではなく「1 ソース → 2 出力」**: 事実は `docs/` に 1 度だけ書く。MkDocs build がそこから 2 つの出力を産む — 人間向けの **HTML サイト**（概要・図・narrative）と、AI 向けの **`/llms.txt`（目次）+ `/llms-full.txt`（全文）**（`mkdocs-llmstxt` が自動生成、[llmstxt.org](https://llmstxt.org/) 標準）。docs サイトのナビは人間専用なので audience ラベルは付けない。`.claude/rules/` は薄いまま `docs/` を参照し、agent 向けの作業指示は root の `AGENTS.md` / `CLAUDE.md` に置く（事実は二重化しない）。
+
 ## 5 つの層
 
 | Layer | 役割 | 配置 | 書く内容 | 書かない内容 |
@@ -20,11 +22,11 @@
 | トピック | SoT | サマリ参照先 |
 |---|---|---|
 | Secret management (4 方式) | `docs/secret-management/index.md` | `.claude/rules/security-secrets.md`、`kubernetes/secrets/README.md` |
-| Namespace naming | `docs/adr/006-namespace-naming.md` (why) + `.claude/rules/environment-separation.md` (how) | `kubernetes/environments/README.md` |
+| Namespace naming | `docs/adr/006-namespace-naming.md` (why) + `.claude/rules/environment-separation.md` (how) | `kubernetes/namespaces/README.md` |
 | Helm multi-source 配置規約 | `kubernetes/README.md` (Pattern A/B) | `.claude/rules/helm-multisource.md` |
 | GitOps workflow | `.claude/rules/gitops-workflow.md` | `CLAUDE.md` Mandatory Constraints |
 | Network ingress (Cloudflare Tunnel + Cilium L2 + Istio Gateway) | `docs/architecture/network.md` | `.claude/rules/network-ingress.md` |
-| Storage (Longhorn + local-path) | `docs/architecture/infrastructure.md` (予定) | `.claude/rules/kubernetes-cluster.md` |
+| Storage (Longhorn + local-path) | `kubernetes/storage/README.md` | `.claude/rules/kubernetes-cluster.md`、`docs/architecture/infrastructure.md` (R2 backup 等の横断的詳細) |
 | Cluster topology (node, label, scheduling) | `.claude/rules/kubernetes-cluster.md` | `kubernetes/README.md` |
 | Tech stack | Top `README.md` | `docs/index.md` |
 

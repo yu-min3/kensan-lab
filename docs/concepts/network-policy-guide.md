@@ -1,91 +1,53 @@
 # NetworkPolicy 運用ガイド
 
-## 設計概要
+> **現行設計の SoT**: CCNP 集約後のネットワークポリシー設計は [ADR-009](../adr/009-shared-allow-istio-network-policy.md) と `kubernetes/network/README.md` が Single Source of Truth。本ページはその運用ガイド（書き方・仕組み）。設計の背景は [ADR-004](../adr/004-network-policy-design.md)。
 
-本クラスタでは **default-deny + allow** パターンで NetworkPolicy を運用する。
-設計の詳細は [ADR-004](../adr/004-network-policy-design.md) を参照。
+旧 3-ns 構成（`kensan-prod` / `kensan-dev` / `kensan-data`、`platform-auth-dev`）を前提とした per-ns default-deny の手書き運用は廃止した。dev/prod 分離廃止 + Phase 3a で `kensan-prod` + `kensan-data` を `kensan` に統合し、ベースラインは CiliumClusterwideNetworkPolicy (CCNP) に集約済み。
 
-## Namespace 分類
+## ベースライン: CCNP 4 種 (mesh-ns 共通)
 
-| 分類 | Namespace | NetworkPolicy | 理由 |
-|------|-----------|---------------|------|
-| 信頼インフラ | kube-system | なし | CNI (Cilium) が動作、制限すると壊れる |
-| 信頼インフラ | istio-system | なし | 全 sidecar への xDS push が必要 |
-| 信頼インフラ | monitoring | なし | 全 namespace のスクレイプ/データ受信が必要 |
-| 信頼インフラ | argocd | なし | API server egress が Cilium kube-proxy replacement で制御不可 |
-| プラットフォーム | backstage | あり | PostgreSQL + GitHub + Argo CD |
-| プラットフォーム | platform-auth-prod | あり | PostgreSQL のみ |
-| プラットフォーム | platform-auth-dev | あり | PostgreSQL のみ |
-| プラットフォーム | cert-manager | あり | API server + Let's Encrypt |
-| アプリケーション | kensan-prod | あり | kensan-data + OTel + AI APIs |
-| アプリケーション | kensan-dev | あり | kensan-data + OTel + AI APIs |
-| アプリケーション | kensan-data | あり | kensan-prod/dev からの ingress のみ |
+`istio-injection: enabled` ラベルが付いた **全 namespace** に対し、4 本の CCNP が横断的に効く。新しい mesh ns を作ると追加作業なしで自動カバーされる（後述）。
 
-## 通信マトリクス
+| CCNP (`kubernetes/network/network-policy/`) | 効果 |
+|---|---|
+| `clusterwide-default-deny-for-mesh-ns` | ingress + egress を default-deny に切替（`reserved:none` で endpoint を select しつつ何も allow しない）|
+| `clusterwide-allow-dns-for-mesh-ns` | kube-system の DNS への egress を解禁 |
+| `clusterwide-allow-istio-for-mesh-ns` | istio-system への egress（sidecar xDS）を解禁 |
+| `clusterwide-allow-prometheus-scrape-for-mesh-ns` | monitoring からの scrape ingress を解禁 |
 
-### アプリケーション層 (kensan-prod / kensan-dev)
+Cilium のセマンティクス上、これらは **additive**: default-deny が床を作り、allow 系 CCNP が各方向を個別に解禁する。4 本とも `argocd.argoproj.io/sync-options: Prune=false` でリソース個別に prune 防御済み。
 
-| 方向 | 相手 | ポート | 用途 |
-|------|------|--------|------|
-| Egress | kube-system | 53/UDP,TCP | DNS |
-| Egress | istio-system | * | Sidecar xDS |
-| Egress | kensan-data | 5432 | PostgreSQL |
-| Egress | kensan-data | 9000 | MinIO |
-| Egress | kensan-data | 8181 | Polaris |
-| Egress | monitoring | 4318 | OTel Collector |
-| Egress | external | 443 | AI APIs (kensan-ai のみ) |
-| Ingress | istio-system | * | Gateway ルーティング |
-| Ingress | monitoring | * | Prometheus スクレイプ |
-| Ingress | 同一 namespace | * | サービス間通信 |
+対象外（`istio-injection` 無しなので per-ns NetworkPolicy のまま運用）: `cert-manager`、`cloudflare-tunnel`、`vault`、`external-secrets`、`vault-config-operator` 等。これらは `kubernetes/network/network-policy/<ns>.yaml` に個別 NP を置く。
 
-### データ層 (kensan-data)
+## per-ns 追加ポリシーの書き方
 
-| 方向 | 相手 | ポート | 用途 |
-|------|------|--------|------|
-| Egress | kube-system | 53/UDP,TCP | DNS |
-| Egress | monitoring | 4318 | OTel Collector |
-| Ingress | kensan-prod | 5432, 9000, 8181 | DB/Storage アクセス |
-| Ingress | kensan-dev | 5432, 9000, 8181 | DB/Storage アクセス |
-| Ingress | monitoring | * | Prometheus スクレイプ |
-| Ingress | 同一 namespace | * | 内部通信 |
+CCNP が DNS / Istio / scrape の床を張るので、各 ns は **そこから足りない通信だけ** を per-ns NetworkPolicy で allow する。配置は PE 専管の `kubernetes/network/network-policy/<ns>.yaml`（app 自己完結の netpol は例外的に app 側 `resources/` に置く。例: `app-kensan` の `syncthing-guard`）。
 
-### プラットフォーム層
+実例 — `kubernetes/network/network-policy/kensan.yaml`:
 
-| Namespace | Egress 先 | Ingress 元 |
-|-----------|----------|-----------|
-| backstage | kube-system (DNS), istio-system, argocd, external (443) | istio-system, monitoring, 同一 namespace |
-| platform-auth-* | kube-system (DNS), istio-system | istio-system, monitoring, 同一 namespace |
-| cert-manager | kube-system (DNS, API:6443), external (443) | monitoring, webhook (10250), 同一 namespace |
+- `allow-intra-namespace` — ns 内の全 pod 間通信（microservice ↔ PostgreSQL ↔ MinIO ↔ Polaris ↔ Dagster を統合 ns 内で許可）
+- `allow-otel-egress` — monitoring:4318（OTel Collector）への egress
+- `allow-external-ai-egress` — `app: kensan-ai` の pod だけ external:443（AI API）
+- `allow-vault-egress` — `app: user-service` の pod だけ vault:8200（Transit）
+- `allow-dagster-external-egress` — Dagster 系 pod だけ external:443（Slack / Gmail / weather API 等）
 
-## 運用手順
+ポイント:
 
-### 新しい namespace を追加する場合
-
-1. namespace マニフェストを作成（PSS ラベル含む）
-2. 以下の NetworkPolicy ファイルを作成:
-   - `default-deny-all` — 全通信拒否
-   - `allow-dns` — DNS 許可
-   - `allow-intra-namespace` — namespace 内通信許可
-   - `allow-prometheus-scrape` — Prometheus スクレイプ許可
-   - Istio 注入 namespace なら `allow-istio` も追加
-3. アプリ固有の通信要件に応じて追加ポリシーを作成
-4. `docs/network-policy-guide.md` の通信マトリクスを更新
-
-### 新しい外部 API 通信を追加する場合
-
-1. 対象の namespace の network-policy.yaml に egress ルールを追加
-2. 可能な限り podSelector で対象 Pod を限定する
+- **外部 egress は `podSelector` で対象 pod を限定する**（ns 全体に external:443 を開けない）
+- **cross-ns 通信は両側に必要**: 送信元 ns に egress、送信先 ns に ingress
+- DNS / Istio / Prometheus scrape は CCNP 済みなので per-ns で書かない
 
 ```yaml
-# 例: 特定の Pod のみ外部 API へのアクセスを許可
+# 例: 特定 pod のみ外部 API への egress を許可
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
   name: allow-external-api
+  namespace: <ns>
 spec:
   podSelector:
     matchLabels:
-      app: my-service      # 対象 Pod を限定
+      app: my-service      # 対象 pod を限定
   policyTypes:
     - Egress
   egress:
@@ -94,30 +56,35 @@ spec:
           port: 443
 ```
 
-### 新しい namespace 間通信を追加する場合
+## 新 namespace が自動カバーされる仕組み
 
-**両側に** ポリシーが必要：
-1. 送信元 namespace に **egress** ルールを追加
-2. 送信先 namespace に **ingress** ルールを追加
+CCNP の `endpointSelector` が `k8s:io.cilium.k8s.namespace.labels.istio-injection: enabled` を見ているため、**namespace に `istio-injection: enabled` ラベルを付けるだけ** で default-deny + DNS/Istio/scrape allow の床が即座に効く。per-ns で default-deny / allow-dns / allow-istio / allow-prometheus-scrape を書く必要はない。
+
+```bash
+# 新 mesh ns 作成時（label を付けると CCNP が自動適用）
+kubectl label namespace my-new-ns istio-injection=enabled
+```
+
+追加で必要なのは「その ns 固有の egress（外部 API、cross-ns DB 等）」だけ。
 
 ## トラブルシュート
 
-### 通信がブロックされている場合の確認手順
+### 通信がブロックされている場合
 
 ```bash
-# 1. 対象 namespace の NetworkPolicy を一覧
+# per-ns NetworkPolicy を一覧
 kubectl get networkpolicy -n <namespace>
 
-# 2. 特定の NetworkPolicy の詳細を確認
-kubectl describe networkpolicy <policy-name> -n <namespace>
+# clusterwide CCNP を一覧
+kubectl get ciliumclusterwidenetworkpolicy
 
-# 3. Cilium のポリシー適用状況を確認
+# Cilium のポリシー適用状況
 kubectl -n kube-system exec -it <cilium-pod> -- cilium policy get
 
-# 4. Cilium のトラフィックモニタリング（リアルタイム）
+# drop をリアルタイム観測
 kubectl -n kube-system exec -it <cilium-pod> -- cilium monitor --type drop
 
-# 5. Hubble で通信フローを確認（Hubble が有効な場合）
+# Hubble で flow 確認
 hubble observe --namespace <namespace> --verdict DROPPED
 ```
 
@@ -125,19 +92,23 @@ hubble observe --namespace <namespace> --verdict DROPPED
 
 | 症状 | 原因 | 対処 |
 |------|------|------|
-| Pod が DNS 解決できない | `allow-dns` ポリシーが不足 | DNS egress ルールを追加 |
-| Istio sidecar が起動しない | `allow-istio` ポリシーが不足 | istio-system への egress を許可 |
-| Prometheus がスクレイプできない | `allow-prometheus-scrape` が不足 | monitoring からの ingress を許可 |
-| サービス間通信ができない | intra-namespace or cross-namespace ルールが不足 | 通信マトリクスを確認し該当ルールを追加 |
-| 外部 API に接続できない | egress 443 が許可されていない | podSelector 付きの egress ルールを追加 |
+| 新 ns の pod が全通信できない | `istio-injection: enabled` ラベル未付与で CCNP の allow 系が効いていない | ns に label を付与 |
+| Pod が DNS 解決できない | mesh 対象外 ns（CCNP 非適用）で per-ns の DNS egress が無い | per-ns NP に DNS egress を追加 |
+| 外部 API に接続できない | per-ns の egress 443 が未許可 | `podSelector` 付き egress を追加 |
+| cross-ns 通信ができない | 片側のみのポリシー | 送信元に egress / 送信先に ingress の両方を追加 |
 
-### 緊急時: NetworkPolicy の一時無効化
+### 緊急時: ベースラインの一時無効化
 
-通信障害の原因が NetworkPolicy であることが確定した場合、default-deny を削除して全通信を許可できる：
+CCNP が原因と確定した場合に限り、該当 CCNP を一時的に外す（**全 mesh ns に波及するので慎重に**）:
 
 ```bash
-# 特定 namespace の default-deny を削除（全通信が許可される）
-kubectl delete networkpolicy default-deny-all -n <namespace>
+kubectl delete ciliumclusterwidenetworkpolicy default-deny-for-mesh-ns
 ```
 
-**注意**: これは一時的な対処。原因を特定したら適切な allow ルールを追加し、default-deny を復元すること。
+これは一時対処。原因特定後は Git からの sync で復元すること（CCNP は `Prune=false` なので git から消しても ArgoCD は自動削除しない点に注意）。
+
+## 関連
+
+- [ADR-004](../adr/004-network-policy-design.md) — NetworkPolicy 設計
+- [ADR-009](../adr/009-shared-allow-istio-network-policy.md) — allow-istio 共有 + CCNP 集約
+- `kubernetes/network/README.md` — network ディレクトリ全体図

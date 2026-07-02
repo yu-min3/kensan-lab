@@ -42,10 +42,12 @@ The platform covers technologies behind 12 out of 16 Golden Kubestronaut certifi
 
 
 - **Gateway** — Cloudflare Tunnel (internet) and Cilium L2 LB (LAN) route traffic through Istio Gateway using Gateway API
-- **Applications** — workloads deployed to prod/dev namespaces via Argo CD, plus the kensan app in a dedicated namespace
+- **Applications** — workloads deployed to per-app namespaces (`app-{name}`) via Argo CD, plus the kensan app in a dedicated namespace
 - **Internal Developer Platform** — Backstage provides a service catalog (catalog-info.yaml), TechDocs (MkDocs), and Golden Path scaffolding templates
 - **Observability** — applications emit telemetry to OTel Collector, which fans out to Prometheus (metrics), Loki (logs), and Tempo (traces), all visualized in Grafana. AlertManager sends alerts to Slack
-- **Security & Internal Network** — Sealed Secrets for Git-encrypted credentials, Cilium + Istio NetworkPolicy, cert-manager for automated TLS, Pod Security Standards
+- **Authentication** — Keycloak is the OIDC identity provider; the Istio Gateway offloads auth to oauth2-proxy (ext_authz), so SSO is enforced at the edge before traffic ever reaches a workload
+- **Secrets** — HashiCorp Vault is the backbone: static secrets in KV v2 (synced into the cluster by External Secrets), dynamic short-lived database credentials, and Transit encryption-as-a-service for PII. Sealed Secrets is used **only** for the few bootstrap credentials that can't depend on Vault yet — e.g. Vault's own auto-unseal key — avoiding a circular dependency
+- **Zero-trust internal network** — Cilium enforces a default-deny NetworkPolicy baseline while Istio provides automatic mTLS for all service-to-service traffic; cert-manager automates TLS and Pod Security Standards harden workloads
 - **Argo CD** — manages all zones via GitOps. Split into `platform-project` (infrastructure) and `app-project` (applications)
 
 <details>
@@ -54,14 +56,6 @@ The platform covers technologies behind 12 out of 16 Golden Kubestronaut certifi
 The platform uses Cilium LoadBalancer with L2 announcements for local network access. For internet exposure, Cloudflare Tunnel provides Zero Trust access without exposing the home IP. See [this article (Japanese)](https://zenn.dev/yuu7751/articles/9df7ce4f1f4830) for setup details.
 
 </details>
-
-**Features:**
-
-- **Argo CD + Helm multi-source** — App of Apps + ApplicationSet for GitOps at scale
-- **Istio + Gateway API** — full service mesh with mTLS, not just an ingress controller
-- **Backstage** — developer portal with service catalog, TechDocs, and scaffolding templates
-- **Multi-arch (ARM64 + AMD64)** — real scheduling constraints, not a uniform cluster
-- **Wired LAN with WiFi fallback** — primary path on Ethernet (1GbE), WiFi automatically takes over via routing metric if the wire goes down. Originally proven on WiFi-only too
 
 ## Tech Stack
 
@@ -73,14 +67,16 @@ The platform uses Cilium LoadBalancer with L2 announcements for local network ac
 |      <img src="docs/assets/logos/argo.svg" width="32">      | [Argo CD](https://argoproj.github.io/cd/)                                                           | GitOps continuous delivery (Helm multi-source, App of Apps, ApplicationSet) |
 |   <img src="docs/assets/logos/backstage.svg" width="32">    | [Backstage](https://backstage.io/)                                                                  | Developer portal — service catalog, TechDocs, templates                     |
 |    <img src="docs/assets/logos/keycloak.svg" width="32">    | [Keycloak](https://www.keycloak.org/)                                                               | Identity and access management (IAM / SSO)                                  |
+|     <img src="docs/assets/logos/vault.svg" width="32">      | [Vault](https://www.vaultproject.io/)                                                               | Secrets management — KV static, dynamic DB credentials, Transit encryption  |
 |   <img src="docs/assets/logos/prometheus.svg" width="32">   | [Prometheus](https://prometheus.io/)                                                                | Metrics collection and alerting                                             |
 |    <img src="docs/assets/logos/grafana.svg" width="32">     | [Grafana](https://grafana.com/)                                                                     | Observability dashboards                                                    |
 |      <img src="docs/assets/logos/loki.svg" width="32">      | [Loki](https://grafana.com/oss/loki/)                                                               | Log aggregation                                                             |
 |     <img src="docs/assets/logos/tempo.svg" width="32">      | [Tempo](https://grafana.com/oss/tempo/)                                                             | Distributed tracing                                                         |
 | <img src="docs/assets/logos/opentelemetry.svg" width="32">  | [OpenTelemetry](https://opentelemetry.io/)                                                          | Telemetry collection (OTel Collector)                                       |
 |  <img src="docs/assets/logos/cert-manager.svg" width="32">  | [cert-manager](https://cert-manager.io/)                                                            | Automated TLS certificates (Let's Encrypt)                                  |
-| <img src="docs/assets/logos/sealed-secrets.png" width="32"> | [Sealed Secrets](https://sealed-secrets.netlify.app/)                                               | Encrypted secrets in Git                                                    |
+| <img src="docs/assets/logos/sealed-secrets.png" width="32"> | [Sealed Secrets](https://sealed-secrets.netlify.app/)                                               | Bootstrap-only secrets, encrypted in Git (Vault-independent)                |
 |   <img src="docs/assets/logos/cloudflare.svg" width="32">   | [Cloudflare Tunnel](https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/) | Zero Trust internet exposure                                                |
+|                                                             | [Kyverno](https://kyverno.io/)                                                                      | Policy engine — admission control, per-workload Pod Security exceptions     |
 
 ## Hardware
 
@@ -99,7 +95,7 @@ The platform uses Cilium LoadBalancer with L2 announcements for local network ac
 | I/O Heavy     | `requiredDuringScheduling: hardware-class=high-performance` | Prometheus, Loki, Tempo, Keycloak |
 | Medium        | `preferredDuringScheduling: high-performance` (weight: 80)  | OTel Collector                    |
 | Light         | No affinity                                                 | Grafana, Hubble UI                |
-| AMD64-only    | `required: kubernetes.io/arch=amd64`                        | Backstage                         |
+| AMD64-only    | `required: kubernetes.io/arch=amd64`                        | kensan, Backstage                 |
 
 </details>
 
@@ -108,14 +104,21 @@ The platform uses Cilium LoadBalancer with L2 announcements for local network ac
 ```
 kubernetes/                    # Core platform (GitOps-managed)
 ├── argocd/                       # Argo CD: applications/, projects/, root-apps/
+├── network/                      # Cilium, Istio, Gateway API, Cloudflare Tunnel, NetworkPolicy
 ├── observability/                # Prometheus, Grafana, Loki, Tempo, OTel Collector
-├── network/                      # Cilium, Istio, Gateway API
-├── security/                     # cert-manager, Sealed Secrets, Keycloak
-├── environments/                 # app-dev, app-prod, kensan-prod, kensan-data, observability, system-infra
-└── storage/                      # local-path-provisioner
+├── auth/                         # Keycloak, oauth2-proxy, Vault OIDC auth
+├── secrets/                      # Vault, External Secrets, Sealed Secrets, cert-manager, Reloader
+├── policy/                       # Kyverno + cluster policies (PSS baseline/restricted, exceptions)
+├── storage/                      # Longhorn, local-path-provisioner
+├── apps/                         # Per-app deploy definitions (e.g. app-kensan: values + raw resources)
+├── environments/                 # Shared-namespace bootstrap (app-prod)
+└── kube-system/                  # Namespace labels, Pod Security Standards
+charts/                           # Platform-provided Helm charts (app-base: generic app deploy chart)
+packages/                         # Shared frontend packages (design-tokens — Whetstone design system)
 backstage/                        # Developer portal (app/ + manifests/)
-apps/                             # Applications deployed on the platform
-docs/                             # ADRs, architecture, bootstrapping guides
+apps/                             # Application source (kensan = current unified app, kensan-legacy = frozen)
+bootstrap/                        # Vault & Keycloak bootstrap (Terraform + scripts)
+docs/                             # ADRs, architecture, guides (MkDocs site)
 ```
 
 ## Documentation
@@ -124,11 +127,15 @@ docs/                             # ADRs, architecture, bootstrapping guides
 | ------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **Docs site**       | **[https://yu-min3.github.io/kensan-lab/](https://yu-min3.github.io/kensan-lab/)** — full documentation site |
 | **Getting Started** | [Installation](./docs/getting-started/installation.md) / [Configuration](./docs/getting-started/configuration.md) / [Bootstrapping](./docs/bootstrapping/index.md) _(in progress)_ / [Secret Management](./docs/secret-management/index.md) |
-| **Architecture**    | [Namespace Labels](./docs/concepts/namespace-label-design.md) / [ADRs](./docs/adr/) / [Kustomize Guidelines](./docs/concepts/kustomize-guidelines.md)                                                                        |
+| **Architecture**    | [Namespace Labels](./docs/concepts/namespace-label-design.md) / [ADRs](./docs/adr/) / [Kustomize Guidelines](./docs/concepts/kustomize-guidelines.md) _(deprecated — Kustomize removed from `kubernetes/`)_                                                                        |
 
 ## Application: kensan
 
-The `apps/kensan/` directory contains a full-stack application running on this platform — a personal productivity tool built with React, Go microservices, Python AI agents, and an Iceberg data lakehouse (Dagster + Polaris). It serves as both a real workload and a reference for what the platform supports: multi-service deployments, database management, CI/CD via Argo CD, and full observability integration with OpenTelemetry instrumentation across all services.
+A real application runs on this platform as a reference workload. It currently exists in two lineages mid-cutover:
+
+- **`apps/kensan`** — the current unified app: a file-based knowledge & goal manager. Markdown files are the single source of truth, served by a single Go service (REST API + bundled SPA, Whetstone design system) shipped as one container image. See [apps/kensan/README.md](./apps/kensan/README.md).
+- **`apps/kensan-legacy`** — the previous full-stack app (React + Go microservices + Python AI agents + an Iceberg data lakehouse with Dagster & Polaris). **Frozen**, kept running only until Phase 7 cutover. It still demonstrates what the platform supports: multi-service deployments, dynamic DB credentials, Argo CD CI/CD, and OpenTelemetry instrumentation across services.
+- **`kubernetes/apps/app-kensan`** — the deploy definition for the current app (Argo CD `Application` consuming the `charts/app-base` chart via multi-source, plus raw resources: per-app namespace, workspace PVC, and LAN-only Syncthing sync).
 
 ## Acknowledgments
 

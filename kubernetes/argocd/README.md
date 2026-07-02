@@ -21,7 +21,7 @@ platform-root-app (root)
        ├─ applications/secrets/ (vault, external-secrets, ...)
        ├─ applications/auth/ (keycloak, oauth2-proxy, ...)
        ├─ applications/observability/applicationset.yaml
-       ├─ applications/environments/applicationset.yaml
+       ├─ applications/namespaces/ (ns-lifecycle app 群 + app-prod)
        ├─ applications/storage/ (longhorn)
        ├─ applications/backstage/
        └─ applications/apps/ (Backstage 経由で auto-commit される user app)

@@ -19,11 +19,11 @@ Diagnose issues with `$ARGUMENTS[0]`.
    | argocd | argocd |
    | prometheus, grafana, loki, tempo, otel-collector | monitoring |
    | cert-manager | cert-manager |
-   | sealed-secrets | kube-system |
-   | keycloak | keycloak-prod / keycloak-dev |
+   | sealed-secrets | sealed-secrets |
+   | keycloak | platform-auth-prod |
    | backstage | backstage |
 
-   If component is an app name, check `app-dev` and `app-prod`.
+   If component is an app name, check `app-prod` (per-app namespaces such as `app-kensan` may also exist).
 
 2. **Check Argo CD Application status**:
    ```bash

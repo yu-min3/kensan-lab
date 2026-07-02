@@ -1,35 +1,43 @@
-import { StrictMode } from 'react'
-import { createRoot } from 'react-dom/client'
-import { Toaster } from 'sonner'
-import './index.css'
-import App from './App.tsx'
-import { httpClient } from './api/client'
-import { useAuthStore } from './stores/useAuthStore'
-import { initTelemetry } from './api/telemetry'
+import { StrictMode } from "react";
+import { createRoot } from "react-dom/client";
+import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { AppShell } from "./components/AppShell";
+import { Dashboard } from "./pages/Dashboard";
+import { DailyPage } from "./pages/DailyPage";
+import { MemoPage } from "./pages/MemoPage";
+import { TasksPage } from "./pages/TasksPage";
+import { ProjectsPage } from "./pages/ProjectsPage";
+import { ReviewsPage } from "./pages/ReviewsPage";
+import { NotesPage } from "./pages/NotesPage";
+import { LifeGoalsPage } from "./pages/LifeGoalsPage";
+import { EditorLabPage } from "./pages/EditorLabPage";
+import "./index.css";
 
-// Initialize OpenTelemetry tracing
-initTelemetry()
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: { staleTime: 15_000, refetchOnWindowFocus: true },
+  },
+});
 
-// 401エラー時にログアウト処理を実行
-httpClient.setOnUnauthorized(() => {
-  useAuthStore.getState().logout()
-})
-
-async function enableMocking() {
-  // MSWを有効化: 明示的にVITE_ENABLE_MSW=trueの場合のみ
-  if (import.meta.env.VITE_ENABLE_MSW === 'true') {
-    const { worker } = await import('./mocks/browser')
-    return worker.start({
-      onUnhandledRequest: 'bypass',
-    })
-  }
-}
-
-enableMocking().then(() => {
-  createRoot(document.getElementById('root')!).render(
-    <StrictMode>
-      <App />
-      <Toaster richColors position="top-right" theme={document.documentElement.classList.contains('dark') ? 'dark' : 'light'} />
-    </StrictMode>,
-  )
-})
+createRoot(document.getElementById("root")!).render(
+  <StrictMode>
+    <QueryClientProvider client={queryClient}>
+      <BrowserRouter>
+        <AppShell>
+          <Routes>
+            <Route path="/" element={<Dashboard />} />
+            <Route path="/tasks" element={<TasksPage />} />
+            <Route path="/projects" element={<ProjectsPage />} />
+            <Route path="/daily" element={<DailyPage />} />
+            <Route path="/memos" element={<MemoPage />} />
+            <Route path="/notes" element={<NotesPage />} />
+            <Route path="/life" element={<LifeGoalsPage />} />
+            <Route path="/reviews" element={<ReviewsPage />} />
+            <Route path="/editor-lab" element={<EditorLabPage />} />
+          </Routes>
+        </AppShell>
+      </BrowserRouter>
+    </QueryClientProvider>
+  </StrictMode>,
+);

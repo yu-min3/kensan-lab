@@ -9,7 +9,8 @@ metadata:
     kensan-lab.platform/component: observability
     ## PSA labels intentionally not enforced:
     ## kube-prometheus-stack の node-exporter は hostNetwork/hostPID/hostPath/hostPort を
-    ## 要求するため "baseline" と非互換。monitoring は platform 系 ns で AD tenant ns ではない
-    ## ので enforce 対象外で OK。
-    ## TODO(kyverno): Kyverno 統合後に ClusterPolicy で baseline 強制 + 既知 workload
-    ##   (node-exporter / vault 等) を per-workload exempt する形で復活させる
+    ## 要求するため "baseline" と非互換。
+    ## PSS は Kyverno ClusterPolicy `pss-baseline` (kubernetes/policy/kyverno-policies/) が
+    ## Audit で監視 (強制は ADR-012 Phase 3 の Enforce 昇格後)。node-exporter は
+    ## PolicyException で per-workload exempt 済み。旧 TODO(kyverno) が挙げていた
+    ## vault は現状 baseline 準拠のため exempt 不要

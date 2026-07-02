@@ -2,6 +2,37 @@
 
 OpenTelemetry を中心に、メトリクス・トレース・ログを統一的に収集・保存・可視化する。
 
+クラスタ健全性（ノード死活・probe・dead-man's switch）の設計は [cluster-health-monitoring.md](./cluster-health-monitoring.md) を参照。
+
+## 監視の全体像
+
+監視は「**何を観るか**（テレメトリ 3 本柱）」と「**どう観るか**（健全性 3 層）」の 2 軸で構成される。
+
+```
+   何を観るか (テレメトリ)               どう観るか (健全性監視の層)
+┌──────────────────────────┐   ┌────────────────────────────────────────┐
+│ Metrics → Prometheus     │   │ ① 受動: scrape できたか                │
+│ Traces  → Tempo          │   │    node-exporter / kube-state-metrics  │
+│ Logs    → Loki           │   │ ② 能動: 外から叩いて応答するか        │
+│      (OTel Collector 経由)│   │    blackbox-exporter (ICMP/HTTPS)      │
+└────────────┬─────────────┘   │ ③ 監視の監視: 監視自体は生きてるか    │
+             │                  │    Grafana Cloud remote_write          │
+             ▼                  │    + no-data アラート                  │
+       Grafana (可視化)         └────────────────┬───────────────────────┘
+             │                                   │
+             ▼                                   ▼
+   Alertmanager → Slack #k8s-alerts    Grafana Cloud → メール
+   (クラスタ内で完結する通知)           (クラスタ外からの dead-man's switch)
+```
+
+| 層 | 主担当 | 検知できる障害の例 | 限界 |
+|---|---|---|---|
+| ① 受動 | kube-prometheus-stack (node-exporter, KSM) + Cluster Health ダッシュボード | リソース枯渇、NotReady、Pi 温度 / microSD 残量、Pod 異常 | scrape 不能の原因 (OS 死亡 vs kubelet 死亡) を区別できない |
+| ② 能動 | blackbox-exporter + Probe CRD | OS 死活、有線断 → WiFi 縮退、Gateway/cert/認証経路のエンドツーエンド断 | probe 自体がクラスタ内なので、クラスタ全停止では沈黙 |
+| ③ 監視の監視 | Grafana Cloud free tier (厳選 ~1.4k series を remote_write) | 監視スタックごと沈黙 (m4neo SPOF)、宅内回線断 | 詳細メトリクスは送っていない (一望ビュー相当のみ) |
+
+3 層が互いの限界を埋める設計。導入経緯と Phase 分割は [cluster-health-monitoring.md](./cluster-health-monitoring.md)、実例は m4neo 障害 #2（8 日間の沈黙、層 ③ の動機）と 2026-06-06 Vault OIDC incident（認証経路の 3 週間潜伏、層 ② の HTTPS probe 対象選定の根拠）。
+
 ## アーキテクチャ
 
 ```
@@ -64,11 +95,19 @@ Prometheus
 - `EtcdSlowWalFsync`: etcd WAL fsync p99 > 100ms (microSD 劣化の先行指標)
 - `EtcdSlowBackendCommit`: etcd backend commit p99 > 250ms
 
+probe ベースのアラート (`kubernetes/observability/blackbox-exporter/resources/blackbox-alerts.yaml`):
+
+- `NodeICMPUnreachable`: 有線 + WiFi 両系統 ICMP 断 5 分 (critical、ノード物理死)
+- `NodeWiredLinkDown`: 有線断 + WiFi 生存 10 分 (warning、fallback 縮退運転)
+- `PlatformEndpointDown`: platform HTTPS probe 断 5 分 (warning、経路レベル故障)
+
+クラスタ外の通知 (dead-man's switch) は Grafana Cloud 側の no-data アラートが担当（上記「監視の全体像」参照）。Alertmanager 経由ではない。
+
 ## コンポーネント
 
 ### OpenTelemetry Collector
 
-テレメトリーの中央集約・処理・転送。Deployment 1 replica、`monitoring` ns、`otel/opentelemetry-collector-contrib:0.93.0`。
+テレメトリーの中央集約・処理・転送。Deployment 1 replica、`monitoring` ns、`opentelemetry-collector` chart（image は chart の appVersion に追従。版数の SoT は `kubernetes/observability/otel-collector/config.json` の `chartVersion`）。
 
 3 つのパイプライン:
 
@@ -105,7 +144,7 @@ exporters: [loki]
 
 ### Grafana Tempo
 
-分散トレーシングバックエンド。Single Binary mode、`monitoring` ns、`grafana/tempo:2.3.1`、10Gi PVC。
+分散トレーシングバックエンド。Single Binary mode、`monitoring` ns、`tempo` chart（image は chart の appVersion に追従。版数の SoT は `kubernetes/observability/tempo/config.json` の `chartVersion`）、10Gi PVC。
 
 - OTLP gRPC: `tempo.monitoring.svc:4317`
 - OTLP HTTP: `tempo.monitoring.svc:4318`
@@ -115,9 +154,15 @@ exporters: [loki]
 
 ### Grafana Loki
 
-ログ集約。SingleBinary mode、`monitoring` ns、`grafana/loki:3.5.7`、10Gi PVC、TSDB v13 schema、保持 7 日。
+ログ集約。SingleBinary mode、`monitoring` ns、`loki` chart（image は chart の appVersion に追従。版数の SoT は `kubernetes/observability/loki/config.json` の `chartVersion`）、10Gi PVC、TSDB v13 schema、保持 7 日。
 
 受信: `http://loki.monitoring.svc:3100/loki/api/v1/push`
+
+### blackbox-exporter
+
+外形監視（能動監視・層 ②）。`prometheus-blackbox-exporter` chart、`monitoring` ns（版数の SoT は `kubernetes/observability/blackbox-exporter/config.json` の `chartVersion`）。Probe CRD でノード ICMP（有線 + WiFi 両系統）と platform エンドポイントの HTTPS を外から叩き、応答性を確認する。アラートは `resources/blackbox-alerts.yaml`（上記「アラートパイプライン」参照）。
+
+詳細: [`kubernetes/observability/blackbox-exporter/`](https://github.com/yu-min3/kensan-lab/tree/main/kubernetes/observability/blackbox-exporter)
 
 ### Grafana
 

@@ -66,6 +66,42 @@ plugins:
       enable_creation_date: true
       type: timeago
       fallback_to_build_date: true
+  # AI-facing output: generates /llms.txt (curated index) and /llms-full.txt
+  # (full content) from the same human docs at build time. No content duplication.
+  # https://llmstxt.org/ · https://github.com/pawamoy/mkdocs-llmstxt
+  - llmstxt:
+      full_output: llms-full.txt
+      markdown_description: >-
+        Enterprise-grade Kubernetes on bare-metal — a reference architecture for
+        platform engineering. Argo CD GitOps, Istio service mesh, Cilium CNI,
+        Vault, Keycloak, Backstage, and full observability (Prometheus, Grafana,
+        Loki, Tempo), running on Raspberry Pis and a mini PC.
+      sections:
+        Getting started:
+          - index.md
+          - getting-started/*.md
+        Architecture:
+          - architecture/*.md
+        Concepts:
+          - concepts/*.md
+        Design system:
+          - design/*.md
+        Bootstrapping:
+          - bootstrapping/*.md
+        Secret management & auth:
+          - secret-management/*.md
+          - auth/*.md
+        Runbooks & operations:
+          - runbooks/*.md
+          - operations/*.md
+          - guides/*.md
+        Architecture decisions:
+          - adr/*.md
+        Incidents & roadmap:
+          - incidents/*.md
+          - roadmap/*.md
+        Articles:
+          - articles.md
 
 markdown_extensions:
   - admonition
@@ -112,25 +148,49 @@ nav:
       - Configuration: getting-started/configuration.md
       - Bootstrapping:
           - Overview: bootstrapping/index.md
-          - Add worker node (M4 Neo): bootstrapping/add-worker-node-m4neo.md
+          - Stage 1 — Vault HA: bootstrapping/12-vault-stage1.md
           - Grafana independent setup: bootstrapping/11-grafana-independent.md
+          - Add worker node (M4 Neo): bootstrapping/add-worker-node-m4neo.md
   - Architecture:
       - Infrastructure overview: architecture/infrastructure.md
       - auth/: architecture/auth.md
       - secrets/: architecture/secrets.md
       - network/: architecture/network.md
       - observability/: architecture/observability.md
+      - Cluster health monitoring: architecture/cluster-health-monitoring.md
   - Concepts:
       - Documentation Layout: concepts/doc-layout.md
-      - Kustomize Guidelines: concepts/kustomize-guidelines.md
       - Namespace Label Design: concepts/namespace-label-design.md
       - Network Policy: concepts/network-policy-guide.md
+      - Policy Enforcement: concepts/policy-enforcement.md
+      - Kustomize Guidelines (deprecated): concepts/kustomize-guidelines.md
+  - Design System:
+      - Overview: design/DESIGN_SYSTEM.md
+      - Components: design/components.md
+      - Patterns: design/patterns.md
+      - Adoption Status: design/adoption-status.md
   - Operations:
       - Secret Management: secret-management/index.md
+      - Auth integration:
+          - ArgoCD ↔ Keycloak (Path B): auth/argocd-keycloak-integration.md
+          - Gateway OIDC (Path A): auth/gateway-oidc.md
+          - oauth2-proxy: auth/oauth2-proxy.md
       - Runbooks:
-          - Longhorn Restore Test: runbooks/longhorn-restore-test.md
+          - runbooks/index.md
+          - Vault Raft auto-join: runbooks/vault-raft-join.md
+          - Cilium WiFi stability: runbooks/cilium-wifi-stability.md
+          - Cilium update strategy: runbooks/cilium-update-strategy.md
+          - Longhorn restore test: runbooks/longhorn-restore-test.md
+          - ArgoCD repo-server tuning: runbooks/argocd-repo-server-tuning.md
+      - Environment cleanup:
+          - kensan dev cleanup: operations/kensan-dev-cleanup.md
+          - Keycloak dev cleanup: operations/keycloak-dev-cleanup.md
+          - Vault role & gateway cleanup: operations/vault-dev-role-and-gateway-cleanup.md
+      - Recovery:
+          - Workspace volume recovery: operations/kensan-workspace-volume-recovery.md
+          - Syncthing pairing recovery: operations/syncthing-pairing-recovery.md
       - Guides:
-          - WiFi Stabilization: guides/wifi-stabilization.md
+          - Raspberry Pi WiFi stabilization: guides/wifi-stabilization.md
   - Architecture Decisions:
       - Overview: adr/index.md
       - 001 — TLS Termination Pattern: adr/001-tls-termination-pattern.md
@@ -143,6 +203,15 @@ nav:
       - 008 — Keycloak DB Credentials: adr/008-keycloak-db-credentials.md
       - 009 — Shared Allow-Istio NetworkPolicy: adr/009-shared-allow-istio-network-policy.md
       - 010 — Istio Native OAuth2 (Absent): adr/010-istio-native-oauth2-absent.md
+      - 011 — Vault Version Pinning: adr/011-vault-version-pinning.md
+      - 012 — Policy Enforcement with Kyverno: adr/012-policy-enforcement-kyverno.md
+      - 013 — Keycloak DB Credentials → Vault Dynamic: adr/013-keycloak-db-credentials-vault-dynamic.md
+      - 014 — Namespace Naming & Label Contract v2: adr/014-namespace-naming-label-contract-v2.md
+      - 015 — VCO + Setup-Script Hybrid: adr/015-vco-setup-script-hybrid.md
+      - 016 — LAN-Frictionless + External-Gate Model: adr/016-lan-frictionless-cf-access-external-gate.md
   - Incidents:
+      - incidents/index.md
       - 2026-03-02 system-infra Sync Blocked: incidents/2026-03-02-system-infra-sync-blocked.md
+  - Roadmap:
+      - Storage (local-path → Longhorn): roadmap/storage-longhorn.md
   - Articles: articles.md

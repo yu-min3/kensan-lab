@@ -1,0 +1,56 @@
+# Prometheus Blackbox Exporter — 能動 probe (ICMP / HTTPS)
+# 設計: docs/architecture/cluster-health-monitoring.md (Phase 2)
+# probe 対象は resources/ の Probe CRD で宣言する (対象追加は Probe CR に 1 行)
+
+fullnameOverride: blackbox-exporter
+
+# ICMP probe を非 root で動かすための sysctl (K8s safe sysctl、デフォルト許可)。
+# gid 1000 (runAsGroup) を ping_group_range に含めることで、blackbox が
+# unprivileged ICMP (SOCK_DGRAM) を使える。
+# 注: capabilities.add ["NET_RAW"] では動かない — K8s に ambient capability が
+# 無いため、非 root プロセスの effective set に capability が入らない (実機確認済み)。
+podSecurityContext:
+  sysctls:
+    - name: net.ipv4.ping_group_range
+      value: "1000 1000"
+
+securityContext:
+  runAsUser: 1000
+  runAsGroup: 1000
+  readOnlyRootFilesystem: true
+  runAsNonRoot: true
+  allowPrivilegeEscalation: false
+  capabilities:
+    drop: ["ALL"]
+
+config:
+  modules:
+    # HTTPS エンドツーエンド疎通 (LB → Gateway → cert → backend)。
+    # oauth2-proxy 保護ホストは Keycloak login への redirect を follow して
+    # 最終 200 で成功 = 認証チェーン込みの疎通確認になる
+    http_2xx:
+      prober: http
+      timeout: 5s
+      http:
+        valid_http_versions: ["HTTP/1.1", "HTTP/2.0"]
+        follow_redirects: true
+        preferred_ip_protocol: "ip4"
+    # ノード OS レベルの死活 (kubelet 死亡と区別するため)
+    icmp:
+      prober: icmp
+      timeout: 5s
+      icmp:
+        preferred_ip_protocol: "ip4"
+
+resources:
+  requests:
+    cpu: 20m
+    memory: 32Mi
+  limits:
+    cpu: 50m
+    memory: 64Mi
+
+# 自己メトリクスは不要 (probe 結果は Prometheus が Probe CRD 経由で scrape する)
+serviceMonitor:
+  selfMonitor:
+    enabled: false

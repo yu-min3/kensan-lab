@@ -1,0 +1,41 @@
+## Kyverno ポリシー本体 (Pattern B: raw YAML、network-policy と同じ思想で集約)
+## engine (kyverno app, wave -2) の CRD 登録後に sync させるため wave -1
+##
+## NOTE: wave は Application CR の作成順しか保証しないため、初回 bootstrap では
+## CRD 登録完了前に sync が走り `no matches for kind ClusterPolicy` で失敗しうる。
+## retry (limit 5, max 3m) で収束する想定 — Degraded で止まった場合は手動 re-sync
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: kyverno-policies
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "-1"
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: platform-project
+  source:
+    repoURL: https://github.com/yu-min3/kensan-lab
+    targetRevision: main
+    path: kubernetes/policy/kyverno-policies
+    directory:
+      recurse: true  # exceptions/ subdir を含める
+  destination:
+    server: https://kubernetes.default.svc
+    ## ClusterPolicy は cluster-scoped。namespaced なのは PolicyException のみで、
+    ## engine 側の features.policyExceptions.namespace=kyverno に合わせる
+    namespace: kyverno
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=false
+      - ServerSideApply=true
+    retry:
+      limit: 5
+      backoff:
+        duration: 5s
+        factor: 2
+        maxDuration: 3m

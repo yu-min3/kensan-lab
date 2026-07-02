@@ -1,0 +1,37 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 630" width="1200" height="630">
+  
+  <rect width="1200" height="630" fill="#F5F2EC"></rect>
+
+  
+  <g stroke="#E5DFD2" stroke-width="1">
+    <line x1="0" y1="80" x2="1200" y2="80"></line>
+    <line x1="0" y1="550" x2="1200" y2="550"></line>
+    <line x1="80" y1="0" x2="80" y2="630"></line>
+    <line x1="1120" y1="0" x2="1120" y2="630"></line>
+  </g>
+
+  
+  <g font-family="&#39;JetBrains Mono&#39;, monospace" font-size="14" fill="#A89C8A" letter-spacing="2">
+    <text x="80" y="64">KENSAN-LAB · WHETSTONE v1.0</text>
+    <text x="1120" y="64" text-anchor="end">PLATFORM · DESIGN SYSTEM</text>
+    <text x="80" y="600">— 砥石で研ぐように、すべての app を同じ言語で磨き上げる</text>
+    <text x="1120" y="600" text-anchor="end">2026 · 05</text>
+  </g>
+
+  
+  <g transform="translate(140, 200) scale(3.2)">
+    <rect x="15" y="61" width="70" height="17" rx="2.5" fill="#7A6E5D"></rect>
+    <path d="M18,58 Q38,50 55,38 Q72,24 82,12 L82,58 Z" fill="#0284C7"></path>
+    <path d="M88,8 L90,3 L92,8 L97,10 L92,12 L90,17 L88,12 L83,10 Z" fill="#0284C7" fill-opacity="0.6"></path>
+  </g>
+
+  
+  <g transform="translate(560, 0)">
+    <text x="0" y="320" font-family="&#39;Noto Serif JP&#39;, &#39;Hiragino Mincho ProN&#39;, serif" font-size="92" font-weight="600" fill="#171411" letter-spacing="2">研鑽</text>
+    <text x="0" y="380" font-family="&#39;Inter&#39;, &#39;Hiragino Sans&#39;, sans-serif" font-size="38" font-weight="600" fill="#171411" letter-spacing="0.5">kensan-lab</text>
+    <text x="0" y="430" font-family="&#39;Inter&#39;, &#39;Hiragino Sans&#39;, sans-serif" font-size="22" font-weight="400" fill="#7A6E5D">platform design system · Whetstone</text>
+
+    
+    <rect x="0" y="455" width="60" height="3" fill="#0284C7"></rect>
+  </g>
+</svg>

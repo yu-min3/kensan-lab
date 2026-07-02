@@ -7,6 +7,9 @@ metadata:
     kensan-lab.platform/environment: infrastructure
     kensan-lab.platform/tier: platform
     kensan-lab.platform/component: service-mesh
+    ## Kyverno pss-baseline の床から除外する宣言 (v2 統一設計、ADR-012)
+    kensan-lab.platform/pss-level: privileged
+    ## PSA labels は Phase 3 (Enforce 昇格) と同時に撤去
     pod-security.kubernetes.io/enforce: privileged
     pod-security.kubernetes.io/warn: baseline
   annotations:

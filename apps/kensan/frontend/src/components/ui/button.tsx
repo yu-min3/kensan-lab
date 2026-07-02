@@ -1,56 +1,53 @@
-import * as React from "react"
-import { Slot } from "@radix-ui/react-slot"
-import { cva, type VariantProps } from "class-variance-authority"
+import { type ButtonHTMLAttributes, forwardRef } from "react";
+import { Loader2 } from "lucide-react";
+import clsx from "clsx";
 
-import { cn } from "@/lib/utils"
+// components.md 01. Button — variant / size はここに列挙されたものだけ
+type Variant = "primary" | "secondary" | "outline" | "ghost" | "destructive" | "link";
+type Size = "sm" | "md" | "lg";
 
-const buttonVariants = cva(
-  "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0",
-  {
-    variants: {
-      variant: {
-        default: "bg-primary text-primary-foreground hover:bg-primary/90",
-        destructive:
-          "bg-destructive text-destructive-foreground hover:bg-destructive/90",
-        outline:
-          "border border-input bg-background hover:bg-accent hover:text-accent-foreground",
-        secondary:
-          "bg-secondary text-secondary-foreground hover:bg-secondary/80",
-        ghost: "hover:bg-accent hover:text-accent-foreground",
-        link: "text-primary underline-offset-4 hover:underline",
-      },
-      size: {
-        default: "h-10 px-4 py-2",
-        sm: "h-9 rounded-md px-3",
-        lg: "h-11 rounded-md px-8",
-        icon: "h-10 w-10",
-      },
-    },
-    defaultVariants: {
-      variant: "default",
-      size: "default",
-    },
-  }
-)
+const variantClass: Record<Variant, string> = {
+  // foreground も必ず semantic トークンで（dark mode では brand/destructive の
+  // 上に乗る文字色が暗色に反転する設計 — text-white 固定は NG）
+  primary: "bg-brand text-brand-foreground hover:opacity-90",
+  secondary: "bg-muted text-foreground hover:bg-accent",
+  outline: "border border-border-strong bg-transparent hover:bg-accent",
+  ghost: "bg-transparent hover:bg-accent",
+  destructive: "bg-destructive text-destructive-foreground hover:opacity-90",
+  link: "bg-transparent text-brand underline-offset-4 hover:underline p-0 h-auto",
+};
 
-export interface ButtonProps
-  extends React.ButtonHTMLAttributes<HTMLButtonElement>,
-    VariantProps<typeof buttonVariants> {
-  asChild?: boolean
+const sizeClass: Record<Size, string> = {
+  sm: "text-xs px-2.5 gap-1.5",
+  md: "text-sm px-3.5 gap-2",
+  lg: "text-base px-5 gap-2",
+};
+
+export interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
+  variant?: Variant;
+  size?: Size;
+  iconOnly?: boolean;
+  loading?: boolean;
 }
 
-const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
-  ({ className, variant, size, asChild = false, ...props }, ref) => {
-    const Comp = asChild ? Slot : "button"
-    return (
-      <Comp
-        className={cn(buttonVariants({ variant, size, className }))}
-        ref={ref}
-        {...props}
-      />
-    )
-  }
-)
-Button.displayName = "Button"
-
-export { Button, buttonVariants }
+export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
+  ({ variant = "secondary", size = "md", iconOnly, loading, className, children, disabled, ...rest }, ref) => (
+    <button
+      ref={ref}
+      disabled={disabled || loading}
+      className={clsx(
+        "ds-control inline-flex items-center justify-center rounded-lg font-medium transition-colors duration-fast",
+        "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50 disabled:pointer-events-none",
+        variantClass[variant],
+        variant !== "link" && sizeClass[size],
+        iconOnly && "aspect-square px-0",
+        className,
+      )}
+      {...rest}
+    >
+      {loading && <Loader2 size={size === "sm" ? 14 : size === "lg" ? 18 : 16} className="animate-spin" />}
+      {children}
+    </button>
+  ),
+);
+Button.displayName = "Button";

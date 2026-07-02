@@ -62,14 +62,21 @@ config:
 
     email_domains                  = ["*"]
 
-    cookie_domains                 = [".platform.yu-min3.com", ".yu-mins.com"]
+    cookie_domains                 = [".platform.yu-min3.com", ".app.yu-min3.com", ".yu-mins.com"]
     cookie_samesite                = "lax"
     cookie_secure                  = true
     cookie_httponly                = true
-    cookie_expire                  = "10h"
-    cookie_refresh                 = "1h"
+    # ADR-016: 内側 identity セッションは 30日 (LAN frictionless = デバイス毎に
+    # 1回ログイン → 以降透過)。外側の厳格さは Cloudflare Access (24h gate) が担うので
+    # この cookie を全ドメイン共通で長くしても外の posture は緩まない。
+    # 前提: Keycloak `kensan` realm の SSO Session Idle/Max + refresh token 寿命も
+    # 30日へ引き上げること (admin console 管理 = GitOps 外、ドリフト注意)。これが
+    # 12h のままだと refresh が失敗し cookie_expire に関わらず再ログインに飛ぶ。
+    # cookie_refresh は短く保ち、refresh token で access token をサイレント更新し続ける。
+    cookie_expire                  = "720h"
+    cookie_refresh                 = "20m"
 
-    whitelist_domains              = [".platform.yu-min3.com", ".yu-mins.com"]
+    whitelist_domains              = [".platform.yu-min3.com", ".app.yu-min3.com", ".yu-mins.com"]
 
     proxy_prefix                   = "/oauth2"
 

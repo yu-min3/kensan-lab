@@ -1,0 +1,17 @@
+{
+  "name": "研鑽 kensan",
+  "short_name": "kensan",
+  "description": "ファイル SSoT のナレッジ & ゴール管理",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#0284C7",
+  "icons": [
+    {
+      "src": "/favicon.svg",
+      "type": "image/svg+xml",
+      "sizes": "any",
+      "purpose": "any"
+    }
+  ]
+}

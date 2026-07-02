@@ -1,0 +1,50 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: app-kensan
+  namespace: argocd
+  annotations:
+    # root-app からの Application CR prune 防止。PVC 自体の防御は
+    # resources/pvc-workspace.yaml のリソース個別 annotation（PR #366）
+    argocd.argoproj.io/sync-options: Prune=false
+  # NOTE: resources-finalizer 不在 — Application 削除で PVC を道連れにしない
+spec:
+  project: app-project
+
+  sources:
+    # 1. platform 提供の汎用 chart（PE 所有）
+    - repoURL: https://github.com/yu-min3/kensan-lab
+      targetRevision: main
+      path: charts/app-base
+      helm:
+        releaseName: app-kensan
+        valueFiles:
+          - $values/kubernetes/apps/app-kensan/values.yaml
+    # 2. values 参照用 ref
+    - repoURL: https://github.com/yu-min3/kensan-lab
+      targetRevision: main
+      ref: values
+    # 3. 生マニフェスト（namespace 等）
+    - repoURL: https://github.com/yu-min3/kensan-lab
+      targetRevision: main
+      path: kubernetes/apps/app-kensan/resources
+      directory:
+        recurse: true
+
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: app-kensan
+
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=false # namespace.yaml（ADR-006 labels 付き）で管理
+      - ServerSideApply=true
+    retry:
+      limit: 5
+      backoff:
+        duration: 5s
+        factor: 2
+        maxDuration: 3m

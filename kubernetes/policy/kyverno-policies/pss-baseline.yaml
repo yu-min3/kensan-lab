@@ -1,0 +1,47 @@
+## PSS baseline の「床」— pss-level=privileged 宣言の ns 以外、全 ns に無条件適用
+## (v2 統一設計: PSA は不活性化し、PSS 強制は Kyverno に一本化 — ADR-012 改訂)
+##
+## scope 設計:
+##   - 床からの離脱は ns 側の `kensan-lab.platform/pss-level: privileged` 宣言が SoT
+##     (現状: kube-system / istio-system / longhorn-system / local-path-storage)。
+##     この宣言を名乗れる条件 (tier=platform) は ns-label-contract rule が強制する
+##   - pss-level 未宣言 / 未知の値の ns はすべて床に落ちる (安全側フォールバック)
+##   - より厳しい level は pss-restricted.yaml (pss-level=restricted) が担当
+##   - 既知の正当な violation は exceptions/ の PolicyException で exempt
+##     (実機照合 2026-06-06: 該当は node-exporter のみ)
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: pss-baseline
+  annotations:
+    policies.kyverno.io/title: Pod Security Standards (Baseline)
+    policies.kyverno.io/category: Pod Security
+    policies.kyverno.io/severity: medium
+    policies.kyverno.io/description: >-
+      Pod Security Standards baseline profile の床。pss-level=privileged を
+      宣言した ns 以外の全 namespace に適用する。例外は per-workload の
+      PolicyException で管理する (Kyverno 統一設計)。
+spec:
+  background: true
+  webhookConfiguration:
+    failurePolicy: Ignore  # admission controller (replica 1) 停止時に cluster を止めない
+  rules:
+    - name: baseline
+      match:
+        any:
+          - resources:
+              kinds:
+                - Pod
+      exclude:
+        any:
+          - resources:
+              kinds:
+                - Pod
+              namespaceSelector:
+                matchLabels:
+                  kensan-lab.platform/pss-level: privileged
+      validate:
+        failureAction: Audit  # Phase 3 で Enforce へ昇格 (ADR-012)
+        podSecurity:
+          level: baseline
+          version: latest

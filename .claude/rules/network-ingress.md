@@ -30,11 +30,14 @@ Cloudflare Tunnel の token は ESO 経由（`external-secret.yaml`、Vault path
 |---------|----|
 | gateway-platform | 192.168.0.242 |
 | gateway-prod | 192.168.0.243 |
+| syncthing-sync (app-kensan) | 192.168.0.245 |
 
 ## Gateway Architecture
 
 - `gateway-platform` (192.168.0.242) → `*.platform.yu-min3.com` / `wildcard-platform-tls` — platform UI (Backstage, ArgoCD, Grafana, Vault 等)
 - `gateway-prod` (192.168.0.243) → `*.app.yu-min3.com` / `wildcard-apps-tls` — user app
+
+**注意 — Gateway 外の入口**: `syncthing-sync`（.245、`app-kensan` ns）は workspace（日記含む生活データ）を Mac ⇄ クラスタで双方向同期する LB VIP。TCP 22000 のみ公開し、Syncthing 自前の TLS + device 認証で保護される（旧 NFS/AUTH_SYS の裸入口は廃止）。global discovery / relay / NAT traversal は init container の config-guard で起動毎に無効化され、LAN-only 不変条件を Git 側から強制する。GUI/REST(8384) は NetworkPolicy `syncthing-guard` でクラスタ内から遮断（設定操作は `kubectl exec` のみ）。Gateway 層 OIDC（ADR-010）の外にあるが、device ペアリング済みのホストのみ接続できる。事実: `kubernetes/apps/app-kensan/resources/syncthing.yaml` / `networkpolicy-syncthing.yaml`。
 
 ホスト一覧と全体図: [`kubernetes/network/README.md`](../../kubernetes/network/README.md) / [`docs/architecture/network.md`](../../docs/architecture/network.md)
 

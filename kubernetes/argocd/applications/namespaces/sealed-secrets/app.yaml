@@ -1,0 +1,43 @@
+## sealed-secrets namespace 管理専用 app (kyverno-namespace と同パターン)
+## NOTE: app 名は controller 本体の app (sealed-secrets) と衝突するため -namespace suffix
+##
+## disaster recovery: この ns には sealing key Secret が住んでおり、消えるとリポジトリ内の
+## 全 SealedSecret が復号不能になる。ns lifecycle app の責務は「label を貼る」ことであって
+## 「ns を消せる」ことではないため、finalizer なし + Prune=false で削除経路を持たせない
+## (PR #374 レビュー指摘)
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: sealed-secrets-namespace
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "-4"
+    argocd.argoproj.io/sync-options: Prune=false  # root app からの prune も防止
+  # NOTE: resources-finalizer 不在 — Application 削除で sealing key を蒸発させない
+spec:
+  project: platform-project
+  source:
+    repoURL: https://github.com/yu-min3/kensan-lab
+    targetRevision: main
+    ## ns manifest はコンポーネント本体ディレクトリに同居させ、include で抜く (統一パターン)
+    ## include 必須: 同居する controller.yaml は controller app (sealed-secrets) が管理する
+    path: kubernetes/secrets/sealed-secrets
+    directory:
+      recurse: false
+      include: 'namespace.yaml'
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: sealed-secrets
+  syncPolicy:
+    automated:
+      prune: false  # sealing key 保護 (header コメント参照)
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=false
+      - ServerSideApply=true
+    retry:
+      limit: 5
+      backoff:
+        duration: 5s
+        factor: 2
+        maxDuration: 3m

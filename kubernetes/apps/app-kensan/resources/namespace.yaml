@@ -1,0 +1,22 @@
+# ADR-006: app-{name} flat + 3-axis labels
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: app-kensan
+  labels:
+    ## 旧 unprefixed labels (environment / team / app) は削除済み (Phase 2)。
+    ## 根拠: live の全 namespaceSelector 保有リソース (CCNP / CNP / NetworkPolicy /
+    ## Gateway allowedRoutes / AuthorizationPolicy / webhook configs) を網羅確認し、
+    ## unprefixed key を参照するものがゼロであることを実測 (2026-06-07)
+    pod-security.kubernetes.io/enforce: restricted
+    # gateway-prod の allowedRoutes namespace selector（これが無いと HTTPRoute が
+    # NotAllowedByListeners で拒否される）
+    kensan-lab.platform/environment: production
+    # ADR-006 正準の prefixed 3-axis + tier。tier=application は Kyverno app-tier
+    # policy (disallow-latest-tag / require-requests) の scope selector でもある
+    kensan-lab.platform/team: yu
+    kensan-lab.platform/app: kensan
+    kensan-lab.platform/tier: application
+    ## Kyverno pss-restricted の対象宣言 (旧 PSA enforce=restricted の引き継ぎ、v2 統一設計)。
+    ## PSA label (enforce: restricted) は Phase 3 (Enforce 昇格) と同時に撤去
+    kensan-lab.platform/pss-level: restricted

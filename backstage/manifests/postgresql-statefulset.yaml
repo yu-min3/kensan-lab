@@ -33,6 +33,10 @@ spec:
         - name: postgresql-data
           mountPath: /var/lib/postgresql/data
           subPath: postgres
+        ## initdb script は PGDATA が空のとき (= DR / fresh cluster) のみ実行される。
+        ## 稼働中クラスタでは inert (既存 PVC では entrypoint が skip する)。
+        - name: initdb
+          mountPath: /docker-entrypoint-initdb.d
         resources:
           requests:
             memory: "128Mi"
@@ -40,6 +44,10 @@ spec:
           limits:
             memory: "512Mi"
             cpu: "500m"
+      volumes:
+      - name: initdb
+        configMap:
+          name: postgresql-initdb
   volumeClaimTemplates:
   - apiVersion: v1
     kind: PersistentVolumeClaim

@@ -24,7 +24,9 @@ This document defines a unified namespace labeling strategy across the entire pl
 | Label Key | Example Values | Description | Target |
 |-----------|---------------|------|----------|
 | `kensan-lab.platform/component` | `keycloak`, `backstage`, `monitoring`, `service-mesh`, `core` | Component identification | Platform tier only |
+| `kensan-lab.platform/pss-level` | `privileged` \| `restricted` | Pod Security Standards level の宣言 (Kyverno が読む。無印 = baseline の床) | 床から外れる ns のみ |
 | `istio-injection` | `enabled` | Istio automatic sidecar injection | Namespaces targeted by service mesh |
+| `kensan-lab.platform/vault-managed-postgres` | `"true"` | vault-database-engine 管理の Postgres が住む ns の opt-in 宣言。CCNP `ccnp-postgres-ingress` / `cnp-vault-egress` の selector が読む | Vault dynamic cred 対象の Postgres を持つ ns のみ（例: `platform-auth-prod`, `kensan`） |
 
 ## Label Value Definitions
 
@@ -32,16 +34,30 @@ This document defines a unified namespace labeling strategy across the entire pl
 
 | Value | Description | Example Namespaces |
 |-------|------|-----------------|
-| `infrastructure` | Core cluster infrastructure | `kube-system`, `istio-system`, `monitoring`, `argocd` |
-| `production` | Production environment | `backstage`, `platform-auth-prod`, `app-prod` |
-| `development` | Development environment | `platform-auth-dev`, `app-dev` |
+| `infrastructure` | Core cluster infrastructure / platform services | `kube-system`, `istio-system`, `monitoring`, `argocd`, `vault`, `platform-auth-prod` |
+| `production` | Production app/workload environment | `app-prod`, `app-kensan`, `kensan` |
+| `development` | （**現在未使用**。dev/prod 分離は廃止 — ADR-006 / ADR-014 参照。将来 dev 環境を足す場合のために値は予約）| — |
 
 ### `kensan-lab.platform/tier`
 
 | Value | Description | Manager | Example Namespaces |
 |-------|------|--------|-----------------|
 | `platform` | Platform infrastructure tier | Platform Engineer (PE) | `istio-system`, `backstage`, `platform-auth-prod` |
-| `application` | Application tier | Application Developer (AD) | `app-prod`, `app-dev`, `app-prod-<name>` |
+| `application` | Application tier | Application Developer (AD) | `app-prod`, `app-kensan`, `kensan` |
+
+### `kensan-lab.platform/pss-level`
+
+Pod Security Standards の level 宣言。**Kyverno だけが読む** (PSA は不活性化 — v2 統一設計、[ADR-012](../adr/012-policy-enforcement-kyverno.md) 改訂)。
+旧 `pod-security.kubernetes.io/*` (PSA) label は Kyverno Enforce 昇格と同時に撤去する。
+
+| Value | Description | Example Namespaces |
+|-------|------|-----------------|
+| (未設定) | `pss-baseline` の床が適用される (デフォルト) | 大多数の ns |
+| `privileged` | 床から除外。**`tier=platform` の ns のみ宣言可** (`ns-label-contract` が強制) | `kube-system`, `istio-system`, `longhorn-system`, `local-path-storage` |
+| `restricted` | 床より厳格な PSS restricted を適用 (opt-in) | `app-kensan` |
+
+この label の契約 (必須 label・宣言条件) は Kyverno `ns-label-contract` policy が機械的に強制する。
+詳細: [`policy-enforcement.md`](policy-enforcement.md)
 
 ### `kensan-lab.platform/component`
 
@@ -51,7 +67,7 @@ This document defines a unified namespace labeling strategy across the entire pl
 | `service-mesh` | Service mesh control plane | `istio-system` |
 | `gitops` | GitOps tooling | `argocd` |
 | `observability` | Monitoring and log management | `monitoring` |
-| `keycloak` | Authentication platform | `platform-auth-prod`, `platform-auth-dev` |
+| `keycloak` | Authentication platform | `platform-auth-prod` |
 | `developer-portal` | Developer portal | `backstage` |
 
 ## Namespace Definition Templates
@@ -90,15 +106,19 @@ metadata:
 
 ### Application Tier
 
+`app-*` namespace は `team` / `app` label が必須（ADR-014 の app-namespace 契約。Kyverno `ns-label-contract` が強制）。`environment` は現状 `production` のみ（`development` は未使用）。
+
 ```yaml
 apiVersion: v1
 kind: Namespace
 metadata:
-  name: <namespace-name>
+  name: app-<name>
   labels:
     app.kubernetes.io/managed-by: argocd
-    kensan-lab.platform/environment: production|development
+    kensan-lab.platform/environment: production
     kensan-lab.platform/tier: application
+    kensan-lab.platform/team: <team>
+    kensan-lab.platform/app: <app>
     istio-injection: enabled
 ```
 
@@ -148,7 +168,7 @@ spec:
 ### 3. RBAC Usage
 
 ```yaml
-# Grant Application Developers access to development environment namespaces
+# Grant Application Developers access to application tier namespaces
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
@@ -157,13 +177,13 @@ rules:
 - apiGroups: ["*"]
   resources: ["*"]
   verbs: ["*"]
-  # Access limited to application tier in the development environment
+  # Access limited to the application tier
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
 metadata:
   name: app-developers-binding
-  namespace: app-dev
+  namespace: app-kensan
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: ClusterRole
@@ -212,16 +232,18 @@ All namespaces created going forward must conform to this label design.
 ### Phase 2: Update Application Tier (Priority: Medium)
 
 ```bash
-# app-dev/namespace.yaml
+# app-kensan/namespace.yaml
 # Before:
 labels:
-  environment: development
+  environment: production
 
 # After:
 labels:
   app.kubernetes.io/managed-by: argocd
-  kensan-lab.platform/environment: development
+  kensan-lab.platform/environment: production
   kensan-lab.platform/tier: application
+  kensan-lab.platform/team: <team>
+  kensan-lab.platform/app: <app>
   istio-injection: enabled
 ```
 
@@ -244,10 +266,11 @@ Gradually update existing namespaces. Proceed while confirming no impact on clus
 | argocd | infrastructure | platform | gitops | No |
 | monitoring | infrastructure | platform | observability | No |
 | backstage | production | platform | developer-portal | Yes |
-| platform-auth-prod | production | platform | keycloak | Yes |
-| platform-auth-dev | development | platform | keycloak | Yes |
+| platform-auth-prod | infrastructure | platform | keycloak | Yes |
+| vault | infrastructure | platform | secrets | No |
 | app-prod | production | application | - | Yes |
-| app-dev | development | application | - | Yes |
+| app-kensan | production | application | - (team=yu, app=kensan) | Yes |
+| kensan | production | application | - | Yes |
 
 ### Best Practices
 
