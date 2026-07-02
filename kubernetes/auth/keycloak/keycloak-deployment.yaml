@@ -12,10 +12,6 @@ spec:
     metadata:
       labels:
         app: keycloak
-      annotations:
-        ## Stakater Reloader: keycloak-postgres-cred (Vault dynamic cred, 12h rotation)
-        ## が rotate されたら Pod を rolling restart して新 env を取り込む。
-        reloader.stakater.com/search: "true"
     spec:
       affinity:
         nodeAffinity:
@@ -36,8 +32,6 @@ spec:
             name: keycloak-env-config
         - secretRef:
             name: keycloak-secret
-        - secretRef:
-            name: keycloak-postgres-cred
         ports:
         - name: http
           containerPort: 8080

@@ -1,13 +1,14 @@
 ## Polaris (Iceberg catalog metastore) 専用 Postgres。
-## dagster-postgres と同じ「専用 StatefulSet + VCO dynamic cred + ESO + reloader」パターン。
+## 専用 StatefulSet + Vault static cred。Polaris は schema owner を持つ catalog metastore なので
+## env 注入 + Reloader restart 前提の VCO dynamic cred にはしない。
 ##
 ## このマニフェストは StatefulSet 自身の bootstrap 用に static admin cred
-## (POLARIS_PG_USER / POLARIS_PG_PASSWORD / POLARIS_PG_DB, ExternalSecret 由来) のみ使う。
-## Polaris アプリ (server + admin-tool) は VCO dynamic cred (postgres-polaris-cred) で接続する。
+## (POLARIS_PG_USER / POLARIS_PG_PASSWORD, ExternalSecret 由来) を使う。
+## DB 名は datasource と同じ `polaris` 固定。
 ##
 ## init script は relational-jdbc が使う固定 schema POLARIS_SCHEMA を stable owner "polaris"
 ## (= POSTGRES_USER, superuser) で事前作成する。これにより:
-##   - dynamic user の rotation (生成/TTL 失効) で schema が消えない
+##   - app 接続 user と schema owner が一致し、bootstrap 時の owner mismatch を避ける
 ##   - admin-tool bootstrap の "CREATE SCHEMA IF NOT EXISTS POLARIS_SCHEMA" が no-op になる
 ##   - dynamic user は VCO role の extraSchemas 権限で POLARIS_SCHEMA 内を読み書きできる
 apiVersion: v1
@@ -75,10 +76,7 @@ spec:
               name: kensan-lakehouse-credentials
               key: POLARIS_PG_PASSWORD
         - name: POSTGRES_DB
-          valueFrom:
-            secretKeyRef:
-              name: kensan-lakehouse-credentials
-              key: POLARIS_PG_DB
+          value: polaris
         - name: PGDATA
           value: /var/lib/postgresql/data/pgdata
         ports:
