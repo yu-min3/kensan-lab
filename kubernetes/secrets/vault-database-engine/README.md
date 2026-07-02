@@ -26,16 +26,20 @@ kubernetes/secrets/vault-database-engine/
 │   └── cnp-vault-egress.yaml             # CNP: vault → managed ns Postgres TCP/5432 (vault ns)
 └── platform-values/
     └── vault-database/                   # capability convention dir
-        ├── backstage.yaml                # 1 instance、AD が触る (override 必要分のみ書く)
-        ├── kensan-app.yaml
-        ├── kensan-dagster.yaml
-        ├── keycloak-prod.yaml
-        └── keycloak-dev.yaml
+        └── kensan-dagster.yaml           # 1 instance、AD が触る (override 必要分のみ書く)
 ```
 
 ArgoCD 側:
 - `applications/secrets/vault-database-engine/app-shared.yaml` — single Application、`shared/` を sync (mount + policy 1 度だけ)
 - `applications/secrets/vault-database-engine/applicationset-instances.yaml` — ApplicationSet、values file を recursive glob (`**/platform-values/vault-database/*.yaml`) で discover、per-instance ArgoCD app を auto 生成
+
+## 適用範囲
+
+この chart は **dynamic credential を K8s Secret に同期し、consumer Pod が env / secretKeyRef で読む** 方式を採る。
+Secret 更新を実行中プロセスへ反映するには Reloader による rolling restart か、アプリ側の明示的な credential reload が必要。
+
+そのため Keycloak / Backstage / Polaris のような長寿命 service、schema owner を持つ service、restart が user session や catalog availability に直結する service には使わない。
+現行の使用対象は Dagster system DB のみ。
 
 ## 設計の核: smart default + override
 
@@ -186,27 +190,23 @@ generators:
 # 1. 全 ArgoCD app が Healthy
 kubectl get app -n argocd | grep vault-db
 
-# 2. Vault に mount + 5 connection + 5 role が入っている
+# 2. Vault に mount + connection + role が入っている
 kubectl exec -n vault vault-0 -c vault -- vault secrets list  # database/ あり
-kubectl exec -n vault vault-0 -c vault -- vault list database/config  # 5 個
-kubectl exec -n vault vault-0 -c vault -- vault list database/roles   # 5 個
+kubectl exec -n vault vault-0 -c vault -- vault list database/config
+kubectl exec -n vault vault-0 -c vault -- vault list database/roles
 
 # 3. 動的 cred 払い出しテスト (Vault 直)
-kubectl exec -n vault vault-0 -c vault -- vault read database/creds/postgres-backstage
+kubectl exec -n vault vault-0 -c vault -- vault read database/creds/postgres-kensan-dagster
 # → username + password が払い出される
 # Postgres 側で \du すると一時 user が見える、TTL 切れで DROP USER される
 
-# 4. ESO 経由で K8s Secret が生成されている (5 ns 分)
-kubectl get secret -n backstage          postgres-backstage-cred
-kubectl get secret -n kensan             postgres-kensan-app-cred
+# 4. ESO 経由で K8s Secret が生成されている
 kubectl get secret -n kensan             postgres-kensan-dagster-cred
-kubectl get secret -n platform-auth-prod postgres-keycloak-prod-cred
-kubectl get secret -n platform-auth-dev  postgres-keycloak-dev-cred
 
 # 5. ExternalSecret status (各 app ns で SecretSynced=True)
 kubectl get externalsecret -A | grep postgres-
 
 # 6. 中身確認 (user/password が動的 user 名になっている)
-kubectl get secret -n backstage postgres-backstage-cred -o jsonpath='{.data.POSTGRES_USER}' | base64 -d
+kubectl get secret -n kensan postgres-kensan-dagster-cred -o jsonpath='{.data.DAGSTER_PG_USER}' | base64 -d
 # → v-kubernet-postgres-... のような Vault 動的 user 名
 ```
