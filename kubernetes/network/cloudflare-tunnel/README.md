@@ -1,6 +1,6 @@
 # cloudflare-tunnel
 
-Outbound-only public ingress. `cloudflared` dials **out** to Cloudflare's edge — no port-forward, no NodePort, no public IP on the cluster. Cloudflare Access sits in front as an edge auth gate, and traffic is delivered to the in-cluster **Istio Gateway** — the same chokepoint LAN traffic uses (see `../README.md`).
+Outbound-only public ingress. `cloudflared` dials **out** to Cloudflare's edge — no port-forward, no NodePort, no public IP on the cluster. Cloudflare Access sits in front as an edge auth gate, and traffic is delivered to the in-cluster **Istio Gateway** — the same chokepoint LAN traffic uses (see the [network overview](https://github.com/yu-min3/kensan-lab/blob/main/kubernetes/network/README.md)).
 
 ## In-cluster components
 
@@ -47,7 +47,7 @@ Point the URL at the **in-cluster Istio Gateway service** (not directly at an ap
 
 **Token handling (GitOps-friendly):** the token lives in Vault at `secret/cloudflare-tunnel/token`; ESO syncs it into the `cloudflare-tunnel-token` Secret (`refreshInterval: 1h`), which the Deployment consumes as `TUNNEL_TOKEN`. Rotating the tunnel = update Vault → ESO resyncs.
 
-**NetworkPolicy:** the `cloudflare-tunnel` ns is not istio-injected, so it uses a per-ns NetworkPolicy (`../network-policy/cloudflare-tunnel.yaml`, see [network-policy-guide](../../../docs/concepts/network-policy-guide.md)). `cloudflared` needs egress for: DNS (53), Cloudflare edge over **QUIC (UDP 7844)** with TCP 443 fallback, and the Istio Gateway service.
+**NetworkPolicy:** the `cloudflare-tunnel` ns is not istio-injected, so it uses a per-ns NetworkPolicy (`kubernetes/network/network-policy/cloudflare-tunnel.yaml`, see the [network-policy guide](https://github.com/yu-min3/kensan-lab/blob/main/docs/concepts/network-policy-guide.md)). `cloudflared` needs egress for: DNS (53), Cloudflare edge over **QUIC (UDP 7844)** with TCP 443 fallback, and the Istio Gateway service.
 
 ## Access configuration (dashboard)
 
@@ -60,7 +60,7 @@ Zero Trust → **Access** → Applications → **Self-hosted**:
 
 **Policy:** `Action: Allow`, selector `Emails` = your address, delivered via **Email OTP**.
 
-Access is an **edge gate**, not the only auth: unauthenticated requests die at Cloudflare's edge before entering the tunnel, while the in-cluster Istio Gateway still enforces Keycloak auth on every route. The current interim model is OTP in front of `*.yu-mins.com`; whether to keep Access as a second factor, collapse it into Keycloak OIDC, or drop it for pass-through is the deferred decision in [ADR-016](../../../docs/adr/016-lan-frictionless-cf-access-external-gate.md).
+Access is an **edge gate**, not the only auth: unauthenticated requests die at Cloudflare's edge before entering the tunnel, while the in-cluster Istio Gateway still enforces Keycloak auth on every route. The current interim model is OTP in front of `*.yu-mins.com`; whether to keep Access as a second factor, collapse it into Keycloak OIDC, or drop it for pass-through is the deferred decision in [ADR-016](https://github.com/yu-min3/kensan-lab/blob/main/docs/adr/016-lan-frictionless-cf-access-external-gate.md).
 
 ## Reference values
 
@@ -73,6 +73,6 @@ Access is an **edge gate**, not the only auth: unauthenticated requests die at C
 
 ## Related
 
-- Network overview and the two ingress paths: [`../README.md`](../README.md)
-- External-gate model (Access vs Keycloak-only vs pass-through): [ADR-016](../../../docs/adr/016-lan-frictionless-cf-access-external-gate.md)
+- Network overview and the two ingress paths: [network README](https://github.com/yu-min3/kensan-lab/blob/main/kubernetes/network/README.md)
+- External-gate model (Access vs Keycloak-only vs pass-through): [ADR-016](https://github.com/yu-min3/kensan-lab/blob/main/docs/adr/016-lan-frictionless-cf-access-external-gate.md)
 - Cloudflare-side edge, LB IPs, known issues: [`.claude/rules/network-ingress.md`](https://github.com/yu-min3/kensan-lab/blob/main/.claude/rules/network-ingress.md)
