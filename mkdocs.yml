@@ -11,6 +11,7 @@ docs_dir: docs
 exclude_docs: |
   bootstrapping/manifests/
   bootstrapping/scripts/
+  refactoring_master_plan.md
 
 validation:
   nav:
