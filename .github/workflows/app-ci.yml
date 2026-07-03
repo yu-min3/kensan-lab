@@ -1,0 +1,47 @@
+name: App CI
+
+on:
+  pull_request:
+    paths:
+      - "apps/kensan/**"
+      - "packages/design-tokens/**"
+      - ".github/workflows/app-ci.yml"
+  push:
+    branches: [main]
+    paths:
+      - "apps/kensan/**"
+      - "packages/design-tokens/**"
+      - ".github/workflows/app-ci.yml"
+
+jobs:
+  backend:
+    name: backend (go vet + test)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/kensan/backend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: apps/kensan/backend/go.mod
+          cache-dependency-path: apps/kensan/backend/go.sum
+      - run: go vet ./...
+      - run: go test ./...
+
+  frontend:
+    name: frontend (tsc + vite build)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/kensan/frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: apps/kensan/frontend/package-lock.json
+      - run: npm ci
+      # tokens.css は packages/design-tokens から相対 import されるため full checkout 前提
+      - run: npm run build
