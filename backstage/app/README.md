@@ -61,7 +61,6 @@ backstage/app/
 ├── plugins/                          # custom Backstage plugins
 ├── templates/                        # scaffolder templates (bundled into image)
 ├── catalog/                          # production catalog data
-├── examples/                         # local-dev samples
 ├── app-config*.yaml                  # 3-file config (see above)
 ├── Makefile                          # entry point — see `make help`
 └── yarn.sh                           # wrapper for bundled Yarn 4
