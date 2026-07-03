@@ -71,7 +71,13 @@ for f in sorted(glob.glob(os.path.join(ROOT, "kubernetes/argocd/**/*.yaml"), rec
                         if not pattern or "{{" in pattern:
                             continue
                         if not glob.glob(os.path.join(ROOT, pattern), recursive=True):
-                            errors.append(f"{rel}: git generator パターンが 0 件マッチ: {pattern}")
+                            # インスタンス 0 件は合法 (全撤去後など)。ディレクトリ自体が
+                            # 無い場合のみ typo / 移動漏れとして fail する
+                            dir_pattern = os.path.dirname(pattern)
+                            if dir_pattern and glob.glob(os.path.join(ROOT, dir_pattern), recursive=True):
+                                print(f"WARN {rel}: generator パターンが 0 件マッチ (ディレクトリは存在・空): {pattern}")
+                            else:
+                                errors.append(f"{rel}: git generator パターンのディレクトリが存在しない: {pattern}")
 
 if errors:
     print("NG:")
