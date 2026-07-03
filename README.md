@@ -111,7 +111,7 @@ kubernetes/                    # Core platform (GitOps-managed)
 ├── policy/                       # Kyverno + cluster policies (PSS baseline/restricted, exceptions)
 ├── storage/                      # Longhorn, local-path-provisioner
 ├── apps/                         # Per-app deploy definitions (e.g. app-kensan: values + raw resources)
-├── environments/                 # Shared-namespace bootstrap (app-prod)
+├── namespaces/                   # Shared-namespace bootstrap (app-prod landing zone)
 └── kube-system/                  # Namespace labels, Pod Security Standards
 charts/                           # Platform-provided Helm charts (app-base: generic app deploy chart)
 packages/                         # Shared frontend packages (design-tokens — Whetstone design system)
