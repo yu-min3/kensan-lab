@@ -63,7 +63,6 @@ spec:
                 kensan-lab.platform/environment: "?*"
                 kensan-lab.platform/tier: application
     ## rule 2: app-{name} ns は ADR-014 の app-namespace contract (team/app) + tier=application
-    ## (app-prod は env-shared landing zone のため除外 — 単一の team/app を割当不能)
     - name: require-app-3-axis
       match:
         any:
@@ -72,13 +71,6 @@ spec:
                 - Namespace
               names:
                 - "app-*"
-      exclude:
-        any:
-          - resources:
-              kinds:
-                - Namespace
-              names:
-                - app-prod
       validate:
         failureAction: Audit  # Phase 3 で Enforce へ昇格 (ADR-012)
         message: >-
