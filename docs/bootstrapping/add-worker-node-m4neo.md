@@ -144,7 +144,7 @@ ARM64 images **cannot run** on AMD64 nodes (`exec format error`). Two solutions:
 
 ### 3.2 Build via Makefile
 
-All `apps/kensan-legacy/` images are built via the `apps/kensan-legacy/Makefile` `k8s-*` targets, which already produce multi-arch manifest lists:
+All `apps/kensan-legacy/` images are built via the `apps/kensan-legacy/Makefile` `k8s-*` targets, which already produce multi-arch manifest lists (historical record — the legacy app has since been removed; browse it at tag `kensan-legacy-final`):
 
 ```bash
 cd apps/kensan-legacy

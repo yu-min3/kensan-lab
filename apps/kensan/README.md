@@ -2,7 +2,7 @@
 
 ファイルベースのナレッジ & ゴール管理アプリ（統合版）。Markdown ファイルを Single Source of Truth として、Go 単一サービス + React UI（Whetstone design system）で操作する。
 
-旧 kensan（`apps/kensan-legacy/`）と kensan-app-v2 のいいとこ取り統合。計画: kensan-workspace `projects/kensan-workspace/unification-plan.md`
+旧 kensan（削除済み、tag `kensan-legacy-final` にアーカイブ — ADR-017）と kensan-app-v2 のいいとこ取り統合。計画: kensan-workspace `projects/kensan-workspace/unification-plan.md`
 
 ## 設計原則
 

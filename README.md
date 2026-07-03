@@ -116,7 +116,7 @@ kubernetes/                    # Core platform (GitOps-managed)
 charts/                           # Platform-provided Helm charts (app-base: generic app deploy chart)
 packages/                         # Shared frontend packages (design-tokens — Whetstone design system)
 backstage/                        # Developer portal (app/ + manifests/)
-apps/                             # Application source (kensan = current unified app, kensan-legacy = frozen)
+apps/                             # Application source (kensan — file-based knowledge & goal manager)
 bootstrap/                        # Vault & Keycloak bootstrap (Terraform + scripts)
 docs/                             # ADRs, architecture, guides (MkDocs site)
 ```
@@ -131,11 +131,12 @@ docs/                             # ADRs, architecture, guides (MkDocs site)
 
 ## Application: kensan
 
-A real application runs on this platform as a reference workload. It currently exists in two lineages mid-cutover:
+A real application runs on this platform as a reference workload:
 
-- **`apps/kensan`** — the current unified app: a file-based knowledge & goal manager. Markdown files are the single source of truth, served by a single Go service (REST API + bundled SPA, Whetstone design system) shipped as one container image. See [apps/kensan/README.md](./apps/kensan/README.md).
-- **`apps/kensan-legacy`** — the previous full-stack app (React + Go microservices + Python AI agents + an Iceberg data lakehouse with Dagster & Polaris). **Frozen**, kept running only until Phase 7 cutover. It still demonstrates what the platform supports: multi-service deployments, dynamic DB credentials, Argo CD CI/CD, and OpenTelemetry instrumentation across services.
-- **`kubernetes/apps/app-kensan`** — the deploy definition for the current app (Argo CD `Application` consuming the `charts/app-base` chart via multi-source, plus raw resources: per-app namespace, workspace PVC, and LAN-only Syncthing sync).
+- **`apps/kensan`** — a file-based knowledge & goal manager. Markdown files are the single source of truth, served by a single Go service (REST API + bundled SPA, Whetstone design system) shipped as one container image. See [apps/kensan/README.md](./apps/kensan/README.md).
+- **`kubernetes/apps/app-kensan`** — the deploy definition (Argo CD `Application` consuming the `charts/app-base` chart via multi-source, plus raw resources: per-app namespace, workspace PVC, and LAN-only Syncthing sync).
+
+> **Looking for the previous full-stack kensan?** The legacy app (React + Go microservices + Google ADK AI agents + an Iceberg lakehouse with Dagster & Polaris) was retired in July 2026 (PR #394) and removed from the working tree. It is preserved as an implementation reference at the git tag [`kensan-legacy-final`](https://github.com/yu-min3/kensan-lab/tree/kensan-legacy-final/apps/kensan-legacy) — see [ADR-017](./docs/adr/017-kensan-legacy-removal.md).
 
 ## Acknowledgments
 

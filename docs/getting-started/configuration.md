@@ -78,7 +78,6 @@ find kubernetes/argocd/ backstage/ apps/ -type f \( -name "*.yaml" -o -name "*.y
 |-----------|------|-------|
 | Argo CD Apps | `kubernetes/argocd/applications/**/app.yaml` | `repoURL` |
 | Root App | `kubernetes/argocd/root-apps/platform-root-app.yaml` | `repoURL` |
-| Container images (legacy kensan) | `apps/kensan-legacy/manifests/services/*.yaml`, `apps/kensan-legacy/manifests/lakehouse/*.yaml` | `ghcr.io/yu-min3/...` |
 | Container image (new kensan) | `kubernetes/apps/app-kensan/values.yaml` | `image.repository: ghcr.io/yu-min3/kensan` |
 | Backstage image | `backstage/manifests/backstage-deployment.yaml` | `ghcr.io/yu-min3/backstage` |
 

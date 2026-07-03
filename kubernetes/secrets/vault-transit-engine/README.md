@@ -127,4 +127,4 @@ Vault audit device は bootstrap TF で enable 済み (`/vault/audit/audit.log`)
 
 - 全体方針: [docs/secret-management/index.md](../../../docs/secret-management/index.md)
 - 同パターンの先行例: [vault-database-engine/README.md](../vault-database-engine/README.md)
-- 実装サンプル (Go shared/vault): `apps/kensan-legacy/backend/shared/vault/`
+- 実装サンプル (Go shared/vault): `apps/kensan-legacy/backend/shared/vault/`（削除済み — tag `kensan-legacy-final` で参照）

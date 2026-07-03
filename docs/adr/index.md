@@ -31,3 +31,4 @@ Each ADR follows a lightweight structure:
 | 014 | [Namespace Naming & Label Contract v2](014-namespace-naming-label-contract-v2.md) | Accepted |
 | 015 | [VCO + Setup-Script Hybrid](015-vco-setup-script-hybrid.md) | Accepted |
 | 016 | [LAN-Frictionless Sessions + External-Gate Model](016-lan-frictionless-cf-access-external-gate.md) | Accepted in part (gate deferred) |
+| 017 | [Remove kensan-legacy (tag archive)](017-kensan-legacy-removal.md) | Accepted |

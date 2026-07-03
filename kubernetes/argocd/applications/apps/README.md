@@ -9,8 +9,6 @@
 apps/
 ├── app-kensan/
 │   └── app.yaml    # 現行 kensan（in-repo chart + per-app ns、3-source）
-├── kensan/
-│   └── app.yaml    # 旧 kensan（apps/kensan-legacy/manifests、ns: kensan）凍結・稼働維持のみ
 └── README.md
 ```
 
@@ -63,7 +61,7 @@ spec:
 `charts/app-base` の利用方法は [charts/app-base/README.md](../../../../charts/app-base/README.md) を参照。
 app 固有の値は `kubernetes/apps/app-<name>/values.yaml` に置く。
 
-`kensan/app.yaml`（凍結中の旧アプリ）は単一 source（`apps/kensan-legacy/manifests` を `directory.recurse`、ns: `kensan`）。Phase 7 cutover 完了時に撤去予定。
+旧 kensan の `kensan/app.yaml` は Phase 7 cutover（PR #394）で撤去済み。ソースは tag `kensan-legacy-final` にアーカイブ（ADR-017）。
 
 ## 将来フロー（予定）: Backstage scaffolded app
 
