@@ -8,6 +8,11 @@ image:
 env:
   - name: KENSAN_DATA_DIR
     value: /data
+  # distroless の既定は UTC。daily のパス解決・@due の「今日」判定・
+  # 「0〜6時は前日の daily」規約（tasks.ReflectionDate）はすべて time.Now() 依存のため、
+  # JST を明示しないと日本時間 9:00 まで前日扱いになる（distroless static は tzdata 同梱）
+  - name: TZ
+    value: Asia/Tokyo
 ghcrPullSecret:
   enabled: true
 pvc:
