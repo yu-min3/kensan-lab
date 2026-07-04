@@ -8,7 +8,6 @@ import {
   ChartSpline,
   FileText,
   FolderKanban,
-  FlaskConical,
   Sparkles,
 } from "lucide-react";
 import clsx from "clsx";
@@ -36,10 +35,7 @@ const nav = [
   },
   {
     group: "振り返り",
-    items: [
-      { to: "/reviews", label: "レビュー", icon: ChartSpline },
-      { to: "/editor-lab", label: "エディタ比較", icon: FlaskConical },
-    ],
+    items: [{ to: "/reviews", label: "レビュー", icon: ChartSpline }],
   },
 ];
 

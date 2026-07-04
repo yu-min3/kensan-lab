@@ -15,3 +15,8 @@ body {
 .tnum {
   font-variant-numeric: tabular-nums;
 }
+
+/* Milkdown ホストの最低高さ。各画面は MilkdownEditor の minHeight prop（--editor-min-h）で調整する */
+.milkdown-host .milkdown {
+  min-height: var(--editor-min-h, 18rem);
+}
