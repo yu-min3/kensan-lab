@@ -16,7 +16,74 @@ body {
   font-variant-numeric: tabular-nums;
 }
 
-/* Milkdown ホストの最低高さ。各画面は MilkdownEditor の minHeight prop（--editor-min-h）で調整する */
+/* ---- Milkdown (Crepe) を Whetstone に馴染ませる ----
+   crepe の frame テーマは「白い紙（#fff）+ 60px/120px の紙面余白 + Noto Serif/Sans + 42px 見出し」を
+   持ち込むため、色・書体はトークンへ、余白と文字サイズはアプリの密度へ上書きする。
+   最低高さは各画面が MilkdownEditor の minHeight prop（--editor-min-h）で調整する */
 .milkdown-host .milkdown {
+  --crepe-color-background: transparent;
+  --crepe-color-on-background: hsl(var(--foreground));
+  --crepe-color-surface: hsl(var(--card));
+  --crepe-color-surface-low: hsl(var(--muted));
+  --crepe-color-on-surface: hsl(var(--foreground));
+  --crepe-color-on-surface-variant: hsl(var(--muted-foreground));
+  --crepe-color-outline: hsl(var(--border-strong));
+  --crepe-color-primary: hsl(var(--brand));
+  --crepe-color-secondary: hsl(var(--brand-muted));
+  --crepe-color-on-secondary: hsl(var(--accent-foreground));
+  --crepe-color-inverse: hsl(var(--foreground));
+  --crepe-color-on-inverse: hsl(var(--card));
+  --crepe-color-inline-code: hsl(var(--brand));
+  --crepe-color-error: hsl(var(--destructive));
+  --crepe-color-hover: hsl(var(--accent) / 0.6);
+  --crepe-color-selected: hsl(var(--accent));
+  --crepe-color-inline-area: hsl(var(--muted));
+  --crepe-font-title: var(--font-serif);
+  --crepe-font-default: var(--font-sans);
+  --crepe-font-code: var(--font-mono);
   min-height: var(--editor-min-h, 18rem);
+}
+
+/* 紙面レイアウト（60px/120px）をやめて Card の余白に任せる。本文はアプリの text-sm に合わせる */
+.milkdown-host .milkdown .ProseMirror {
+  padding: 0.25rem 0.125rem;
+}
+.milkdown-host .milkdown .ProseMirror p {
+  font-size: 0.875rem;
+  line-height: 1.7;
+}
+
+/* 見出しはアプリの密度に縮める（crepe 既定は h1=42px・font-weight 400） */
+.milkdown-host .milkdown .ProseMirror h1,
+.milkdown-host .milkdown .ProseMirror h2,
+.milkdown-host .milkdown .ProseMirror h3,
+.milkdown-host .milkdown .ProseMirror h4,
+.milkdown-host .milkdown .ProseMirror h5,
+.milkdown-host .milkdown .ProseMirror h6 {
+  font-weight: 700;
+}
+.milkdown-host .milkdown .ProseMirror h1 {
+  font-size: 1.5rem;
+  line-height: 1.4;
+  margin-top: 1.25rem;
+}
+.milkdown-host .milkdown .ProseMirror h2 {
+  font-size: 1.25rem;
+  line-height: 1.4;
+  margin-top: 1rem;
+}
+.milkdown-host .milkdown .ProseMirror h3 {
+  font-size: 1.125rem;
+  line-height: 1.4;
+  margin-top: 0.75rem;
+}
+.milkdown-host .milkdown .ProseMirror h4,
+.milkdown-host .milkdown .ProseMirror h5,
+.milkdown-host .milkdown .ProseMirror h6 {
+  font-size: 1rem;
+  line-height: 1.5;
+  margin-top: 0.75rem;
+}
+.milkdown-host .milkdown .ProseMirror h1:first-child {
+  margin-top: 0;
 }
