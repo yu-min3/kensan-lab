@@ -13,11 +13,8 @@ spec:
   - "https://github.com/yu-min3/*"
 
   destinations:
-  - namespace: kensan
-    server: "https://kubernetes.default.svc"
-  - namespace: app-prod
-    server: "https://kubernetes.default.svc"
   # ADR-006 の app-{name} flat namespace（新 kensan が第 1 号）
+  # (旧 kensan ns / app-prod landing zone は撤去済み — PR #394 / ADR-017)
   - namespace: app-kensan
     server: "https://kubernetes.default.svc"
 
