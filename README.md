@@ -115,7 +115,7 @@ kubernetes/                    # Core platform (GitOps-managed)
 └── kube-system/                  # Namespace labels, Pod Security Standards
 charts/                           # Platform-provided Helm charts (app-base: generic app deploy chart)
 packages/                         # Shared frontend packages (design-tokens — Whetstone design system)
-backstage/                        # Developer portal (app/ + manifests/)
+backstage/                        # Developer portal source (deploy definition: kubernetes/backstage/)
 apps/                             # Application source (kensan — file-based knowledge & goal manager)
 bootstrap/                        # Vault & Keycloak bootstrap (Terraform + scripts)
 docs/                             # ADRs, architecture, guides (MkDocs site)

@@ -32,4 +32,4 @@ Each ADR follows a lightweight structure:
 | 015 | [VCO + Setup-Script Hybrid](015-vco-setup-script-hybrid.md) | Accepted |
 | 016 | [LAN-Frictionless Sessions + External-Gate Model](016-lan-frictionless-cf-access-external-gate.md) | Accepted in part (gate deferred) |
 | 017 | [Remove kensan-legacy (tag archive)](017-kensan-legacy-removal.md) | Accepted |
-| 018 | [Backstage manifests placement](018-backstage-manifests-placement.md) | Proposed |
+| 018 | [Backstage manifests placement](018-backstage-manifests-placement.md) | Accepted |

@@ -57,7 +57,7 @@ find kubernetes/ backstage/ apps/ -type f \( -name "*.yaml" -o -name "*.yml" \) 
 | Grafana HTTPRoute | `kubernetes/observability/grafana/resources/httproute.yaml` | `grafana.yu-mins.com` |
 | Prometheus HTTPRoute | `kubernetes/observability/prometheus/resources/httproute-prometheus.yaml` | `prometheus.yu-mins.com` |
 | Longhorn HTTPRoute | `kubernetes/storage/longhorn/resources/httproute.yaml` | `longhorn.yu-mins.com` |
-| Backstage HTTPRoute | `backstage/manifests/httproute.yaml` | `backstage.yu-mins.com` |
+| Backstage HTTPRoute | `kubernetes/backstage/httproute.yaml` | `backstage.yu-mins.com` |
 | oauth2-proxy HTTPRoute | `kubernetes/auth/oauth2-proxy/resources/httproute.yaml` | `{backstage,prometheus,longhorn}.yu-mins.com` の `/oauth2` callback |
 | Keycloak bootstrap | `bootstrap/keycloak/setup.sh` | redirect URIs / hostnames |
 
@@ -79,7 +79,7 @@ find kubernetes/argocd/ backstage/ apps/ -type f \( -name "*.yaml" -o -name "*.y
 | Argo CD Apps | `kubernetes/argocd/applications/**/app.yaml` | `repoURL` |
 | Root App | `kubernetes/argocd/root-apps/platform-root-app.yaml` | `repoURL` |
 | Container image (new kensan) | `kubernetes/apps/app-kensan/values.yaml` | `image.repository: ghcr.io/yu-min3/kensan` |
-| Backstage image | `backstage/manifests/backstage-deployment.yaml` | `ghcr.io/yu-min3/backstage` |
+| Backstage image | `kubernetes/backstage/backstage-deployment.yaml` | `ghcr.io/yu-min3/backstage` |
 
 ### 3. LoadBalancer IP Range
 
