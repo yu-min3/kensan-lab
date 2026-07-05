@@ -5,14 +5,14 @@ This directory contains the **production** catalog data for Backstage running in
 ## Purpose
 
 - **Production Only**: This catalog is loaded in the Kubernetes (production) environment
-- **Independent Management**: Completely separate from `examples/` (which is for local development)
+- **Single catalog**: Loaded in production and local development alike (the scaffold-era `examples/` demo data has been removed)
 - **Version Controlled**: Changes to organizational structure are tracked in Git
 
 ## Important Notes
 
 - ✅ **Included in Docker image**: Copied to `/app/catalog` in production containers
 - ✅ **Loaded in Kubernetes**: Referenced by `app-config.kubernetes.yaml`
-- ❌ **NOT loaded locally**: Local development uses `examples/` instead
+- ✅ **Also loaded locally**: `app-config.yaml` points at the same files for `make dev`
 
 ## Directory Structure
 
@@ -116,18 +116,9 @@ Changes to this catalog are automatically applied when:
 
 ## Development vs Production
 
-| Aspect | Local Development (`examples/`) | Production (`catalog/`) |
-|--------|--------------------------------|-------------------------|
-| Purpose | Learning, testing, demos | Actual organizational data |
-| Location | `backstage-app/examples/` | `backstage-app/catalog/` |
-| Config | `app-config.yaml` | `app-config.kubernetes.yaml` |
-| Docker | NOT included | Included |
-| Components | ✅ Included | ❌ Not included |
-| Templates | ✅ Included | ❌ Not included |
-| Domains | ✅ Included (examples) | ✅ Included (production) |
-| Organizations | ✅ Included (examples) | ✅ Included (production) |
+Both environments load this directory. The only difference is the config file that references it
+(`app-config.yaml` for `make dev`, `app-config.kubernetes.yaml` in the Docker image).
 
 ## See Also
 
-- [Examples README](../examples/README.md) - Development/testing catalog
 - [Backstage Catalog Documentation](https://backstage.io/docs/features/software-catalog/)
