@@ -2,9 +2,10 @@
 
 ## Status
 
-**Proposed.** Drafted as part of the refactoring master plan (Phase 5 / W12). Decision and
-execution are deliberately separated: this ADR records the options and a recommendation;
-the move itself (if accepted) is a follow-up PR.
+**Accepted** (2026-07-06). The "app-like nature" of Backstage was discussed and judged to be
+about *source placement* (already outside `kubernetes/`), not deploy-definition placement —
+`kubernetes/` means "everything deployed to the cluster", which also covers non-k8s-native
+apps like Keycloak. Executed in the same decision: `backstage/manifests` → `kubernetes/backstage`.
 
 ## Date
 
