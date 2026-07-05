@@ -74,20 +74,21 @@ flowchart LR
     end
     A2 --> B1
 
-    subgraph Key["Legend"]
-        AL["green: allowed inside namespace"]
-        DN["red: cross-namespace denied until explicit allow"]
-    end
+    AL["allowed inside namespace"]
+    DN["cross-namespace denied<br/>until explicit allow"]
+    AL -.-> A1
+    DN -.-> B1
 
     style nsA fill:#2D2820,stroke:#948B79,color:#FCFAF6
     style nsB fill:#2D2820,stroke:#948B79,color:#FCFAF6
-    style Key fill:#26221D,stroke:#4A4232,color:#FCFAF6
     classDef pod fill:#1A1714,stroke:#4A4232,color:#FCFAF6
     classDef note fill:#26221D,stroke:#4A4232,color:#E8E1D6
     class A1,A2,B1 pod
     class AL,DN note
     linkStyle 0 stroke:#377A50,color:#377A50
     linkStyle 1 stroke:#CC3925,color:#CC3925
+    linkStyle 2 stroke:#377A50,stroke-dasharray:3 3,color:#377A50
+    linkStyle 3 stroke:#CC3925,stroke-dasharray:3 3,color:#CC3925
 ```
 
 ### mTLS PERMISSIVE — automatic between pods
@@ -108,14 +109,13 @@ flowchart LR
     SC1 <==> SC2
     Out -.-> SC2
 
-    subgraph Key["Legend"]
-        MT["blue: automatic mTLS between sidecars"]
-        PT["gray dotted: plaintext still accepted in PERMISSIVE"]
-    end
+    MT["automatic mTLS"]
+    PT["plaintext accepted<br/>(PERMISSIVE)"]
+    MT -.-> SC1
+    PT -.-> Out
 
     style P1 fill:#2D2820,stroke:#948B79,color:#FCFAF6
     style P2 fill:#2D2820,stroke:#948B79,color:#FCFAF6
-    style Key fill:#26221D,stroke:#4A4232,color:#FCFAF6
     classDef app fill:#1A1714,stroke:#4A4232,color:#FCFAF6
     classDef proxy fill:#075985,stroke:#38BDF8,color:#FCFAF6
     classDef plain fill:#3D372E,stroke:#948B79,color:#E8E1D6
@@ -126,6 +126,8 @@ flowchart LR
     class MT,PT note
     linkStyle 2 stroke:#0284C7,color:#0284C7
     linkStyle 3 stroke:#9A9183,color:#9A9183
+    linkStyle 4 stroke:#0284C7,stroke-dasharray:3 3,color:#0284C7
+    linkStyle 5 stroke:#9A9183,stroke-dasharray:3 3,color:#9A9183
 ```
 
 ## Design rationale
