@@ -1,1 +1,0 @@
-"""Kensan Lakehouse Query Utilities"""

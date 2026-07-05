@@ -1,4 +1,0 @@
-[default]
-region = us-east-1
-s3 =
-    path_style = true
