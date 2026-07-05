@@ -22,6 +22,7 @@ A bare-metal Kubernetes network stack — CNI, service mesh, ingress, NetworkPol
 Bottom = Cilium (L3/4), top = Istio (L7). Zero-trust is the vertical spine that ties three controls — one from each engine layer — into a single posture.
 
 ```mermaid
+%%{init: {"flowchart": {"htmlLabels": false}} }%%
 flowchart TB
     subgraph ISTIO["L7 — Istio mesh ｜ identity & ingress"]
         GW["Istio Gateway<br/>TLS termination / ingress auth (ext_authz → oauth2-proxy)"]
@@ -63,6 +64,7 @@ default-deny and mTLS are **two independent axes**, not one knob. Each spans a d
 > Same-namespace traffic flows only when the namespace has an explicit `allow-intra-namespace` policy. Cross-namespace traffic requires explicit allows on the relevant side(s).
 
 ```mermaid
+%%{init: {"flowchart": {"htmlLabels": false}} }%%
 flowchart LR
     subgraph nsA["ns A"]
         A1[Pod] <==>|"✓ allow-intra-namespace"| A2[Pod]
@@ -82,6 +84,7 @@ flowchart LR
 > Injected sidecars get mTLS automatically. PERMISSIVE still accepts plaintext (STRICT would reject it).
 
 ```mermaid
+%%{init: {"flowchart": {"htmlLabels": false}} }%%
 flowchart LR
     subgraph P1["Pod A (sidecar injected)"]
         App1[app] --- SC1[istio-proxy]

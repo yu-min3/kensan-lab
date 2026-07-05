@@ -141,6 +141,9 @@ extra:
       link: https://dev.to/
   generator: false
 
+extra_css:
+  - stylesheets/whetstone.css
+
 nav:
   - Home: index.md
   - Getting Started:

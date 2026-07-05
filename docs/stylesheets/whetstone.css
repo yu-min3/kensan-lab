@@ -1,0 +1,231 @@
+/*
+ * Whetstone for Docs
+ * ------------------
+ * MkDocs Material adapter for the kensan-lab Whetstone design tokens.
+ * Keep this file limited to documentation-site chrome and Markdown
+ * rendering. App component rules still live in packages/design-tokens/.
+ */
+
+:root {
+  --whetstone-font-sans: "Inter", "Hiragino Sans", "Noto Sans JP", ui-sans-serif, system-ui, sans-serif;
+  --whetstone-font-serif: "Noto Serif JP", "Hiragino Mincho ProN", "Yu Mincho", serif;
+  --whetstone-font-mono: "JetBrains Mono", "SF Mono", ui-monospace, Menlo, monospace;
+  --whetstone-radius: 0.5rem;
+  --whetstone-shadow-sm: 0 1px 3px 0 hsl(30 20% 10% / 0.08), 0 1px 2px -1px hsl(30 20% 10% / 0.04);
+}
+
+[data-md-color-scheme="default"] {
+  --background: 40 27% 94%;
+  --foreground: 36 11% 9%;
+  --card: 40 38% 98%;
+  --card-foreground: 36 11% 9%;
+  --muted: 40 22% 90%;
+  --muted-foreground: 32 8% 45%;
+  --accent: 199 70% 92%;
+  --accent-foreground: 199 89% 25%;
+  --border: 36 23% 85%;
+  --border-strong: 36 23% 78%;
+  --brand: 199 89% 40%;
+  --brand-foreground: 40 38% 98%;
+  --brand-muted: 199 70% 92%;
+  --success: 145 40% 36%;
+  --warning: 32 80% 45%;
+  --destructive: 4 70% 48%;
+  --info: 199 89% 40%;
+}
+
+[data-md-color-scheme="slate"] {
+  --background: 30 10% 13%;
+  --foreground: 40 27% 94%;
+  --card: 30 10% 16%;
+  --card-foreground: 40 27% 94%;
+  --muted: 30 10% 18%;
+  --muted-foreground: 30 8% 66%;
+  --accent: 199 40% 22%;
+  --accent-foreground: 199 89% 80%;
+  --border: 30 10% 24%;
+  --border-strong: 30 10% 32%;
+  --brand: 199 89% 60%;
+  --brand-foreground: 30 10% 13%;
+  --brand-muted: 199 40% 25%;
+  --success: 145 45% 52%;
+  --warning: 32 90% 62%;
+  --destructive: 4 65% 52%;
+  --info: 199 89% 60%;
+}
+
+[data-md-color-scheme] {
+  --md-default-bg-color: hsl(var(--background));
+  --md-default-fg-color: hsl(var(--foreground));
+  --md-default-fg-color--light: hsl(var(--muted-foreground));
+  --md-default-fg-color--lighter: hsl(var(--muted-foreground) / 0.72);
+  --md-default-fg-color--lightest: hsl(var(--muted-foreground) / 0.42);
+  --md-primary-fg-color: hsl(var(--card));
+  --md-primary-bg-color: hsl(var(--foreground));
+  --md-accent-fg-color: hsl(var(--brand));
+  --md-typeset-a-color: hsl(var(--brand));
+  --md-code-bg-color: hsl(var(--muted));
+  --md-code-fg-color: hsl(var(--foreground));
+  --md-code-hl-color: hsl(var(--brand) / 0.18);
+  --md-footer-bg-color: hsl(var(--card));
+  --md-footer-bg-color--dark: hsl(var(--background));
+  --md-footer-fg-color: hsl(var(--foreground));
+  --md-footer-fg-color--light: hsl(var(--muted-foreground));
+  --md-footer-fg-color--lighter: hsl(var(--muted-foreground) / 0.72);
+  --md-shadow-z1: none;
+  --md-shadow-z2: var(--whetstone-shadow-sm);
+  --md-shadow-z3: var(--whetstone-shadow-sm);
+}
+
+body {
+  font-family: var(--whetstone-font-sans);
+  font-feature-settings: "ss01", "cv11";
+  text-rendering: optimizeLegibility;
+}
+
+.md-header {
+  border-bottom: 1px solid hsl(var(--border));
+  box-shadow: none;
+}
+
+.md-header,
+.md-tabs {
+  background-color: hsl(var(--card));
+  color: hsl(var(--foreground));
+}
+
+.md-header__title,
+.md-tabs__link {
+  color: hsl(var(--foreground));
+}
+
+.md-search__form {
+  background-color: hsl(var(--muted));
+  border: 1px solid hsl(var(--border));
+  border-radius: var(--whetstone-radius);
+}
+
+.md-search__form:hover {
+  background-color: hsl(var(--card));
+}
+
+.md-nav__link--active,
+.md-nav__link[aria-current="page"] {
+  color: hsl(var(--brand));
+  font-weight: 600;
+}
+
+.md-nav__item .md-nav__link--active {
+  background-color: hsl(var(--brand-muted) / 0.5);
+  border-radius: calc(var(--whetstone-radius) - 2px);
+  padding-inline: 0.4rem;
+}
+
+.md-typeset {
+  color: hsl(var(--foreground));
+}
+
+.md-typeset h1,
+.md-typeset h2 {
+  color: hsl(var(--foreground));
+  font-family: var(--whetstone-font-serif);
+  font-weight: 600;
+  letter-spacing: 0;
+}
+
+.md-typeset h1 {
+  margin-bottom: 0.8em;
+}
+
+.md-typeset h2 {
+  border-top: 1px solid hsl(var(--border));
+  padding-top: 1.2rem;
+}
+
+.md-typeset h3,
+.md-typeset h4 {
+  color: hsl(var(--foreground));
+  letter-spacing: 0;
+}
+
+.md-typeset a {
+  color: hsl(var(--brand));
+}
+
+.md-typeset a:hover {
+  color: hsl(var(--brand) / 0.82);
+}
+
+.md-typeset code,
+.md-typeset kbd,
+.md-typeset pre {
+  font-family: var(--whetstone-font-mono);
+}
+
+.md-typeset code {
+  border: 1px solid hsl(var(--border));
+  border-radius: 4px;
+}
+
+.md-typeset pre > code {
+  border: 1px solid hsl(var(--border));
+  border-radius: var(--whetstone-radius);
+}
+
+.md-typeset table:not([class]) {
+  background-color: hsl(var(--card));
+  border: 1px solid hsl(var(--border));
+  border-radius: var(--whetstone-radius);
+  box-shadow: none;
+  overflow: hidden;
+}
+
+.md-typeset table:not([class]) th {
+  background-color: hsl(var(--muted));
+  color: hsl(var(--foreground));
+  font-weight: 650;
+}
+
+.md-typeset table:not([class]) td {
+  border-top: 1px solid hsl(var(--border));
+}
+
+.md-typeset .admonition,
+.md-typeset details {
+  background-color: hsl(var(--card));
+  border-color: hsl(var(--border-strong));
+  border-radius: var(--whetstone-radius);
+  box-shadow: none;
+}
+
+.md-typeset .admonition-title,
+.md-typeset summary {
+  background-color: hsl(var(--muted));
+  border-top-left-radius: var(--whetstone-radius);
+  border-top-right-radius: var(--whetstone-radius);
+}
+
+.md-typeset .grid.cards > ul > li,
+.md-typeset .grid > .card {
+  background-color: hsl(var(--card));
+  border: 1px solid hsl(var(--border));
+  border-radius: var(--whetstone-radius);
+  box-shadow: none;
+}
+
+.md-typeset .mermaid {
+  background-color: hsl(var(--card));
+  border: 1px solid hsl(var(--border));
+  border-radius: var(--whetstone-radius);
+  padding: 1rem;
+}
+
+.md-typeset .mermaid svg {
+  display: block;
+  margin-inline: auto;
+  max-width: 100%;
+}
+
+.md-footer {
+  border-top: 1px solid hsl(var(--border));
+}
