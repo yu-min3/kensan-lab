@@ -1,5 +1,7 @@
 name: App CI
 
+# apps/ に住む app は kensan 1 個の前提で決め打ち（新 app は Backstage template で別 repo に生成される。in-repo app が 2 個目になったら matrix 化する）
+
 on:
   pull_request:
     paths:
