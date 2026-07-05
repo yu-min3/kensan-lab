@@ -1,0 +1,75 @@
+name: Manifest CI
+
+on:
+  pull_request:
+    paths:
+      - "kubernetes/**"
+      - "charts/**"
+      - ".yamllint"
+      - "scripts/validate_argocd_apps.py"
+      - ".github/workflows/manifest-ci.yml"
+  push:
+    branches: [main]
+    paths:
+      - "kubernetes/**"
+      - "charts/**"
+      - ".yamllint"
+      - "scripts/validate_argocd_apps.py"
+      - ".github/workflows/manifest-ci.yml"
+
+jobs:
+  yamllint:
+    name: yamllint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: pipx install yamllint
+      - run: yamllint -c .yamllint kubernetes charts
+
+  kubeconform:
+    name: kubeconform (schema validation)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install kubeconform
+        run: |
+          curl -sSL https://github.com/yannh/kubeconform/releases/latest/download/kubeconform-linux-amd64.tar.gz | tar xz kubeconform
+      # values.yaml / Chart.yaml / chart templates / platform-values (helm values) は
+      # K8s manifest ではないため対象外。CR は -ignore-missing-schemas で skip される
+      - name: Validate raw manifests
+        run: |
+          find kubernetes -name '*.yaml' \
+            ! -name 'values.yaml' \
+            ! -name 'Chart.yaml' \
+            ! -path '*/chart/templates/*' \
+            ! -path '*/platform-values/*' \
+            -print0 | xargs -0 ./kubeconform -ignore-missing-schemas -summary
+
+  helm-render:
+    name: helm template (in-repo charts)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      # ApplicationSet が inject するのと同等のパラメータを渡して render が壊れていないか確認
+      - name: app-base (app-kensan values)
+        run: helm template app-kensan charts/app-base -f kubernetes/apps/app-kensan/values.yaml > /dev/null
+      - name: vault-database-engine (per-instance values)
+        run: |
+          for f in kubernetes/secrets/vault-database-engine/platform-values/vault-database/*.yaml; do
+            name="postgres-$(basename "$f" .yaml)"
+            helm template "$name" kubernetes/secrets/vault-database-engine/chart -f "$f" --set "name=$name" > /dev/null
+          done
+      - name: vault-transit-engine (per-instance values)
+        run: |
+          for f in kubernetes/secrets/vault-transit-engine/platform-values/vault-transit/*.yaml; do
+            name="transit-$(basename "$f" .yaml)"
+            helm template "$name" kubernetes/secrets/vault-transit-engine/chart -f "$f" --set "name=$name" > /dev/null
+          done
+
+  argocd-static-validation:
+    name: Argo CD static validation
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: pip install pyyaml
+      - run: python3 scripts/validate_argocd_apps.py

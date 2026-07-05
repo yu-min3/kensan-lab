@@ -2,12 +2,23 @@
 # yamllint configuration for Kubernetes style
 extends: default
 
+# Helm chart の Go template は YAML として parse できないため除外
+ignore: |
+  charts/*/templates/
+  kubernetes/secrets/*/chart/templates/
+  kubernetes/network/gateway-api/gateway-api-crds.yaml
+
 rules:
-  # Kubernetes style: no indent for list items (dash at parent level)
+  # 実態は「シーケンスをインデントする」スタイルが主流のため強制しない
+  # (旧設定 indent-sequences: false は実 manifest と乖離しており CI 未適用だった)
   indentation:
     spaces: 2
-    indent-sequences: false  # This is the key setting!
+    indent-sequences: whatever
     check-multi-line-strings: false
+
+  # `{ }` 内の空白は style として許容 (values.yaml の flow mapping で多用)
+  braces:
+    max-spaces-inside: 1
 
   # Line length is disabled for Kubernetes manifests (often auto-generated)
   line-length: disable
