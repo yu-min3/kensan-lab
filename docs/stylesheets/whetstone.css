@@ -236,6 +236,25 @@ body {
   max-width: 100%;
 }
 
+.md-typeset .mermaid .edgeLabel,
+.md-typeset .mermaid .edgeLabel p,
+.md-typeset .mermaid .edgeLabel span {
+  color: hsl(var(--foreground)) !important;
+  font-weight: 650 !important;
+  line-height: 1.25 !important;
+}
+
+.md-typeset .mermaid .edgeLabel,
+.md-typeset .mermaid .edgeLabel .labelBkg {
+  background-color: hsl(var(--background) / 0.92) !important;
+}
+
+.md-typeset .mermaid .edgeLabel rect {
+  fill: hsl(var(--background) / 0.92) !important;
+  stroke: hsl(var(--border)) !important;
+  rx: 4px;
+}
+
 .md-footer {
   border-top: 1px solid hsl(var(--border));
 }

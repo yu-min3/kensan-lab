@@ -67,12 +67,12 @@ default-deny and mTLS are **two independent axes**, not one knob. Each spans a d
 %%{init: {"flowchart": {"htmlLabels": false}} }%%
 flowchart LR
     subgraph nsA["ns A"]
-        A1[Pod] <==>|"✓ allow-intra-namespace"| A2[Pod]
+        A1[Pod] <==>|"allowed in ns"| A2[Pod]
     end
     subgraph nsB["ns B"]
         B1[Pod]
     end
-    A2 -->|"✗ cross-ns default-deny<br/>needs explicit allow(s)"| B1
+    A2 -->|"cross-ns denied<br/>allow required"| B1
 
     classDef default fill:#26221D,stroke:#4A4232,color:#FCFAF6
     linkStyle 0 stroke:#377A50,color:#377A50
@@ -94,8 +94,8 @@ flowchart LR
     end
     Out["outside mesh / no sidecar"]
 
-    SC1 <==>|"🔒 Istio establishes mTLS automatically<br/>(no config, mutual auth)"| SC2
-    Out -.->|"plaintext also accepted (PERMISSIVE)<br/>※ STRICT would reject"| SC2
+    SC1 <==>|"mTLS auto"| SC2
+    Out -.->|"plaintext accepted<br/>(PERMISSIVE)"| SC2
 
     classDef default fill:#26221D,stroke:#4A4232,color:#FCFAF6
     classDef proxy fill:#075985,stroke:#38BDF8,color:#FCFAF6
