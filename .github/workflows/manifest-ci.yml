@@ -53,15 +53,30 @@ jobs:
       # ApplicationSet が inject するのと同等のパラメータを渡して render が壊れていないか確認
       - name: app-base (app-kensan values)
         run: helm template app-kensan charts/app-base -f kubernetes/apps/app-kensan/values.yaml > /dev/null
+      # instance 0 件 (glob 空振り) でも fail せず、chart 単体の render を smoke check する
       - name: vault-database-engine (per-instance values)
         run: |
-          for f in kubernetes/secrets/vault-database-engine/platform-values/vault-database/*.yaml; do
+          shopt -s nullglob
+          files=(kubernetes/secrets/vault-database-engine/platform-values/vault-database/*.yaml)
+          if [ ${#files[@]} -eq 0 ]; then
+            echo "no instances — render chart with smoke values"
+            helm template ci-smoke kubernetes/secrets/vault-database-engine/chart \
+              --set name=ci-smoke --set ns=ci-smoke > /dev/null
+          fi
+          for f in "${files[@]}"; do
             name="postgres-$(basename "$f" .yaml)"
             helm template "$name" kubernetes/secrets/vault-database-engine/chart -f "$f" --set "name=$name" > /dev/null
           done
       - name: vault-transit-engine (per-instance values)
         run: |
-          for f in kubernetes/secrets/vault-transit-engine/platform-values/vault-transit/*.yaml; do
+          shopt -s nullglob
+          files=(kubernetes/secrets/vault-transit-engine/platform-values/vault-transit/*.yaml)
+          if [ ${#files[@]} -eq 0 ]; then
+            echo "no instances — render chart with smoke values"
+            helm template ci-smoke kubernetes/secrets/vault-transit-engine/chart \
+              --set name=ci-smoke --set ns=ci-smoke --set keyName=ci-smoke > /dev/null
+          fi
+          for f in "${files[@]}"; do
             name="transit-$(basename "$f" .yaml)"
             helm template "$name" kubernetes/secrets/vault-transit-engine/chart -f "$f" --set "name=$name" > /dev/null
           done
