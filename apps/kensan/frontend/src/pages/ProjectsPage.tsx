@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useSearchParams, Link } from "react-router-dom";
 import {
@@ -18,8 +18,10 @@ import {
 import clsx from "clsx";
 import { api, ApiError, todayISO, type ProjectSummary, type ProjectDetail, type Task } from "../lib/api";
 import { PageHeader } from "../components/PageHeader";
-import { MarkdownEditor } from "../components/MarkdownEditor";
+import { MilkdownEditor } from "../components/editors/MilkdownEditor";
+import { useAutosaveFile } from "../hooks/useAutosaveFile";
 import { Card, CardBody } from "../components/ui/card";
+import { SaveStatus } from "../components/ui/save-status";
 import { Badge } from "../components/ui/badge";
 import { Button } from "../components/ui/button";
 import { Empty, ErrorState, SkeletonRows, Skeleton } from "../components/ui/states";
@@ -445,84 +447,38 @@ function spliceSection(content: string, heading: string, body: string): string {
 const FREE_HEADING = "フリースペース";
 
 // README の ## フリースペース セクションだけを md 自由編集（autosave）。
-// README 全文は files API で読み書きし、フロントで該当セクションを差し替える（他セクションは保持）。
+// README 全文は files API で読み書きし、該当セクションだけ差し替える（他セクションは保持）。
+// デバウンス保存・楽観ロック・離脱時 flush は useAutosaveFile に集約。
 function FreeSpace({ name, onSaved }: { name: string; onSaved: () => void }) {
   const path = `projects/${name}/README.md`;
-  const file = useQuery({ queryKey: ["file", path], queryFn: () => api.file(path) });
-  const [body, setBody] = useState<string | null>(null);
-  const baseMtime = useRef("");
-  const full = useRef(""); // 最新の README 全文
-  const savedBody = useRef(""); // 最後に保存したセクション本文
-  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  useEffect(() => {
-    if (!file.data || body !== null) return;
-    full.current = file.data.content;
-    baseMtime.current = file.data.doc.mtime;
-    const b = extractSection(file.data.content, FREE_HEADING);
-    savedBody.current = b;
-    setBody(b);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [file.data]);
-
-  const save = useMutation({
-    mutationFn: (next: string) => {
-      const newFull = spliceSection(full.current, FREE_HEADING, next);
-      return api.putFile(path, newFull, baseMtime.current).then((res) => ({ res, newFull, next }));
-    },
-    onSuccess: ({ res, newFull, next }) => {
-      baseMtime.current = res.doc.mtime;
-      full.current = newFull;
-      savedBody.current = next;
-      onSaved();
-    },
+  const file = useAutosaveFile({
+    path,
+    read: (c) => extractSection(c, FREE_HEADING),
+    write: (c, b) => spliceSection(c, FREE_HEADING, b),
+    onSaved,
   });
 
-  const flush = () => {
-    if (timer.current) {
-      clearTimeout(timer.current);
-      timer.current = null;
-    }
-    if (body !== null && body !== savedBody.current) save.mutate(body);
-  };
-  const flushRef = useRef(flush);
-  flushRef.current = flush;
-  useEffect(() => () => flushRef.current(), []);
-
-  const onChange = (next: string) => {
-    setBody(next);
-    if (timer.current) clearTimeout(timer.current);
-    timer.current = setTimeout(() => save.mutate(next), 800);
-  };
-
-  const conflict = save.error instanceof ApiError && save.error.status === 409;
-  const dirty = body !== null && body !== savedBody.current;
-  const status = conflict ? "競合" : save.isError ? "保存エラー" : save.isPending ? "保存中…" : dirty ? "未保存…" : file.data ? "保存済み" : "";
-
-  if (file.isPending) return <Skeleton className="h-40 w-full" />;
-  if (file.isError) return <ErrorState error={file.error} onRetry={() => file.refetch()} />;
-  if (conflict) {
+  if (file.query.isError) return <ErrorState error={file.query.error} onRetry={() => file.query.refetch()} />;
+  if (file.conflict) {
     return (
       <ErrorState
         error={new ApiError(409, "他のクライアント（Claude Code / VSCode）が先に編集しました。再読込してください。")}
-        onRetry={() => {
-          save.reset();
-          setBody(null);
-          file.refetch();
-        }}
+        onRetry={file.retry}
       />
     );
   }
+  if (file.query.isPending || file.initialBody === null) return <Skeleton className="h-40 w-full" />;
 
   return (
     <div className="ds-stack !gap-2">
       <div className="flex justify-end">
-        <span className={save.isError ? "text-xs text-destructive" : "text-xs text-muted-foreground"}>{status}</span>
+        <SaveStatus state={file.saveState} />
       </div>
       <div className="rounded-md border border-border bg-card p-3">
-        <MarkdownEditor
-          value={body ?? ""}
-          onChange={onChange}
+        <MilkdownEditor
+          key={file.editorKey}
+          defaultValue={file.initialBody}
+          onChange={file.onChange}
           minHeight="14rem"
           placeholder="このプロジェクトの自由メモ。設計の走り書き・関連リンク（[[…]] や URL）・なんでも。"
         />
