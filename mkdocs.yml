@@ -164,12 +164,12 @@ nav:
       - Namespace Label Design: concepts/namespace-label-design.md
       - Network Policy: concepts/network-policy-guide.md
       - Policy Enforcement: concepts/policy-enforcement.md
-      - Kustomize Guidelines (deprecated): concepts/kustomize-guidelines.md
   - Design System:
       - Overview: design/DESIGN_SYSTEM.md
       - Components: design/components.md
       - Patterns: design/patterns.md
       - Adoption Status: design/adoption-status.md
+      - Brand Assets: design/brand/README.md
   - Operations:
       - Secret Management: secret-management/index.md
       - Auth integration:
@@ -184,9 +184,6 @@ nav:
           - Longhorn restore test: runbooks/longhorn-restore-test.md
           - ArgoCD repo-server tuning: runbooks/argocd-repo-server-tuning.md
       - Environment cleanup:
-          - kensan dev cleanup: operations/kensan-dev-cleanup.md
-          - Keycloak dev cleanup: operations/keycloak-dev-cleanup.md
-          - Vault role & gateway cleanup: operations/vault-dev-role-and-gateway-cleanup.md
       - Recovery:
           - Workspace volume recovery: operations/kensan-workspace-volume-recovery.md
           - Syncthing pairing recovery: operations/syncthing-pairing-recovery.md
