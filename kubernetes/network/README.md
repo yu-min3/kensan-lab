@@ -41,10 +41,10 @@ flowchart TB
     ZT -.->|identity| MTLS
     ZT -.->|reachability: deny→allow| CCNP
 
-    classDef default fill:#FCFAF6,stroke:#D2C9B5,color:#1A1714
-    classDef l7 fill:#E0F1F8,stroke:#0284C7,color:#1A1714
-    classDef l34 fill:#E3F0E8,stroke:#377A50,color:#1A1714
-    classDef zt fill:#FBE7D2,stroke:#C97516,color:#1A1714
+    classDef default fill:#26221D,stroke:#4A4232,color:#FCFAF6
+    classDef l7 fill:#075985,stroke:#38BDF8,color:#FCFAF6
+    classDef l34 fill:#2F6B45,stroke:#7AC99A,color:#FCFAF6
+    classDef zt fill:#8A4B12,stroke:#FDBA74,color:#FCFAF6
     class GW,MTLS l7
     class KP,LB,CCNP,HUB l34
     class ZT zt
@@ -74,7 +74,7 @@ flowchart LR
     end
     A2 -->|"✗ cross-ns default-deny<br/>needs explicit allow(s)"| B1
 
-    classDef default fill:#FCFAF6,stroke:#D2C9B5,color:#1A1714
+    classDef default fill:#26221D,stroke:#4A4232,color:#FCFAF6
     linkStyle 0 stroke:#377A50,color:#377A50
     linkStyle 1 stroke:#CC3925,color:#CC3925
 ```
@@ -97,9 +97,9 @@ flowchart LR
     SC1 <==>|"🔒 Istio establishes mTLS automatically<br/>(no config, mutual auth)"| SC2
     Out -.->|"plaintext also accepted (PERMISSIVE)<br/>※ STRICT would reject"| SC2
 
-    classDef default fill:#FCFAF6,stroke:#D2C9B5,color:#1A1714
-    classDef proxy fill:#E0F1F8,stroke:#0284C7,color:#1A1714
-    classDef plain fill:#ECE6DA,stroke:#9A9183,color:#6B6358
+    classDef default fill:#26221D,stroke:#4A4232,color:#FCFAF6
+    classDef proxy fill:#075985,stroke:#38BDF8,color:#FCFAF6
+    classDef plain fill:#3D372E,stroke:#948B79,color:#E8E1D6
     class SC1,SC2 proxy
     class Out plain
     linkStyle 2 stroke:#0284C7,color:#0284C7
