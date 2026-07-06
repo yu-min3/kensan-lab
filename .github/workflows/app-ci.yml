@@ -45,5 +45,6 @@ jobs:
           cache: npm
           cache-dependency-path: apps/kensan/frontend/package-lock.json
       - run: npm ci
+      - run: npm test
       # tokens.css は packages/design-tokens から相対 import されるため full checkout 前提
       - run: npm run build
