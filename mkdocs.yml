@@ -180,6 +180,7 @@ nav:
           - runbooks/index.md
           - Vault Raft auto-join: runbooks/vault-raft-join.md
           - Vault storage migration (Longhorn): runbooks/vault-storage-migration-longhorn.md
+          - VCO drift after Vault rebuild: runbooks/vco-vault-state-drift.md
           - Cilium WiFi stability: runbooks/cilium-wifi-stability.md
           - Cilium update strategy: runbooks/cilium-update-strategy.md
           - Longhorn restore test: runbooks/longhorn-restore-test.md

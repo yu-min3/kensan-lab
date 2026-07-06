@@ -1,6 +1,9 @@
 # kensan-lab リファクタリング マスタープラン
 
-> **Status**: 承認済み・実行中 / 作成: 2026-07-03（origin/main f0a31dd + 実クラスタ確認済み）
+> **Status**: Phase 0-5 完了（2026-07-06 時点）・Phase 6 着手可 / 作成: 2026-07-03
+> 完了実績: Phase 0 (CI #398/#399) / Phase 1 (#400/#402 + disk 掃除) / Phase 2 (#403-#406/#409) /
+> Phase 3 (#411) / Phase 4 (#401 + tag) / Phase 5 (ADR-018 #412/#414、W15 storage 一本化 #413/#415/#416)。
+> 残: Phase 6 (W17/18 frontend テスト)、ブランチ掃除、temp/ バックアップ処分
 > Phase 4 の legacy 処遇は **(a) tag + 削除で決定**（Yu、2026-07-03）。tag `kensan-legacy-final` 作成・push 済み
 >
 > ⚠️ `docs/` は MkDocs で GitHub Pages（+ llms.txt）として **public 公開される**。
