@@ -244,15 +244,29 @@ body {
   line-height: 1.25 !important;
 }
 
-.md-typeset .mermaid .edgeLabel,
-.md-typeset .mermaid .edgeLabel .labelBkg {
-  background-color: hsl(var(--background) / 0.92) !important;
+.md-typeset .mermaid .edgeLabel {
+  transform-box: fill-box;
+  transform-origin: center;
+  translate: 0 -0.65rem;
 }
 
+.md-typeset .mermaid .edgeLabel foreignObject {
+  overflow: visible;
+  transform: translateY(-0.75rem);
+}
+
+.md-typeset .mermaid .edgeLabel,
+.md-typeset .mermaid .edgeLabel .labelBkg,
 .md-typeset .mermaid .edgeLabel rect {
-  fill: hsl(var(--background) / 0.92) !important;
-  stroke: hsl(var(--border)) !important;
-  rx: 4px;
+  background-color: hsl(var(--card)) !important;
+  fill: hsl(var(--card)) !important;
+  stroke: transparent !important;
+}
+
+.md-typeset .mermaid .edgeLabel .labelBkg,
+.md-typeset .mermaid .edgeLabel rect {
+  rx: 3px;
+  ry: 3px;
 }
 
 .md-footer {

@@ -22,7 +22,7 @@ A bare-metal Kubernetes network stack — CNI, service mesh, ingress, NetworkPol
 Bottom = Cilium (L3/4), top = Istio (L7). Zero-trust is the vertical spine that ties three controls — one from each engine layer — into a single posture.
 
 ```mermaid
-%%{init: {"flowchart": {"htmlLabels": false}} }%%
+%%{init: {"flowchart": {"htmlLabels": true}} }%%
 flowchart TB
     subgraph ISTIO["L7 — Istio mesh ｜ identity & ingress"]
         GW["Istio Gateway<br/>TLS termination / ingress auth (ext_authz → oauth2-proxy)"]
@@ -64,28 +64,22 @@ default-deny and mTLS are **two independent axes**, not one knob. Each spans a d
 > Same-namespace traffic flows only when the namespace has an explicit `allow-intra-namespace` policy. Cross-namespace traffic requires explicit allows on the relevant side(s).
 
 ```mermaid
-%%{init: {"flowchart": {"htmlLabels": false}} }%%
+%%{init: {"flowchart": {"htmlLabels": true}} }%%
 flowchart LR
     subgraph nsA["ns A"]
-        A1[Pod] <==> AL["allowed inside namespace"] <==> A2[Pod]
+        A1[Pod] <==>|"allowed inside namespace"| A2[Pod]
     end
     subgraph nsB["ns B"]
         B1[Pod]
     end
-    A2 --> DN["cross-namespace denied<br/>until explicit allow"] --> B1
+    A2 -->|"cross-namespace denied<br/>until explicit allow"| B1
 
     style nsA fill:#2D2820,stroke:#948B79,color:#FCFAF6
     style nsB fill:#2D2820,stroke:#948B79,color:#FCFAF6
     classDef pod fill:#1A1714,stroke:#4A4232,color:#FCFAF6
-    classDef allowLabel fill:#203A2B,stroke:#377A50,color:#E8F5EC
-    classDef denyLabel fill:#3A201C,stroke:#CC3925,color:#FBE7D2
     class A1,A2,B1 pod
-    class AL allowLabel
-    class DN denyLabel
     linkStyle 0 stroke:#377A50,color:#377A50
-    linkStyle 1 stroke:#377A50,color:#377A50
-    linkStyle 2 stroke:#CC3925,color:#CC3925
-    linkStyle 3 stroke:#CC3925,color:#CC3925
+    linkStyle 1 stroke:#CC3925,color:#CC3925
 ```
 
 ### mTLS PERMISSIVE — automatic between pods
@@ -93,7 +87,7 @@ flowchart LR
 > Injected sidecars get mTLS automatically. PERMISSIVE still accepts plaintext (STRICT would reject it).
 
 ```mermaid
-%%{init: {"flowchart": {"htmlLabels": false}} }%%
+%%{init: {"flowchart": {"htmlLabels": true}} }%%
 flowchart LR
     subgraph P1["Pod A (sidecar injected)"]
         App1[app] --- SC1[istio-proxy]
@@ -103,25 +97,19 @@ flowchart LR
     end
     Out["outside mesh / no sidecar"]
 
-    SC1 <==> MT["automatic mTLS"] <==> SC2
-    Out -.-> PT["plaintext accepted<br/>(PERMISSIVE)"] -.-> SC2
+    SC1 <==>|"automatic mTLS"| SC2
+    Out -.->|"plaintext accepted<br/>(PERMISSIVE)"| SC2
 
     style P1 fill:#2D2820,stroke:#948B79,color:#FCFAF6
     style P2 fill:#2D2820,stroke:#948B79,color:#FCFAF6
     classDef app fill:#1A1714,stroke:#4A4232,color:#FCFAF6
     classDef proxy fill:#075985,stroke:#38BDF8,color:#FCFAF6
     classDef plain fill:#3D372E,stroke:#948B79,color:#E8E1D6
-    classDef mtlsLabel fill:#08344A,stroke:#38BDF8,color:#E0F1F8
-    classDef plainLabel fill:#26221D,stroke:#948B79,color:#E8E1D6
     class App1,App2 app
     class SC1,SC2 proxy
     class Out plain
-    class MT mtlsLabel
-    class PT plainLabel
     linkStyle 2 stroke:#0284C7,color:#0284C7
-    linkStyle 3 stroke:#0284C7,color:#0284C7
-    linkStyle 4 stroke:#9A9183,stroke-dasharray:3 3,color:#9A9183
-    linkStyle 5 stroke:#9A9183,stroke-dasharray:3 3,color:#9A9183
+    linkStyle 3 stroke:#9A9183,stroke-dasharray:3 3,color:#9A9183
 ```
 
 ## Design rationale
