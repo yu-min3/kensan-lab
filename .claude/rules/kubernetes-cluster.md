@@ -40,8 +40,7 @@ globs: "kubernetes/**"
 
 ## Storage
 
-- 新規 PVC は `longhorn`（default、replicated block）。`local-path` は legacy で段階的廃止
-- `local-path` PVC は **node-local**。StatefulSet を別ノードに移すと再作成 + データ消失
+- PVC は `longhorn`（default、replicated block）。`local-path` は 2026-07 に全廃済み（provisioner / SC とも撤去）
 
 詳細・R2 backup 構成: [`kubernetes/storage/README.md`](../../kubernetes/storage/README.md) / [`docs/architecture/infrastructure.md`](../../docs/architecture/infrastructure.md)
 

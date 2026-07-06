@@ -1,18 +1,16 @@
 # storage
 
-PersistentVolume プロビジョナ。デフォルトは Longhorn (レプリケート block storage)。`local-path` は legacy で段階的廃止予定。
+PersistentVolume プロビジョナ。Longhorn (レプリケート block storage) に一本化済み（`local-path` は 2026-07 全廃）。
 
 ## 構成
 
 | dir | 役割 | StorageClass |
 |---|---|---|
 | `longhorn/` | Longhorn (replicated block, default)。R2 への定期 backup + snapshot RecurringJob 同梱 | `longhorn` (default) |
-| `local-path-provisioner/` | Rancher local-path (node-local hostPath)。Longhorn 移行未完の PVC 用 | `local-path` |
 
 ## 使い分け
 
 - **新規ワークロードは `longhorn`**。複数ノードに block レベルで複製されるので、ノード障害でデータ消失しない
-- **`local-path` は触らない**。残ってる PVC を Longhorn に移行する場合は手動 (PVC 再作成 + データコピー)
 
 Longhorn 移行は commit 45a6a61 で完了済み。Postgres 系 4 個は commit cb3cdb6 で Longhorn 移行済み。
 
