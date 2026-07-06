@@ -67,28 +67,25 @@ default-deny and mTLS are **two independent axes**, not one knob. Each spans a d
 %%{init: {"flowchart": {"htmlLabels": false}} }%%
 flowchart LR
     subgraph nsA["ns A"]
-        A1[Pod] <==> A2[Pod]
+        A1[Pod] <==> AL["allowed inside namespace"] <==> A2[Pod]
     end
     subgraph nsB["ns B"]
         B1[Pod]
     end
-    A2 --> B1
-
-    AL["allowed inside namespace"]
-    DN["cross-namespace denied<br/>until explicit allow"]
-    AL -.-> A1
-    DN -.-> B1
+    A2 --> DN["cross-namespace denied<br/>until explicit allow"] --> B1
 
     style nsA fill:#2D2820,stroke:#948B79,color:#FCFAF6
     style nsB fill:#2D2820,stroke:#948B79,color:#FCFAF6
     classDef pod fill:#1A1714,stroke:#4A4232,color:#FCFAF6
-    classDef note fill:#26221D,stroke:#4A4232,color:#E8E1D6
+    classDef allowLabel fill:#203A2B,stroke:#377A50,color:#E8F5EC
+    classDef denyLabel fill:#3A201C,stroke:#CC3925,color:#FBE7D2
     class A1,A2,B1 pod
-    class AL,DN note
+    class AL allowLabel
+    class DN denyLabel
     linkStyle 0 stroke:#377A50,color:#377A50
-    linkStyle 1 stroke:#CC3925,color:#CC3925
-    linkStyle 2 stroke:#377A50,stroke-dasharray:3 3,color:#377A50
-    linkStyle 3 stroke:#CC3925,stroke-dasharray:3 3,color:#CC3925
+    linkStyle 1 stroke:#377A50,color:#377A50
+    linkStyle 2 stroke:#CC3925,color:#CC3925
+    linkStyle 3 stroke:#CC3925,color:#CC3925
 ```
 
 ### mTLS PERMISSIVE — automatic between pods
@@ -106,27 +103,24 @@ flowchart LR
     end
     Out["outside mesh / no sidecar"]
 
-    SC1 <==> SC2
-    Out -.-> SC2
-
-    MT["automatic mTLS"]
-    PT["plaintext accepted<br/>(PERMISSIVE)"]
-    MT -.-> SC1
-    PT -.-> Out
+    SC1 <==> MT["automatic mTLS"] <==> SC2
+    Out -.-> PT["plaintext accepted<br/>(PERMISSIVE)"] -.-> SC2
 
     style P1 fill:#2D2820,stroke:#948B79,color:#FCFAF6
     style P2 fill:#2D2820,stroke:#948B79,color:#FCFAF6
     classDef app fill:#1A1714,stroke:#4A4232,color:#FCFAF6
     classDef proxy fill:#075985,stroke:#38BDF8,color:#FCFAF6
     classDef plain fill:#3D372E,stroke:#948B79,color:#E8E1D6
-    classDef note fill:#26221D,stroke:#4A4232,color:#E8E1D6
+    classDef mtlsLabel fill:#08344A,stroke:#38BDF8,color:#E0F1F8
+    classDef plainLabel fill:#26221D,stroke:#948B79,color:#E8E1D6
     class App1,App2 app
     class SC1,SC2 proxy
     class Out plain
-    class MT,PT note
+    class MT mtlsLabel
+    class PT plainLabel
     linkStyle 2 stroke:#0284C7,color:#0284C7
-    linkStyle 3 stroke:#9A9183,color:#9A9183
-    linkStyle 4 stroke:#0284C7,stroke-dasharray:3 3,color:#0284C7
+    linkStyle 3 stroke:#0284C7,color:#0284C7
+    linkStyle 4 stroke:#9A9183,stroke-dasharray:3 3,color:#9A9183
     linkStyle 5 stroke:#9A9183,stroke-dasharray:3 3,color:#9A9183
 ```
 
