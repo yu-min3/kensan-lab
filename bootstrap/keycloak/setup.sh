@@ -273,8 +273,7 @@ GATEWAY_PROTECTED_HOSTS=(
   prometheus.yu-mins.com
   longhorn.yu-mins.com
   # gateway-prod 側の protected host (新 kensan、ADR-010 の app 系への拡張)
-  kensan.app.yu-min3.com # Phase 7 で legacy から継承した本番 host (#394)
-  kensan-preview.app.yu-min3.com
+  kensan.app.yu-min3.com # 本番 host（Phase 7 で legacy から継承, #394）
   kensan.yu-mins.com # kensan アプリの外部公開 (Cloudflare Tunnel → gateway-prod)
 )
 # Grafana は auth.generic_oauth で Keycloak 直結 (Path B)。Authorization Bearer
