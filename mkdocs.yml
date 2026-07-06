@@ -142,6 +142,9 @@ extra:
       link: https://dev.to/
   generator: false
 
+extra_css:
+  - stylesheets/whetstone.css
+
 nav:
   - Home: index.md
   - Getting Started:
@@ -157,6 +160,7 @@ nav:
       - auth/: architecture/auth.md
       - secrets/: architecture/secrets.md
       - network/: architecture/network.md
+      - network/ · Cloudflare Tunnel & Access: architecture/cloudflare-tunnel.md
       - observability/: architecture/observability.md
       - Cluster health monitoring: architecture/cluster-health-monitoring.md
   - Concepts:
