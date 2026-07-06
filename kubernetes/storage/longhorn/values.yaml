@@ -73,7 +73,7 @@ defaultSettings:
 
 # StorageClass: longhorn (Phase 1 = replica=1)
 persistence:
-  defaultClass: false                # default は既存の local-path 維持
+  defaultClass: true                 # local-path 全廃済み (2026-07)。longhorn が唯一の default
   defaultClassReplicaCount: 1
   reclaimPolicy: Retain              # 誤削除対策
   defaultDataLocality: best-effort

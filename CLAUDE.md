@@ -62,7 +62,7 @@ Backstage: `cd backstage/app && make {install,dev,all TAG=...}`
 レビューエージェント（Claude `/code-review`、Codex `codex exec review` — 後者は `AGENTS.md` symlink 経由で本ファイルを読む）は以下の優先度で指摘する:
 
 - **P0 (block)**: 生 secret の commit（`temp/*-raw.yaml`・`.env`・token / credential 平文）/ rendered Helm manifest（`helm template` 出力）の commit / GitOps バイパス（`kubectl apply` 前提の変更）
-- **P1 (warn)**: single-arch image 指定（multi-arch manifest list 必須）/ chart version を Application CR の `targetRevision` 以外で管理 / 新規 PVC での `local-path` 指定（default は `longhorn`）/ stateful データを持つリソース（PVC・StorageClass・RecurringJob 等、prune でデータ消失・再作成不能になるもの）への `Prune=false` annotation 漏れ
+- **P1 (warn)**: single-arch image 指定（multi-arch manifest list 必須）/ chart version を Application CR の `targetRevision` 以外で管理 / 新規 PVC で `longhorn` 以外の storageClass 指定（local-path は全廃済み）/ stateful データを持つリソース（PVC・StorageClass・RecurringJob 等、prune でデータ消失・再作成不能になるもの）への `Prune=false` annotation 漏れ
 - **P2 (info)**: doc-layout 規約違反 / namespace 命名（`app-{name}`）違反 / HTTPRoute の `parentRefs` と Gateway の不整合
 
 ## Domain & Network

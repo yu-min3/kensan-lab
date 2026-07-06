@@ -109,7 +109,7 @@ kubernetes/                    # Core platform (GitOps-managed)
 ├── auth/                         # Keycloak, oauth2-proxy, Vault OIDC auth
 ├── secrets/                      # Vault, External Secrets, Sealed Secrets, cert-manager, Reloader
 ├── policy/                       # Kyverno + cluster policies (PSS baseline/restricted, exceptions)
-├── storage/                      # Longhorn, local-path-provisioner
+├── storage/                      # Longhorn (replicated block storage)
 ├── apps/                         # Per-app deploy definitions (e.g. app-kensan: values + raw resources)
 ├── namespaces/                   # Shared-namespace bootstrap (app-prod landing zone)
 └── kube-system/                  # Namespace labels, Pod Security Standards

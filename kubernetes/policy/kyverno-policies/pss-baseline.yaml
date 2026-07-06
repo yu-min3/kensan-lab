@@ -3,7 +3,7 @@
 ##
 ## scope 設計:
 ##   - 床からの離脱は ns 側の `kensan-lab.platform/pss-level: privileged` 宣言が SoT
-##     (現状: kube-system / istio-system / longhorn-system / local-path-storage)。
+##     (現状: kube-system / istio-system / longhorn-system)。
 ##     この宣言を名乗れる条件 (tier=platform) は ns-label-contract rule が強制する
 ##   - pss-level 未宣言 / 未知の値の ns はすべて床に落ちる (安全側フォールバック)
 ##   - より厳しい level は pss-restricted.yaml (pss-level=restricted) が担当

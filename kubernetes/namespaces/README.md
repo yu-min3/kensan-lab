@@ -17,6 +17,6 @@ ns 管理は 2 種類に分かれる:
 ## 運用ノート
 
 - **Application 名の `-namespace` suffix は不統一のまま**（`reloader-namespace` vs `kube-system` 等）。ArgoCD の Application rename = 旧 prune + 新 create であり、ns 巻き添え削除の事故リスクに見合わないため意図的に据え置き（ownership-transfer の手順を踏めば可能だが優先度低）
-- `sealed-secrets-namespace` / `local-path-storage-namespace` は **finalizer なし + Prune=false**（sealing key / legacy PVC の保護。各 app.yaml のヘッダコメント参照）
+- `sealed-secrets-namespace` は **finalizer なし + Prune=false**（sealing key の保護。app.yaml のヘッダコメント参照）
 - 同居ディレクトリに他の manifest がある場合、component 側 app に `directory.exclude: 'namespace.yaml'` が必要（例: `applications/secrets/sealed-secrets/app.yaml`）
 

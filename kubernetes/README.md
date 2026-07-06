@@ -12,7 +12,7 @@ Argo CD で同期される全 platform component の Git source。
 | `observability/` | Prometheus, Grafana, Loki, Tempo, OTel Collector |
 | `auth/` | Keycloak (OIDC IdP), oauth2-proxy (Gateway ext_authz), Vault OIDC auth |
 | `secrets/` | Vault + Vault Config Operator + Vault Database/Transit engines, External Secrets, Sealed Secrets, cert-manager, Reloader |
-| `storage/` | local-path-provisioner, Longhorn |
+| `storage/` | Longhorn |
 | `policy/` | Kyverno (policy engine + ClusterPolicy / PolicyException 群) |
 | `backstage/` | Backstage (developer portal) の deploy 定義 — Pattern B。ソースは `backstage/app/`（ADR-018） |
 | `kube-system/` | kube-system ns の label / PSA / 共通リソース管理 |
@@ -46,7 +46,7 @@ Helm chart を使わず、raw manifest だけを Argo CD app が読むコンポ�
 └── *.yaml
 ```
 
-例: `network/network-policy/`, `network/cloudflare-tunnel/`, `network/gateway-api/`, `secrets/sealed-secrets/`, `storage/local-path-provisioner/`, `network/istio/` 直下の Gateway / PeerAuthentication / namespace 等
+例: `network/network-policy/`, `network/cloudflare-tunnel/`, `network/gateway-api/`, `secrets/sealed-secrets/`, `network/istio/` 直下の Gateway / PeerAuthentication / namespace 等
 
 トップレベルにそのまま .yaml を置く。`resources/` で 1 段挟まない。
 

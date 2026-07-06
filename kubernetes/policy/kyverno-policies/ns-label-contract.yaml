@@ -24,7 +24,7 @@ spec:
     failurePolicy: Ignore
   rules:
     ## rule 1: 全 ns に required labels (environment + tier。tier は値域も検査)。
-    ## bare ns (reloader / sealed-secrets / local-path-storage) は ns lifecycle app
+    ## bare ns (reloader / sealed-secrets) は ns lifecycle app
     ## (applications/namespaces/) で remediate 済み — Phase 2
     - name: require-base-labels
       match:

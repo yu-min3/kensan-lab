@@ -63,4 +63,4 @@ replicated storage と R2 バックアップ（`s3://kensan-lab-longhorn-backup@
 ## Notes
 
 - Grafana MCP が使える場合は `longhorn_volume_robustness` / `longhorn_backup_state` メトリクスで時系列の劣化傾向も補足できる（ServiceMonitor 設定済み、storage-plan §5.9）
-- `local-path` PVC は本 skill の対象外（legacy・node-local。`kubernetes-cluster.md` 参照）
+- 全 PVC が Longhorn 管理（local-path は 2026-07 全廃）のため、本 skill でクラスタ全体の volume を網羅できる
