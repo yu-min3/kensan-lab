@@ -25,7 +25,7 @@ resources:
 persistence:
   enabled: true
   type: pvc
-  storageClassName: local-path
+  storageClassName: longhorn
   size: 2Gi
 
 # Sidecar configuration for auto-discovery

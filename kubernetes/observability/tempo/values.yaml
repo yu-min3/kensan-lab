@@ -61,7 +61,7 @@ tempo:
 persistence:
   enabled: true
   size: 10Gi
-  storageClassName: local-path
+  storageClassName: longhorn
   enableStatefulSetAutoDeletePVC: false
 
 # Schedule on high-performance node (NVMe I/O for trace storage)

@@ -73,7 +73,7 @@ singleBinary:
   persistence:
     enabled: true
     size: 10Gi
-    storageClass: local-path
+    storageClass: longhorn
     enableStatefulSetAutoDeletePVC: false
 
 # Gateway disabled (direct access via ClusterIP)
