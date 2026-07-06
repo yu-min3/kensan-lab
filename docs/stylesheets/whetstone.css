@@ -242,24 +242,29 @@ body {
   color: hsl(var(--foreground)) !important;
   font-weight: 650 !important;
   line-height: 1.25 !important;
+  text-shadow:
+    0 1px 0 hsl(var(--card)),
+    0 -1px 0 hsl(var(--card)),
+    1px 0 0 hsl(var(--card)),
+    -1px 0 0 hsl(var(--card));
 }
 
 .md-typeset .mermaid .edgeLabel {
   transform-box: fill-box;
   transform-origin: center;
-  translate: 0 -0.65rem;
+  translate: 0 -1.4rem;
 }
 
 .md-typeset .mermaid .edgeLabel foreignObject {
   overflow: visible;
-  transform: translateY(-0.75rem);
+  transform: translateY(-1.4rem);
 }
 
 .md-typeset .mermaid .edgeLabel,
 .md-typeset .mermaid .edgeLabel .labelBkg,
 .md-typeset .mermaid .edgeLabel rect {
-  background-color: hsl(var(--card)) !important;
-  fill: hsl(var(--card)) !important;
+  background-color: transparent !important;
+  fill: transparent !important;
   stroke: transparent !important;
 }
 
