@@ -1,7 +1,8 @@
 # Vault storage migration: local-path → Longhorn
 
-> **Status: 手順書ドラフト（未実行）。** リファクタリング計画 Phase 5 / W15。
-> 実行は 1 セッションを確保し、各 Step の確認を通してから次へ進むこと。
+> **Status: 実行済み（2026-07-06）。** 全 Phase を本手順どおり実施し、ダウンタイムゼロ・
+> quorum 維持で完了（leader は step-down で vault-2 に移動）。以後は Vault ノードの
+> storage 作り直し全般の参考手順として残す。
 
 ## 背景
 
