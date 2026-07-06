@@ -189,7 +189,6 @@ nav:
           - Cilium update strategy: runbooks/cilium-update-strategy.md
           - Longhorn restore test: runbooks/longhorn-restore-test.md
           - ArgoCD repo-server tuning: runbooks/argocd-repo-server-tuning.md
-      - Environment cleanup:
       - Recovery:
           - Workspace volume recovery: operations/kensan-workspace-volume-recovery.md
           - Syncthing pairing recovery: operations/syncthing-pairing-recovery.md
