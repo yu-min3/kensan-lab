@@ -67,12 +67,12 @@ default-deny and mTLS are **two independent axes**, not one knob. Each spans a d
 %%{init: {"flowchart": {"htmlLabels": true}} }%%
 flowchart LR
     subgraph nsA["ns A"]
-        A1[Pod] <==>|"allowed inside namespace"| A2[Pod]
+        A1[Pod] <==>|"allowed inside<br/>namespace"| A2[Pod]
     end
     subgraph nsB["ns B"]
         B1[Pod]
     end
-    A2 -->|"cross-namespace denied<br/>until explicit allow"| B1
+    A2 -->|"cross-namespace<br/>denied until<br/>explicit allow"| B1
 
     style nsA fill:#2D2820,stroke:#948B79,color:#FCFAF6
     style nsB fill:#2D2820,stroke:#948B79,color:#FCFAF6
