@@ -27,8 +27,7 @@ spec:
     - to:
         - operation:
             hosts:
-              - kensan.app.yu-min3.com # Phase 7 で legacy から継承した本番 host
-              - kensan-preview.app.yu-min3.com
+              - kensan.app.yu-min3.com # 本番 host（Phase 7 で legacy から継承）
               - kensan.yu-mins.com # Cloudflare Tunnel 経由の外部公開（gateway-prod http-tunnel listener）
             notPaths:
               - /oauth2
