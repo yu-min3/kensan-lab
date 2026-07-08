@@ -150,6 +150,6 @@ The need to "showcase Vault dynamic credentials" is satisfied by placing the ken
 
 - ADR-005: Phase 1 Authentication via Istio Native oauth2 + Keycloak (premise that Keycloak is the sole IdP)
 - ADR-007: Do Not Adopt Vault PKI (the same "do not move everything to Vault" principle)
-- Design source: `kensan-workspace/projects/kensan-lab/secrets-phase1-design.md` § #4 The Keycloak DB chicken-and-egg problem and decision
+- Design source: `kensan-workspace/projects/kensan-lab/docs/secrets-phase1-design.md` § #4 The Keycloak DB chicken-and-egg problem and decision
 - [Keycloak: Database Configuration](https://www.keycloak.org/server/db)
 - [HashiCorp Vault Database Secrets Engine](https://developer.hashicorp.com/vault/docs/secrets/databases)

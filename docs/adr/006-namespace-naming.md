@@ -152,4 +152,4 @@ Splitting Projects along the team axis (`app-project-team-a`, etc.) is reconside
 
 - ADR-005: Phase 1 Authentication via Istio Native oauth2 + Keycloak (the label is referenced from AuthorizationPolicy)
 - `.claude/rules/environment-separation.md` (definition of the three-layer model)
-- Design source: `kensan-workspace/projects/kensan-lab/secrets-phase1-design.md` § Namespace separation strategy
+- Design source: `kensan-workspace/projects/kensan-lab/docs/secrets-phase1-design.md` § Namespace separation strategy

@@ -171,6 +171,6 @@ Per-app namespace `AuthorizationPolicy` is not required in Phase 1. Add it only 
 - ADR-002: Phased Implementation of Authentication and Authorization Architecture (Phase 2 implementation method replaced by this ADR)
 - ADR-006: Application Namespace Naming Convention (the `kensan-lab.platform/team` label is referenced from AuthorizationPolicy)
 - ADR-008: Keycloak DB Credentials Are Not Moved to Vault (the boring-keeping policy for Keycloak itself)
-- Design source: `kensan-workspace/projects/kensan-lab/secrets-phase1-design.md` § Application authentication/authorization flow (Istio + Keycloak)
+- Design source: `kensan-workspace/projects/kensan-lab/docs/secrets-phase1-design.md` § Application authentication/authorization flow (Istio + Keycloak)
 - [Istio: External Authorization](https://istio.io/latest/docs/tasks/security/authorization/authz-custom/)
 - [Istio 1.27 Release Notes](https://istio.io/latest/news/releases/1.27.x/)

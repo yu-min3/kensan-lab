@@ -126,6 +126,6 @@ Two factual corrections from the design review; **the decision (no Vault PKI) st
 
 - ADR-001: TLS Termination Pattern (external -> Gateway TLS termination)
 - ADR-008: Keycloak DB Credentials Are Not Moved to Vault (the same "do not move everything to Vault" principle)
-- Design source: `kensan-workspace/projects/kensan-lab/secrets-phase1-design.md` § TLS ownership organization (rationale for not adopting Vault PKI) / § Future Vault PKI adoption scenario: via istio-csr
+- Design source: `kensan-workspace/projects/kensan-lab/docs/secrets-phase1-design.md` § TLS ownership organization (rationale for not adopting Vault PKI) / § Future Vault PKI adoption scenario: via istio-csr
 - [istio-csr](https://cert-manager.io/docs/usage/istio-csr/)
 - [HashiCorp Vault PKI Secrets Engine](https://developer.hashicorp.com/vault/docs/secrets/pki)
