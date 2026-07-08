@@ -157,11 +157,13 @@ nav:
           - Add worker node (M4 Neo): bootstrapping/add-worker-node-m4neo.md
   - Architecture:
       - Infrastructure overview: architecture/infrastructure.md
+      - argocd/: architecture/argocd.md
       - auth/: architecture/auth.md
       - secrets/: architecture/secrets.md
       - network/: architecture/network.md
       - network/ · Cloudflare Tunnel & Access: architecture/cloudflare-tunnel.md
       - observability/: architecture/observability.md
+      - storage/: architecture/storage.md
       - Cluster health monitoring: architecture/cluster-health-monitoring.md
   - Concepts:
       - Documentation Layout: concepts/doc-layout.md
