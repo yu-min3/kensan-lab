@@ -10,7 +10,8 @@ export default defineConfig({
       allow: ["../../.."],
     },
     proxy: {
-      "/api": "http://localhost:8080",
+      // 別ポートの backend（並行ブランチの検証等）は KENSAN_API で切替
+      "/api": process.env.KENSAN_API ?? "http://localhost:8080",
     },
   },
 });

@@ -433,8 +433,10 @@ func setPriorityTag(text string, n int) string {
 }
 
 // DeleteLine はチェックボックス行を 1 行削除する（楽観ロック付き）。
+// 即消しではなく .kensan/trash.md へ退避し、app の /trash から復元できる。
 func DeleteLine(ws *workspace.Workspace, file string, line int, expectText string) error {
-	return ws.Mutate(file, func(content []byte, exists bool) ([]byte, error) {
+	var mark, body, section string
+	err := ws.Mutate(file, func(content []byte, exists bool) ([]byte, error) {
 		if !exists {
 			return nil, fmt.Errorf("file not found: %s", file)
 		}
@@ -446,10 +448,32 @@ func DeleteLine(ws *workspace.Workspace, file string, line int, expectText strin
 		if m == nil || strings.TrimSpace(m[2]) != strings.TrimSpace(expectText) {
 			return nil, fmt.Errorf("%w: %s:%d", ErrLineMismatch, file, line)
 		}
+		mark, body = m[1], strings.TrimSpace(m[2])
+		// 直近の見出しを復元先として記録する（@from の section）
+		for i := line - 2; i >= 0; i-- {
+			if h := headingRe.FindStringSubmatch(lines[i]); h != nil {
+				section = h[2]
+				break
+			}
+		}
 		// full slice expression で元 slice の clobber を防ぐ
 		out := append(lines[:line-1:line-1], lines[line:]...)
 		return []byte(workspaceTouch(strings.Join(out, "\n"))), nil
 	})
+	if err != nil {
+		return err
+	}
+	// 退避に失敗したら元ファイルへ戻す（行消失を防ぐ。Move と同じ復元パターン）
+	if terr := appendTrashEntry(ws, mark, body, file, section, time.Now()); terr != nil {
+		_ = ws.Mutate(file, func(content []byte, exists bool) ([]byte, error) {
+			if !exists {
+				return nil, nil
+			}
+			return []byte(strings.TrimRight(string(content), "\n") + "\n- [" + mark + "] " + body + "\n"), nil
+		})
+		return terr
+	}
+	return nil
 }
 
 // SetState はチェックボックスの状態を書き換える（todo / done / skipped）。

@@ -9,6 +9,7 @@ import {
   FileText,
   FolderKanban,
   Sparkles,
+  Trash2,
 } from "lucide-react";
 import clsx from "clsx";
 import { FloatingMemoButton } from "./FloatingMemoButton";
@@ -95,6 +96,20 @@ export function AppShell({ children }: { children: ReactNode }) {
             Yu
           </div>
           <span className="text-sm">Yu</span>
+          {/* ゴミ箱 — 普段は目立たせない（footer の小さなアイコンのみ） */}
+          <NavLink
+            to="/trash"
+            className={({ isActive }) =>
+              clsx(
+                "ml-auto size-7 grid place-items-center rounded-md transition-colors",
+                isActive ? "bg-accent text-accent-foreground" : "text-muted-foreground hover:text-foreground hover:bg-accent/60",
+              )
+            }
+            title="ゴミ箱 — 削除したタスクの確認・復元"
+            aria-label="ゴミ箱"
+          >
+            <Trash2 size={15} />
+          </NavLink>
         </footer>
       </aside>
       <main className="ds-page min-w-0">{children}</main>
