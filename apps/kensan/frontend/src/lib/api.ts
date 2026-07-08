@@ -259,7 +259,29 @@ export const api = {
   // 指定コミット時点のファイル内容。
   historyAt: (path: string, rev: string) =>
     request<{ rev: string; content: string }>(`/history/${encodeURI(path)}?rev=${rev}`),
+
+  // ゴミ箱（.kensan/trash.md）。app での削除はここへ退避される。
+  trash: () => request<{ items: TrashEntry[] | null; total: number }>("/trash"),
+
+  // 元のファイル・セクションへ復元（元が無ければ todo.md ## Now）。text は raw（楽観ロック）
+  trashRestore: (e: TrashEntry) =>
+    request<{ task: Task }>("/trash/restore", { method: "POST", body: JSON.stringify({ line: e.line, text: e.raw }) }),
+
+  // 完全削除（復元不可）
+  trashPurge: (e: TrashEntry) =>
+    request<{ status: string }>("/trash/delete", { method: "POST", body: JSON.stringify({ line: e.line, text: e.raw }) }),
 };
+
+export interface TrashEntry {
+  text: string; // 復元される本文（@due 等の行内タグ込み）
+  display: string; // 表示用（行内タグ除去）
+  state: "todo" | "done" | "skipped";
+  from?: string; // 元ファイル（workspace 相対）
+  section?: string; // 元セクション
+  deleted?: string; // YYYY-MM-DD
+  line: number; // .kensan/trash.md 内の行番号（locator）
+  raw: string; // trash 行の本文（楽観ロック用）
+}
 
 export interface Commit {
   hash: string;
