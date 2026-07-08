@@ -1,0 +1,31 @@
+# Backstage は自前の auth framework を持ち、Authorization: Bearer に Keycloak JWT が
+# 入っていると「自分が発行した token でない」と判定して catalog API を 401 にする。
+#
+# gateway-platform の RequestAuthentication は認可のため forwardOriginalToken: true で
+# Keycloak id_token を upstream へ転送している（Keycloak admin console の master realm
+# token を Keycloak 本体へ透過させるのに必要なので、グローバルには false にできない —
+# 詳細: requestauthentication-gateway-platform.yaml / ADR/#358）。
+#
+# そこで Backstage ワークロードに限定して、sidecar が inbound の JWT を検証した後に
+# トークンを剥がす（forwardOriginalToken: false）。gateway 側で group 認可は既に
+# 評価済みなので、ここでは剥がすだけ。剥がした後は edge 認証済みの匿名リクエストとして
+# Backstage container に届き、dangerouslyDisableDefaultAuthPolicy 下で catalog read が通る。
+#
+# 注: 同一 pod 内の localhost 呼び出し（search collator 等）は sidecar inbound を
+# 経由しないため本 RA の影響を受けない。
+apiVersion: security.istio.io/v1
+kind: RequestAuthentication
+metadata:
+  name: backstage-strip-forwarded-jwt
+  namespace: backstage
+spec:
+  selector:
+    matchLabels:
+      app: backstage
+  jwtRules:
+    - issuer: "https://auth.platform.yu-min3.com/realms/kensan"
+      jwksUri: "https://auth.platform.yu-min3.com/realms/kensan/protocol/openid-connect/certs"
+      forwardOriginalToken: false
+    - issuer: "https://auth.platform.yu-min3.com/realms/master"
+      jwksUri: "https://auth.platform.yu-min3.com/realms/master/protocol/openid-connect/certs"
+      forwardOriginalToken: false
