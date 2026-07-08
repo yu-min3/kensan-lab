@@ -4,6 +4,8 @@ Authentication in kensan-lab is intentionally centralized but not flattened into
 
 The important design rule: **protect at the Gateway when the app cannot protect itself; bypass at the Gateway when the app has a first-class auth surface**. Vault, Argo CD, Grafana, and Keycloak stay app-native. Backstage, Prometheus, Hubble, Longhorn, and the file-based kensan app are protected by oauth2-proxy + Istio AuthorizationPolicy.
 
+**Design thesis:** keep identity, browser session handling, and enforcement as separate responsibilities. **Keycloak is the source of identity**, **oauth2-proxy is the browser/OIDC adapter**, and **Istio is the policy enforcement point**. This keeps SSO centralized without making every application depend on the same proxy semantics.
+
 ## Components
 
 | dir / file | role | namespace |
@@ -13,6 +15,19 @@ The important design rule: **protect at the Gateway when the app cannot protect 
 | `vault-oidc-auth/` | Vault OIDC auth mount, role, external group, and group alias managed through VCO | `vault` |
 | `../network/istio/authorizationpolicy-gateway-platform-*.yaml` | Platform host allow rules and oauth2-proxy CUSTOM enforcement | `istio-system` |
 | `../network/istio/authorizationpolicy-gateway-prod-*.yaml` | App gateway protection for `kensan.app.yu-min3.com`, preview, and Cloudflare tunnel host | `istio-system` |
+
+## Why This Stack Works
+
+The auth stack is intentionally not "Keycloak in front of everything". Each tool is used where it has the strongest contract:
+
+| choice | why it wins here |
+|---|---|
+| **Keycloak as the single IdP** | One realm owns users, groups, and OIDC clients for platform UIs, CLI-oriented tools, and app auth. Group claims become the common authorization vocabulary. |
+| **Istio Gateway as the enforcement point** | Auth is bound to the same chokepoint that already owns TLS termination, host routing, and network ingress. Missing host rules fail closed instead of becoming app-local drift. |
+| **oauth2-proxy via `envoy_ext_authz_http`** | Istio has stable external authorization integration but no native OAuth2/OIDC redirect provider. oauth2-proxy supplies mature browser flow, cookies, refresh handling, CSRF protection, and Keycloak discovery without EnvoyFilter fragility. |
+| **app-native bypass for Vault / Argo CD / Grafana / Keycloak** | These apps have real auth surfaces: CLI flows, API tokens, callbacks, or native role mapping. Bypassing them at the Gateway preserves those semantics while still sharing the same Keycloak identity. |
+
+This is the useful middle ground: platform UIs that lack auth get a uniform SSO gate, while tools with first-class auth keep their native behavior. The result is enterprise-shaped SSO and edge authorization without forcing every service through one lowest-common-denominator pattern.
 
 ## Two Auth Paths
 
