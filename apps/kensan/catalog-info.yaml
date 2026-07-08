@@ -1,0 +1,24 @@
+# App-owned descriptor (Backstage Golden Path): this app repo declares its own
+# Component/API here. Backstage fetches it via a `type: url` catalog location
+# (see backstage/app/app-config.kubernetes.yaml). Edits here update the catalog live.
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: kensan
+  description: File-based knowledge & goal manager — Go single binary + bundled SPA (Whetstone)
+  annotations:
+    github.com/project-slug: yu-min3/kensan-lab
+    backstage.io/kubernetes-id: kensan
+  tags:
+    - go
+    - spa
+    - knowledge-management
+    - gitops
+  links:
+    - url: https://github.com/yu-min3/kensan-lab/tree/main/apps/kensan
+      title: Source
+spec:
+  type: service
+  lifecycle: production
+  owner: platform-engineering
+  system: kensan

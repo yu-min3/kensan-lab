@@ -99,6 +99,12 @@ catalog:
       rules:
         - allow: [Group, User]
 
+    # App-owned descriptors (Golden Path): fetched from GitHub
+    - type: url
+      target: https://github.com/yu-min3/kensan-lab/blob/main/apps/kensan/catalog-info.yaml
+      rules:
+        - allow: [Component, API]
+
 kubernetes:
   # see https://backstage.io/docs/features/kubernetes/configuration for kubernetes configuration options
 

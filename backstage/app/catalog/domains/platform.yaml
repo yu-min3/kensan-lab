@@ -18,3 +18,13 @@ metadata:
 spec:
   owner: platform-engineering
   domain: platform
+
+---
+apiVersion: backstage.io/v1alpha1
+kind: System
+metadata:
+  name: kensan
+  description: kensan — file-based knowledge & goal manager running on the platform
+spec:
+  owner: platform-engineering
+  domain: platform
