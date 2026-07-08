@@ -9,6 +9,9 @@ metadata:
   annotations:
     github.com/project-slug: yu-min3/kensan-lab
     backstage.io/kubernetes-id: kensan
+    # TechDocs: mkdocs.yml + docs/ はこの catalog-info.yaml と同じ dir (apps/kensan/)。
+    # builder/generator=local（image に mkdocs-techdocs-core 同梱）で閲覧時にビルドされる。
+    backstage.io/techdocs-ref: dir:.
   tags:
     - go
     - spa

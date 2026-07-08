@@ -1,0 +1,9 @@
+site_name: kensan
+site_description: File-based knowledge & goal manager running on kensan-lab
+
+nav:
+  - Home: index.md
+  - Architecture: architecture.md
+
+plugins:
+  - techdocs-core
