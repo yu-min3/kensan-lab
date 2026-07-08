@@ -10,13 +10,15 @@ type: goal
 
 「インフラ × AI × 事業」を掛け合わせ、組織の技術的意思決定をリードできるエンジニア
 
-## 今期のフォーカス（2026 Q1-Q2）
+## 今期のフォーカス（Q3: 2026-07〜09）
 
-1. **対外発信の第一歩を踏み出す** — KubeCon CFP 提出、技術ブログ月1投稿
-2. **ホームラボを公開する** — 技術的クレデンシャルの土台
-3. 転職価値を上げる — 履歴書にかける業務成果
+North Star に向けて、今期どのプロジェクトを優先するか。
 
-## 今月のゴール（6月）
+- **projects/kubecon-2026** → 対外発信の第一歩。7/29-30 本番でいい経験を作り切る
+- **projects/kensan-lab** → ホームラボの技術的クレデンシャルを固める
+- 転職価値を上げる — 履歴書にかける業務成果
+
+## 過去の月次ゴール（アーカイブ、〜6月）
 
 - [ ] ダッシュボードには出さない月次ゴール
 `
@@ -30,17 +32,28 @@ func TestParse(t *testing.T) {
 	}
 
 	if len(g.Focus) != 3 {
-		t.Fatalf("focus: want 3 (月次は除外), got %d: %+v", len(g.Focus), g.Focus)
+		t.Fatalf("focus: want 3 (アーカイブ節は除外), got %d: %+v", len(g.Focus), g.Focus)
 	}
-	if g.Focus[0].Title != "対外発信の第一歩を踏み出す" {
+	if g.Focus[0].Title != "projects/kubecon-2026" {
 		t.Errorf("focus[0].Title (太字剥がし) mismatch: %q", g.Focus[0].Title)
 	}
-	if g.Focus[0].Detail != "KubeCon CFP 提出、技術ブログ月1投稿" {
-		t.Errorf("focus[0].Detail (em dash 区切り) mismatch: %q", g.Focus[0].Detail)
+	if g.Focus[0].Detail != "対外発信の第一歩。7/29-30 本番でいい経験を作り切る" {
+		t.Errorf("focus[0].Detail (→ 区切り) mismatch: %q", g.Focus[0].Detail)
 	}
-	// 太字なし項目も title/detail に分かれる
+	// 太字なし・em dash 区切りの旧フォーマット項目も title/detail に分かれる（寛容なパース）
 	if g.Focus[2].Title != "転職価値を上げる" || g.Focus[2].Detail != "履歴書にかける業務成果" {
 		t.Errorf("focus[2] mismatch: %+v", g.Focus[2])
+	}
+}
+
+func TestParseNumberedLegacyFormat(t *testing.T) {
+	// 旧フォーマット（番号付きリスト）も引き続きパースできる（寛容なパース原則）
+	g := Parse("## 今期のフォーカス（2026 Q1-Q2）\n\n1. **対外発信の第一歩を踏み出す** — KubeCon CFP 提出\n2. ホームラボを公開する\n")
+	if len(g.Focus) != 2 {
+		t.Fatalf("focus: want 2, got %d: %+v", len(g.Focus), g.Focus)
+	}
+	if g.Focus[0].Title != "対外発信の第一歩を踏み出す" || g.Focus[0].Detail != "KubeCon CFP 提出" {
+		t.Errorf("focus[0] mismatch: %+v", g.Focus[0])
 	}
 }
 

@@ -3,9 +3,11 @@
 // ファイル契約（conventions.md / goals.md）:
 //
 //	goals.md  ## North Star            ← 北極星（1 文）
-//	goals.md  ## 今期のフォーカス（...） ← 今期の重点（番号付きリスト）
+//	goals.md  ## 今期のフォーカス（...） ← 今期の重点（箇条書き。project へのリンク + 優先理由）
 //
-// 月次ゴール（## 今月のゴール）はダッシュボードには出さない（D5）。
+// 2026-07 の goals.md 再構成（projects/kensan-workspace/goals-restructure-2026-07.md）で
+// 番号付きリストから `- ` 箇条書きに変わった。旧フォーマットの番号付きリストも寛容に受け付ける。
+// 月次ゴール（## 今月のゴール）はダッシュボードには出さない（D5）。今は goals.md 自体から廃止済み。
 package goals
 
 import (
@@ -17,7 +19,7 @@ import (
 
 var (
 	headingRe   = regexp.MustCompile(`^(#{1,6})\s+(.+?)\s*$`)
-	focusItemRe = regexp.MustCompile(`^\s*\d+\.\s+(.+)$`)
+	focusItemRe = regexp.MustCompile(`^\s*(?:-|\d+\.)\s+(.+)$`)
 )
 
 // Focus は今期のフォーカス 1 項目。Title（太字部）と Detail（補足）に分ける。
@@ -69,12 +71,15 @@ func Parse(content string) Goals {
 	return g
 }
 
-// splitFocus は「**タイトル** — 補足」を Title/Detail に分ける。
-// 区切りは em dash（—）優先、なければ ' - '。太字マーカーは落とす。
+// splitFocus は「**タイトル** → 補足」を Title/Detail に分ける。
+// 区切りは → （project → 優先理由の新フォーマット）優先、次に em dash（—）、なければ ' - '。
+// 太字マーカーは落とす。
 func splitFocus(item string) Focus {
 	item = strings.TrimSpace(item)
 	sep, sepLen := -1, 0
-	if i := strings.Index(item, "—"); i >= 0 {
+	if i := strings.Index(item, "→"); i >= 0 {
+		sep, sepLen = i, len("→")
+	} else if i := strings.Index(item, "—"); i >= 0 {
 		sep, sepLen = i, len("—")
 	} else if i := strings.Index(item, " - "); i >= 0 {
 		sep, sepLen = i, len(" - ")
