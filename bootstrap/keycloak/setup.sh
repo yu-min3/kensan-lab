@@ -7,6 +7,8 @@
 #   1. realm "kensan" 作成
 #   2. groups "platform-admin", "platform-dev" 作成
 #   3. user "yu" (email: ymisaki00@gmail.com) 作成 → platform-admin に assign
+#   3.5. client scope "groups" 作成 + realm default 登録 (groups claim の一元付与。
+#        per-client mapper は廃止し、再実行時に既存 client から除去して移行する)
 #   4. OIDC client "vault" 作成 (Vault Stage 1 Bootstrap TF が使う)
 #   5. client_secret + user password を Bitwarden に保存 (既存アイテムは現在値で更新)
 #
@@ -180,9 +182,49 @@ else
 fi
 
 # === OIDC Client 共通関数 ===
+# === realm 共通の "groups" client scope ===
+# groups claim の付与を per-client mapper から realm default client scope に一本化する。
+# 理由: client ごとに mapper を付ける方式は、client 追加時の付け忘れ / 再構築時の
+# 伝播漏れ (2026-06-06 incident と同族の設定 drift) の温床になる。scope を realm
+# default にしておけば、以後作られる client は生成された瞬間から groups claim を持つ。
+GROUPS_SCOPE_ID=""
+ensure_groups_client_scope() {
+  echo "" >&2
+  echo "==> Ensuring realm client scope 'groups'..." >&2
+  GROUPS_SCOPE_ID=$(kcadm get client-scopes -r "$REALM" --fields id,name 2>/dev/null \
+    | jq -r '.[] | select(.name == "groups") | .id' || true)
+  if [ -n "$GROUPS_SCOPE_ID" ]; then
+    echo "    client scope 'groups' already exists (id: $GROUPS_SCOPE_ID)" >&2
+  else
+    kcadm create client-scopes -r "$REALM" \
+      -s name=groups \
+      -s protocol=openid-connect \
+      -s 'attributes."include.in.token.scope"=false' \
+      -s 'attributes."display.on.consent.screen"=false' > /dev/null
+    GROUPS_SCOPE_ID=$(kcadm get client-scopes -r "$REALM" --fields id,name \
+      | jq -r '.[] | select(.name == "groups") | .id')
+    kcadm create "client-scopes/$GROUPS_SCOPE_ID/protocol-mappers/models" -r "$REALM" \
+      -s name=groups \
+      -s protocol=openid-connect \
+      -s protocolMapper=oidc-group-membership-mapper \
+      -s 'config."claim.name"=groups' \
+      -s 'config."full.path"=false' \
+      -s 'config."id.token.claim"=true' \
+      -s 'config."access.token.claim"=true' \
+      -s 'config."userinfo.token.claim"=true' > /dev/null
+    echo "    client scope 'groups' + mapper created (id: $GROUPS_SCOPE_ID)" >&2
+  fi
+
+  # realm default に登録 (PUT は冪等 — 登録済みなら no-op)
+  kcadm update "realms/$REALM/default-default-client-scopes/$GROUPS_SCOPE_ID" > /dev/null
+  echo "    registered as realm default client scope" >&2
+}
+ensure_groups_client_scope
+
 # 引数: <client_id> <name> <description> <redirect_uris_json> <web_origins_json> <post_logout_uri>
 # 戻り値: stdout に client UUID を 1 行で出力。
-# 副作用: 存在しなければ作成し groups protocol mapper を付ける。冪等。
+# 副作用: 存在しなければ作成。groups claim は realm 共通の client scope 'groups' が
+#         付与する (per-client mapper は廃止。既存 client からは移行時に削除)。冪等。
 ensure_oidc_client() {
   local cid="$1"
   local cname="$2"
@@ -215,18 +257,19 @@ ensure_oidc_client() {
     uuid=$(kcadm get clients -r "$REALM" --query "clientId=$cid" --fields id \
       | jq -r '.[0].id')
     echo "    client '$cid' created (id: $uuid)" >&2
+    # groups claim は realm default の client scope 'groups' が付与するので
+    # per-client mapper は作らない
+  fi
 
-    echo "==> Adding 'groups' protocol mapper to '$cid'..." >&2
-    kcadm create "clients/$uuid/protocol-mappers/models" -r "$REALM" \
-      -s name=groups \
-      -s protocol=openid-connect \
-      -s protocolMapper=oidc-group-membership-mapper \
-      -s 'config."claim.name"=groups' \
-      -s 'config."full.path"=false' \
-      -s 'config."id.token.claim"=true' \
-      -s 'config."access.token.claim"=true' \
-      -s 'config."userinfo.token.claim"=true' > /dev/null
-    echo "    groups mapper added" >&2
+  # 移行 (冪等): scope を default に attach し、旧 per-client mapper が残っていれば
+  # claim の二重付与を避けるため削除する
+  kcadm update "clients/$uuid/default-client-scopes/$GROUPS_SCOPE_ID" -r "$REALM" > /dev/null
+  local legacy_mapper
+  legacy_mapper=$(kcadm get "clients/$uuid/protocol-mappers/models" -r "$REALM" 2>/dev/null \
+    | jq -r '.[] | select(.name == "groups") | .id' || true)
+  if [ -n "$legacy_mapper" ]; then
+    echo "    removing legacy per-client groups mapper (superseded by realm scope)" >&2
+    kcadm delete "clients/$uuid/protocol-mappers/models/$legacy_mapper" -r "$REALM" > /dev/null
   fi
 
   # script を SSoT として、redirectUris / webOrigins / post-logout を毎回 update。
