@@ -11,7 +11,10 @@ docs_dir: docs
 exclude_docs: |
   bootstrapping/manifests/
   bootstrapping/scripts/
-  refactoring_master_plan.md
+
+# Drafted but not yet published anywhere — keep out of nav until real article links exist
+not_in_nav: |
+  articles.md
 
 validation:
   nav:
@@ -101,8 +104,6 @@ plugins:
         Incidents & roadmap:
           - incidents/*.md
           - roadmap/*.md
-        Articles:
-          - articles.md
 
 markdown_extensions:
   - admonition
@@ -222,4 +223,3 @@ nav:
       - 2026-03-02 system-infra Sync Blocked: incidents/2026-03-02-system-infra-sync-blocked.md
   - Roadmap:
       - Storage (local-path → Longhorn): roadmap/storage-longhorn.md
-  - Articles: articles.md
