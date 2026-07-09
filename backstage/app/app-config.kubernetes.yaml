@@ -53,6 +53,13 @@ catalog:
     rules:
     - allow: [Group, User]
 
+  # App-owned descriptors (Golden Path): each app repo declares its own
+  # Component/API in catalog-info.yaml, fetched from GitHub (integrations.github).
+  - type: url
+    target: https://github.com/yu-min3/kensan-lab/blob/main/apps/kensan/catalog-info.yaml
+    rules:
+    - allow: [Component, API]
+
   # NOTE: Example data (components, etc) is NOT loaded in production
   # Examples are only available in local development (see app-config.yaml)
 
