@@ -52,6 +52,19 @@ yu (local) → vault login -method=oidc role=admin
 
 oauth2-proxy passes pre-authenticated Bearer tokens through (`--skip-jwt-bearer-tokens`), so CLI flows (`vault login`, `argocd login --sso`) coexist with browser flows on the same hosts.
 
+## Who logs in as what
+
+Authorization is two-tier: the Keycloak `groups` claim (`platform-admin` / `platform-dev`) is mapped independently by each consumer.
+
+| Consumer | `platform-admin` becomes… | `platform-dev` becomes… |
+|---|---|---|
+| Gateway reach | all protected hosts | Backstage + Prometheus only |
+| ArgoCD | `role:admin` | `role:readonly` |
+| Grafana | `Admin` | `Editor` |
+| Vault | policy `admin` | login rejected (`bound_claims`) |
+
+Currently one human user (`platform-admin`); the dev tier is pre-wired but empty. Full mapping, break-glass accounts, and known gaps: [Identity & RBAC model](https://github.com/yu-min3/kensan-lab/blob/main/docs/auth/identity-model.md).
+
 ## Design rationale
 
 **Three principles thread the whole design:**
