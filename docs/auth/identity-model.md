@@ -87,6 +87,19 @@ Every SSO path above dies with Keycloak — by design there are local escape hat
 | Grafana | `grafana-admin` | local admin (ESO-delivered secret) | dashboard access without SSO |
 | Keycloak | `KEYCLOAK_ADMIN` (master realm) | bootstrap admin | administering the IdP itself |
 
+## The tier contract
+
+Each app maps the claim independently, so consistency is kept by **contract, not by mechanism**. Every per-app mapping above is an expression of this table — when adding or changing a mapping, derive it from here:
+
+| Capability | `platform-admin` — *operates the platform* | `platform-dev` — *builds and observes apps* |
+|---|---|---|
+| Mutate infrastructure state (ArgoCD sync, Longhorn ops, network internals) | ✅ | ❌ — ArgoCD readonly; Hubble / Longhorn not even reachable |
+| Observe (metrics, dashboards, deploy state) | ✅ | ✅ — Grafana **Editor** counts as content creation, not infra mutation |
+| Touch secrets directly (Vault) | ✅ | ❌ — login rejected; dev apps receive secrets via ESO delivery instead |
+| Unmapped authenticated user | — | **deny by default**, everywhere |
+
+Known deviations from the contract (tracked as work items): Grafana's `Viewer` fallback grants unmapped users read access (violates deny-by-default), and Backstage's guest provider erases the tier distinction in-app entirely (see the gap note above).
+
 ## Design intent
 
 - **Two tiers, not N**: `platform-admin` (operate everything) and `platform-dev` (read/edit application-level surfaces). Finer-grained roles are deliberately deferred until a second human actually exists — empty RBAC taxonomy is maintenance without benefit.
