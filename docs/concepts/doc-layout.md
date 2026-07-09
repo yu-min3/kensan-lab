@@ -25,8 +25,8 @@
 | Namespace naming | `docs/adr/006-namespace-naming.md` (why) + `.claude/rules/environment-separation.md` (how) | `kubernetes/namespaces/README.md` |
 | Helm multi-source 配置規約 | `kubernetes/README.md` (Pattern A/B) | `.claude/rules/helm-multisource.md` |
 | GitOps workflow | `.claude/rules/gitops-workflow.md` | `CLAUDE.md` Mandatory Constraints |
-| Network ingress (Cloudflare Tunnel + Cilium L2 + Istio Gateway) | `docs/architecture/network.md` | `.claude/rules/network-ingress.md` |
-| Storage (Longhorn + local-path) | `kubernetes/storage/README.md` | `.claude/rules/kubernetes-cluster.md`、`docs/architecture/infrastructure.md` (R2 backup 等の横断的詳細) |
+| Network ingress (Cloudflare Tunnel + Cilium L2 + Istio Gateway) | `kubernetes/network/README.md`（`docs/architecture/network.md` はその transclude） | `.claude/rules/network-ingress.md` |
+| Storage (Longhorn) | `kubernetes/storage/README.md`（R2 backup・RecurringJob・SC 含む。`docs/architecture/storage.md` はその transclude） | `.claude/rules/kubernetes-cluster.md` |
 | Cluster topology (node, label, scheduling) | `.claude/rules/kubernetes-cluster.md` | `kubernetes/README.md` |
 | Tech stack | Top `README.md` | `docs/index.md` |
 
@@ -51,6 +51,7 @@
 `kubernetes/<cat>/README.md` および `kubernetes/<cat>/<comp>/README.md` は以下を満たす。
 
 - **長さ**: 5〜30 行程度。これ以上膨らんだら `docs/` に押し出す合図
+    - **例外 — architecture カテゴリ README** (`kubernetes/<cat>/README.md` のうち `docs/architecture/<cat>.md` の transclude 元になっているもの): サイトのアーキページ SoT を兼ねるため、**~150 行 + mermaid 図まで許容**。テンプレは network を手本にする（Design thesis → Components → 図 → Design rationale → Related）
 - **必須セクション**:
   - 1 行サマリ (このディレクトリ / component は何か)
   - 含まれるサブディレクトリ / 主要ファイルの説明

@@ -42,7 +42,7 @@ globs: "kubernetes/**"
 
 - PVC は `longhorn`（default、replicated block）。`local-path` は 2026-07 に全廃済み（provisioner / SC とも撤去）
 
-詳細・R2 backup 構成: [`kubernetes/storage/README.md`](../../kubernetes/storage/README.md) / [`docs/architecture/infrastructure.md`](../../docs/architecture/infrastructure.md)
+詳細・R2 backup 構成: [`kubernetes/storage/README.md`](../../kubernetes/storage/README.md)（SoT。`docs/architecture/storage.md` はその transclude）
 
 ## Adding New Nodes
 
