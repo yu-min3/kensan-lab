@@ -1,147 +1,148 @@
 # Secret Management
 
-このプラットフォームでは 4 つの方式で Secret / 暗号鍵を管理する。用途に応じて使い分ける。
+The platform manages secrets and encryption keys through four methods, chosen per use case.
 
-## 方式と使い分け
+## Methods and when to use each
 
-| 方式 | 用途 | ローテ | Source of Truth |
+| Method | Use for | Rotation | Source of Truth |
 |------|------|--------|-----------------|
-| **Vault dynamic (VDBE)** | restart / credential reload を許容できる Postgres app 接続 cred | TTL 24h / 12h rotation | Vault Database engine が動的生成 |
-| **Vault static (ESO)** | DB root cred / API key / 管理者 pw / 各種トークン | Vault に新値を書けば最大 1h で配布 | Vault KV v2 |
-| **Vault Transit** | DB に保存する PII の暗号鍵 (kensan `users.name`) | 手動 rotate (`vault write -f transit/keys/.../rotate`)、新規 encrypt は最新版で実行 | Vault Transit engine (鍵自体が Vault 内、ciphertext のみ DB) |
-| **SealedSecret** | Vault 自身の起動依存 / 内部 PKI / image pull token | 手動 (低頻度) | Git repo |
+| **Vault dynamic (VDBE)** | Postgres app connection creds where a restart / credential reload is acceptable | TTL 24h / 12h rotation | Generated on demand by the Vault Database engine |
+| **Vault static (ESO)** | DB root creds / API keys / admin passwords / misc tokens | Write a new value to Vault → delivered within 1h | Vault KV v2 |
+| **Vault Transit** | Encryption keys for PII stored in DB columns (kensan `users.name`) | Manual rotate (`vault write -f transit/keys/.../rotate`); new encryptions use the latest key version | Vault Transit engine (the key itself stays inside Vault; only ciphertext reaches the DB) |
+| **SealedSecret** | Vault's own startup dependencies / internal PKI / image pull tokens | Manual (low frequency) | Git repo |
 
-### 方針
-- 漏洩時の blast radius を最小化したい **Postgres app 接続 cred** → Vault dynamic。ただし `env` 注入 + Reloader restart 前提のため、IdP / catalog metastore / schema owner を持つ長寿命 service には使わない
-- ローテが必要だが頻度低く、Vault が前提として動いていれば取得できる secret → Vault static (ESO)
-- **DB カラムに保存する PII (氏名など)** → Vault Transit (鍵をアプリ Pod / DB に降ろさない envelope 暗号化、Stage 6)
-- Vault 自身 / cert-manager / Cilium PKI など **Vault に依存できない低レイヤ** → SealedSecret
+### Policy
 
-## VCO カバレッジと例外
+- **Postgres app connection creds**, where we want the smallest possible blast radius on leak → Vault dynamic. Because delivery relies on `env` injection + a Reloader restart, it is *not* used for long-lived services that own an IdP, a catalog metastore, or a schema (see the "kept static" list below)
+- Secrets that need rotation but change rarely, and can assume Vault is up → Vault static (ESO)
+- **PII stored in DB columns** (names etc.) → Vault Transit (envelope encryption that never hands the key to the app pod or the DB — Stage 6)
+- **Low layers that cannot depend on Vault** — Vault itself, cert-manager, Cilium PKI → SealedSecret
 
-Vault 側の declarative 管理は **Vault Config Operator (VCO、redhat-cop/vault-config-operator)** が担う。CR を kensan-lab repo に置いて GitOps、controller が reconcile して Vault に sync。
-ただし Vault API の全てに CR が用意されているわけではなく、**少数の例外は手動 (setup script) で運用** している。
+## VCO coverage and exceptions
 
-### VCO で declarative にできる操作
+Declarative management on the Vault side is handled by the **Vault Config Operator (VCO, redhat-cop/vault-config-operator)**: CRs live in the kensan-lab repo (GitOps), and the controller reconciles them into Vault.
+Not every Vault API has a corresponding CR, however — **a small number of exceptions are operated by setup scripts**.
 
-| Vault 操作 | CR | 使用箇所 |
+### Operations VCO makes declarative
+
+| Vault operation | CR | Used in |
 |---|---|---|
-| Secret engine mount | `SecretEngineMount` | `vault-database-engine/shared/mount.yaml`、`vault-transit-engine/shared/mount.yaml` |
-| Policy (HCL) | `Policy` | `vault-database-engine/shared/policy-eso-read.yaml`、`vault-transit-engine/chart/templates/policy.yaml` |
-| K8s auth role (SA bind + policy 付与) | `KubernetesAuthEngineRole` | 両 engine の `chart/templates/vault-auth-role.yaml` |
-| OIDC auth role | `JWTOIDCAuthEngineRole` | Keycloak SSO 統合 (Stage 4) |
-| Database engine config (root cred + connectionURL) | `DatabaseSecretEngineConfig` | `vault-database-engine/chart/templates/connection.yaml` (root cred は Vault KV から参照 = 完全 declarative) |
+| Secret engine mount | `SecretEngineMount` | `vault-database-engine/shared/mount.yaml`, `vault-transit-engine/shared/mount.yaml` |
+| Policy (HCL) | `Policy` | `vault-database-engine/shared/policy-eso-read.yaml`, `vault-transit-engine/chart/templates/policy.yaml` |
+| K8s auth role (SA binding + policy grant) | `KubernetesAuthEngineRole` | `chart/templates/vault-auth-role.yaml` in both engines |
+| OIDC auth role | `JWTOIDCAuthEngineRole` | Keycloak SSO integration (Stage 4) |
+| Database engine config (root cred + connectionURL) | `DatabaseSecretEngineConfig` | `vault-database-engine/chart/templates/connection.yaml` (root cred is referenced from Vault KV = fully declarative) |
 | Database engine role (CREATE/REVOKE SQL) | `DatabaseSecretEngineRole` | `vault-database-engine/chart/templates/role.yaml` |
-| Identity Group / Alias | `Group` / `GroupAlias` | OIDC ログイン UX (Stage 4-5) |
+| Identity Group / Alias | `Group` / `GroupAlias` | OIDC login UX (Stage 4–5) |
 
-Stage 2〜5 と Stage 6 の policy/auth role は **ほぼ 100% VCO で完結** している。
+The policies and auth roles of Stages 2–5 and Stage 6 are **almost 100% covered by VCO**.
 
-### 例外 (setup script で運用)
+### Exceptions (operated via setup scripts)
 
-| Vault 操作 | 状況 | 手当て |
+| Vault operation | Situation | Handling |
 |---|---|---|
-| **Transit key 作成 / rotate** | VCO に `TransitSecretEngine` 系 CR が存在しない | `kubernetes/secrets/vault-transit-engine/bootstrap/setup-transit-keys.sh` を新 key 名で 1 度きり実行。rotate は `vault write -f transit/keys/<name>/rotate` を手動 |
-| **OIDC config (`auth/oidc/config`)** | VCO の patch が未対応で、provider URL 等の full-write が必要 | `bootstrap/vault/post-bootstrap-oidc-ux.sh` (Stage 4) で full-write |
+| **Transit key creation / rotation** | VCO has no `TransitSecretEngine`-style CR | Run `kubernetes/secrets/vault-transit-engine/bootstrap/setup-transit-keys.sh` once per new key name; rotate manually with `vault write -f transit/keys/<name>/rotate` |
+| **OIDC config (`auth/oidc/config`)** | VCO's patch support can't do the full-write needed for provider URL etc. | Full-write via `bootstrap/vault/post-bootstrap-oidc-ux.sh` (Stage 4) |
 
-撤去せずハイブリッド継続を選んだ理由 (撤去判断のトリガーライン含む) は [ADR-015](../adr/015-vco-setup-script-hybrid.md) で扱う。
+The rationale for keeping this hybrid rather than eliminating the scripts (including the trigger line for retiring them) is covered in [ADR-015](../adr/015-vco-setup-script-hybrid.md).
 
 ## Inventory
 
-### Vault dynamic (Postgres app cred)
+### Vault dynamic (Postgres app creds)
 
-| ns | Secret | アプリ | 状態 |
+| ns | Secret | App | Status |
 |---|---|---|---|
-| kensan | postgres-kensan-dagster-cred | dagster (3 deployment) | ✅ 使用中 |
+| kensan | postgres-kensan-dagster-cred | dagster (3 deployments) | ✅ in use |
 
-### Vault static (ESO 経由、Vault KV v2 → K8s Secret、refreshInterval 1h)
+### Vault static (via ESO — Vault KV v2 → K8s Secret, refreshInterval 1h)
 
-| ns | Secret | 中身 | 役割 |
+| ns | Secret | Contents | Role |
 |---|---|---|---|
-| argocd | argocd-oidc-secret | client-id / client-secret | Argo CD の Keycloak OIDC client cred (`security/argocd/oidc`) |
-| backstage | backstage-secret | GITHUB_TOKEN | Backstage GitHub 連携 |
+| argocd | argocd-oidc-secret | client-id / client-secret | Argo CD's Keycloak OIDC client cred (`security/argocd/oidc`) |
+| backstage | backstage-secret | GITHUB_TOKEN | Backstage GitHub integration |
 | backstage | postgresql-secret | POSTGRES_USER/PASSWORD/DB | Postgres StatefulSet boot + VCO root cred + backstage app |
 | cloudflare-tunnel | cloudflare-tunnel | tunnel token | Cloudflare Tunnel |
 | kensan | kensan-db-credentials | POSTGRES_USER/PASSWORD | kensan Postgres boot + VCO root |
 | kensan | kensan-lakehouse-credentials | AWS_*, POLARIS_BOOTSTRAP_CREDENTIALS, POLARIS_PG_* | S3 / Polaris |
 | kensan | kensan-minio-credentials | MinIO root | MinIO StatefulSet |
 | kensan | kensan-app-credentials | JWT_SECRET + DB_USER/PASSWORD | kensan microservices |
-| kensan | kensan-ai-credentials | API key 等 | kensan-ai |
-| kensan | kensan-minio-app-credentials | MinIO app cred | kensan microservices から MinIO アクセス |
-| monitoring | alertmanager-slack | Slack webhook | Alertmanager 通知 |
+| kensan | kensan-ai-credentials | API keys etc. | kensan-ai |
+| kensan | kensan-minio-app-credentials | MinIO app cred | MinIO access from kensan microservices |
+| monitoring | alertmanager-slack | Slack webhook | Alertmanager notifications |
 | monitoring | grafana-admin | Grafana admin | Grafana UI |
-| monitoring | grafana-oidc-secret | GF_AUTH_GENERIC_OAUTH_CLIENT_ID/SECRET | Grafana の Keycloak OIDC client cred (`observability/grafana/oidc`) |
-| monitoring | grafana-cloud-remote-write | username / password | Prometheus → Grafana Cloud remote-write 認証 (`monitoring/grafana-cloud/remote-write`) |
-| platform-auth-prod | keycloak-secret | KEYCLOAK_ADMIN_PASSWORD / KC_DB_PASSWORD | Keycloak admin + DB password (`KC_DB_PASSWORD` は `platform-auth/prod/postgresql.POSTGRES_PASSWORD` から同期) |
+| monitoring | grafana-oidc-secret | GF_AUTH_GENERIC_OAUTH_CLIENT_ID/SECRET | Grafana's Keycloak OIDC client cred (`observability/grafana/oidc`) |
+| monitoring | grafana-cloud-remote-write | username / password | Prometheus → Grafana Cloud remote-write auth (`monitoring/grafana-cloud/remote-write`) |
+| platform-auth-prod | keycloak-secret | KEYCLOAK_ADMIN_PASSWORD / KC_DB_PASSWORD | Keycloak admin + DB password (`KC_DB_PASSWORD` is synced from `platform-auth/prod/postgresql.POSTGRES_PASSWORD`) |
 | platform-auth-{prod,dev} | postgresql-secret | POSTGRES_USER/PASSWORD/DB | Keycloak Postgres boot + VCO root |
-| {app-prod, backstage, kensan, app-kensan} | ghcr-pull-secret | `.dockerconfigjson` (GHCR image pull token) | 各 ns の imagePullSecrets。Vault path `secret/ghcr/pull-token` を全 ns で共有 (app-kensan は app-base chart の externalsecret-ghcr.yaml 経由) |
+| {app-prod, backstage, kensan, app-kensan} | ghcr-pull-secret | `.dockerconfigjson` (GHCR image pull token) | `imagePullSecrets` in each ns; Vault path `secret/ghcr/pull-token` is shared across all of them (app-kensan receives it via the app-base chart's `externalsecret-ghcr.yaml`) |
 
-### Vault Transit (Stage 6, アプリ側で encrypt/decrypt API を直叩き)
+### Vault Transit (Stage 6 — apps call the encrypt/decrypt API directly)
 
-K8s Secret として配布する形式ではなく、アプリ Pod が Vault に **K8s SA auth で login → Transit API 直叩き** で encrypt / decrypt する。鍵自体は Vault 内に常駐し、Pod / DB のどこにも降りない。
+Not delivered as a K8s Secret. The app pod **logs into Vault with K8s SA auth and calls the Transit API directly** for encrypt / decrypt. The key itself stays resident inside Vault and never lands in a pod or a DB.
 
-| ns | 鍵名 / mount | 用途 | アプリ |
+| ns | Key / mount | Purpose | App |
 |---|---|---|---|
-| vault | `transit/keys/users-name` (aes256-gcm96) | kensan `users.name` カラム encryption + HMAC | kensan user-service (kensan ns) |
+| vault | `transit/keys/users-name` (aes256-gcm96) | kensan `users.name` column encryption + HMAC | kensan user-service (kensan ns) |
 
-設計詳細: [`kubernetes/secrets/vault-transit-engine/README.md`](https://github.com/yu-min3/kensan-lab/tree/main/kubernetes/secrets/vault-transit-engine)
+Design details: [`kubernetes/secrets/vault-transit-engine/README.md`](https://github.com/yu-min3/kensan-lab/tree/main/kubernetes/secrets/vault-transit-engine)
 
-| 項目 | 値 |
+| Item | Value |
 |---|---|
-| Auth role | `transit-kensan-users` (kubernetes auth method、vault-database-engine の命名 `postgres-<base>` と対称) |
-| bind 先 SA | `kensan/transit-kensan-users` (chart が自動生成、user-service Pod の SA) |
-| Policy | `transit-kensan-users` (transit/{encrypt,decrypt,hmac,rewrap}/users-name のみ) |
-| ConfigMap | `kensan/transit-kensan-users-config` (chart 生成、`VAULT_ADDR` / `VAULT_AUTH_ROLE` / `VAULT_TRANSIT_KEY`、Reloader match=true) |
-| Token TTL | 30 min (アプリ側 renew loop で延長、max 1h) |
-| Key 作成 | `kubernetes/secrets/vault-transit-engine/bootstrap/setup-transit-keys.sh` を 1 度だけ手動実行 |
-| Rotation | `vault write -f transit/keys/users-name/rotate` → アプリ側で `transit/rewrap` 経由で旧 ciphertext を更新 |
+| Auth role | `transit-kensan-users` (kubernetes auth method; named symmetrically with vault-database-engine's `postgres-<base>`) |
+| Bound SA | `kensan/transit-kensan-users` (auto-generated by the chart; the user-service pod's SA) |
+| Policy | `transit-kensan-users` (only transit/{encrypt,decrypt,hmac,rewrap}/users-name) |
+| ConfigMap | `kensan/transit-kensan-users-config` (chart-generated; `VAULT_ADDR` / `VAULT_AUTH_ROLE` / `VAULT_TRANSIT_KEY`, Reloader match=true) |
+| Token TTL | 30 min (renewed by the app's renew loop, max 1h) |
+| Key creation | Run `kubernetes/secrets/vault-transit-engine/bootstrap/setup-transit-keys.sh` once, manually |
+| Rotation | `vault write -f transit/keys/users-name/rotate` → the app refreshes old ciphertext via `transit/rewrap` |
 
-Vault 側 (mount/policy/auth role) と consumer ns 側 (SA/ConfigMap) は chart 化済 (`vault-transit-engine/chart/` + `platform-values/vault-transit/<consumer>.yaml`)。consumer Deployment は `serviceAccountName` + `envFrom: configMapRef` で参照、Reloader で rotation 連動。key 作成だけ手動 (VCO 限界、上の「VCO カバレッジと例外」参照)。
+The Vault side (mount/policy/auth role) and the consumer-ns side (SA/ConfigMap) are chart-managed (`vault-transit-engine/chart/` + `platform-values/vault-transit/<consumer>.yaml`). Consumer Deployments reference them via `serviceAccountName` + `envFrom: configMapRef`, with Reloader wiring rotation through. Only key creation is manual (a VCO limitation — see "VCO coverage and exceptions" above).
 
-### SealedSecret (Vault に依存しない静的、ローテ頻度低)
+### SealedSecret (static, independent of Vault, low rotation frequency)
 
-| ns | Secret | 役割 | なぜ Vault じゃない |
+| ns | Secret | Role | Why not Vault |
 |---|---|---|---|
-| vault | vault-aws-kms-credentials | Vault auto-unseal KMS cred | Vault 自身の起動に必要 (循環依存回避) |
-| cert-manager | route53-credentials | Let's Encrypt DNS-01 用 IAM | cert-manager は低レイヤ、ローテ低頻度 |
-| kube-system | cilium-ca / hubble-relay-client-certs / hubble-server-certs | Cilium / Hubble 内部 PKI | 内部発行、ローテ低頻度 |
-| longhorn-system | longhorn-r2-backup | R2 backup token | Longhorn 自己完結 |
+| vault | vault-aws-kms-credentials | Vault auto-unseal KMS cred | Needed for Vault's own startup (avoids the circular dependency) |
+| cert-manager | route53-credentials | IAM cred for Let's Encrypt DNS-01 | cert-manager is a low layer; rotation is rare |
+| kube-system | cilium-ca / hubble-relay-client-certs / hubble-server-certs | Cilium / Hubble internal PKI | Internally issued; rotation is rare |
+| longhorn-system | longhorn-r2-backup | R2 backup token | Longhorn is self-contained |
 
-### 据置 (static のまま維持)
+### Kept static (deliberately not dynamic)
 
-| アプリ | 理由 | 方針 |
+| App | Reason | Policy |
 |--------|------|----------|
-| keycloak | DB credential rotation による Pod restart が SSO session を破壊する。IdP は Vault / SSO の中核で循環依存も大きい | Vault static (ESO) の `keycloak-secret` に固定 |
-| backstage | 長寿命 service で 12h restart の価値が薄い。plugin DB / schema owner 問題もある | Vault static (ESO) の `postgresql-secret` に固定 |
-| polaris | schema owner を持つ catalog metastore。dynamic user が既存 table owner でないと bootstrap が失敗する | Vault static (ESO) の `kensan-lakehouse-credentials` に固定 |
-| kensan-app | 自作 app だが現状は runtime credential reload 非対応。Reloader restart による dynamic 化は価値が薄い | Vault static (ESO) の `kensan-app-credentials` に固定 |
+| keycloak | DB credential rotation restarts the pod, which destroys SSO sessions. The IdP is the core of Vault / SSO and carries a large circular dependency | Pinned to Vault static (ESO) `keycloak-secret` |
+| backstage | Long-lived service where a 12h restart has little value; also has plugin DB / schema-owner issues | Pinned to Vault static (ESO) `postgresql-secret` |
+| polaris | Catalog metastore that owns its schema; bootstrap fails unless the dynamic user owns the existing tables | Pinned to Vault static (ESO) `kensan-lakehouse-credentials` |
+| kensan-app | In-house app, but no runtime credential reload support today; dynamic via Reloader restarts isn't worth it yet | Pinned to Vault static (ESO) `kensan-app-credentials` |
 
 ## Operations
 
-### SealedSecret 作成
+### Creating a SealedSecret
 
 ```bash
-# 1. raw secret を作成 (dry-run)
+# 1. Create the raw secret (dry-run)
 kubectl create secret generic <name> --namespace <ns> \
   --from-literal=<key>=<value> --dry-run=client -o yaml > temp/<name>-raw.yaml
 
-# 2. kubeseal で暗号化
+# 2. Encrypt with kubeseal
 kubeseal --format yaml < temp/<name>-raw.yaml > kubernetes/<cat>/<comp>/resources/<name>-sealed.yaml
 
-# 3. raw を破棄
+# 3. Discard the raw file
 rm temp/<name>-raw.yaml
 
-# 4. commit + push → Sealed Secrets controller が cluster 内で復号 → Secret 作成
+# 4. commit + push → the Sealed Secrets controller decrypts in-cluster → Secret created
 ```
 
-`temp/*-raw.yaml` は `.gitignore` 済 (絶対 commit しない)。
+`temp/*-raw.yaml` is gitignored (never commit it).
 
-### Vault static (ESO) 追加
+### Adding a Vault static (ESO) secret
 
 ```bash
-# 1. Vault KV v2 に書く
+# 1. Write to Vault KV v2
 vault kv put secret/<path> KEY1=value1 KEY2=value2
 
-# 2. ExternalSecret manifest を作成 (例)
+# 2. Create the ExternalSecret manifest (example)
 cat <<EOF > kubernetes/<cat>/<comp>/resources/<name>-external-secret.yaml
 apiVersion: external-secrets.io/v1
 kind: ExternalSecret
@@ -161,20 +162,20 @@ spec:
       remoteRef: { key: <path>, property: KEY1 }
 EOF
 
-# 3. commit + push → ESO が refresh interval 内に同期
+# 3. commit + push → ESO syncs within the refresh interval
 ```
 
-### Vault dynamic (VDBE) 追加
+### Adding a Vault dynamic (VDBE) credential
 
-1. `kubernetes/secrets/vault-database-engine/platform-values/vault-database/<name>.yaml` を作成 (`ns`, `rootOwner`, `keyMapping` 等を override)
-2. ApplicationSet が拾って `DatabaseSecretEngineRole` (Vault) + `ExternalSecret` (K8s) を自動生成
-3. 詳細: [`kubernetes/secrets/vault-database-engine/README.md`](https://github.com/yu-min3/kensan-lab/blob/main/kubernetes/secrets/vault-database-engine/README.md)
+1. Create `kubernetes/secrets/vault-database-engine/platform-values/vault-database/<name>.yaml` (override `ns`, `rootOwner`, `keyMapping`, etc.)
+2. The ApplicationSet picks it up and auto-generates the `DatabaseSecretEngineRole` (Vault) + `ExternalSecret` (K8s)
+3. Details: [`kubernetes/secrets/vault-database-engine/README.md`](https://github.com/yu-min3/kensan-lab/blob/main/kubernetes/secrets/vault-database-engine/README.md)
 
-## 関連ドキュメント
+## Related
 
 - Sealed Secrets controller: [`kubernetes/secrets/sealed-secrets/`](https://github.com/yu-min3/kensan-lab/tree/main/kubernetes/secrets/sealed-secrets)
 - External Secrets Operator: [`kubernetes/secrets/external-secrets/`](https://github.com/yu-min3/kensan-lab/tree/main/kubernetes/secrets/external-secrets)
 - Vault: [`kubernetes/secrets/vault/`](https://github.com/yu-min3/kensan-lab/tree/main/kubernetes/secrets/vault)
 - Vault Config Operator: [`kubernetes/secrets/vault-config-operator/`](https://github.com/yu-min3/kensan-lab/tree/main/kubernetes/secrets/vault-config-operator)
-- Vault Database engine + ESO 統合: [`kubernetes/secrets/vault-database-engine/`](https://github.com/yu-min3/kensan-lab/tree/main/kubernetes/secrets/vault-database-engine)
+- Vault Database engine + ESO integration: [`kubernetes/secrets/vault-database-engine/`](https://github.com/yu-min3/kensan-lab/tree/main/kubernetes/secrets/vault-database-engine)
 - Vault Transit engine (Stage 6): [`kubernetes/secrets/vault-transit-engine/`](https://github.com/yu-min3/kensan-lab/tree/main/kubernetes/secrets/vault-transit-engine)
