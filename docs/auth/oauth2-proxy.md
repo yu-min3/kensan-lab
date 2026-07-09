@@ -41,7 +41,7 @@ With `failOpen: false` (set on the Istio side), an oauth2-proxy outage makes the
 
 `scope = "openid email profile"`. `groups` is a claim name, not a scope — do not add it to the scope list (Keycloak rejects it with `Invalid scopes: groups`).
 
-The groups claim is added to the id_token automatically by the `oidc-group-membership-mapper` attached directly to the `istio-gateway-platform` client, with `id.token.claim=true`.
+The groups claim is added to the id_token automatically by the realm-level `groups` client scope (attached to all clients by default; managed by `bootstrap/keycloak/setup.sh`).
 
 ## CLI coexistence (skip_jwt_bearer_tokens)
 

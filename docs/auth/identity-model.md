@@ -9,7 +9,7 @@ Who exists in the identity system, which groups they belong to, and what role th
 | IdP | Keycloak, realm `kensan` (self-hosted, local user store — **no upstream federation**; identities live here, not in Google/GitHub) |
 | Human users | `yu` (currently the only one), member of `platform-admin` |
 | Groups | `platform-admin` (full operator) / `platform-dev` (reduced role — **defined but currently empty**, reserved for future app developers) |
-| Claim propagation | each OIDC client carries an `oidc-group-membership-mapper` that puts the `groups` claim on the id_token |
+| Claim propagation | a realm-level `groups` client scope (default for all clients) puts the `groups` claim on the id_token — one definition, no per-client mapper to forget |
 | Provisioning | realm / groups / users / clients created by `bootstrap/keycloak/setup.sh` |
 
 So the honest current state: **one human, one group, and effectively admin everywhere** — but every mapping below is already two-tier, so adding a `platform-dev` user requires zero per-app work.
@@ -78,7 +78,7 @@ Notes on the two ends of the spectrum:
 
 ## Break-glass accounts (outside SSO)
 
-Every SSO path above dies with Keycloak — by design there are local escape hatches, stored in the password manager:
+Every SSO path above dies with Keycloak — by design there are local escape hatches, stored in the password manager. They are exercised quarterly by the [break-glass drill](../runbooks/break-glass-drill.md) so they can't rot unnoticed:
 
 | System | Account | Mechanism | Why it exists |
 |---|---|---|---|
@@ -98,7 +98,7 @@ Each app maps the claim independently, so consistency is kept by **contract, not
 | Touch secrets directly (Vault) | ✅ | ❌ — login rejected; dev apps receive secrets via ESO delivery instead |
 | Unmapped authenticated user | — | **deny by default**, everywhere |
 
-Known deviations from the contract (tracked as work items): Grafana's `Viewer` fallback grants unmapped users read access (violates deny-by-default), and Backstage's guest provider erases the tier distinction in-app entirely (see the gap note above).
+Known deviation from the contract (tracked as a work item): Backstage's guest provider erases the tier distinction in-app entirely (see the gap note above). Grafana's former `Viewer` fallback — the other deviation — has been removed (`role_attribute_strict` now denies unmapped users).
 
 ## Design intent
 

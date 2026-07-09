@@ -13,3 +13,4 @@ Operational runbooks for recurring tasks and known failure modes on the kensan-l
 | [Cilium update strategy](cilium-update-strategy.md) | Safely upgrading Cilium without dropping the cluster network |
 | [Longhorn restore test](longhorn-restore-test.md) | Verifying Longhorn backups by restoring a volume |
 | [ArgoCD repo-server tuning](argocd-repo-server-tuning.md) | Tuning the Argo CD repo-server for large repos |
+| [Break-glass drill](break-glass-drill.md) | Quarterly verification that every non-SSO escape hatch still works |

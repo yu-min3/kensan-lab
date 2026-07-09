@@ -186,6 +186,7 @@ nav:
           - oauth2-proxy: auth/oauth2-proxy.md
       - Runbooks:
           - runbooks/index.md
+          - Break-glass drill: runbooks/break-glass-drill.md
           - Vault Raft auto-join: runbooks/vault-raft-join.md
           - Vault storage migration (Longhorn): runbooks/vault-storage-migration-longhorn.md
           - VCO drift after Vault rebuild: runbooks/vco-vault-state-drift.md
