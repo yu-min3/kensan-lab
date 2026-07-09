@@ -220,6 +220,8 @@ nav:
       - 018 — Backstage Manifests Placement: adr/018-backstage-manifests-placement.md
   - Incidents:
       - incidents/index.md
+      - 2026-06-24 m4neo Silent-Freeze Series: incidents/2026-06-24-m4neo-silent-freeze.md
+      - 2026-06-06 Vault OIDC Credential Drift: incidents/2026-06-06-vault-oidc-credential-drift.md
       - 2026-03-02 system-infra Sync Blocked: incidents/2026-03-02-system-infra-sync-blocked.md
   - Roadmap:
       - Storage (local-path → Longhorn): roadmap/storage-longhorn.md
