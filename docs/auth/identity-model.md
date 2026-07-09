@@ -14,27 +14,53 @@ Who exists in the identity system, which groups they belong to, and what role th
 
 So the honest current state: **one human, one group, and effectively admin everywhere** — but every mapping below is already two-tier, so adding a `platform-dev` user requires zero per-app work.
 
-## How a group becomes a role (the federation map)
+## How a group becomes a role — claim mapping, not federation
+
+This is **not** identity federation: no upstream IdP, no identity brokering, no role synchronization between apps. Exactly one thing crosses the boundary — the **`groups` claim on the id_token** — and each application feeds it into its *own* RBAC engine to derive a *local* role. The apps never talk to each other about authorization.
 
 ```mermaid
 %%{init: {"flowchart": {"htmlLabels": true}} }%%
 flowchart LR
-    U["user: yu"] -->|member of| G["Keycloak group<br/>platform-admin"]
-    G -->|"groups claim<br/>on id_token"| CLAIM(( ))
+    subgraph KC["Keycloak realm kensan ｜ the only identity store"]
+        U["user: yu"] -->|member of| G["group:<br/>platform-admin"]
+    end
 
-    CLAIM --> GW["Istio Gateway ALLOW<br/>reach Cat-2 + Cat-3 hosts"]
-    CLAIM --> ARGO["ArgoCD<br/>role:admin (policy.csv)"]
-    CLAIM --> GRAF["Grafana<br/>Admin (role_attribute_path)"]
-    CLAIM --> VLT["Vault<br/>identity group → policy 'admin'"]
+    G ==>|"id_token<br/><code>groups: [platform-admin]</code>"| CLAIM["the one shared artifact:<br/>a claim — not a session,<br/>not a synced role"]
+
+    subgraph MAP["4 independent mapping engines"]
+        M1["Istio AuthorizationPolicy<br/>(claim value ∈ host rule)"]
+        M2["ArgoCD policy.csv<br/><code>g, platform-admin, role:admin</code>"]
+        M3["Grafana JMESPath<br/><code>role_attribute_path</code>"]
+        M4["Vault bound_claims →<br/>external identity group"]
+    end
+
+    CLAIM --> M1 --> R1(["reach Cat-2/3 hosts"])
+    CLAIM --> M2 --> R2(["role:admin"])
+    CLAIM --> M3 --> R3(["Admin"])
+    CLAIM --> M4 --> R4(["policy: admin"])
 
     classDef default fill:#26221D,stroke:#4A4232,color:#FCFAF6
     classDef idp fill:#075985,stroke:#38BDF8,color:#FCFAF6
-    classDef app fill:#2F6B45,stroke:#7AC99A,color:#FCFAF6
+    classDef claim fill:#8A4B12,stroke:#FDBA74,color:#FCFAF6
+    classDef eng fill:#2F6B45,stroke:#7AC99A,color:#FCFAF6
+    classDef role fill:#1A1714,stroke:#7AC99A,color:#FCFAF6
     class U,G idp
-    class GW,ARGO,GRAF,VLT app
+    class CLAIM claim
+    class M1,M2,M3,M4 eng
+    class R1,R2,R3,R4 role
 ```
 
-One group membership, evaluated independently by each consumer. There is no shared session between the apps — what's shared is the **claim**, and each app maps it with its own mechanism:
+For contrast, what each model would mean here:
+
+| | Identity federation (not used) | Claim mapping (this platform) |
+|---|---|---|
+| Identities live in | an upstream IdP (Google, GitHub, corporate AD) — Keycloak would only *broker* them | Keycloak's local user store, full stop |
+| What crosses the app boundary | the identity itself, delegated | one `groups` claim on the id_token |
+| Where roles are decided | often centralized / synced into apps | inside each app, by its own config (policy.csv / JMESPath / bound_claims / AuthorizationPolicy) |
+| Revoking a person | at the upstream IdP | remove the group membership in Keycloak → every app's role evaporates at the next token refresh |
+| Failure coupling | upstream IdP outage kills login | Keycloak outage kills login (hence the break-glass table below) |
+
+The practical consequence: **membership is managed in exactly one place, but each app's mapping is config owned by that app** — all of it in Git, so "who can become what" is reviewable in a PR.
 
 | Consumer | Mapping mechanism | `platform-admin` | `platform-dev` | any other authenticated user |
 |---|---|---|---|---|
