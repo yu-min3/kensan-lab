@@ -196,6 +196,7 @@ nav:
           - Workspace volume recovery: operations/kensan-workspace-volume-recovery.md
           - Syncthing pairing recovery: operations/syncthing-pairing-recovery.md
       - Guides:
+          - OTel integration & troubleshooting: guides/observability-integration.md
           - Raspberry Pi WiFi stabilization: guides/wifi-stabilization.md
   - Architecture Decisions:
       - Overview: adr/index.md
