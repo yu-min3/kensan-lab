@@ -24,9 +24,9 @@ This document defines a unified namespace labeling strategy across the entire pl
 | Label Key | Example Values | Description | Target |
 |-----------|---------------|------|----------|
 | `kensan-lab.platform/component` | `keycloak`, `backstage`, `monitoring`, `service-mesh`, `core` | Component identification | Platform tier only |
-| `kensan-lab.platform/pss-level` | `privileged` \| `restricted` | Pod Security Standards level の宣言 (Kyverno が読む。無印 = baseline の床) | 床から外れる ns のみ |
+| `kensan-lab.platform/pss-level` | `privileged` \| `restricted` | Declares the Pod Security Standards level (read by Kyverno; unset = the baseline floor) | Only namespaces deviating from the floor |
 | `istio-injection` | `enabled` | Istio automatic sidecar injection | Namespaces targeted by service mesh |
-| `kensan-lab.platform/vault-managed-postgres` | `"true"` | vault-database-engine 管理の Postgres が住む ns の opt-in 宣言。CCNP `ccnp-postgres-ingress` / `cnp-vault-egress` の selector が読む | Vault dynamic cred 対象の Postgres を持つ ns のみ（例: `platform-auth-prod`, `kensan`） |
+| `kensan-lab.platform/vault-managed-postgres` | `"true"` | Opt-in declaration for namespaces hosting Postgres managed by vault-database-engine; read by the selectors of CCNP `ccnp-postgres-ingress` / `cnp-vault-egress` | Only namespaces with Postgres under Vault dynamic creds (e.g. `platform-auth-prod`, `kensan`) |
 
 ## Label Value Definitions
 
@@ -36,7 +36,7 @@ This document defines a unified namespace labeling strategy across the entire pl
 |-------|------|-----------------|
 | `infrastructure` | Core cluster infrastructure / platform services | `kube-system`, `istio-system`, `monitoring`, `argocd`, `vault`, `platform-auth-prod` |
 | `production` | Production app/workload environment | `app-prod`, `app-kensan`, `kensan` |
-| `development` | （**現在未使用**。dev/prod 分離は廃止 — ADR-006 / ADR-014 参照。将来 dev 環境を足す場合のために値は予約）| — |
+| `development` | (**Currently unused.** dev/prod separation was retired — see ADR-006 / ADR-014. The value is reserved in case a dev environment is added later) | — |
 
 ### `kensan-lab.platform/tier`
 
@@ -47,17 +47,17 @@ This document defines a unified namespace labeling strategy across the entire pl
 
 ### `kensan-lab.platform/pss-level`
 
-Pod Security Standards の level 宣言。**Kyverno だけが読む** (PSA は不活性化 — v2 統一設計、[ADR-012](../adr/012-policy-enforcement-kyverno.md) 改訂)。
-旧 `pod-security.kubernetes.io/*` (PSA) label は Kyverno Enforce 昇格と同時に撤去する。
+Declares the Pod Security Standards level. **Read only by Kyverno** (PSA is deactivated — v2 unified design, [ADR-012](../adr/012-policy-enforcement-kyverno.md) revision).
+The legacy `pod-security.kubernetes.io/*` (PSA) labels are removed together with the Kyverno Enforce promotion.
 
 | Value | Description | Example Namespaces |
 |-------|------|-----------------|
-| (未設定) | `pss-baseline` の床が適用される (デフォルト) | 大多数の ns |
-| `privileged` | 床から除外。**`tier=platform` の ns のみ宣言可** (`ns-label-contract` が強制) | `kube-system`, `istio-system`, `longhorn-system`, `local-path-storage` |
-| `restricted` | 床より厳格な PSS restricted を適用 (opt-in) | `app-kensan` |
+| (unset) | The `pss-baseline` floor applies (default) | Most namespaces |
+| `privileged` | Excluded from the floor. **Only `tier=platform` namespaces may declare it** (enforced by `ns-label-contract`) | `kube-system`, `istio-system`, `longhorn-system`, `local-path-storage` |
+| `restricted` | PSS restricted, stricter than the floor (opt-in) | `app-kensan` |
 
-この label の契約 (必須 label・宣言条件) は Kyverno `ns-label-contract` policy が機械的に強制する。
-詳細: [`policy-enforcement.md`](policy-enforcement.md)
+The contract for this label (required labels, declaration conditions) is mechanically enforced by the Kyverno `ns-label-contract` policy.
+Details: [`policy-enforcement.md`](policy-enforcement.md)
 
 ### `kensan-lab.platform/component`
 
@@ -106,7 +106,7 @@ metadata:
 
 ### Application Tier
 
-`app-*` namespace は `team` / `app` label が必須（ADR-014 の app-namespace 契約。Kyverno `ns-label-contract` が強制）。`environment` は現状 `production` のみ（`development` は未使用）。
+`app-*` namespaces require the `team` / `app` labels (the app-namespace contract of ADR-014, enforced by Kyverno `ns-label-contract`). `environment` is currently `production` only (`development` is unused).
 
 ```yaml
 apiVersion: v1
