@@ -2,9 +2,9 @@
 # Load environment variables from .env file if it exists
 -include .env
 
-# For GHCR push credential
-GITHUB_TOKEN ?= $(GITHUB_GHCR_PAT)
-export GITHUB_TOKEN
+# GHCR push credential (write:packages)。後方互換で GITHUB_TOKEN / GITHUB_GHCR_PAT も許容。
+WRITE_GHCR_PAT ?= $(or $(GITHUB_TOKEN),$(GITHUB_GHCR_PAT))
+export WRITE_GHCR_PAT
 
 # Variables
 APP_NAME := ${{ values.name }}
@@ -68,12 +68,12 @@ build: check-tag ## Build container image (requires TAG=<version>)
 
 login: ## Login to GHCR
 	@echo "$(GREEN)Logging in to GHCR...$(NC)"
-	@echo "$(YELLOW)Note: Set GITHUB_TOKEN or GITHUB_GHCR_PAT environment variable$(NC)"
-	@if [ -z "$$GITHUB_TOKEN" ] && [ -z "$$GITHUB_GHCR_PAT" ]; then \
-		echo "$(RED)ERROR: GITHUB_TOKEN or GITHUB_GHCR_PAT not set$(NC)"; \
+	@echo "$(YELLOW)Note: Set WRITE_GHCR_PAT (write:packages) environment variable$(NC)"
+	@if [ -z "$(WRITE_GHCR_PAT)" ]; then \
+		echo "$(RED)ERROR: WRITE_GHCR_PAT (write:packages) not set$(NC)"; \
 		exit 1; \
 	fi
-	@echo "$${GITHUB_TOKEN:-$$GITHUB_GHCR_PAT}" | $(CONTAINER_RUNTIME) login ghcr.io -u $${GITHUB_USER:-yu-min3} --password-stdin
+	@echo "$(WRITE_GHCR_PAT)" | $(CONTAINER_RUNTIME) login ghcr.io -u $${GITHUB_USER:-yu-min3} --password-stdin
 
 push: check-tag login ## Push container image to registry (requires TAG=<version>)
 	@echo "$(GREEN)Pushing image: $(FULL_IMAGE)$(NC)"

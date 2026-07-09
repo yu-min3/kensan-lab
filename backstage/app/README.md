@@ -39,10 +39,13 @@ All three are committed. Sensitive values come from env vars. Create `../.env` (
 
 ```bash
 GITHUB_USER=your-username
-GITHUB_GHCR_PAT=ghp_xxxxxxxxxxxxx
+WRITE_GHCR_PAT=ghp_xxx   # write:packages — image push (make login / make push)
+READ_GHCR_PAT=ghp_xxx    # read — runtime GITHUB_TOKEN (make dev/run) & image pull
 ```
 
-`app-config.local.yaml` references `${GITHUB_GHCR_PAT}` for GitHub integration.
+`make` uses `WRITE_GHCR_PAT` for `login`/`push`, and exposes `READ_GHCR_PAT` as
+`GITHUB_TOKEN` for the GitHub integration (`app-config.local.yaml` references
+`${GITHUB_TOKEN}`). 旧 `GITHUB_GHCR_PAT` を設定していれば両方の fallback になる。
 
 ## Deployment
 
