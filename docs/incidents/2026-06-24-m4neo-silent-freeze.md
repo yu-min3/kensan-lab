@@ -15,7 +15,7 @@ This is a series post-mortem: the same node froze three times, and the most valu
 
 | # | Date | Downtime | Signature | Note |
 |---|------|----------|-----------|------|
-| 1 | 2026-05-15 | hours | NIC (r8169) deadlock suspected | first occurrence; recovery measures designed but **not implemented** |
+| 1 | 2026-05-15 | — | NIC (r8169) deadlock suspected | first occurrence; recovery measures designed but **not implemented** |
 | 2 | 2026-05-29 | **8 days** | ping OK (3ms), SSH times out at banner exchange — kernel network stack alive, userland entirely dead. Journal cuts off with zero warning | watchdog + panic sysctls deployed on recovery day |
 | 3 | 2026-06-24 | 34 hours | identical to #2: log stops mid-line during routine apt automation, no hung-task / OOM / panic traces | **the defenses from #2 did not fire** — see below |
 
