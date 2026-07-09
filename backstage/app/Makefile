@@ -3,8 +3,14 @@
 -include ../.env
 export
 
-# For Backstage compatibility: use GITHUB_GHCR_PAT as GITHUB_TOKEN if not set
-GITHUB_TOKEN ?= $(GITHUB_GHCR_PAT)
+# GHCR token split (.env で使い分ける):
+#   WRITE_GHCR_PAT (write:packages) — image push / GHCR login
+#   READ_GHCR_PAT  (read:packages / repo read) — Backstage 実行時 GITHUB_TOKEN
+#                  （github url reader / catalog-info fetch / TechDocs）
+# 旧 GITHUB_GHCR_PAT は後方互換の fallback として両方に流用する。
+WRITE_GHCR_PAT ?= $(GITHUB_GHCR_PAT)
+READ_GHCR_PAT  ?= $(GITHUB_GHCR_PAT)
+GITHUB_TOKEN   ?= $(READ_GHCR_PAT)
 export GITHUB_TOKEN
 
 # Default values
@@ -53,7 +59,8 @@ help:
 	@echo ""
 	@echo "Environment Variables (set in ../.env):"
 	@echo "  GITHUB_USER        - GitHub username"
-	@echo "  GITHUB_GHCR_PAT    - GitHub Personal Access Token for GHCR"
+	@echo "  WRITE_GHCR_PAT     - PAT (write:packages) for image push / login"
+	@echo "  READ_GHCR_PAT      - PAT (read) for runtime GITHUB_TOKEN (dev/run)"
 	@echo "  TAG                - Image tag (default: latest)"
 
 #==============================================================================
@@ -127,7 +134,7 @@ build: build-backend
 .PHONY: login
 login:
 	@echo "Logging in to GHCR..."
-	@echo "$(GITHUB_GHCR_PAT)" | $(CONTAINER_RUNTIME) login ghcr.io -u $(GITHUB_USER) --password-stdin
+	@echo "$(WRITE_GHCR_PAT)" | $(CONTAINER_RUNTIME) login ghcr.io -u $(GITHUB_USER) --password-stdin
 
 .PHONY: push
 push: login build
