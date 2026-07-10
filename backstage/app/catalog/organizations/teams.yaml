@@ -22,7 +22,21 @@ spec:
   children: []
 
 # --- Users: Platform members ---
-# Note: These are demo users. In production, use external auth provider (OIDC/SAML)
+
+# 実ユーザー: SSO sign-in resolver が x-auth-request-email を
+# spec.profile.email に突合してこの entity に解決する
+---
+apiVersion: backstage.io/v1alpha1
+kind: User
+metadata:
+  name: yu
+spec:
+  profile:
+    displayName: Yu
+    email: ymisaki00@gmail.com
+  memberOf: [platform-engineering]
+
+# Note: Below are demo users kept for catalog demonstration purposes
 
 # Platform Engineering Team Members
 ---

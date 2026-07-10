@@ -1,7 +1,12 @@
 # Backstage Build and Deployment Makefile
 # Load environment variables from .env file if it exists
+# (実体は repo root の .env。旧配置の backstage/.env も互換で読む)
 -include ../.env
+-include ../../.env
 export
+
+# repo root .env は WRITE_GHCR_PAT 名で保持している。未指定ならそれを使う
+GITHUB_GHCR_PAT ?= $(WRITE_GHCR_PAT)
 
 # For Backstage compatibility: use GITHUB_GHCR_PAT as GITHUB_TOKEN if not set
 GITHUB_TOKEN ?= $(GITHUB_GHCR_PAT)
