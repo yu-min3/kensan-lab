@@ -1,8 +1,8 @@
-# ADR-012: Kyverno による Policy Enforcement (validate-only / Audit → Enforce)
+# ADR-012: Policy Enforcement with Kyverno (validate-only / Audit → Enforce)
 
 ## Status
 
-**Accepted** (2026-06-06) / **v2 改訂** (2026-06-07): PSA 併用 → Kyverno 統一（末尾の改訂セクション参照）
+**Accepted** (2026-06-06) / **v2 revision** (2026-06-07): PSA coexistence → Kyverno-only (see the revision section at the end)
 
 ## Date
 
@@ -10,124 +10,124 @@
 
 ## Context
 
-### PSA (Pod Security Admission) の限界
+### The limits of PSA (Pod Security Admission)
 
-クラスタの Pod Security は PSA の namespace label で管理してきたが、PSA は **namespace 単位の all-or-nothing** しかできない。`kubernetes/observability/namespace.yaml` では node-exporter (hostNetwork / hostPID / hostPort / hostPath を要求) が baseline と非互換のため、monitoring ns 全体の enforce を断念し、以下の TODO を残していた:
+The cluster's Pod Security had been managed with PSA namespace labels, but PSA is **all-or-nothing per namespace**. In `kubernetes/observability/namespace.yaml`, node-exporter (which requires hostNetwork / hostPID / hostPort / hostPath) is incompatible with baseline, forcing us to give up enforcement for the whole monitoring ns and leave this TODO:
 
 ```
-TODO(kyverno): Kyverno 統合後に ClusterPolicy で baseline 強制 + 既知 workload
-  (node-exporter / vault 等) を per-workload exempt する形で復活させる
+TODO(kyverno): after Kyverno integration, restore enforcement via ClusterPolicy
+  baseline + per-workload exemptions for known workloads (node-exporter / vault etc.)
 ```
 
-### その他の動機
+### Other motivations
 
-1. **ADR-011 の silent upgrade 事故**: Vault が `:latest` tag で major 跨ぎの silent upgrade を起こした (PR #271)。image tag 規律を engine で強制したい
-2. **ADR-006 の label 強制**: ADR-006 自身が「new-namespace creation procedure must enforce it as a required field」と要求している。実機照合 (2026-06-06) では app-kensan が unprefixed の `team` / `app` label を使っており、強制機構の不在が既に表記ゆれを生んでいる
-3. **AD tenant のガードレール**: Backstage 経由デプロイの品質 (requests 必須等) を Git 管理のポリシーで担保する
+1. **The ADR-011 silent upgrade accident**: Vault silently crossed a major version on the `:latest` tag (PR #271). Image-tag discipline should be enforced by an engine
+2. **ADR-006 label enforcement**: ADR-006 itself demands that "new-namespace creation procedure must enforce it as a required field". A live audit (2026-06-06) found app-kensan using unprefixed `team` / `app` labels — the absence of an enforcement mechanism was already producing drift
+3. **Guardrails for AD tenants**: quality of Backstage-driven deployments (required requests etc.) should be guaranteed by Git-managed policy
 
-### 検討した選択肢
+### Options considered
 
-| 観点 | Kyverno (採用) | OPA Gatekeeper | PSA のみ (現状) |
+| Aspect | Kyverno (adopted) | OPA Gatekeeper | PSA only (status quo) |
 |---|---|---|---|
-| ポリシー記述 | YAML ネイティブ | Rego 言語 | label のみ |
-| PSS 対応 | `validate.podSecurity` 組み込み | ConstraintTemplate 自作 | ◯ (ただし ns 単位) |
-| per-workload 例外 | `PolicyException` CRD | label ベースのみ | ✗ |
-| GitOps 親和性 | CRD ベース、Argo CD 実績多数 | 同等 (2 段構成) | — |
+| Policy authoring | YAML-native | Rego language | labels only |
+| PSS support | built-in `validate.podSecurity` | hand-written ConstraintTemplates | ◯ (but per-namespace) |
+| Per-workload exceptions | `PolicyException` CRD | label-based only | ✗ |
+| GitOps affinity | CRD-based, extensive Argo CD track record | comparable (two-tier setup) | — |
 
 ## Decision
 
-**Kyverno (chart 3.8.1 / v1.16 系) を validate-only で採用し、Audit → Enforce の段階ロールアウトを行う。**
+**Adopt Kyverno (chart 3.8.1 / v1.16 line) validate-only, with a staged Audit → Enforce rollout.**
 
-### 1. 構成
+### 1. Layout
 
-- 新 category `kubernetes/policy/` を作成。engine (`kyverno` app、Pattern A) とポリシー本体 (`kyverno-policies` app、Pattern B) を **別 Application に分離** — ポリシー変更の PR が engine の Helm sync を触らない (network-policy と同じ思想)
-- `PolicyException` は `features.policyExceptions.namespace=kyverno` で **kyverno ns のみ受理**。例外も必ず Git (`kubernetes/policy/kyverno-policies/exceptions/`) を経由する
-- sync-wave: ns bootstrap `-4` → engine `-2` → policies `-1` (CRD 登録順を保証)
+- New category `kubernetes/policy/`. The engine (`kyverno` app, Pattern A) and the policies (`kyverno-policies` app, Pattern B) are **separate Applications** — a policy-change PR never touches the engine's Helm sync (same philosophy as network-policy)
+- `PolicyException` is accepted **only in the kyverno ns** (`features.policyExceptions.namespace=kyverno`). Exceptions also always go through Git (`kubernetes/policy/kyverno-policies/exceptions/`)
+- sync-waves: ns bootstrap `-4` → engine `-2` → policies `-1` (guaranteeing CRD registration order)
 
-### 2. validate のみ。mutate は使わない
+### 2. validate only; no mutate
 
-mutate は Argo CD の reconciliation loop と競合する (CNCF "GitOps and mutating policies: the tale of two loops")。mutate → live が Git と乖離 → selfHeal が再 apply → 再 mutate のループ / OutOfSync 常態化が起きる。
+Mutation conflicts with Argo CD's reconciliation loop (CNCF: "GitOps and mutating policies: the tale of two loops"): mutate → live diverges from Git → selfHeal re-applies → re-mutate loops / permanent OutOfSync.
 
-- 注入したい値は **Git の manifest に直接書く** のが本リポの正道 (全リソース Git 管理のため mutate の出番が構造的にない)。例: platform 側の requests 未設定 ~50 container は values.yaml への追記で解消する
-- 将来 mutate が必要になった場合は、対象 Application に限定して Argo CD 2.10+ の Server-Side Diff を併用する: `argocd.argoproj.io/compare-options: ServerSideDiff=true,IncludeMutationWebhook=true` (diff 計算が SSA dry-run を通り、mutation 込みの predicted live state で比較される)。全 app 一括有効化は admission controller への負荷増の既知 issue があるため per-app annotation に限定する
+- Values we want injected are **written directly into the Git manifests** — the honest path for this repo (everything is Git-managed, so mutation has no structural role). Example: the ~50 platform containers missing requests get them added in each values.yaml
+- If mutation ever becomes necessary, pair it with Argo CD 2.10+ Server-Side Diff scoped to the affected Application: `argocd.argoproj.io/compare-options: ServerSideDiff=true,IncludeMutationWebhook=true` (diffing goes through an SSA dry-run and compares against the mutation-inclusive predicted live state). Enabling it fleet-wide has a known admission-load issue, so keep it per-app
 
-### 3. ホームラボ制約への対応
+### 3. Homelab constraints
 
-| 項目 | 設定 | 理由 |
+| Item | Setting | Reason |
 |---|---|---|
-| `features.admissionReports` | **無効化** | master の etcd は microSD。admission 毎の EphemeralReport 書き込みを止め、violation 可視化は background scan (1h) 由来の PolicyReport に一本化 |
-| `backgroundScanInterval` | `1h` を明示 pin | 設計値を chart default 任せにしない (ADR-011 と同型の silent change 防止) |
-| `features.reporting` | validate のみ | mutate / generate / imageVerify は未使用 |
-| 各 controller replicas | 1 | homelab に HA 不要 |
-| webhook `failurePolicy` | `Ignore` (policy 側で指定) | admission controller (replica 1) 停止時に cluster 全体の Pod 作成を止めない。Enforce 安定後に `Fail` 昇格を判断 |
-| `cleanupController` | 無効化 | CleanupPolicy 未使用。Pi のリソース節約 |
-| `backgroundController` | 無効化 | 担当は generate / mutateExisting のみで validate-only 構成では恒久 idle (background scan の PolicyReport 生成は reports-controller の担当) |
-| nodeAffinity | preferred `hardware-class=high-performance` (weight 80) | webhook latency 抑制。Medium カテゴリの scheduling rule に準拠 |
+| `features.admissionReports` | **disabled** | the master's etcd lives on a microSD. Stop per-admission EphemeralReport writes; violation visibility consolidates on background-scan (1h) PolicyReports |
+| `backgroundScanInterval` | explicitly pinned to `1h` | don't leave a design value to the chart default (preventing the same class of silent change as ADR-011) |
+| `features.reporting` | validate only | mutate / generate / imageVerify unused |
+| controller replicas | 1 each | no HA needed in a homelab |
+| webhook `failurePolicy` | `Ignore` (set per policy) | an admission-controller (1 replica) outage must not block pod creation cluster-wide. Promotion to `Fail` is judged after Enforce stabilizes |
+| `cleanupController` | disabled | CleanupPolicy unused; saves Pi resources |
+| `backgroundController` | disabled | it only serves generate / mutateExisting, permanently idle in a validate-only setup (background-scan PolicyReports are the reports-controller's job) |
+| nodeAffinity | preferred `hardware-class=high-performance` (weight 80) | keeps webhook latency down; follows the Medium-category scheduling rule |
 
-### 4. 初期ポリシーと scope
+### 4. Initial policies and scope
 
-| ポリシー | scope | 初期 mode |
+| Policy | Scope | Initial mode |
 |---|---|---|
-| `pss-baseline` | PSA `enforce=privileged` label の ns **以外の全 ns** (label selector 除外) | Audit |
-| `disallow-latest-tag` | app tier (`tier=application` label ∪ `app-*` / `kensan` ns 名) | Audit |
-| `require-requests` | 同上 | Audit |
-| `require-ns-labels` | `app-*` ns (ADR-006)。app-prod は env-shared landing zone のため exclude | Audit |
+| `pss-baseline` | **every** ns except those labeled PSA `enforce=privileged` (label-selector exclusion) | Audit |
+| `disallow-latest-tag` | app tier (`tier=application` label ∪ ns names `app-*` / `kensan`) | Audit |
+| `require-requests` | same | Audit |
+| `require-ns-labels` | `app-*` ns (ADR-006); app-prod excluded as the env-shared landing zone | Audit |
 
-privileged 設計 ns (現状 kube-system / istio-system / longhorn-system) は PSA `enforce: privileged` を明示済みの PE 専管領域なので、**ns 側の PSA 宣言を SoT とした label selector** で scope 外とする (name list のハードコードを避け、4 つ目の privileged ns 追加時にこの policy の編集を不要にする)。これにより必要な PolicyException は **node-exporter 1 件のみ** (実機照合 2026-06-06。kensan の hook Job 2 件に requests 欠落があったが、本 PR で requests を追記して解消)。
+The privileged-by-design namespaces (then kube-system / istio-system / longhorn-system) are PE-only territory with PSA `enforce: privileged` already declared, so they are scoped out via a **label selector that treats the ns-side PSA declaration as SoT** (avoiding a hardcoded name list, so adding a 4th privileged ns requires no policy edit). This leaves exactly **one PolicyException: node-exporter** (live audit 2026-06-06; kensan's 2 hook Jobs were missing requests, fixed by adding requests in the same PR).
 
-### 5. 段階的ロールアウト
+### 5. Staged rollout
 
-1. **Phase 1**: 全ポリシー Audit で投入、PolicyReport で violation と etcd 負荷を 1〜2 週間観測
-2. **Phase 2**: violation を棚卸しし、PolicyException の追加 or Git 側 remediate で violation ゼロ化
-3. **Phase 3**: app tier から Enforce 昇格 → platform 系は例外整備が済んだものから順次。webhook failurePolicy の `Fail` 昇格もここで判断
+1. **Phase 1**: land all policies in Audit; observe violations and etcd load via PolicyReports for 1–2 weeks
+2. **Phase 2**: triage violations; reach zero via PolicyExceptions or Git-side remediation
+3. **Phase 3**: promote to Enforce starting from the app tier → platform policies as their exceptions are ready. Decide on webhook failurePolicy `Fail` promotion here too
 
 ## Consequences
 
 ### Positive
 
-- monitoring ns の TODO(kyverno) を回収: baseline 監査 + node-exporter のみ最小 control (Host Namespaces / Host Ports / HostPath Volumes) で exempt
-- 例外が Git 管理の宣言的リソースになる (PSA 時代は「ns ごと諦める」しかなかった)
-- ADR-006 / ADR-011 の規律に enforcement 機構がつく
-- 全ポリシー Audit 開始 + failurePolicy Ignore のため、導入時の blast radius がゼロ
+- The monitoring-ns TODO(kyverno) is repaid: baseline auditing + node-exporter exempted on the minimal controls only (Host Namespaces / Host Ports / HostPath Volumes)
+- Exceptions become declarative, Git-managed resources (in the PSA era the only option was "give up on the whole namespace")
+- ADR-006 / ADR-011 discipline gains an enforcement mechanism
+- All policies start in Audit with failurePolicy Ignore, so the introduction has zero blast radius
 
 ### Trade-offs
 
-- Audit 期間中は強制力がない (Phase 3 まで violation は report されるだけ)
-- failurePolicy Ignore の間は、admission controller 停止中に violation が素通りする (background scan が事後検出はする)。Enforce 昇格時に Fail 化とのバランスを再検討
-- admissionReports 無効化により、violation の検出は最大で background scan 間隔 (1h) 遅延する
-- Kyverno 分のリソース消費 (~200m / 256Mi requests、3 controller)。実測でキャパシティに問題ないことを確認済み
+- No enforcement during the Audit period (violations are only reported until Phase 3)
+- While failurePolicy is Ignore, violations slip through during an admission-controller outage (the background scan still detects them after the fact). Rebalanced against Fail promotion at Enforce time
+- With admissionReports disabled, violation detection lags up to the background-scan interval (1h)
+- Kyverno's resource footprint (~200m / 256Mi requests, 3 controllers) — measured and confirmed to fit capacity
 
-## v2 改訂 (2026-06-07): PSA 併用 → Kyverno 統一
+## v2 revision (2026-06-07): PSA coexistence → Kyverno-only
 
-### 改訂の経緯
+### Why the revision
 
-初版は PSA を「Kyverno (replica 1 + failurePolicy Ignore) 停止中の in-process backstop」として併用する設計だったが、運用設計のレビューで以下が明らかになり **Kyverno 一本化** に改めた:
+The first version kept PSA as an "in-process backstop while Kyverno (1 replica + failurePolicy Ignore) is down", but an operational review made the case for **consolidating on Kyverno**:
 
-1. **backstop の実価値 ≈ ε**: クラスタへの書き込み経路は Argo CD (Git / PR レビュー済み) のみ。Kyverno 停止中に再作成される Pod は既検証の同一 spec であり、新規違反が入り込む現実的経路がない。すり抜けても background scan が 1h 以内に PolicyReport へ記録する
-2. **ゾーン分けの認知コストが実在**: 「PSA enforce ゾーン / Kyverno 専任ゾーン / privileged ゾーン」の 3 区分は、運用者が「この ns はどちらに弾かれるか」を常に考えることを強いる。例外の非互換 (PSA enforce が上流で先に拒否するため PolicyException が無力化する) がゾーン分けを要求する根因だった
-3. **業界多数派との一致**: Giant Swarm (PSA を RFC で明示的に却下) / DoD Big Bang (Kyverno-only enforcing) など、Kyverno を本格採用する組織は PSA を併用しない。Gatekeeper がデフォルト failurePolicy Ignore + Audit 補完で大量運用されている事実も、Ignore 運用が異端でないことの傍証
+1. **The backstop's real value ≈ ε**: the only write path into the cluster is Argo CD (Git / PR-reviewed). Pods recreated during a Kyverno outage carry already-vetted, identical specs; there is no realistic path for a new violation to enter. Anything that slips through is recorded in a PolicyReport by the background scan within 1h
+2. **The zoning has real cognitive cost**: the three-way split "PSA-enforce zone / Kyverno-only zone / privileged zone" forces the operator to constantly reason about "which layer rejects this ns?". The exception incompatibility (PSA enforce rejects upstream first, neutering PolicyException) was the root cause requiring the zoning
+3. **Alignment with the industry mainstream**: organizations that adopt Kyverno seriously don't run PSA alongside — Giant Swarm (explicitly rejected PSA in an RFC), DoD Big Bang (Kyverno-only enforcing). Gatekeeper shipping with failurePolicy Ignore by default plus Audit compensation is further evidence that Ignore-based operation is not heresy
 
-### v2 の設計
+### The v2 design
 
-- **PSA は label 撤去で不活性化** (in-tree のため削除作業は不要 — label がなければ何もしない)
-- **ns の PSS level は Kyverno 専用 label `kensan-lab.platform/pss-level` で宣言**: 無印 = `pss-baseline` の床 / `privileged` = 床から除外 (tier=platform のみ、`ns-label-contract` rule 3 が強制) / `restricted` = `pss-restricted` policy が適用 (opt-in)。PSA の label key を流用しない (流用すると PSA 本体が再活性化する)
-- **`ns-label-contract`** (require-ns-labels を吸収): label の契約 (required labels / 3-axis / privileged 宣言条件) を policy として強制 — OpenShift の label syncer と同じ「label の真実性を機械が守る」思想の validate 版
-- **移行順序 (強制の空白を作らない)**: PR #2 で pss-level label を追加 (PSA label と併存・全 policy Audit) → Phase 3 の Enforce 昇格と**同じ PR で PSA label を撤去** (atomic swap)
+- **PSA is deactivated by removing its labels** (it's in-tree, so nothing to uninstall — without labels it does nothing)
+- **A namespace's PSS level is declared with the Kyverno-only label `kensan-lab.platform/pss-level`**: unset = the `pss-baseline` floor / `privileged` = excluded from the floor (tier=platform only, enforced by `ns-label-contract` rule 3) / `restricted` = the `pss-restricted` policy applies (opt-in). PSA's label key is not reused (reusing it would re-activate PSA itself)
+- **`ns-label-contract`** (absorbing require-ns-labels): enforces the label contract (required labels / 3-axis / privileged declaration conditions) as policy — the validate flavor of OpenShift's label-syncer idea, "a machine guards the truthfulness of labels"
+- **Migration order (no enforcement gap)**: PR #2 adds the pss-level labels (coexisting with PSA labels, all policies Audit) → **the PSA labels are removed in the same PR as the Phase 3 Enforce promotion** (atomic swap)
 
-### v2 で受け入れるトレードオフ
+### Trade-offs accepted in v2
 
-- Kyverno 停止中は PSS 強制が完全にゼロになる窓ができる (初版では PSA が床を維持していた)。上記 1 の ε 評価に基づき受け入れる
-- 統一後は Kyverno が唯一の強制層になるため、Enforce 安定後の failurePolicy `Fail` 昇格の価値が上がる。昇格条件: ① Enforce で violation ゼロが数週間継続 ② `admissionController.replicas: 2` (m4neo + worker 分散) ③ `config.webhooks` で kube-system を webhook レベルで除外 (停電復旧時の CNI デッドロック予防) ④ Fail にするのは app-tier policy のみ (per-policy 設定)。なお master / etcd の SPOF には HA も Fail も無力なので、「昇格しない」も常に正当な選択
+- A window exists where PSS enforcement drops to zero while Kyverno is down (v1's PSA floor would have held). Accepted based on the ε assessment in point 1
+- After unification Kyverno is the sole enforcement layer, which raises the value of promoting failurePolicy to `Fail` once Enforce is stable. Promotion conditions: ① weeks of zero violations under Enforce ② `admissionController.replicas: 2` (spread across two nodes) ③ excluding kube-system at the webhook level via `config.webhooks` (preventing the CNI deadlock on power-loss recovery) ④ Fail only for app-tier policies (per-policy setting). Note that neither HA nor Fail helps against the master/etcd SPOF, so "don't promote" remains a permanently valid choice
 
 ## Errata (2026-06-07)
 
-- §4 の privileged 設計 ns 列挙「現状 kube-system / istio-system / longhorn-system」は **local-path-storage が漏れている**（執筆時点から `pss-level: privileged` を持つ ns は 4 つ。`docs/concepts/policy-enforcement.md` 側の列挙が正）。本文の「name list のハードコードを避ける」設計どおり policy 自体への影響はない
-- label 契約の格付けは [ADR-014](014-namespace-naming-label-contract-v2.md) で正式化された（全 ns 必須 = `environment` + `tier`、`app-*` ns 必須 = `team` + `app`、`component` は platform 慣行。ADR-006 の 3-axis 定義との衝突を解消）
+- §4's enumeration of privileged-by-design namespaces ("then kube-system / istio-system / longhorn-system") **omits local-path-storage** (4 namespaces carried `pss-level: privileged` at time of writing; the enumeration in `docs/concepts/policy-enforcement.md` is authoritative). Per the "no hardcoded name list" design, the policy itself is unaffected
+- The label contract's tiering was formalized in [ADR-014](014-namespace-naming-label-contract-v2.md) (required for all ns = `environment` + `tier`; required for `app-*` ns = `team` + `app`; `component` is a platform convention), resolving the clash with ADR-006's 3-axis definition
 
 ## References
 
 - [ADR-006](006-namespace-naming.md): Namespace Naming (3-axis labels)
-- [ADR-011](011-vault-version-pinning.md): Vault `:latest` silent upgrade 事故
-- [`docs/concepts/policy-enforcement.md`](../concepts/policy-enforcement.md): ポリシー inventory / 運用手順 (SoT)
+- [ADR-011](011-vault-version-pinning.md): the Vault `:latest` silent upgrade accident
+- [`docs/concepts/policy-enforcement.md`](../concepts/policy-enforcement.md): policy inventory / operations (SoT)
 - [CNCF: GitOps and mutating policies — the tale of two loops](https://www.cncf.io/blog/2024/01/18/gitops-and-mutating-policies-the-tale-of-two-loops/)
 - [Argo CD Diff Strategies (Server-Side Diff)](https://argo-cd.readthedocs.io/en/stable/user-guide/diff-strategies/)

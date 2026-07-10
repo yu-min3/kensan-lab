@@ -2,7 +2,7 @@
 
 ## Status
 
-**Accepted** (2026-04-14, 暫定対応として採用)
+**Accepted** (2026-04-14, adopted as an interim measure)
 
 ## Date
 
@@ -10,23 +10,23 @@
 
 ## Context
 
-`kubernetes/secrets/vault/values.yaml` で `server.image.tag` を `"2.0.0"` に明示 pin している。本 ADR はその経緯と解除条件を残す。
+`kubernetes/secrets/vault/values.yaml` explicitly pins `server.image.tag` to `"2.0.0"`. This ADR records why, and the conditions for removing the pin.
 
-### 背景: silent upgrade 事故
+### Background: the silent upgrade accident
 
-HashiCorp Vault Helm chart `0.32.0` (2026-01-14 リリース) の template は、`server.image.tag` に空文字 `""` が入っていると `default "latest"` を発動して `image: hashicorp/vault:latest` を render する仕様。
+In HashiCorp Vault Helm chart `0.32.0` (released 2026-01-14), the template applies `default "latest"` when `server.image.tag` is the empty string `""`, rendering `image: hashicorp/vault:latest`.
 
-このリポでは当初 `tag: ""` (= chart default に従う) を期待して空文字を指定していたが、実際には `:latest` が選択されていた。2026-04-14 に Vault 2.0.0 が `:latest` tag に publish されたタイミングで、3 replica 全 Pod が `RollingUpdate` で 2.0.0 に silent upgrade された。PR #271 のレビュー中に発覚。
+This repo had specified the empty string expecting "follow the chart default" — but what it actually selected was `:latest`. When Vault 2.0.0 was published to the `:latest` tag on 2026-04-14, all 3 replicas were silently upgraded to 2.0.0 via `RollingUpdate`. Discovered during review of PR #271.
 
-### 影響
+### Impact
 
-- Vault major 跨ぎの upgrade (1.x → 2.x) を予期せず実施
-- 公式は major 跨ぎ downgrade をサポートしていない (raft snapshot / storage format 互換性なし)
-- 戻すには手動 storage migration が必要、homelab スケールで現実的でない
+- An unplanned major-version upgrade of Vault (1.x → 2.x)
+- Major-version downgrades are officially unsupported (raft snapshot / storage format incompatibility)
+- Rolling back would require a manual storage migration — not realistic at homelab scale
 
 ## Decision
 
-`server.image.tag: "2.0.0"` を明示 pin する。
+Explicitly pin `server.image.tag: "2.0.0"`.
 
 ```yaml
 server:
@@ -35,35 +35,36 @@ server:
     tag: "2.0.0"
 ```
 
-### 本来の原則
+### The underlying principle
 
-- `tag` 行は削除して chart default に従う (chart 0.32.0 では `server.image.tag = 1.21.2`)
-- これにより chart upgrade と image upgrade を 1 つのレビュー単位に揃えられる
+- Delete the `tag` line and follow the chart default (chart 0.32.0 defaults `server.image.tag` to 1.21.2)
+- That keeps chart upgrades and image upgrades in a single review unit
 
-### 暫定対応の理由
+### Why an interim measure instead
 
-- すでに 2.0.0 で稼働中、1.21 への downgrade は raft storage format 非互換でリスクあり
-- 動いている major version を維持することを優先
+- Already running on 2.0.0; downgrading to 1.21 carries raft-storage-format incompatibility risk
+- Priority is keeping the running major version stable
 
-## 解除条件
+## Conditions for removing the pin
 
-以下を全て満たした時点で本 pin を解除する:
+Remove the pin once both hold:
 
-1. chart 0.33+ 系がリリースされ、`server.image.tag` の chart default が 2.x line に追従していること
-2. その時点で稼働中の Vault major version と chart default が同じ major であること
+1. A chart 0.33+ release exists whose `server.image.tag` chart default has caught up to the 2.x line
+2. The running Vault major version and the chart default are the same major at that point
 
-解除手順:
-- `server.image.tag` 行を削除して chart default に従わせる
-- chart upgrade PR の中で `helm template` 出力を diff 確認し、image tag が想定通り 2.x 系であることを check
+Removal procedure:
 
-## 教訓
+- Delete the `server.image.tag` line and follow the chart default
+- In the chart-upgrade PR, diff the `helm template` output and check the image tag is the expected 2.x
 
-- Helm chart の `default "latest"` 挙動は silent upgrade の温床
-- `tag: ""` は「chart default に従う」ではなく「`:latest` を引く」になる場合がある
-- 空文字渡しは避け、明示 pin か行削除のどちらかにする
+## Lessons
+
+- Helm charts' `default "latest"` behavior is a breeding ground for silent upgrades
+- `tag: ""` can mean "pull `:latest`" rather than "follow the chart default"
+- Avoid passing empty strings: either pin explicitly or delete the line
 
 ## References
 
-- PR #271: silent upgrade 発見・対応
-- HashiCorp Vault chart 0.32.0 (2026-01-14 リリース)
-- Vault 2.0.0 (2026-04-14 GA)
+- PR #271: discovery and handling of the silent upgrade
+- HashiCorp Vault chart 0.32.0 (released 2026-01-14)
+- Vault 2.0.0 (GA 2026-04-14)

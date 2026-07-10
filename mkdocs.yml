@@ -11,7 +11,10 @@ docs_dir: docs
 exclude_docs: |
   bootstrapping/manifests/
   bootstrapping/scripts/
-  refactoring_master_plan.md
+
+# Drafted but not yet published anywhere — keep out of nav until real article links exist
+not_in_nav: |
+  articles.md
 
 validation:
   nav:
@@ -101,8 +104,6 @@ plugins:
         Incidents & roadmap:
           - incidents/*.md
           - roadmap/*.md
-        Articles:
-          - articles.md
 
 markdown_extensions:
   - admonition
@@ -179,8 +180,9 @@ nav:
   - Operations:
       - Secret Management: secret-management/index.md
       - Auth integration:
-          - ArgoCD ↔ Keycloak (Path B): auth/argocd-keycloak-integration.md
+          - Identity & RBAC model: auth/identity-model.md
           - Gateway OIDC (Path A): auth/gateway-oidc.md
+          - ArgoCD ↔ Keycloak (Path B): auth/argocd-keycloak-integration.md
           - oauth2-proxy: auth/oauth2-proxy.md
       - Runbooks:
           - runbooks/index.md
@@ -219,7 +221,8 @@ nav:
       - 018 — Backstage Manifests Placement: adr/018-backstage-manifests-placement.md
   - Incidents:
       - incidents/index.md
+      - 2026-06-24 m4neo Silent-Freeze Series: incidents/2026-06-24-m4neo-silent-freeze.md
+      - 2026-06-06 Vault OIDC Credential Drift: incidents/2026-06-06-vault-oidc-credential-drift.md
       - 2026-03-02 system-infra Sync Blocked: incidents/2026-03-02-system-infra-sync-blocked.md
   - Roadmap:
       - Storage (local-path → Longhorn): roadmap/storage-longhorn.md
-  - Articles: articles.md

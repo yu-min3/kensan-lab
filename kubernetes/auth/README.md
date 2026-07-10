@@ -1,8 +1,8 @@
 # Auth: one IdP, authenticate at the gateway, apps trust headers
 
-Authentication and authorization for humans and services — built around one idea: **complete browser authentication once, at the Istio Gateway, so the apps behind it never implement login.**
+Authentication and authorization for humans and services — built around one idea: **complete browser authentication once, at the Istio Gateway, so the apps it protects never implement login.**
 
-**Design thesis:** **Keycloak is the single IdP; the Gateway is the single browser chokepoint.** oauth2-proxy sits on the Gateway as an `ext_authz` check — every platform UI (including ones with no native auth at all) gets OIDC for free, and apps downstream simply trust the authenticated headers. Paths that *can't* ride through a browser proxy — CLI logins like `vault login -method=oidc` — get their own OIDC client against the same Keycloak realm. One identity source, two kinds of consumers.
+**Design thesis:** **Keycloak is the single IdP; the Gateway is the single browser chokepoint.** oauth2-proxy sits on the Gateway as an `ext_authz` check — UIs with no auth of their own get OIDC for free and simply trust the authenticated headers. Apps that bring their own auth (ArgoCD, Grafana, Vault — including CLI logins that can't ride through a browser proxy) get their own OIDC client against the same Keycloak realm and bypass the gateway check. One identity source, two kinds of consumers.
 
 **What you'll find here:** how the SSO flow actually moves between Gateway, oauth2-proxy, and Keycloak; why Gateway-level auth won over per-service OIDC and Istio-native filters; and how LAN and internet traffic get different session friction on the same infrastructure.
 
@@ -23,7 +23,7 @@ sequenceDiagram
     participant GW as Istio Gateway<br/>(gateway-platform)
     participant O2P as oauth2-proxy<br/>(ext_authz)
     participant KC as Keycloak
-    participant APP as Backstage / Grafana<br/>/ ArgoCD UI etc.
+    participant APP as Backstage / Prometheus<br/>/ Hubble / Longhorn
 
     U->>GW: HTTPS /
     GW->>O2P: ext_authz check
@@ -52,17 +52,30 @@ yu (local) → vault login -method=oidc role=admin
 
 oauth2-proxy passes pre-authenticated Bearer tokens through (`--skip-jwt-bearer-tokens`), so CLI flows (`vault login`, `argocd login --sso`) coexist with browser flows on the same hosts.
 
+## Who logs in as what
+
+Authorization is two-tier: the Keycloak `groups` claim (`platform-admin` / `platform-dev`) is mapped independently by each consumer.
+
+| Consumer | `platform-admin` becomes… | `platform-dev` becomes… |
+|---|---|---|
+| Gateway reach | all protected hosts | Backstage + Prometheus only |
+| ArgoCD | `role:admin` | `role:readonly` |
+| Grafana | `Admin` | `Editor` |
+| Vault | policy `admin` | login rejected (`bound_claims`) |
+
+Currently one human user (`platform-admin`); the dev tier is pre-wired but empty. Full mapping, break-glass accounts, and known gaps: [Identity & RBAC model](https://github.com/yu-min3/kensan-lab/blob/main/docs/auth/identity-model.md).
+
 ## Design rationale
 
 **Three principles thread the whole design:**
 
-1. **Authenticate at the chokepoint, not per app.** All ingress converges on the Istio Gateway (see [`kubernetes/network/README.md`](https://github.com/yu-min3/kensan-lab/blob/main/kubernetes/network/README.md)), so that is where browser auth lives. Apps with no native auth (Hubble, Prometheus, Longhorn, Alertmanager) are fully covered without ad-hoc basic auth; the hybrid gateway + per-service model is [ADR-002](https://github.com/yu-min3/kensan-lab/blob/main/docs/adr/002-authentication-authorization-architecture.md).
+1. **Authenticate at the chokepoint, not per app.** All ingress converges on the Istio Gateway (see [`kubernetes/network/README.md`](https://github.com/yu-min3/kensan-lab/blob/main/kubernetes/network/README.md)), so that is where browser auth lives. Apps with no native auth (Hubble, Prometheus, Longhorn) are fully covered without ad-hoc basic auth; the hybrid gateway + per-service model is [ADR-002](https://github.com/yu-min3/kensan-lab/blob/main/docs/adr/002-authentication-authorization-architecture.md).
 2. **Choose the boring, documented mechanism.** Istio's native Envoy `oauth2` filter is officially "under active development" — not a surface to build a production-framed platform on. oauth2-proxy via `envoy_ext_authz_http` (GA, the documented Istio pattern, the homelab-ecosystem standard) won after a full comparison of SSO behavior, logout, and audit centralization ([ADR-005](https://github.com/yu-min3/kensan-lab/blob/main/docs/adr/005-istio-native-oauth2.md) → [ADR-010](https://github.com/yu-min3/kensan-lab/blob/main/docs/adr/010-istio-native-oauth2-absent.md)).
 3. **Same identity, different friction per network.** LAN (`*.platform.yu-min3.com` via L2 LB) and internet (`*.yu-mins.com` via Cloudflare Tunnel) land on the same Gateway, but the inner session runs 30 days so the LAN is frictionless, while external traffic keeps a second factor at the Cloudflare edge (Access OTP as interim gate — [ADR-016](https://github.com/yu-min3/kensan-lab/blob/main/docs/adr/016-lan-frictionless-cf-access-external-gate.md)).
 
 Concrete choices:
 
-- **One tier of auth for reachability, a second for identity.** The Gateway gate answers "may this request enter at all"; apps that need real user identity and RBAC (ArgoCD, Grafana, Vault) additionally run their own OIDC client against the same realm — still one IdP, zero duplicate user stores.
+- **Own-auth apps bypass the gateway check instead of doubling up.** Apps that need real user identity and RBAC (ArgoCD, Grafana, Vault) run their own OIDC client against the same realm and are passed through at the Gateway — one IdP, zero duplicate user stores, no header clashes (Grafana notably misreads oauth2-proxy's Bearer header as an API key). The host-by-host matrix is in the [Gateway OIDC guide](https://github.com/yu-min3/kensan-lab/blob/main/docs/auth/gateway-oidc.md).
 - **The IdP's own dependencies are treated as critical path.** Keycloak's DB credentials are Vault dynamic with explicit cascade mitigations ([ADR-013](https://github.com/yu-min3/kensan-lab/blob/main/docs/adr/013-keycloak-db-credentials-vault-dynamic.md)); its availability directly gates every login above.
 - **Vault's OIDC mount is GitOps too.** The `vault-oidc-auth/` CRs (auth role, identity group, group alias) are reconciled by Vault Config Operator, so SSO wiring for Vault is reviewable in a PR like everything else ([ADR-015](https://github.com/yu-min3/kensan-lab/blob/main/docs/adr/015-vco-setup-script-hybrid.md) covers the one scripted exception).
 

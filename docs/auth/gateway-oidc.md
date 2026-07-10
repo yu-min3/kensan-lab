@@ -1,21 +1,21 @@
-# Gateway OIDC (Path A) 運用ガイド
+# Gateway OIDC (Path A) operations guide
 
-`*.platform.yu-min3.com` 配下の認証/認可を Istio gateway-platform で集中制御する仕組みのオペレーションドキュメント。
+Operations document for the mechanism that centralizes authentication/authorization for everything under `*.platform.yu-min3.com` at the Istio gateway-platform.
 
-設計判断の根拠と path 選定の議論は ADR-005 / ADR-010 を参照。本書は「**今動いてる構成の解説と、新 host を追加するときの作業手順**」に絞る。
+For the rationale behind the design and the path-selection debate, see ADR-005 / ADR-010. This document sticks to "**how the running configuration works, and the procedure for adding a new host**".
 
 ## TL;DR
 
-| 認証方式 | どの host が該当 | gateway 層での扱い |
+| Auth style | Hosts | Treatment at the gateway |
 |---|---|---|
-| **app-native auth** (app が自前で OIDC や独自認証を持つ) | Vault, ArgoCD, Keycloak, oauth2-proxy 自身, **Grafana** | **bypass** (gateway は素通し) |
-| **gateway-enforced OIDC** (app は認証を持たない or proxy header を信頼) | Backstage, Prometheus, Hubble, Longhorn | **CUSTOM (oauth2-proxy ext_authz) + ALLOW (group claim 検査)** |
+| **app-native auth** (the app has its own OIDC or custom auth) | Vault, ArgoCD, Keycloak, oauth2-proxy itself, **Grafana** | **bypass** (the gateway passes traffic straight through) |
+| **gateway-enforced OIDC** (the app has no auth, or trusts proxy headers) | Backstage, Prometheus, Hubble, Longhorn | **CUSTOM (oauth2-proxy ext_authz) + ALLOW (group claim check)** |
 
-> **Grafana が bypass な理由**: oauth2-proxy が付与する `Authorization: Bearer ...` を Grafana が自前の API key と誤解釈して 403 を返すため、gateway 層では素通しし、Grafana 自身の Keycloak OIDC (`auth.generic_oauth`) に認証を委ねる。実装は `authorizationpolicy-gateway-platform-allow.yaml` の Category 1。
+> **Why Grafana is a bypass**: Grafana misinterprets the `Authorization: Bearer ...` header added by oauth2-proxy as one of its own API keys and returns 403. So the gateway passes it through and authentication is delegated to Grafana's own Keycloak OIDC (`auth.generic_oauth`). Implemented as Category 1 in `authorizationpolicy-gateway-platform-allow.yaml`.
 
-判定軸は「**アプリが自前で auth を持ってるか**」だけ。CLI/UI の区別ではない。Vault は CLI も UI も同じ host を共有しており、Vault 自身が両方を認証する。
+The only deciding axis is "**does the app bring its own auth?**" — not CLI vs UI. Vault serves CLI and UI from the same host, and Vault itself authenticates both.
 
-## アーキテクチャ概要
+## Architecture overview
 
 ```
                     Internet
@@ -39,144 +39,147 @@
             │                     │
             │                     ▼
             │             RequestAuthentication
-            │              (Bearer JWT 検証)
+            │              (Bearer JWT validation)
             │                     │
             │                     ▼
             │             ALLOW (groups claim)
             │                     │
             ▼                     ▼
        upstream app          upstream app
-       (自前 auth)          (header trust)
+       (own auth)            (header trust)
 ```
 
-## Host × Group マトリクス
+## Host × group matrix
 
-`kubernetes/network/istio/authorizationpolicy-gateway-platform-allow.yaml` の rule に対応:
+Corresponds to the rules in `kubernetes/network/istio/authorizationpolicy-gateway-platform-allow.yaml`:
 
-| Host | Category | 許可 group | 認証方式 |
+| Host | Category | Allowed groups | Auth style |
 |---|---|---|---|
-| `auth.platform.yu-min3.com` | 1: bypass | (claim 検査なし) | Keycloak 自身 |
-| `oauth2-proxy.platform.yu-min3.com` | 1: bypass | (claim 検査なし) | callback 専用、保護対象外 |
-| `vault.platform.yu-min3.com` | 1: bypass | (claim 検査なし) | Vault native OIDC + Vault token |
-| `argocd.platform.yu-min3.com` | 1: bypass | (claim 検査なし) | ArgoCD native OIDC + 自前 JWT |
-| `grafana.platform.yu-min3.com` | 1: bypass | (claim 検査なし) | Grafana native OIDC (`auth.generic_oauth`)。Bearer 誤解釈回避のため bypass |
-| `backstage.platform.yu-min3.com` | 2: admin + dev | `platform-admin`, `platform-dev` | oauth2-proxy 強制 |
-| `prometheus.platform.yu-min3.com` | 2: admin + dev | `platform-admin`, `platform-dev` | oauth2-proxy 強制 |
-| `hubble.platform.yu-min3.com` | 3: admin only | `platform-admin` | oauth2-proxy 強制 |
-| `longhorn.platform.yu-min3.com` | 3: admin only | `platform-admin` | oauth2-proxy 強制 |
+| `auth.platform.yu-min3.com` | 1: bypass | (no claim check) | Keycloak itself |
+| `oauth2-proxy.platform.yu-min3.com` | 1: bypass | (no claim check) | callback only, not a protected target |
+| `vault.platform.yu-min3.com` | 1: bypass | (no claim check) | Vault native OIDC + Vault tokens |
+| `argocd.platform.yu-min3.com` | 1: bypass | (no claim check) | ArgoCD native OIDC + its own JWTs |
+| `grafana.platform.yu-min3.com` | 1: bypass | (no claim check) | Grafana native OIDC (`auth.generic_oauth`); bypass to avoid the Bearer misinterpretation |
+| `backstage.platform.yu-min3.com` | 2: admin + dev | `platform-admin`, `platform-dev` | oauth2-proxy enforced |
+| `prometheus.platform.yu-min3.com` | 2: admin + dev | `platform-admin`, `platform-dev` | oauth2-proxy enforced |
+| `hubble.platform.yu-min3.com` | 3: admin only | `platform-admin` | oauth2-proxy enforced |
+| `longhorn.platform.yu-min3.com` | 3: admin only | `platform-admin` | oauth2-proxy enforced |
 
-## リソースレイアウト
+## Resource layout
 
-| ファイル | 役割 |
+| File | Role |
 |---|---|
-| `kubernetes/network/istio/requestauthentication-gateway-platform.yaml` | Authorization header の Bearer JWT を Keycloak で検証、`request.auth.claims` を populate |
-| `kubernetes/network/istio/authorizationpolicy-gateway-platform-allow.yaml` | 許可ルール本体。3 rule で全 host を網羅。ここに無い host は暗黙 deny |
-| `kubernetes/network/istio/authorizationpolicy-gateway-platform-oauth2.yaml` | Category 2/3 host にだけ oauth2-proxy ext_authz を強制 (CUSTOM action) |
-| `kubernetes/auth/oauth2-proxy/values.yaml` | oauth2-proxy 自身の Helm values。cookie domain / Keycloak client id 等 |
-| `kubernetes/network/istio/istiod/values.yaml` | `meshConfig.extensionProviders[oauth2-proxy]` で oauth2-proxy を ext_authz target として登録 |
+| `kubernetes/network/istio/requestauthentication-gateway-platform.yaml` | Validates Bearer JWTs in the Authorization header against Keycloak, populates `request.auth.claims` |
+| `kubernetes/network/istio/authorizationpolicy-gateway-platform-allow.yaml` | The allow rules. 3 rules cover every host; a host absent from here is implicitly denied |
+| `kubernetes/network/istio/authorizationpolicy-gateway-platform-oauth2.yaml` | Enforces oauth2-proxy ext_authz (CUSTOM action) on Category 2/3 hosts only |
+| `kubernetes/auth/oauth2-proxy/values.yaml` | oauth2-proxy's own Helm values — cookie domain, Keycloak client id, etc. |
+| `kubernetes/network/istio/istiod/values.yaml` | Registers oauth2-proxy as an ext_authz target via `meshConfig.extensionProviders[oauth2-proxy]` |
 
-## 新 host を追加するときのチェックリスト
+## Checklist for adding a new host
 
-### Case A: 新 UI app (自前 auth なし、oauth2-proxy で守りたい)
+### Case A: new UI app (no auth of its own; protect with oauth2-proxy)
 
-例: `awx.platform.yu-min3.com` を追加、admin + dev に開放したい。
+Example: add `awx.platform.yu-min3.com`, open to admin + dev.
 
-1. `authorizationpolicy-gateway-platform-allow.yaml` の Category 2 rule の `hosts:` に追記
-2. `authorizationpolicy-gateway-platform-oauth2.yaml` の `hosts:` にも追記 (CUSTOM の対象に入れる)
-3. HTTPRoute をアプリ側に追加 (`gateway-platform` を parentRef)
-4. アプリの認証は **header trust モード** に設定 (oauth2-proxy が `X-Auth-Request-User` 等を付ける)。Backstage なら proxy auth provider 等。(注: Grafana は Bearer 誤解釈のため bypass + native OIDC 側。Case B を参照)
+1. Add the host to the Category 2 rule's `hosts:` in `authorizationpolicy-gateway-platform-allow.yaml`
+2. Also add it to `hosts:` in `authorizationpolicy-gateway-platform-oauth2.yaml` (bring it under CUSTOM)
+3. Add an HTTPRoute on the app side (`gateway-platform` as parentRef)
+4. Configure the app for **header-trust mode** (oauth2-proxy adds `X-Auth-Request-User` etc.). For Backstage that's the proxy auth provider. (Note: Grafana is bypass + native OIDC because of the Bearer misinterpretation — see Case B)
 
-### Case B: 新自前-auth app (Vault/ArgoCD と同類)
+### Case B: new own-auth app (same family as Vault/ArgoCD)
 
-例: `nexus.platform.yu-min3.com` を追加、Nexus 自身に OIDC 設定済み。
+Example: add `nexus.platform.yu-min3.com`, with OIDC configured in Nexus itself.
 
-1. `authorizationpolicy-gateway-platform-allow.yaml` の Category 1 rule の `hosts:` に追記
-2. Keycloak に nexus 用 OIDC client を作る (bootstrap/keycloak/setup.sh と同様の手順)
-3. アプリ側で Keycloak realm `kensan` を SSO source に設定
-4. CUSTOM policy には**触らない** (bypass のため)
+1. Add the host to the Category 1 rule's `hosts:` in `authorizationpolicy-gateway-platform-allow.yaml`
+2. Create an OIDC client for nexus in Keycloak (same procedure as `bootstrap/keycloak/setup.sh`)
+3. Point the app at Keycloak realm `kensan` as its SSO source
+4. **Do not touch** the CUSTOM policy (it's a bypass)
 
-### Case C: 既存 bypass host を gateway-enforced に切り替えたい
+### Case C: converting an existing bypass host to gateway-enforced
 
-非推奨。Vault/ArgoCD は CLI が壊れる ([ADR-010](../adr/010-istio-native-oauth2-absent.md) 参照)。やるなら host 分離 (Path B) を別途設計。
+Not recommended. Vault/ArgoCD would break their CLIs (see [ADR-010](../adr/010-istio-native-oauth2-absent.md)). If truly needed, design host separation (Path B) separately.
 
-## SSO の挙動
+## SSO behavior
 
-### Single Sign-On (login 1 回で全部)
+### Single Sign-On (one login for everything)
 
-朝 Yu が初めて何らかの UI を開く:
+Opening any UI for the first time in the morning:
 
-1. `backstage.platform.yu-min3.com` (例) → oauth2-proxy が cookie なし検出 → Keycloak へ 302
-2. Keycloak login (Yu / password)
-3. oauth2-proxy が cookie set (cookie_domain `.platform.yu-min3.com`)
-4. その後、`prometheus.platform...` `hubble.platform...` `longhorn.platform...` 全部 cookie 1 個で透過 (Grafana は別途 native OIDC だが同じ Keycloak session を共有)
+1. `backstage.platform.yu-min3.com` (say) → oauth2-proxy sees no cookie → 302 to Keycloak
+2. Keycloak login (username / password)
+3. oauth2-proxy sets its cookie (cookie_domain `.platform.yu-min3.com`)
+4. After that, `prometheus.platform...` `hubble.platform...` `longhorn.platform...` all pass with the single cookie (Grafana uses its own native OIDC but shares the same Keycloak session)
 
-`vault.platform...` を開くと:
-1. Vault UI が「Login with OIDC」に飛ばす
-2. Vault が Keycloak へ redirect → **Keycloak の session が活きてる** ので login 画面スキップ → token 発行
-3. Vault UI 入れる
+Opening `vault.platform...`:
 
-つまり Yu の体感では **朝 1 回 Keycloak login すれば全 UI に通る**。
+1. Vault UI presents "Login with OIDC"
+2. Vault redirects to Keycloak → **the Keycloak session is still alive**, so the login screen is skipped → token issued
+3. You're in the Vault UI
 
-### Single Logout (の限界)
+In practice: **one Keycloak login in the morning opens every UI**.
 
-oauth2-proxy `/sign_out` を叩くと cookie が消えて Category 2/3 の UI から落ちる。**ただし** Vault session / ArgoCD session は **個別に kill しないと残る** (それぞれ独自の token surface を持つため)。
+### Single Logout (and its limits)
 
-完全に切るには:
-- Keycloak admin console で realm session kill (全アプリの次回 refresh で失効)
-- または各アプリで個別 logout
+Hitting oauth2-proxy's `/sign_out` clears the cookie and logs you out of the Category 2/3 UIs. **However**, Vault and ArgoCD sessions **survive until killed individually** (each has its own token surface).
 
-homelab 規模では「PC 落とす」「次回 cookie 期限切れ」を待つ運用で十分。
+To cut everything:
 
-## トラブルシュート
+- Kill the realm session in the Keycloak admin console (every app expires on its next refresh)
+- Or log out of each app individually
 
-### 症状: Category 2/3 の UI で `403 RBAC: access denied`
+At homelab scale, "shut the PC" or waiting for cookie expiry is a perfectly fine operational answer.
 
-考えられる原因:
-1. Keycloak group に user が入ってない
-   - `kcadm.sh get groups -r kensan` で確認
-2. Keycloak の group claim mapper が ID token に乗ってない
-   - `bootstrap/keycloak/setup.sh` の `ensure_oidc_client` 関数で付与してるはず
-   - 検査: oauth2-proxy ログで実際の id_token の claim を見る
-3. ALLOW policy の rule が間違ってる
+## Troubleshooting
+
+### Symptom: `403 RBAC: access denied` on a Category 2/3 UI
+
+Possible causes:
+
+1. The user isn't in the Keycloak group
+   - Check with `kcadm.sh get groups -r kensan`
+2. The Keycloak group claim mapper isn't on the ID token
+   - The `ensure_oidc_client` function in `bootstrap/keycloak/setup.sh` should have added it
+   - Inspect: look at the actual id_token claims in the oauth2-proxy log
+3. The ALLOW policy rule is wrong
    - `kubectl -n istio-system get authorizationpolicy gateway-platform-allow -o yaml`
-4. RequestAuthentication が JWKS を取れてない
-   - istiod ログ: `kubectl -n istio-system logs deploy/istiod | grep -i jwks`
+4. RequestAuthentication can't fetch JWKS
+   - istiod log: `kubectl -n istio-system logs deploy/istiod | grep -i jwks`
 
-### 症状: bypass host で 403
+### Symptom: 403 on a bypass host
 
-bypass host が ALLOW policy の Category 1 に入ってない可能性。
+The bypass host may be missing from Category 1 of the ALLOW policy.
 
 ```bash
 kubectl -n istio-system get authorizationpolicy gateway-platform-allow \
   -o jsonpath='{.spec.rules[0].to[0].operation.hosts}' | jq
 ```
 
-### 症状: oauth2-proxy へ届かず "no healthy upstream"
+### Symptom: "no healthy upstream" before reaching oauth2-proxy
 
-oauth2-proxy が落ちてる、または auth-system ns の Service / Endpoints が壊れてる。
+oauth2-proxy is down, or the Service / Endpoints in the auth-system ns are broken.
 
 ```bash
 kubectl -n auth-system get pod,svc,endpoints
 kubectl -n auth-system logs -l app.kubernetes.io/name=oauth2-proxy -c oauth2-proxy --tail=50
 ```
 
-`failOpen: false` の設計なので oauth2-proxy 落下 → Category 2/3 の UI は全部 503。bypass host (Vault/ArgoCD/Keycloak/Grafana) は影響なし。
+The design is `failOpen: false`, so an oauth2-proxy outage → every Category 2/3 UI returns 503. Bypass hosts (Vault/ArgoCD/Keycloak/Grafana) are unaffected.
 
-### 症状: `vault login -method=oidc` が失敗するようになった
+### Symptom: `vault login -method=oidc` suddenly fails
 
-bypass policy が壊れてる可能性。Phase 2 PR が ALLOW policy で vault.platform を Category 1 に入れ忘れた / 削除されたなど。
+The bypass policy may be broken — e.g. a PR forgot to keep vault.platform in Category 1 of the ALLOW policy, or deleted it.
 
 ```bash
-# Vault host が ALLOW されてるか確認
+# Is the Vault host still allowed?
 kubectl -n istio-system get authorizationpolicy gateway-platform-allow \
   -o yaml | grep -A 5 vault
 ```
 
-緊急 revert: `kubectl -n istio-system delete authorizationpolicy gateway-platform-oauth2-authz` (CUSTOM を消すと oauth2-proxy 強制が外れて全 host pass through に戻る)。
+Emergency revert: `kubectl -n istio-system delete authorizationpolicy gateway-platform-oauth2-authz` (removing CUSTOM lifts the oauth2-proxy enforcement and every host passes through again).
 
-## ロールバック手順
+## Rollback
 
-すべて取り消したい場合:
+To undo everything:
 
 ```bash
 kubectl -n istio-system delete \
@@ -185,10 +188,10 @@ kubectl -n istio-system delete \
   requestauthentication/gateway-platform-keycloak-jwt
 ```
 
-ArgoCD selfHeal が ON なら数十秒で復活する。完全に消すには Git から 3 つの YAML を削除して push。
+With ArgoCD selfHeal ON they come back within tens of seconds. To remove permanently, delete the 3 YAMLs from Git and push.
 
-## 関連 ADR
+## Related ADRs
 
-- [ADR-002](../adr/002-authentication-authorization-architecture.md): platform 全体の認証方式
+- [ADR-002](../adr/002-authentication-authorization-architecture.md): platform-wide authentication model
 - [ADR-005](../adr/005-istio-native-oauth2.md): Istio native OAuth2 (status: Re-evaluation Required)
-- [ADR-010](../adr/010-istio-native-oauth2-absent.md): Path A (oauth2-proxy ext_authz) 採択の根拠
+- [ADR-010](../adr/010-istio-native-oauth2-absent.md): rationale for adopting Path A (oauth2-proxy ext_authz)
