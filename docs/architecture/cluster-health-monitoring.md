@@ -110,6 +110,47 @@ Puts "monitoring of the monitoring, plus a dashboard that stays visible during a
 - **Failures covered**: monitoring-node down, Prometheus / Alertmanager down, total cluster outage, home network / uplink loss
 - **Phase 4 candidate (optional)**: external HTTP probes via a Cloudflare Workers cron + a public status page (external-viewpoint separation of "home uplink down" vs "Gateway broken")
 
+### Current Grafana Cloud state
+
+Verified via the Grafana Cloud API on 2026-07-10.
+
+**Alert rule**
+
+| Field | Value |
+|---|---|
+| Folder | `kensan-lab` |
+| Rule group | `cluster-help` |
+| Rule | `kensan-lab cluster silent` |
+| Evaluation interval | `1m` |
+| Pending period | `5m` |
+| Datasource | `grafanacloud-prom` |
+| Query | `up{job="node-exporter"}` |
+| Condition | last value `< 0.5` |
+| No data state | `Alerting` |
+| Execution error state | `Error` |
+| Receiver | `mymail` |
+
+This is the external dead-man's switch for the homelab. It fires when the
+node-exporter `up` series stops arriving in Grafana Cloud, which covers local
+Prometheus failure, remote_write failure, total cluster loss, and home network
+loss. The contact point is email-based; the address is intentionally not stored
+in this repository.
+
+**Dashboard**
+
+Grafana Cloud has a custom dashboard named `Cluster Health (Cloud)` with UID
+`cluster-health-cloud`. It mirrors the local Cluster Health dashboard at Cloud
+datasource scope. The panels currently cover:
+
+- node liveness, Node Ready, Node Uptime, and pressure conditions
+- node-exporter `up` history
+- CPU, memory, root disk, and CPU temperature
+- wired link / WiFi fallback state and interface traffic
+- abnormal pods, container restarts, PVC usage, and pod count per node
+
+The other dashboards visible in the stack are Grafana Cloud built-ins such as
+Usage Insights, Cardinality management, Billing/Usage, and Incident Insights.
+
 ## PR breakdown
 
 | PR | Content | Deployment impact |
