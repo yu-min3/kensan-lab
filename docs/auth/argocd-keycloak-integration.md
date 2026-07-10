@@ -40,7 +40,7 @@ configs:
 
 Do **not** include `groups` in `requestedScopes`. In Keycloak, `groups` is a claim name rather than a scope; putting it in scopes gets rejected with "Invalid scopes: groups".
 
-The `oidc-group-membership-mapper` attached directly to the `argocd` client (created by `bootstrap/keycloak/setup.sh`) puts the `groups` claim on the id_token. ArgoCD receives it by requesting `groups: { essential: true }` in `requestedIDTokenClaims`.
+The realm-level `groups` client scope (attached to all clients by default; managed by `bootstrap/keycloak/setup.sh`) puts the `groups` claim on the id_token. ArgoCD receives it by requesting `groups: { essential: true }` in `requestedIDTokenClaims`.
 
 ## RBAC mapping
 
