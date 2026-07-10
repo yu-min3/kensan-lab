@@ -28,8 +28,10 @@ import { Root } from './components/Root';
 import {
   AlertDisplay,
   OAuthRequestDialog,
+  ProxiedSignInPage,
   SignInPage,
 } from '@backstage/core-components';
+import { configApiRef, useApi } from '@backstage/core-plugin-api';
 import { createApp } from '@backstage/app-defaults';
 import { AppRouter, FlatRoutes } from '@backstage/core-app-api';
 import { CatalogGraphPage } from '@backstage/plugin-catalog-graph';
@@ -58,7 +60,15 @@ const app = createApp({
     });
   },
   components: {
-    SignInPage: props => <SignInPage {...props} auto providers={['guest']} />,
+    // 本番 (gateway 経由) は oauth2Proxy で SSO identity を消費、
+    // ローカル dev (auth.providers に oauth2Proxy が無い) は guest のまま。
+    SignInPage: props => {
+      const configApi = useApi(configApiRef);
+      if (configApi.has('auth.providers.oauth2Proxy')) {
+        return <ProxiedSignInPage {...props} provider="oauth2Proxy" />;
+      }
+      return <SignInPage {...props} auto providers={['guest']} />;
+    },
   },
 });
 

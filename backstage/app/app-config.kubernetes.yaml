@@ -58,8 +58,11 @@ catalog:
 
 auth:
   providers:
-    guest:
-      dangerouslyAllowOutsideDevelopment: true
+    # Gateway (Istio ext_authz + oauth2-proxy) が認証済みの identity を
+    # x-auth-request-* ヘッダで届ける。resolver はコード側
+    # (packages/backend/src/authModuleOauth2Proxy.ts) が x-auth-request-email を
+    # catalog User の spec.profile.email に突合する。guest は本番では使わない。
+    oauth2Proxy: {}
 
 techdocs:
   builder: 'local'

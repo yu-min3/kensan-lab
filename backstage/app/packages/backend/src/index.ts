@@ -28,6 +28,8 @@ backend.add(import('@backstage/plugin-auth-backend'));
 // See https://backstage.io/docs/backend-system/building-backends/migrating#the-auth-plugin
 backend.add(import('@backstage/plugin-auth-backend-module-guest-provider'));
 // See https://backstage.io/docs/auth/guest/provider
+// oauth2Proxy provider (gateway SSO identity) — custom resolver for x-auth-request-* headers
+backend.add(import('./authModuleOauth2Proxy'));
 
 // catalog plugin
 backend.add(import('@backstage/plugin-catalog-backend'));

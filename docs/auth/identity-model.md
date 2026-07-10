@@ -67,14 +67,14 @@ The practical consequence: **membership is managed in exactly one place, but eac
 | **Gateway** Cat-2 hosts (Backstage, Prometheus) | Istio `AuthorizationPolicy` on the groups claim | ✅ reach | ✅ reach | ❌ denied at the gateway |
 | **Gateway** Cat-3 hosts (Hubble, Longhorn) | same | ✅ reach | ❌ | ❌ |
 | **ArgoCD** | `rbac.policy.csv` (`scopes: [groups]`) | `role:admin` | `role:readonly` | no role mapped → no access (no default role) |
-| **Grafana** | `role_attribute_path` (JMESPath on groups) | `Admin` | `Editor` | `Viewer` |
+| **Grafana** | `role_attribute_path` (JMESPath on groups) | `Admin` | `Editor` | ❌ login rejected (`role_attribute_strict`, no fallback) |
 | **Vault** | OIDC role `default` `bound_claims` + external identity group → policy | policy `admin` (token TTL 1h / max 8h) | ❌ **login rejected** (`bound_claims` allows only platform-admin) | ❌ login rejected |
-| **Backstage** | — (guest provider) | see note below | | |
+| **Backstage** | custom oauth2Proxy resolver — `x-auth-request-email` → catalog User (`spec.profile.email`) | signed in as their catalog User entity | same (gateway reach already filtered) | ❌ no matching User entity → sign-in fails |
 
 Notes on the two ends of the spectrum:
 
 - **Vault is the strictest**: membership is checked at *login* (`bound_claims`), not just at role-mapping — a non-admin can't even get a token. The role attaches no policies directly; policy `admin` flows through the external identity group `platform-admin` (`kubernetes/auth/vault-oidc-auth/`, VCO-managed), so group membership in Keycloak is the single switch.
-- **Backstage is the loosest (known gap)**: the gateway guarantees only `platform-admin` / `platform-dev` can reach it, but the app itself runs the **guest auth provider** — the SSO identity is not yet consumed for in-app authorization. Wiring the `X-Auth-Request-*` headers into a Backstage proxy auth provider is future work.
+- **Backstage consumes the gateway identity** via the oauth2Proxy provider with a custom sign-in resolver (`backstage/app/packages/backend/src/authModuleOauth2Proxy.ts`): the built-in resolvers expect `x-forwarded-*` headers or a JWT profile, but this platform forwards `x-auth-request-*` and [strips the Keycloak JWT at the workload](https://github.com/yu-min3/kensan-lab/blob/main/kubernetes/backstage/requestauthentication-strip-jwt.yaml), so sign-in matches `x-auth-request-email` against the catalog User's `spec.profile.email`. Scaffolder runs and catalog ownership are now attributed to a real user. Remaining softness: in-app permissions don't yet differ by tier (Backstage's permission framework isn't wired to groups), and the backend still runs `dangerouslyDisableDefaultAuthPolicy` — tightening both is follow-up work.
 
 ## Break-glass accounts (outside SSO)
 
@@ -98,7 +98,7 @@ Each app maps the claim independently, so consistency is kept by **contract, not
 | Touch secrets directly (Vault) | ✅ | ❌ — login rejected; dev apps receive secrets via ESO delivery instead |
 | Unmapped authenticated user | — | **deny by default**, everywhere |
 
-Known deviation from the contract (tracked as a work item): Backstage's guest provider erases the tier distinction in-app entirely (see the gap note above). Grafana's former `Viewer` fallback — the other deviation — has been removed (`role_attribute_strict` now denies unmapped users).
+Both former deviations are closed: Grafana's `Viewer` fallback has been removed (`role_attribute_strict` now denies unmapped users), and Backstage's guest provider has been replaced by gateway-identity sign-in (see the note above; in-app *role* differentiation by tier remains future work).
 
 ## Design intent
 
