@@ -1,0 +1,1 @@
+---8<--- "kubernetes/argocd/README.md"

@@ -157,11 +157,13 @@ nav:
           - Add worker node (M4 Neo): bootstrapping/add-worker-node-m4neo.md
   - Architecture:
       - Infrastructure overview: architecture/infrastructure.md
+      - argocd/: architecture/argocd.md
       - auth/: architecture/auth.md
       - secrets/: architecture/secrets.md
       - network/: architecture/network.md
       - network/ · Cloudflare Tunnel & Access: architecture/cloudflare-tunnel.md
       - observability/: architecture/observability.md
+      - storage/: architecture/storage.md
       - Cluster health monitoring: architecture/cluster-health-monitoring.md
   - Concepts:
       - Documentation Layout: concepts/doc-layout.md
@@ -189,11 +191,11 @@ nav:
           - Cilium update strategy: runbooks/cilium-update-strategy.md
           - Longhorn restore test: runbooks/longhorn-restore-test.md
           - ArgoCD repo-server tuning: runbooks/argocd-repo-server-tuning.md
-      - Environment cleanup:
       - Recovery:
           - Workspace volume recovery: operations/kensan-workspace-volume-recovery.md
           - Syncthing pairing recovery: operations/syncthing-pairing-recovery.md
       - Guides:
+          - OTel integration & troubleshooting: guides/observability-integration.md
           - Raspberry Pi WiFi stabilization: guides/wifi-stabilization.md
   - Architecture Decisions:
       - Overview: adr/index.md
