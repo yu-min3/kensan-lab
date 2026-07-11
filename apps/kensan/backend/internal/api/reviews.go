@@ -24,6 +24,61 @@ type reviewEntry struct {
 
 var weeklyRe = regexp.MustCompile(`^W\d+`)
 
+var (
+	// 正規の reviews/daily/YYYY/MM/DD.html と、過渡期の flat な YYYY-MM-DD.html の両方を拾う
+	dailyDateRe   = regexp.MustCompile(`(\d{4})[-/](\d{2})[-/](\d{2})\.[^.]+$`)
+	weeklyDateRe  = regexp.MustCompile(`(\d{4})/W0*(\d{1,2})\.[^.]+$`)
+	monthlyDateRe = regexp.MustCompile(`(\d{4})/0*(\d{1,2})-monthly\.[^.]+$`)
+)
+
+// reviewDate はレビューの「期間終端」をパス規約から導く。
+// mtime は再生成・rsync で簡単に狂い、月次が日次の列に割り込む並びになるため使わない。
+// daily = その日 / weekly = ISO 週の日曜 / monthly = 月末。導けないものは mtime に fallback。
+func reviewDate(rel string, kind string, mtime time.Time) time.Time {
+	switch kind {
+	case "daily":
+		if m := dailyDateRe.FindStringSubmatch(rel); m != nil {
+			if t, err := time.Parse("2006-01-02", m[1]+"-"+m[2]+"-"+m[3]); err == nil {
+				return t
+			}
+		}
+	case "weekly":
+		if m := weeklyDateRe.FindStringSubmatch(rel); m != nil {
+			year := atoi(m[1])
+			week := atoi(m[2])
+			return isoWeekSunday(year, week)
+		}
+	case "monthly":
+		if m := monthlyDateRe.FindStringSubmatch(rel); m != nil {
+			year := atoi(m[1])
+			month := atoi(m[2])
+			// 翌月 1 日 - 1 日 = 月末
+			return time.Date(year, time.Month(month)+1, 1, 0, 0, 0, 0, time.UTC).AddDate(0, 0, -1)
+		}
+	}
+	return mtime
+}
+
+func atoi(s string) int {
+	n := 0
+	for _, c := range s {
+		n = n*10 + int(c-'0')
+	}
+	return n
+}
+
+// isoWeekSunday は ISO 8601 週番号の週の日曜（期間終端）を返す。
+func isoWeekSunday(year, week int) time.Time {
+	// ISO 週 1 は 1/4 を含む週。その週の月曜を起点に week-1 週 + 6 日進める
+	jan4 := time.Date(year, 1, 4, 0, 0, 0, 0, time.UTC)
+	wd := int(jan4.Weekday())
+	if wd == 0 {
+		wd = 7 // Sunday を 7 に（ISO は月曜始まり）
+	}
+	week1Monday := jan4.AddDate(0, 0, -(wd - 1))
+	return week1Monday.AddDate(0, 0, (week-1)*7+6)
+}
+
 // GET /api/v1/reviews
 func (s *Server) handleReviews(w http.ResponseWriter, _ *http.Request) {
 	root := filepath.Join(s.ws.Root, "reviews")
@@ -67,8 +122,38 @@ func (s *Server) handleReviews(w http.ResponseWriter, _ *http.Request) {
 		out = append(out, reviewEntry{Path: rel, Name: name, Kind: kind, MTime: info.ModTime(), Size: info.Size()})
 		return nil
 	})
-	sort.Slice(out, func(i, j int) bool { return out[i].MTime.After(out[j].MTime) })
+	out = dedupeReviews(out)
+	// 期間終端の新しい順（同日なら daily を上に）。mtime 順だと再生成した月次が
+	// 今週の日次の間に割り込む（実データで 4 月月次が 7/7 と 7/6 の間に出た）
+	sort.SliceStable(out, func(i, j int) bool {
+		di := reviewDate(out[i].Path, out[i].Kind, out[i].MTime)
+		dj := reviewDate(out[j].Path, out[j].Kind, out[j].MTime)
+		if !di.Equal(dj) {
+			return di.After(dj)
+		}
+		return out[i].Path < out[j].Path
+	})
 	writeJSON(w, http.StatusOK, map[string]any{"reviews": out, "total": len(out)})
+}
+
+// dedupeReviews は同じ期間のレビューが .md（過渡期の旧形式）と .html の両方で
+// 存在するとき .html を採用する（W19 が 2 件並ぶ実データの解消）。
+func dedupeReviews(in []reviewEntry) []reviewEntry {
+	stem := func(e reviewEntry) string { return strings.TrimSuffix(e.Path, filepath.Ext(e.Path)) }
+	htmlStems := make(map[string]bool, len(in))
+	for _, e := range in {
+		if strings.HasSuffix(e.Path, ".html") {
+			htmlStems[stem(e)] = true
+		}
+	}
+	out := in[:0]
+	for _, e := range in {
+		if strings.HasSuffix(e.Path, ".md") && htmlStems[stem(e)] {
+			continue
+		}
+		out = append(out, e)
+	}
+	return out
 }
 
 // GET /api/v1/reviews/{path...} — レビューファイルを生のまま配信（iframe 用）。

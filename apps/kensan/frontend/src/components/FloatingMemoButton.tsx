@@ -124,6 +124,7 @@ export function FloatingMemoButton() {
                   <div key={`${i}-${text.slice(0, 12)}`} className="p-3 hover:bg-accent/40 transition-colors group">
                     {editingIndex === i ? (
                       <textarea
+                        name="quick-memo-edit"
                         className="w-full min-h-[60px] resize-none rounded-md border border-border bg-card p-2 text-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                         value={editText}
                         autoFocus
@@ -172,6 +173,9 @@ export function FloatingMemoButton() {
           <div className="border-t border-border p-3 bg-accent/20">
             <textarea
               ref={inputRef}
+              id="quick-memo-input"
+              name="quick-memo-input"
+              aria-label="新しいメモを入力"
               className="w-full min-h-[60px] max-h-[100px] resize-none rounded-md border border-border bg-card p-2 text-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
               value={content}
               onChange={(e) => setContent(e.target.value)}

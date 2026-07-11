@@ -16,7 +16,7 @@ import {
   X,
 } from "lucide-react";
 import clsx from "clsx";
-import { api, ApiError, todayISO, type ProjectSummary, type ProjectDetail, type Task } from "../lib/api";
+import { api, ApiError, todayISO, type Doc, type ProjectSummary, type ProjectDetail, type Task } from "../lib/api";
 import { PageHeader } from "../components/PageHeader";
 import { MilkdownEditor } from "../components/editors/MilkdownEditor";
 import { useAutosaveFile } from "../hooks/useAutosaveFile";
@@ -383,15 +383,7 @@ function ProjectDetailView({ name }: { name: string }) {
         {/* タグ付きノート（notes/ の frontmatter tags に project 名） */}
         <Section title={`タグ付きノート #${name}`}>
           {(taggedNotes.data?.files ?? []).length > 0 ? (
-            <ul className="ds-stack !gap-1">
-              {(taggedNotes.data?.files ?? []).map((doc) => (
-                <li key={doc.path} className="text-sm">
-                  <Link to={`/notes?path=${encodeURIComponent(doc.path)}`} className="text-brand hover:underline">
-                    {doc.meta.title || doc.path.replace(/^notes\//, "").replace(/\.md$/, "")}
-                  </Link>
-                </li>
-              ))}
-            </ul>
+            <NoteLinkList docs={taggedNotes.data?.files ?? []} />
           ) : (
             <p className="text-xs text-muted-foreground">
               ノートの frontmatter <code className="px-1 rounded bg-muted">tags</code> に{" "}
@@ -401,6 +393,36 @@ function ProjectDetailView({ name }: { name: string }) {
         </Section>
       </CardBody>
     </Card>
+  );
+}
+
+// タグ付きノートのリンク一覧。長寿プロジェクトでは 40 件超の「リンクの壁」になるため、
+// 既定は先頭 8 件 + 「すべて表示」で折りたたむ（新しい順が上に来る前提の一覧をそのまま使う）。
+const NOTE_LIST_COLLAPSED = 8;
+function NoteLinkList({ docs }: { docs: Doc[] }) {
+  const [expanded, setExpanded] = useState(false);
+  const visible = expanded ? docs : docs.slice(0, NOTE_LIST_COLLAPSED);
+  return (
+    <>
+      <ul className="ds-stack !gap-1">
+        {visible.map((doc) => (
+          <li key={doc.path} className="text-sm">
+            <Link to={`/notes?path=${encodeURIComponent(doc.path)}`} className="text-brand hover:underline">
+              {doc.meta.title || doc.path.replace(/^notes\//, "").replace(/\.md$/, "")}
+            </Link>
+          </li>
+        ))}
+      </ul>
+      {docs.length > NOTE_LIST_COLLAPSED && (
+        <button
+          className="mt-2 text-xs text-muted-foreground hover:text-foreground"
+          onClick={() => setExpanded(!expanded)}
+          aria-expanded={expanded}
+        >
+          {expanded ? "折りたたむ" : `すべて表示（${docs.length} 件）`}
+        </button>
+      )}
+    </>
   );
 }
 

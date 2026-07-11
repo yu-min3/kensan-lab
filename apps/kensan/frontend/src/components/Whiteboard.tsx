@@ -109,6 +109,8 @@ export function Whiteboard() {
           />
         ) : (
           <textarea
+            id="whiteboard-body"
+            name="whiteboard-body"
             className="w-full min-h-[16rem] resize-y bg-transparent text-sm leading-relaxed focus:outline-none font-sans"
             placeholder="思考の置き場。なんでも書き殴る…"
             value={body ?? ""}

@@ -53,7 +53,7 @@ export function ReviewsPage() {
         title="レビュー"
         sub="週次・日次の振り返り。生成は Claude Code の /weekly-review と /reflection が行う。"
       />
-      <div className="grid grid-cols-[280px_1fr] gap-6 items-start">
+      <div className="grid grid-cols-1 md:grid-cols-[280px_1fr] gap-6 items-start">
         <Card>
           <CardBody className="!p-2">
             {reviews.isPending ? (
