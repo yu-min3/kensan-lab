@@ -24,6 +24,14 @@ spec:
             paths:
               - /oauth2
               - /oauth2/*
+    # PWA manifest / favicon は無条件で通す（CUSTOM 側の notPaths とセット。
+    # 除外理由はそちらのコメント参照。JWT が無い request は claims rule を
+    # 満たせないため、この明示 rule が無いと deny になる）
+    - to:
+        - operation:
+            paths:
+              - /manifest.webmanifest
+              - /favicon.svg
     # protected host は platform-admin group 必須
     - to:
         - operation:

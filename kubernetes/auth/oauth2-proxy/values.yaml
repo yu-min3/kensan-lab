@@ -74,7 +74,12 @@ config:
     # 12h のままだと refresh が失敗し cookie_expire に関わらず再ログインに飛ぶ。
     # cookie_refresh は短く保ち、refresh token で access token をサイレント更新し続ける。
     cookie_expire                  = "720h"
-    cookie_refresh                 = "20m"
+    # ⚠️ cookie_refresh は Keycloak の Access Token Lifespan（realm 既定 5m）より
+    # 必ず短くする。20m にしていた間、session 開始 5〜20 分の窓で失効済み id_token を
+    # Bearer として転送し続け、RequestAuthentication が全 request を
+    # 401 "Jwt is expired" で落としていた（kensan app が数分で全面エラーになる実バグ）。
+    # 4m = 5m lifespan - 1m マージン。Lifespan を変えるときはここも連動させること。
+    cookie_refresh                 = "4m"
 
     whitelist_domains              = [".platform.yu-min3.com", ".app.yu-min3.com", ".yu-mins.com"]
 
