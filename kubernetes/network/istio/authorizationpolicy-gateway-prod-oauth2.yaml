@@ -32,3 +32,9 @@ spec:
             notPaths:
               - /oauth2
               - /oauth2/*
+              # PWA manifest / favicon は認証なしで配信する（app 名とアイコンのみで秘匿性なし）。
+              # ブラウザの manifest fetch は Keycloak への cross-origin redirect を CORS で
+              # ブロックするため、ext_authz に通すと manifest が一切取得できない。
+              # ALLOW 側（gateway-prod-allow）にも同じ paths の素通し rule が必要（セット運用）。
+              - /manifest.webmanifest
+              - /favicon.svg
