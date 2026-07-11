@@ -20,6 +20,7 @@ import { Card, CardHead, CardBody } from "./ui/card";
 import { Badge } from "./ui/badge";
 import { Button } from "./ui/button";
 import { Empty, ErrorState, SkeletonRows } from "./ui/states";
+import { useToast } from "./ui/toast";
 
 // 今日やる（@today / @due≤今日 + todo.md ## Now）⇄ ストック（project の未完了タスク）。
 // レーン間移動は @today タグの付け外し。ストックは @p(N) 優先度で縦に並び、ドラッグで並べ替え。
@@ -57,16 +58,37 @@ export function TaskBoard({ lanes = "split" }: { lanes?: "split" | "stack" } = {
     onSettled: settled,
   });
   const archive = useMutation({ mutationFn: (t: Task) => api.archiveToDaily(t), onSettled: settled });
-  const del = useMutation({
-    mutationFn: (t: Task) => api.deleteTask(t),
-    onError: onErr,
-    onSuccess: () => setDialog(null),
-    onSettled: settled,
-  });
   const save = useMutation({
     mutationFn: (input: TaskSaveInput) => api.saveTask(input),
     onError: onErr,
     onSuccess: () => setDialog(null),
+    onSettled: settled,
+  });
+  // 削除は確認ダイアログでなく Toast + Undo（patterns.md 04/05: 取り消し可能な操作）。
+  // 元に戻すは saveTask による再作成なので、行位置と @p(N) は復元されない（内容は完全復元）。
+  const toast = useToast();
+  const del = useMutation({
+    mutationFn: (t: Task) => api.deleteTask(t),
+    onError: onErr,
+    onSuccess: (_data, t) => {
+      setDialog(null);
+      toast({
+        title: "タスクを削除しました",
+        desc: t.display,
+        durationMs: 8000,
+        action: {
+          label: "元に戻す",
+          onClick: () =>
+            save.mutate({
+              project: t.project ?? "",
+              display: t.display,
+              today: t.today,
+              due: t.due ?? "",
+              milestone: t.milestone ?? "",
+            }),
+        },
+      });
+    },
     onSettled: settled,
   });
   const setPriority = useMutation({
@@ -149,7 +171,18 @@ export function TaskBoard({ lanes = "split" }: { lanes?: "split" | "stack" } = {
   const onDelete = (t: Task) => del.mutate(t);
   const deleteFromDialog = () => {
     const i = dialog?.initial;
-    if (i?.file && i.line) del.mutate({ file: i.file, line: i.line, text: i.text ?? "" } as Task);
+    if (!i?.file || !i.line) return;
+    // Undo（saveTask 再作成）に使うため、locator 以外のフィールドも引き継ぐ
+    del.mutate({
+      file: i.file,
+      line: i.line,
+      text: i.text ?? "",
+      display: i.display,
+      project: i.project || undefined,
+      today: i.today,
+      due: i.due || undefined,
+      milestone: i.milestone || undefined,
+    } as Task);
   };
 
   return (
@@ -309,7 +342,11 @@ function TodayLane({
                 />
                 <TaskName task={t} onOpen={onOpen} className={t.state === "skipped" ? "line-through text-muted-foreground" : undefined} />
                 <Badges task={t} />
-                {t.project && (
+                {/* ストックへ戻す = @today タグ外し。@due≤今日 由来のタスクは @today を
+                    外しても today 判定のままで「戻したのに復活する」ように見えるので出さない
+                    （kensan 今日やる復活問題 調査レポートの方針 A）。期限を動かしたい場合は
+                    本文クリック → 編集ダイアログで期限を変更・削除する */}
+                {t.project && t.today && !(t.due && t.due <= todayISO()) && (
                   <button
                     className="text-xs text-muted-foreground hover:text-foreground opacity-0 group-hover:opacity-100 transition-opacity"
                     disabled={busy}

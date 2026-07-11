@@ -52,7 +52,7 @@ export function LifeGoalsPage() {
         }
       />
 
-      <div className={clsx("grid gap-6 items-start", showHistory ? "grid-cols-[1fr_340px]" : "grid-cols-1")}>
+      <div className={clsx("grid gap-6 items-start", showHistory ? "grid-cols-1 lg:grid-cols-[1fr_340px]" : "grid-cols-1")}>
         <Card className="min-h-[60vh]">
           {file.conflict ? (
             <CardBody>

@@ -109,3 +109,64 @@ func TestReviewsSymlinkSafety(t *testing.T) {
 		t.Errorf("symlink escape served content: %q", body)
 	}
 }
+
+// 一覧の並びは mtime でなく期間終端（reviewDate）の新しい順で、md/html 重複は html を採用する。
+func TestReviewsOrderAndDedupe(t *testing.T) {
+	ts, root := newTestServer(t)
+	write := func(rel, content string) {
+		abs := filepath.Join(root, rel)
+		if err := os.MkdirAll(filepath.Dir(abs), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(abs, []byte(content), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	// mtime は書き込み順（= 全部ほぼ同時刻）なので、並びが規約由来であることを検証できる
+	write("reviews/2026/04-monthly.md", "月次4月")            // 期間終端 2026-04-30
+	write("reviews/daily/2026/07/07.html", "<html>7/7</html>") // 2026-07-07
+	write("reviews/daily/2026/07/06.html", "<html>7/6</html>") // 2026-07-06
+	write("reviews/2026/W27.html", "<html>W27</html>")         // ISO W27 の日曜 = 2026-07-05
+	write("reviews/2026/W19.html", "<html>W19</html>")         // html/md 重複 → html 採用
+	write("reviews/2026/W19.md", "W19 旧形式")
+
+	var list struct {
+		Reviews []struct {
+			Path string `json:"path"`
+		} `json:"reviews"`
+		Total int `json:"total"`
+	}
+	if code := getJSON(t, ts.URL+"/api/v1/reviews", &list); code != 200 {
+		t.Fatalf("reviews list: %d", code)
+	}
+	got := make([]string, 0, len(list.Reviews))
+	for _, r := range list.Reviews {
+		got = append(got, r.Path)
+	}
+	want := []string{
+		"reviews/daily/2026/07/07.html",
+		"reviews/daily/2026/07/06.html",
+		"reviews/2026/W27.html",
+		"reviews/2026/W19.html",
+		"reviews/2026/04-monthly.md",
+	}
+	if len(got) != len(want) {
+		t.Fatalf("want %d entries (W19.md deduped), got %d: %v", len(want), len(got), got)
+	}
+	for i := range want {
+		if got[i] != want[i] {
+			t.Fatalf("order mismatch at %d: want %v, got %v", i, want, got)
+		}
+	}
+}
+
+func TestIsoWeekSunday(t *testing.T) {
+	// 2026-07-05 は ISO 2026-W27 の日曜（07-06(月) が W28 開始）
+	if d := isoWeekSunday(2026, 27); d.Format("2006-01-02") != "2026-07-05" {
+		t.Errorf("W27 sunday: got %s", d.Format("2006-01-02"))
+	}
+	// 2026-W1 の日曜 = 2026-01-04（1/4 を含む週が W1）
+	if d := isoWeekSunday(2026, 1); d.Format("2006-01-02") != "2026-01-04" {
+		t.Errorf("W1 sunday: got %s", d.Format("2006-01-02"))
+	}
+}

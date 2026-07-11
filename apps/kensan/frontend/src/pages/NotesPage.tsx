@@ -48,7 +48,7 @@ export function NotesPage() {
         title="ノート"
         sub="技術ノート・読書記録の閲覧と全文検索。編集は Claude Code / VSCode で。"
       />
-      <div className="grid grid-cols-[320px_1fr] gap-6 items-start">
+      <div className="grid grid-cols-1 md:grid-cols-[320px_1fr] gap-6 items-start">
         <div className="ds-section">
           <Card>
             <CardBody className="ds-stack">
