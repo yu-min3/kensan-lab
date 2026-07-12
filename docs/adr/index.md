@@ -27,9 +27,10 @@ Each ADR follows a lightweight structure:
 | 010 | [Istio Native OAuth2 (Absent)](010-istio-native-oauth2-absent.md) | Accepted |
 | 011 | [Vault Image Tag Explicit Pin](011-vault-version-pinning.md) | Accepted |
 | 012 | [Policy Enforcement with Kyverno](012-policy-enforcement-kyverno.md) | Accepted |
-| 013 | [Keycloak DB Credentials → Vault Dynamic](013-keycloak-db-credentials-vault-dynamic.md) | Accepted |
+| 013 | [Keycloak DB Credentials → Vault Dynamic](013-keycloak-db-credentials-vault-dynamic.md) | Superseded by 019 |
 | 014 | [Namespace Naming & Label Contract v2](014-namespace-naming-label-contract-v2.md) | Accepted |
 | 015 | [VCO + Setup-Script Hybrid](015-vco-setup-script-hybrid.md) | Accepted |
 | 016 | [LAN-Frictionless Sessions + External-Gate Model](016-lan-frictionless-cf-access-external-gate.md) | Accepted in part (gate deferred) |
 | 017 | [Remove kensan-legacy (tag archive)](017-kensan-legacy-removal.md) | Accepted |
 | 018 | [Backstage manifests placement](018-backstage-manifests-placement.md) | Accepted |
+| 019 | [Keycloak DB Credentials → Revert to Vault Static](019-keycloak-db-credentials-revert-to-static.md) | Accepted |

@@ -2,7 +2,8 @@
 
 ## Status
 
-Accepted — **Supersedes [ADR-008](008-keycloak-db-credentials.md)**
+**Superseded by [ADR-019](019-keycloak-db-credentials-revert-to-static.md)** (2026-07-02 revert to
+Vault static) — was: Accepted, supersedes [ADR-008](008-keycloak-db-credentials.md)
 
 > **Note on timing**: This ADR is a *retroactive record*. The migration itself was implemented at Stage 5c
 > (`keycloak-postgres-cred`, defined by the VDBE instance

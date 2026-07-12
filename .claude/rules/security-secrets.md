@@ -56,10 +56,10 @@ metadata:
 ## GHCR Pull Secrets
 
 - `ghcr-pull-secret`（`.dockerconfigjson`）は Vault static (ESO) で配布。Vault path: `secret/ghcr/pull-token`
-- 各 app ns（`app-prod`、`backstage`、`kensan`、`app-kensan`）が `ExternalSecret` で受け取り、ServiceAccount が `imagePullSecrets: [ghcr-pull-secret]` で参照（`app-kensan` は app-base chart の `externalsecret-ghcr.yaml` 経由）
+- 各 app ns（`backstage`、`app-kensan`）が `ExternalSecret` で受け取り、ServiceAccount が `imagePullSecrets: [ghcr-pull-secret]` で参照（`app-kensan` は app-base chart の `externalsecret-ghcr.yaml` 経由。旧 `kensan` / `app-prod` ns は 2026-07 撤去済み）
 
 ## Keycloak Authentication
 
 - OIDC IdP: `auth.platform.yu-min3.com`（`platform-auth-prod` ns）
 - Gateway-level 認可: Istio Gateway + oauth2-proxy を ext_authz として使う（`auth-system` ns、ADR-010）
-- Postgres backing store の cred は Vault dynamic（[ADR-008](../../docs/adr/008-keycloak-db-credentials.md)）
+- Postgres backing store の cred は Vault static (ESO の `keycloak-secret`)。dynamic 化は実施→revert 済み（[ADR-019](../../docs/adr/019-keycloak-db-credentials-revert-to-static.md)。経緯: ADR-008 → 013 → 019）

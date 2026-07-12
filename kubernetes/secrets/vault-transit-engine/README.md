@@ -20,8 +20,8 @@ kubernetes/secrets/vault-transit-engine/
 ├── shared/                                  # capability bootstrap (1 度だけ)
 │   └── mount.yaml                           # SecretEngineMount (transit/)
 ├── platform-values/
-│   └── vault-transit/                       # capability convention dir
-│       └── kensan-users.yaml                # 1 consumer ぶん、AD が触る
+│   └── vault-transit/                       # capability convention dir — consumer 1 つにつき 1 ファイル
+│       └── (現在 consumer なし)              # 例: kensan-users.yaml (kensan-legacy 撤去 #404 で削除)
 └── bootstrap/
     └── setup-transit-keys.sh                # 1 度きり: transit/keys/<name> 作成 (VCO 未対応)
 ```
