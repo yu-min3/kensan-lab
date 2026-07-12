@@ -99,11 +99,17 @@ catalog:
       rules:
         - allow: [Group, User]
 
-    # App-owned descriptors (Golden Path): fetched from GitHub
-    - type: url
-      target: https://github.com/yu-min3/kensan-lab/blob/main/apps/kensan/catalog-info.yaml
-      rules:
-        - allow: [Component, API]
+  providers:
+    github:
+      kensanLabApps:
+        organization: yu-min3
+        catalogPath: /apps/*/catalog-info.yaml
+        filters:
+          branch: main
+          repository: ^kensan-lab$
+        schedule:
+          frequency: { minutes: 30 }
+          timeout: { minutes: 3 }
 
 kubernetes:
   # see https://backstage.io/docs/features/kubernetes/configuration for kubernetes configuration options
