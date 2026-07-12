@@ -1,6 +1,7 @@
 # kensan-workspace（生活データ SSoT）専用 StorageClass。
-# default の longhorn SC は numberOfReplicas=1 / reclaim Delete で、
-# 日記・ノートの SSoT には不足（PV 喪失の教訓: local-path reclaim=Delete 事故）。
+# default の longhorn SC は numberOfReplicas=1（reclaim は Retain に統一済み）で、
+# 単一 replica はノード喪失に耐えないため日記・ノートの SSoT には不足
+#（PV 喪失の教訓: local-path reclaim=Delete 事故）。
 #
 # - replica 2: m4neo (NVMe) + Pi worker のクロスノード複製。m4neo 凍結歴 2 回への備え
 # - Retain: PVC を誤削除しても PV/データは残る

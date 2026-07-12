@@ -19,13 +19,19 @@ A bare-metal Kubernetes homelab built with technologies typical of enterprise pl
   <figcaption>How traffic flows through the platform and how components interact</figcaption>
 </figure>
 
-- **Gateway** — Cloudflare Tunnel (internet) and Cilium L2 LB (LAN) route traffic through Istio Gateway via Gateway API; oauth2-proxy enforces OIDC at the Gateway via ext_authz
-- **Applications** — workloads deployed to `app-{name}` namespaces (ADR-006) via Argo CD
-- **Internal Developer Platform** — Backstage provides service catalog, TechDocs, and Golden Path scaffolding
-- **Observability** — apps emit telemetry to OTel Collector → Prometheus / Loki / Tempo, visualized in Grafana
-- **Secrets** — Vault + External Secrets Operator for dynamic / static creds, Sealed Secrets for Vault-independent bootstrap, Reloader for rollout on rotation
-- **Security** — Cilium + Istio NetworkPolicy, cert-manager (Let's Encrypt), Pod Security Standards
-- **GitOps** — Argo CD splits into `platform-project` (infra) and `app-project` (applications)
+Each domain has an architecture page — design thesis, component map, diagrams, and the rationale behind the choices:
+
+| Domain | One-liner |
+|---|---|
+| [Argo CD](architecture/argocd.md) | One root App-of-Apps, Git as the only actor; ApplicationSet only where structure is uniform |
+| [Network](architecture/network.md) · [Cloudflare Tunnel](architecture/cloudflare-tunnel.md) | Cilium CNI + L2 LB, Istio mesh, Gateway API edge; Zero Trust internet exposure |
+| [Auth](architecture/auth.md) | Keycloak OIDC, enforced once at the Gateway (oauth2-proxy ext_authz) |
+| [Secrets](architecture/secrets.md) | Vault at the core, four delivery methods, SealedSecret bootstrap lane |
+| [Observability](architecture/observability.md) | Three pillars through one OTel pipe; the monitoring is itself monitored |
+| [Storage](architecture/storage.md) | Longhorn only; Retain + Prune=false + off-cluster R2 backups |
+| [Backstage](architecture/backstage.md) | IDP front door — golden path templates, catalog, TechDocs |
+
+Cross-cutting overviews: [Infrastructure](architecture/infrastructure.md) and [Cluster health monitoring](architecture/cluster-health-monitoring.md).
 
 ## How to use this site
 

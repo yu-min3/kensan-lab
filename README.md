@@ -10,11 +10,15 @@
 
 **Enterprise-grade Kubernetes on bare-metal — a reference architecture for platform engineering.**
 
-[![Kubernetes](https://img.shields.io/badge/Kubernetes-v1.32-326CE5?style=flat-square&logo=kubernetes&logoColor=white)](https://kubernetes.io/)
-[![Argo CD](https://img.shields.io/badge/Argo_CD-v2.14-EF7B4D?style=flat-square&logo=argo&logoColor=white)](https://argoproj.github.io/cd/)
+[![Kubernetes](https://img.shields.io/badge/Kubernetes-v1.33-326CE5?style=flat-square&logo=kubernetes&logoColor=white)](https://kubernetes.io/)
+[![Argo CD](https://img.shields.io/badge/Argo_CD-v3.2-EF7B4D?style=flat-square&logo=argo&logoColor=white)](https://argoproj.github.io/cd/)
 [![Istio](https://img.shields.io/badge/Istio-v1.27-466BB0?style=flat-square&logo=istio&logoColor=white)](https://istio.io/)
 [![Cilium](https://img.shields.io/badge/Cilium-v1.18-F8C517?style=flat-square&logo=cilium&logoColor=black)](https://cilium.io/)
 [![License](https://img.shields.io/badge/License-Apache_2.0-blue?style=flat-square)](./LICENSE)
+
+[![Manifest CI](https://github.com/yu-min3/kensan-lab/actions/workflows/manifest-ci.yml/badge.svg)](https://github.com/yu-min3/kensan-lab/actions/workflows/manifest-ci.yml)
+[![App CI](https://github.com/yu-min3/kensan-lab/actions/workflows/app-ci.yml/badge.svg)](https://github.com/yu-min3/kensan-lab/actions/workflows/app-ci.yml)
+[![Docs](https://github.com/yu-min3/kensan-lab/actions/workflows/docs.yml/badge.svg)](https://github.com/yu-min3/kensan-lab/actions/workflows/docs.yml)
 
 </div>
 
@@ -76,7 +80,7 @@ The platform uses Cilium LoadBalancer with L2 announcements for local network ac
 |  <img src="docs/assets/logos/cert-manager.svg" width="32">  | [cert-manager](https://cert-manager.io/)                                                            | Automated TLS certificates (Let's Encrypt)                                  |
 | <img src="docs/assets/logos/sealed-secrets.png" width="32"> | [Sealed Secrets](https://sealed-secrets.netlify.app/)                                               | Bootstrap-only secrets, encrypted in Git (Vault-independent)                |
 |   <img src="docs/assets/logos/cloudflare.svg" width="32">   | [Cloudflare Tunnel](https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/) | Zero Trust internet exposure                                                |
-|                                                             | [Kyverno](https://kyverno.io/)                                                                      | Policy engine — admission control, per-workload Pod Security exceptions     |
+|    <img src="docs/assets/logos/kyverno.svg" width="32">     | [Kyverno](https://kyverno.io/)                                                                      | Policy engine — admission control, per-workload Pod Security exceptions     |
 
 ## Hardware
 
@@ -127,7 +131,8 @@ docs/                             # ADRs, architecture, guides (MkDocs site)
 | ------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **Docs site**       | **[https://yu-min3.github.io/kensan-lab/](https://yu-min3.github.io/kensan-lab/)** — full documentation site |
 | **Getting Started** | [Installation](./docs/getting-started/installation.md) / [Configuration](./docs/getting-started/configuration.md) / [Bootstrapping](./docs/bootstrapping/index.md) _(in progress)_ / [Secret Management](./docs/secret-management/index.md) |
-| **Architecture**    | [Namespace Labels](./docs/concepts/namespace-label-design.md) / [ADRs](./docs/adr/)                                                                        |
+| **Architecture (per domain)** | [Argo CD](./kubernetes/argocd/README.md) / [Network](./kubernetes/network/README.md) / [Auth](./kubernetes/auth/README.md) / [Secrets](./kubernetes/secrets/README.md) / [Storage](./kubernetes/storage/README.md) / [Observability](./kubernetes/observability/README.md) / [Backstage](./kubernetes/backstage/README.md) — design thesis, diagrams, and rationale for each domain |
+| **Concepts & Decisions** | [Namespace Labels](./docs/concepts/namespace-label-design.md) / [Network Policy](./docs/concepts/network-policy-guide.md) / [Policy Enforcement](./docs/concepts/policy-enforcement.md) / [ADRs](./docs/adr/) |
 
 ## Application: kensan
 
