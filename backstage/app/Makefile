@@ -52,7 +52,7 @@ help:
 	@echo "  make clean         - Remove local Docker image"
 	@echo ""
 	@echo "GitOps Deployment (for kensan-lab):"
-	@echo "  make update-image  - Build, push, and update manifests/backstage-deployment.yaml"
+	@echo "  make update-image  - Build, push, and update kubernetes/backstage/backstage-deployment.yaml"
 	@echo "  make commit-deploy - Commit the manifest change (run inside a worktree)"
 	@echo "  make preview       - Show current image in the manifest"
 	@echo "  (deploy 手順: worktree を切る → update-image → commit-deploy → gh pr create)"
@@ -162,8 +162,8 @@ clean:
 #==============================================================================
 
 ## Flat manifest 運用 (kustomize overlays は retired)。image tag は
-## ../manifests/backstage-deployment.yaml を直接書き換える。
-MANIFEST := ../manifests/backstage-deployment.yaml
+## kubernetes/backstage/backstage-deployment.yaml を直接書き換える (ADR-018 で移設)。
+MANIFEST := ../../kubernetes/backstage/backstage-deployment.yaml
 
 .PHONY: update-image
 update-image: build push
@@ -194,8 +194,8 @@ deploy:
 .PHONY: commit-deploy
 commit-deploy:
 	@echo "Committing manifest change..."
-	cd .. && git add manifests/backstage-deployment.yaml
-	cd .. && git commit -m "Deploy Backstage $(TAG)"
+	cd ../.. && git add kubernetes/backstage/backstage-deployment.yaml
+	cd ../.. && git commit -m "Deploy Backstage $(TAG)"
 	## fresh worktree branch には upstream が無いため -u + HEAD で明示 push
 	cd .. && git push -u origin HEAD
 	@echo "✅ Committed and pushed"

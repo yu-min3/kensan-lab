@@ -10,7 +10,7 @@ make install   # install dependencies (bundled Yarn 4)
 make dev       # local dev server on :7007
 make build     # build container image
 make push      # build + push to GHCR
-make all TAG=v0.0.7   # build + push + bump kustomization.yaml
+make update-image TAG=v0.0.7   # build + push + bump kubernetes/backstage/backstage-deployment.yaml
 ```
 
 `make` is the single entry point for build/deploy. The full target list, container runtime switch, and required env vars are documented in `make help`.
@@ -49,7 +49,7 @@ READ_GHCR_PAT=ghp_xxx    # read — runtime GITHUB_TOKEN (make dev/run) & image 
 
 ## Deployment
 
-GitOps via Argo CD — `make all TAG=v0.0.7` builds, pushes to GHCR, and updates `kubernetes/backstage/overlays/prod/kustomization.yaml`. Commit + push the kustomization change to trigger sync.
+GitOps via Argo CD — `make update-image TAG=v0.0.7` builds, pushes to GHCR, and updates the image tag in `kubernetes/backstage/backstage-deployment.yaml` (flat manifests, ADR-018). Commit + push the manifest change (from a worktree, `make commit-deploy TAG=...`) to trigger sync.
 
 Manual `kubectl apply` is **not** recommended — auto-sync + self-heal will revert manual changes. To pause for emergencies: `argocd app set backstage --sync-policy none`.
 

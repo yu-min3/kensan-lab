@@ -21,12 +21,12 @@
 
 | トピック | SoT | サマリ参照先 |
 |---|---|---|
-| Secret management (4 方式) | `docs/secret-management/index.md` | `.claude/rules/security-secrets.md`、`kubernetes/secrets/README.md` |
+| ドメイン別アーキテクチャ (argocd / auth / network / secrets / storage / observability / backstage) | `kubernetes/<cat>/README.md`（**Model A**: `docs/architecture/<cat>.md` はその transclude。storage は R2 backup・RecurringJob・SC 含む） | `.claude/rules/` の対応トピック |
+| Secret management (4 方式のマトリクス・inventory・運用手順) | `docs/secret-management/index.md`（アーキテクチャ・設計判断は `kubernetes/secrets/README.md` 側 — 役割分担） | `.claude/rules/security-secrets.md` |
+| Backstage Golden Path (AD 向け手順) | `docs/guides/backstage-golden-path.md` | `kubernetes/backstage/README.md`、`.claude/rules/environment-separation.md` |
 | Namespace naming | `docs/adr/006-namespace-naming.md` (why) + `.claude/rules/environment-separation.md` (how) | `kubernetes/namespaces/README.md` |
 | Helm multi-source 配置規約 | `kubernetes/README.md` (Pattern A/B) | `.claude/rules/helm-multisource.md` |
 | GitOps workflow | `.claude/rules/gitops-workflow.md` | `CLAUDE.md` Mandatory Constraints |
-| Network ingress (Cloudflare Tunnel + Cilium L2 + Istio Gateway) | `kubernetes/network/README.md`（`docs/architecture/network.md` はその transclude） | `.claude/rules/network-ingress.md` |
-| Storage (Longhorn) | `kubernetes/storage/README.md`（R2 backup・RecurringJob・SC 含む。`docs/architecture/storage.md` はその transclude） | `.claude/rules/kubernetes-cluster.md` |
 | Cluster topology (node, label, scheduling) | `.claude/rules/kubernetes-cluster.md` | `kubernetes/README.md` |
 | Tech stack | Top `README.md` | `docs/index.md` |
 
