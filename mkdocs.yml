@@ -218,6 +218,7 @@ nav:
       - 016 — LAN-Frictionless + External-Gate Model: adr/016-lan-frictionless-cf-access-external-gate.md
       - 017 — Remove kensan-legacy (tag archive): adr/017-kensan-legacy-removal.md
       - 018 — Backstage Manifests Placement: adr/018-backstage-manifests-placement.md
+      - 019 — Keycloak DB Credentials → Revert to Static: adr/019-keycloak-db-credentials-revert-to-static.md
   - Incidents:
       - incidents/index.md
       - 2026-03-02 system-infra Sync Blocked: incidents/2026-03-02-system-infra-sync-blocked.md

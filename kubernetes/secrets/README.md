@@ -41,7 +41,7 @@ flowchart LR
     TR -->|"API call per encrypt/decrypt<br/>(key never leaves Vault)"| APP["app Pod (SA auth)"]
 
     GIT["Git (SealedSecret YAML)"] --> SSC["sealed-secrets controller"]
-    SSC -->|K8s Secret| BOOT["bootstrap layer:<br/>Vault KMS cred / cert-manager DNS-01<br/>Cilium PKI / Longhorn R2"]
+    SSC -->|K8s Secret| BOOT["bootstrap layer:<br/>Vault KMS cred / cert-manager DNS-01<br/>Longhorn R2"]
 
     classDef default fill:#26221D,stroke:#4A4232,color:#FCFAF6
     classDef vault fill:#075985,stroke:#38BDF8,color:#FCFAF6
@@ -57,25 +57,27 @@ flowchart LR
 | **Vault dynamic** (Database engine) | Postgres app creds where a restart / credential reload is acceptable | TTL 24h, generated per lease |
 | **Vault static** (KV via ESO) | API keys, admin passwords, tokens — low churn but rotatable | write new value to Vault → delivered within 1h |
 | **Vault Transit** | PII columns in app DBs (envelope encryption; only ciphertext touches the DB) | manual key rotate + rewrap |
-| **SealedSecret** | Anything below Vault's dependency line — Vault's own KMS unseal cred, cert-manager DNS-01 IAM, Cilium internal PKI, Longhorn R2 token | manual, low frequency |
+| **SealedSecret** | Anything below Vault's dependency line — Vault's own KMS unseal cred, cert-manager DNS-01 IAM, Longhorn R2 token | manual, low frequency |
+
+> **Current inventory (2026-07):** the dynamic and Transit rails are deployed and were battle-tested by the previous kensan application, but their last consumers left with the kensan-legacy retirement ([ADR-017](https://github.com/yu-min3/kensan-lab/blob/main/docs/adr/017-kensan-legacy-removal.md)) and the Keycloak revert ([ADR-019](https://github.com/yu-min3/kensan-lab/blob/main/docs/adr/019-keycloak-db-credentials-revert-to-static.md)) — **zero active instances today**; every live secret rides Vault static (ESO) or SealedSecret. Adding a consumer back is one `platform-values/` file ([engine README](https://github.com/yu-min3/kensan-lab/blob/main/kubernetes/secrets/vault-database-engine/README.md)).
 
 ## Design rationale
 
 **Three principles thread the whole design:**
 
-1. **Right-size, don't centralize.** Moving a secret to Vault dynamic buys blast-radius reduction but costs a restart on every rotation — so IdP / catalog metastores / long-lived services (Keycloak, Backstage, Polaris) deliberately stay on Vault static. The same restraint applies to certificates: Vault PKI is intentionally not enabled while cert-manager + Let's Encrypt already finish the job ([ADR-007](https://github.com/yu-min3/kensan-lab/blob/main/docs/adr/007-no-vault-pki.md)).
+1. **Right-size, don't centralize.** Moving a secret to Vault dynamic buys blast-radius reduction but costs a restart on every rotation — so IdPs and long-lived schema-owning services (Keycloak, Backstage) deliberately stay on Vault static. The same restraint applies to certificates: Vault PKI is intentionally not enabled while cert-manager + Let's Encrypt already finish the job ([ADR-007](https://github.com/yu-min3/kensan-lab/blob/main/docs/adr/007-no-vault-pki.md)).
 2. **Declarative by default, scripts as a bounded exception.** Vault mounts, policies, and auth roles are Vault Config Operator CRs living in Git — GitOps all the way into Vault, no `terraform apply`, no state file full of secrets. Only two operations stay script-managed (Transit key creation, OIDC config full-write), and that exception list is exhaustive by contract ([ADR-015](https://github.com/yu-min3/kensan-lab/blob/main/docs/adr/015-vco-setup-script-hybrid.md)).
-3. **The bootstrap layer must not depend on Vault.** Whatever Vault needs to start (KMS auto-unseal cred), and whatever the cluster needs before Vault is healthy (CNI PKI, cert issuance), is sealed into Git and decrypted in-cluster — breaking the circular dependency by construction.
+3. **The bootstrap layer must not depend on Vault.** Whatever Vault needs to start (KMS auto-unseal cred), and whatever must exist before Vault is healthy (cert-manager's DNS-01 credential, Longhorn's backup target), is sealed into Git and decrypted in-cluster — breaking the circular dependency by construction. (Cilium's internal PKI, once on this list, moved to a cert-manager `Certificate` with auto-renewal.)
 
 Concrete choices:
 
 - **Rotation is closed end-to-end.** ESO refreshes the K8s Secret; Reloader sees the change and rolls the workload. A rotation in Vault reaches running pods with no human in the loop.
-- **Keycloak DB credentials are the stress test.** First kept static (restart breaks SSO sessions — [ADR-008](https://github.com/yu-min3/kensan-lab/blob/main/docs/adr/008-keycloak-db-credentials.md)), later moved to Vault dynamic with explicit cascade-risk mitigations ([ADR-013](https://github.com/yu-min3/kensan-lab/blob/main/docs/adr/013-keycloak-db-credentials-vault-dynamic.md)) — a worked example of the "right-size" principle being re-evaluated as constraints change.
+- **Keycloak DB credentials are the stress test.** First kept static (restart breaks SSO sessions — [ADR-008](https://github.com/yu-min3/kensan-lab/blob/main/docs/adr/008-keycloak-db-credentials.md)), then moved to Vault dynamic with explicit cascade-risk mitigations ([ADR-013](https://github.com/yu-min3/kensan-lab/blob/main/docs/adr/013-keycloak-db-credentials-vault-dynamic.md)), then reverted to static after operating it confirmed ADR-008's prediction — rotation restarts kept breaking SSO sessions ([ADR-019](https://github.com/yu-min3/kensan-lab/blob/main/docs/adr/019-keycloak-db-credentials-revert-to-static.md)). A worked example of the "right-size" principle being re-evaluated twice as operational evidence accumulated.
 - **Transit keeps keys out of pods and DBs.** Apps authenticate with their ServiceAccount and call encrypt/decrypt; the key material never leaves Vault, so a DB dump or pod compromise yields only ciphertext.
 - **Vault's image tag is explicitly pinned** — an upgrade of the secret core should never ride in on a chart bump unnoticed ([ADR-011](https://github.com/yu-min3/kensan-lab/blob/main/docs/adr/011-vault-version-pinning.md)).
 
 ## Related
 
 - Full decision matrix, secret inventory, and operations (seal / rotate / debug): [`docs/secret-management/index.md`](https://github.com/yu-min3/kensan-lab/blob/main/docs/secret-management/index.md)
-- ADRs: [007 No Vault PKI](https://github.com/yu-min3/kensan-lab/blob/main/docs/adr/007-no-vault-pki.md) / [008 Keycloak DB credentials](https://github.com/yu-min3/kensan-lab/blob/main/docs/adr/008-keycloak-db-credentials.md) / [011 Vault version pinning](https://github.com/yu-min3/kensan-lab/blob/main/docs/adr/011-vault-version-pinning.md) / [013 Keycloak → Vault dynamic](https://github.com/yu-min3/kensan-lab/blob/main/docs/adr/013-keycloak-db-credentials-vault-dynamic.md) / [015 VCO + setup-script hybrid](https://github.com/yu-min3/kensan-lab/blob/main/docs/adr/015-vco-setup-script-hybrid.md)
+- ADRs: [007 No Vault PKI](https://github.com/yu-min3/kensan-lab/blob/main/docs/adr/007-no-vault-pki.md) / [008 Keycloak DB credentials](https://github.com/yu-min3/kensan-lab/blob/main/docs/adr/008-keycloak-db-credentials.md) / [011 Vault version pinning](https://github.com/yu-min3/kensan-lab/blob/main/docs/adr/011-vault-version-pinning.md) / [013 Keycloak → Vault dynamic](https://github.com/yu-min3/kensan-lab/blob/main/docs/adr/013-keycloak-db-credentials-vault-dynamic.md) / [019 Keycloak → revert to static](https://github.com/yu-min3/kensan-lab/blob/main/docs/adr/019-keycloak-db-credentials-revert-to-static.md) / [015 VCO + setup-script hybrid](https://github.com/yu-min3/kensan-lab/blob/main/docs/adr/015-vco-setup-script-hybrid.md)
 - AI operational rules (seal workflow, file safety): [`.claude/rules/security-secrets.md`](https://github.com/yu-min3/kensan-lab/blob/main/.claude/rules/security-secrets.md)
