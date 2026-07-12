@@ -51,4 +51,4 @@ Day-2 development never re-enters the platform repo: push code → CI builds a m
 
 ## Current state and target model
 
-The template currently deploys into the shared `app-prod` landing zone. The target model is one namespace per app (`app-<name>`, [ADR-006](../adr/006-namespace-naming.md) / [ADR-014](../adr/014-namespace-naming-label-contract-v2.md)) with the namespace and HTTPRoute owned by the app side; `app-kensan` already runs that pattern and the template will follow. Until then, both patterns coexist by design.
+The namespace model is one namespace per app (`app-<name>`, [ADR-006](../adr/006-namespace-naming.md) / [ADR-014](../adr/014-namespace-naming-label-contract-v2.md)) with the namespace and HTTPRoute owned by the app side — `app-kensan` runs this pattern, and the shared `app-prod` landing zone was retired with the migration (2026-07). The scaffolder template still generates a CR targeting the retired `app-prod` namespace and legacy dev/prod wording; updating it to the per-app model is a known follow-up, so treat the template's namespace output as pending that update.
