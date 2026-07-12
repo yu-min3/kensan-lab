@@ -223,5 +223,5 @@ nav:
       - incidents/index.md
       - 2026-03-02 system-infra Sync Blocked: incidents/2026-03-02-system-infra-sync-blocked.md
   - Roadmap:
-      - Storage (local-path → Longhorn): roadmap/storage-longhorn.md
+      - Storage (local-path → Longhorn) — done, archived: roadmap/storage-longhorn.md
   - Articles: articles.md

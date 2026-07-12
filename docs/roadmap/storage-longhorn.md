@@ -1,6 +1,6 @@
 # Storage roadmap: local-path → Longhorn
 
-> **✅ 完了 (2026-05)** — Longhorn 移行は完了済み。現行のストレージ構成・StorageClass・R2 backup は `kubernetes/storage/README.md` が SoT。本ページは計画当時のロードマップを残すアーカイブ文書。
+> **✅ 完了** — Longhorn 移行は 2026-05 に完了し、`local-path` は 2026-07 に全廃（provisioner / StorageClass とも撤去）。現行のストレージ構成・StorageClass・R2 backup は `kubernetes/storage/README.md` が SoT。本ページは計画当時のロードマップを残すアーカイブ文書。
 >
 > 実装上の差分: 当時想定した `longhorn-single` という StorageClass は採用せず、**`longhorn`（default、replicated block）と `longhorn-workspace`** の 2 つとして実現した。以降「`longhorn-single`」への言及は実装では `longhorn` / `longhorn-workspace` に読み替えること。
 
