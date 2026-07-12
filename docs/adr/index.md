@@ -34,3 +34,4 @@ Each ADR follows a lightweight structure:
 | 017 | [Remove kensan-legacy (tag archive)](017-kensan-legacy-removal.md) | Accepted |
 | 018 | [Backstage manifests placement](018-backstage-manifests-placement.md) | Accepted |
 | 019 | [Keycloak DB Credentials → Revert to Vault Static](019-keycloak-db-credentials-revert-to-static.md) | Accepted |
+| 020 | [Namespace lifecycle app cleanup + backstage/app flatten](020-namespace-lifecycle-app-cleanup.md) | Accepted |

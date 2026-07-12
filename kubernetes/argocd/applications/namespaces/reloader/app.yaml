@@ -1,4 +1,9 @@
-## reloader namespace 管理専用 app (kyverno-namespace と同パターン)
+## ⚠️ ADR-020: 統合予定、削除しないこと (このコミットではまだ)。
+## `secrets/reloader` app が resources/namespace.yaml を追加 source として持つようになったので、
+## ライブクラスタで ns の tracking-id が `reloader` app に移ったことを確認してから、この app と
+## kubernetes/secrets/reloader/namespace.yaml (重複コピー) を同じ PR で削除する。
+## 先にこの app だけ消すと、resources-finalizer + prune:true で reloader ns ごと消える。
+## 旧: reloader namespace 管理専用 app (kyverno-namespace と同パターン)
 ## 既存の bare ns を SSA で adopt して contract 準拠の label を付与する
 apiVersion: argoproj.io/v1alpha1
 kind: Application
