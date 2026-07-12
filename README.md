@@ -54,6 +54,18 @@ The platform covers technologies behind 12 out of 16 Golden Kubestronaut certifi
 - **Zero-trust internal network** — Cilium enforces a default-deny NetworkPolicy baseline while Istio provides automatic mTLS for all service-to-service traffic; cert-manager automates TLS and Pod Security Standards harden workloads
 - **Argo CD** — manages all zones via GitOps. Split into `platform-project` (infrastructure) and `app-project` (applications)
 
+## Showcase
+
+The platform is a live system, not only a manifest collection:
+
+<div align="center">
+<img src="docs/assets/showcase/argocd-app-tree.png" alt="Argo CD applications list — 38 applications Synced and Healthy, 0 OutOfSync" width="800">
+<br>
+<sub>Every component reconciled by Argo CD — 38 Synced / 0 OutOfSync</sub>
+</div>
+
+More running-system views (Grafana cluster health, Hubble network flows, Backstage catalog) in the **[Showcase gallery](./docs/showcase.md)**.
+
 <details>
 <summary><b>Internet Exposure</b></summary>
 
@@ -130,6 +142,7 @@ docs/                             # ADRs, architecture, guides (MkDocs site)
 | Category            | Links                                                                                                                                                                                                       |
 | ------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **Docs site**       | **[https://yu-min3.github.io/kensan-lab/](https://yu-min3.github.io/kensan-lab/)** — full documentation site |
+| **Showcase**        | [Screenshot gallery](./docs/showcase.md) — the running system: Argo CD, Grafana, Hubble (Backstage / kensan slots pending) |
 | **Getting Started** | [Installation](./docs/getting-started/installation.md) / [Configuration](./docs/getting-started/configuration.md) / [Bootstrapping](./docs/bootstrapping/index.md) _(in progress)_ / [Secret Management](./docs/secret-management/index.md) |
 | **Architecture (per domain)** | [Argo CD](./kubernetes/argocd/README.md) / [Network](./kubernetes/network/README.md) / [Auth](./kubernetes/auth/README.md) / [Secrets](./kubernetes/secrets/README.md) / [Storage](./kubernetes/storage/README.md) / [Observability](./kubernetes/observability/README.md) / [Backstage](./kubernetes/backstage/README.md) — design thesis, diagrams, and rationale for each domain |
 | **Concepts & Decisions** | [Namespace Labels](./docs/concepts/namespace-label-design.md) / [Network Policy](./docs/concepts/network-policy-guide.md) / [Policy Enforcement](./docs/concepts/policy-enforcement.md) / [ADRs](./docs/adr/) |
