@@ -9,7 +9,6 @@ copyright: Copyright &copy; yu-min3
 docs_dir: docs
 
 exclude_docs: |
-  bootstrapping/manifests/
   bootstrapping/scripts/
   refactoring_master_plan.md
 
@@ -164,6 +163,7 @@ nav:
       - network/ · Cloudflare Tunnel & Access: architecture/cloudflare-tunnel.md
       - observability/: architecture/observability.md
       - storage/: architecture/storage.md
+      - backstage/: architecture/backstage.md
       - Cluster health monitoring: architecture/cluster-health-monitoring.md
   - Concepts:
       - Documentation Layout: concepts/doc-layout.md
@@ -195,6 +195,7 @@ nav:
           - Workspace volume recovery: operations/kensan-workspace-volume-recovery.md
           - Syncthing pairing recovery: operations/syncthing-pairing-recovery.md
       - Guides:
+          - Backstage Golden Path: guides/backstage-golden-path.md
           - OTel integration & troubleshooting: guides/observability-integration.md
           - Raspberry Pi WiFi stabilization: guides/wifi-stabilization.md
   - Architecture Decisions:
