@@ -24,13 +24,10 @@ visibility (Hubble) — plus the app the platform exists to run.
 
 ## Backstage — the Internal Developer Platform
 
-_Screenshot pending._
-<!-- Save to: docs/assets/showcase/backstage-catalog.png · then replace the line above with:
 <figure markdown>
-  ![Backstage Software Catalog listing kensan-lab components with TechDocs links](assets/showcase/backstage-catalog.png){ width="900" }
-  <figcaption>Service catalog, Golden Path templates, and TechDocs — self-service for app developers.</figcaption>
+  ![Backstage entity page for the kensan component — About panel, ownership, tags, a Relations graph, and a TechDocs link](assets/showcase/backstage-catalog.png){ width="900" }
+  <figcaption>The kensan component in Backstage: ownership and system, a live Relations graph, and one click to its TechDocs — the catalog that turns "what runs here" into self-service.</figcaption>
 </figure>
--->
 
 ## Hubble — zero-trust network visibility
 
