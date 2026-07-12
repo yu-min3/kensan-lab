@@ -24,7 +24,7 @@ spec:
                       - high-performance
       containers:
       - name: backstage
-        image: ghcr.io/yu-min3/backstage:v0.0.9
+        image: ghcr.io/yu-min3/backstage:v0.0.10
         imagePullPolicy: Always
         ports:
         - containerPort: 7007
