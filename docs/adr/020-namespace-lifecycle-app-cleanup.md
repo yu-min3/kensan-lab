@@ -6,6 +6,17 @@
 `kubernetes/namespaces/` felt structurally out of place compared to other components; the
 review then extended to a related directory-nesting oddity in `backstage/`.
 
+**Part 1 executed** (2026-07-12, #438 + follow-up): Phase 1 (duplicate `resources/namespace.yaml`
++ `CreateNamespace=true`) merged and synced; live cluster showed `SharedResourceWarning` as
+expected (ArgoCD deliberately withholds automated sync/selfHeal on a resource declared by two
+Applications, to avoid the two apps fighting over ownership in a loop). Ownership was
+transferred with a one-time manual `kubectl annotate namespace reloader
+argocd.argoproj.io/tracking-id=reloader:/Namespace:reloader/reloader --overwrite`, confirmed
+`reloader` app went `Synced`/`Healthy` and the Reloader controller pod was undisturbed
+throughout. Phase 2 (this change: delete `reloader-namespace` app + duplicate `namespace.yaml`)
+completes the migration. Part 2 (`backstage/app` flatten) is still pending, now unblocked since
+#437 merged.
+
 ## Date
 
 2026-07-12
