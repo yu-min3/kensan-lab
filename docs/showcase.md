@@ -4,9 +4,16 @@ This page is the visual entry point for the running kensan-lab platform. The
 repository is a reference architecture, but it is also a live system — these
 views are the proof.
 
-Four surfaces tell the story: deployment health (Argo CD), observability
-(Grafana), the developer platform (Backstage), and zero-trust network
-visibility (Hubble) — plus the app the platform exists to run.
+Six views tell the story: the physical bare-metal cluster, deployment health
+(Argo CD), observability (Grafana), the developer platform (Backstage),
+zero-trust network visibility (Hubble), and the app the platform exists to run.
+
+## Hardware — bare metal, literally
+
+<figure markdown>
+  ![The physical kensan-lab cluster — a stacked Raspberry Pi 5 trio, the M4 Neo worker, and a TP-Link TL-SG116E switch](assets/showcase/hardware-cluster.png){ width="900" }
+  <figcaption>The platform behind the dashboards: three Raspberry Pi 5 nodes and one amd64 worker, connected through a managed switch. The architecture in this repository runs on this hardware.</figcaption>
+</figure>
 
 ## Argo CD — the cluster is GitOps-managed
 
