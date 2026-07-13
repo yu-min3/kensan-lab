@@ -45,9 +45,14 @@ zero-trust network visibility (Hubble), and the app the platform exists to run.
 
 ## kensan — the app that runs on the platform
 
+kensan is **not the point of this repository — the platform is.** It's a dogfooding
+workload: a real app that exercises the platform end-to-end (deployed by Argo CD,
+cataloged in Backstage, secured at the Gateway, observed like any other service), so
+the platform is proven against something real rather than a toy.
+
 <figure markdown>
   ![kensan dashboard — North Star and quarterly focus, a today lane, a prioritized backlog, memos, and a whiteboard, rendered in the Whetstone design system](assets/showcase/kensan-app.png){ width="900" }
-  <figcaption>Dogfooding: kensan (Go single binary + Whetstone SPA) is a real workload deployed by Argo CD, cataloged in Backstage, and observed like any other service. Shown here with a sample workspace — the app reads Markdown files as its single source of truth.</figcaption>
+  <figcaption>kensan (Go single binary + Whetstone SPA), a file-based knowledge & goal manager that reads Markdown as its single source of truth. Shown with a <strong>sample workspace</strong> — fictional data, not a live view. The UI is the author's personal tool and is currently Japanese-only (see <a href="https://github.com/yu-min3/kensan-lab/blob/main/apps/kensan/demo-workspace/">demo-workspace</a> to run it locally).</figcaption>
 </figure>
 
 ## Capture guidelines
