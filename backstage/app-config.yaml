@@ -79,8 +79,10 @@ catalog:
     - allow: [Component, System, API, Resource, Location]
   locations:
     # FastAPI template (from templates directory)
+    # Same resolution as the locations below: relative to the backend execution directory
+    # (packages/backend/dist/packages/backend when running 'make dev'), so 5 levels up.
     - type: file
-      target: ../../templates/fastapi-template/template.yaml
+      target: ../../../../../templates/fastapi-template/template.yaml
       rules:
         - allow: [Template]
 

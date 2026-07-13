@@ -27,20 +27,27 @@ Verified by checking each `COPY` source path exists relative to the new `backsta
 (all present except the two `dist/*.tar.gz` build outputs, which are expected to not exist
 pre-build).
 
-The `app-config.yaml` catalog `target:` paths, by contrast, needed **no changes** — on inspection
-they're documented as relative to the backend's own runtime execution directory
-(`packages/backend/dist/packages/backend`), which is an internal detail of the app's package
-layout, not of where `backstage/` itself sits in the outer repo. Moving the app root doesn't
-change that internal relative structure.
+The `app-config.yaml` catalog `target:` paths for `domains/*.yaml` and `organizations/*.yaml`
+needed **no changes** — they're documented as relative to the backend's own runtime execution
+directory (`packages/backend/dist/packages/backend`), an internal detail of the app's package
+layout, not of where `backstage/` sits in the outer repo. Moving the app root doesn't change
+that internal relative structure. This was confirmed empirically (see below), not just by
+inspection.
 
-Local dev-server verification (`make dev`, to empirically confirm the catalog paths as planned)
-could not be completed in this environment: `yarn install` failed building the native
-`isolated-vm` module against the host's Node v25 (project `engines` pins `20 || 22`). This is a
-pre-existing host/toolchain mismatch, reproducible identically on the pre-flatten layout — not
-something this change introduced or could fix. `make dev` / `make build` should be run once
-before relying on this in production, on a host with a matching Node version (or accept that the
-`packages/backend/Dockerfile` build, which pins `node:22-bookworm-slim` itself, is the more
-reliable check but still requires `build-backend` to succeed on the host first).
+**Local dev-server verification was completed**, after installing Node 22 via `mise` (host
+default was v25, which fails to build the native `isolated-vm` module — `engines` pins
+`20 || 22`; this mismatch was pre-existing and unrelated to the flatten, reproducible
+identically on the pre-flatten layout). Running `make dev` under Node 22 surfaced one genuine,
+**pre-existing** bug, unrelated to the flatten but only caught because the verification was
+actually run: the fastapi-template catalog location used `target: ../../templates/fastapi-template/template.yaml`
+(2 levels up) while the other two `type: file` locations in the same file correctly use 5
+levels up, with a comment explaining why (`packages/backend/dist/packages/backend` is 5 levels
+below the app root). All three locations resolve from the identical execution directory, so 2
+levels was simply wrong — Backstage logged `file .../packages/backend/dist/templates/fastapi-template/template.yaml
+does not exist` and silently skipped the template on every run, including before this change.
+Fixed to `../../../../../templates/fastapi-template/template.yaml` (5 levels, matching the
+other two) as part of this PR. Re-running `make dev` after the fix showed zero
+`does not exist` warnings and normal catalog/search collation.
 
 ## Date
 
