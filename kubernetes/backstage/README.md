@@ -10,14 +10,14 @@ The Internal Developer Platform (IDP) surface — service catalog, TechDocs, and
 
 | file | role |
 |---|---|
-| `backstage-deployment.yaml` | Backstage app+backend (single image from `backstage/app/`, port 7007, amd64 / high-performance node) |
+| `backstage-deployment.yaml` | Backstage app+backend (single image from `backstage/`, port 7007, amd64 / high-performance node) |
 | `postgresql-statefulset.yaml` + `postgresql-initdb-configmap.yaml` | Postgres 16 backing store — 12 plugin DBs pre-created for DR determinism (`pluginDivisionMode: database`) |
 | `*-external-secret.yaml` / `ghcr-pull-secret.yaml` | Static creds via ESO — GitHub token, Postgres cred, GHCR pull token |
 | `httproute.yaml` | Attaches to `gateway-platform` (`backstage.platform.yu-min3.com`) |
 | `requestauthentication-strip-jwt.yaml` | Strips the Gateway-forwarded Keycloak JWT before it reaches Backstage (see rationale) |
 | `namespace.yaml` / `network-policy.yaml` / `pdb.yaml` | `backstage` ns — PSA baseline, Istio injection, default-deny + explicit allows |
 
-Source code lives at [`backstage/app/`](https://github.com/yu-min3/kensan-lab/tree/main/backstage/app) (integrated in this repo, not a separate one); scaffolding templates at [`backstage/app/templates/`](https://github.com/yu-min3/kensan-lab/tree/main/backstage/app/templates).
+Source code lives at [`backstage/`](https://github.com/yu-min3/kensan-lab/tree/main/backstage) (integrated in this repo, not a separate one); scaffolding templates at [`backstage/templates/`](https://github.com/yu-min3/kensan-lab/tree/main/backstage/templates).
 
 ## Golden Path: form → running app
 
@@ -53,7 +53,7 @@ Step-by-step walkthrough: [Golden Path guide](https://github.com/yu-min3/kensan-
 
 1. **Registration is a PR, not an API call.** The scaffolder does not push into `kensan-lab` directly — it opens a pull request adding the Application CR. The platform keeps its review gate even on the fully-automated path, and a bad template run is a closed PR, not a live deployment.
 2. **Backstage authenticates nobody.** OIDC is enforced at the Istio Gateway (oauth2-proxy ext_authz, [ADR-010](https://github.com/yu-min3/kensan-lab/blob/main/docs/adr/010-istio-native-oauth2-absent.md)) before traffic reaches the pod, so Backstage runs with its default auth policy disabled instead of duplicating a login flow. The subtle consequence: the Gateway forwards the Keycloak JWT upstream, Backstage sees a Bearer token it didn't issue, and 401s — so a workload-scoped `RequestAuthentication` verifies and then *strips* the token (`forwardOriginalToken: false`). The header comment in [`requestauthentication-strip-jwt.yaml`](https://github.com/yu-min3/kensan-lab/blob/main/kubernetes/backstage/requestauthentication-strip-jwt.yaml) records the full chain.
-3. **Deploy definition next to every other component, source next to no other.** Manifests moved from `backstage/manifests/` to `kubernetes/backstage/` so that `kubernetes/` is the single answer to "what runs on the cluster" and manifest CI covers it ([ADR-018](https://github.com/yu-min3/kensan-lab/blob/main/docs/adr/018-backstage-manifests-placement.md)). The app source stays at top-level `backstage/app/` — it's a workload we build, not platform config.
+3. **Deploy definition next to every other component, source next to no other.** Manifests moved from `backstage/manifests/` to `kubernetes/backstage/` so that `kubernetes/` is the single answer to "what runs on the cluster" and manifest CI covers it ([ADR-018](https://github.com/yu-min3/kensan-lab/blob/main/docs/adr/018-backstage-manifests-placement.md)). The app source stays at top-level `backstage/` — it's a workload we build, not platform config.
 
 Concrete choices:
 
@@ -66,5 +66,5 @@ Concrete choices:
 
 - Golden Path walkthrough (AD perspective): [`docs/guides/backstage-golden-path.md`](https://github.com/yu-min3/kensan-lab/blob/main/docs/guides/backstage-golden-path.md)
 - Manifest placement decision: [ADR-018](https://github.com/yu-min3/kensan-lab/blob/main/docs/adr/018-backstage-manifests-placement.md) · Gateway auth model: [ADR-002](https://github.com/yu-min3/kensan-lab/blob/main/docs/adr/002-authentication-authorization-architecture.md) / [ADR-010](https://github.com/yu-min3/kensan-lab/blob/main/docs/adr/010-istio-native-oauth2-absent.md)
-- App source, local dev, image build: [`backstage/app/README.md`](https://github.com/yu-min3/kensan-lab/blob/main/backstage/app/README.md)
+- App source, local dev, image build: [`backstage/README.md`](https://github.com/yu-min3/kensan-lab/blob/main/backstage/README.md)
 - Roles and namespace model (PE / AD split): [`.claude/rules/environment-separation.md`](https://github.com/yu-min3/kensan-lab/blob/main/.claude/rules/environment-separation.md)

@@ -14,7 +14,7 @@ Argo CD で同期される全 platform component の Git source。
 | `secrets/` | Vault + Vault Config Operator + Vault Database/Transit engines, External Secrets, Sealed Secrets, cert-manager, Reloader |
 | `storage/` | Longhorn |
 | `policy/` | Kyverno (policy engine + ClusterPolicy / PolicyException 群) |
-| `backstage/` | Backstage (developer portal) の deploy 定義 — Pattern B。ソースは `backstage/app/`（ADR-018） |
+| `backstage/` | Backstage (developer portal) の deploy 定義 — Pattern B。ソースは repo top-level `backstage/`（ADR-018 / ADR-020） |
 | `kube-system/` | kube-system ns の label / PSA / 共通リソース管理 |
 
 ## コンポーネントのレイアウト規則

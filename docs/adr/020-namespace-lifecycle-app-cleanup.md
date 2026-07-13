@@ -13,11 +13,48 @@ Applications, to avoid the two apps fighting over ownership in a loop). Ownershi
 transferred with a one-time manual `kubectl annotate namespace reloader
 argocd.argoproj.io/tracking-id=reloader:/Namespace:reloader/reloader --overwrite`, confirmed
 `reloader` app went `Synced`/`Healthy` and the Reloader controller pod was undisturbed
-throughout. Phase 2 (this change: delete `reloader-namespace` app + duplicate `namespace.yaml`)
-completes the migration. Part 2 (`backstage/app` flatten) is still pending, now unblocked since
-#437 merged.
+throughout. Phase 2 (delete `reloader-namespace` app + duplicate `namespace.yaml`, #441)
+completed the migration cleanly.
 
-## Date
+**Part 2 executed** (2026-07-13): `backstage/app/*` flattened to `backstage/*`. Beyond the
+mechanical `Makefile` path fixes anticipated in the plan below, actually reading the files
+surfaced one more real path dependency the plan hadn't named: `packages/backend/Dockerfile`'s
+`COPY` instructions were all prefixed `app/...`, because the Docker build context was
+`backstage/` (one `cd ..` from the old `backstage/app/`) with the Dockerfile itself living
+inside that context at `app/packages/backend/Dockerfile`. Post-flatten the context is
+`backstage/` directly with no `cd ..` needed, so every `COPY` source lost its `app/` prefix.
+Verified by checking each `COPY` source path exists relative to the new `backstage/` root
+(all present except the two `dist/*.tar.gz` build outputs, which are expected to not exist
+pre-build).
+
+The `app-config.yaml` catalog `target:` paths for `domains/*.yaml` and `organizations/*.yaml`
+needed **no changes** — they're documented as relative to the backend's own runtime execution
+directory (`packages/backend/dist/packages/backend`), an internal detail of the app's package
+layout, not of where `backstage/` sits in the outer repo. Moving the app root doesn't change
+that internal relative structure. This was confirmed empirically (see below), not just by
+inspection.
+
+**Local dev-server verification was completed**, after installing Node 22 via `mise` (host
+default was v25, which fails to build the native `isolated-vm` module — `engines` pins
+`20 || 22`; this mismatch was pre-existing and unrelated to the flatten, reproducible
+identically on the pre-flatten layout). Running `make dev` under Node 22 surfaced one genuine,
+**pre-existing** bug, unrelated to the flatten but only caught because the verification was
+actually run: the fastapi-template catalog location used `target: ../../templates/fastapi-template/template.yaml`
+(2 levels up) while the other two `type: file` locations in the same file correctly use 5
+levels up, with a comment explaining why (`packages/backend/dist/packages/backend` is 5 levels
+below the app root). All three locations resolve from the identical execution directory, so 2
+levels was simply wrong — Backstage logged `file .../packages/backend/dist/templates/fastapi-template/template.yaml
+does not exist` and silently skipped the template on every run, including before this change.
+Fixed to `../../../../../templates/fastapi-template/template.yaml` (5 levels, matching the
+other two) as part of this PR. Re-running `make dev` after the fix showed zero
+`does not exist` warnings and normal catalog/search collation.
+
+The Node v25/v22 mismatch that blocked the first verification attempt exposed a real gap:
+`package.json` declares `engines: "20 || 22"` and CI pins `node-version: 22`
+(`.github/workflows/app-ci.yml`), but no local pin ever existed — no `.nvmrc`, `.tool-versions`,
+or `.mise.toml` anywhere in git history. Only Yarn was actually pinned (bundled binary at
+`.yarn/releases/`, `packageManager: yarn@4.4.1`). Added `backstage/.tool-versions` (`node 22`,
+matching CI) so `mise install` picks the right version automatically going forward.
 
 2026-07-12
 

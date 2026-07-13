@@ -19,7 +19,7 @@ make update-image TAG=v0.0.7   # build + push + bump kubernetes/backstage/backst
 
 | Requirement | Version | Notes |
 |-------------|---------|-------|
-| Node.js | 22.x | Use nvm for version management |
+| Node.js | 20.x or 22.x | Pinned in `.tool-versions` (`mise install` picks it up); `nvm use` also works |
 | Docker | latest | `CONTAINER_RUNTIME=podman` to switch |
 | GitHub PAT | `packages:write` | GHCR push + GitHub integration |
 | Memory | 2 GB+ free | For dependency installation (`NODE_OPTIONS=--max-old-space-size=4096` if low) |
@@ -29,13 +29,13 @@ make update-image TAG=v0.0.7   # build + push + bump kubernetes/backstage/backst
 ## Configuration
 
 ```
-backstage/app/
+backstage/
 ├── app-config.yaml              # base
 ├── app-config.kubernetes.yaml   # k8s overlay
 └── app-config.local.yaml        # local overrides (env-var-driven)
 ```
 
-All three are committed. Sensitive values come from env vars. Create `../.env` (one level up, repository root) with:
+All three are committed. Sensitive values come from env vars. Create `.env` (this directory) with:
 
 ```bash
 GITHUB_USER=your-username
@@ -58,7 +58,7 @@ Manual `kubectl apply` is **not** recommended — auto-sync + self-heal will rev
 ### Directory Layout
 
 ```
-backstage/app/
+backstage/
 ├── .yarn/releases/yarn-4.4.1.cjs    # bundled Yarn 4
 ├── packages/{app,backend}/           # frontend / backend
 ├── plugins/                          # custom Backstage plugins

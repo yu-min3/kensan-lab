@@ -18,7 +18,7 @@ The reference cluster's exact node inventory (RPi 5 + M4 Neo, hardware-class lab
 
 - `kubectl`, `helm`, `kubeseal`
 - `docker` (default; multi-arch via `docker buildx`) — `make ... CONTAINER_RUNTIME=podman` to switch
-- `make` — every component uses `make <target>` as the entry point. See `make help` in `apps/kensan/` and `backstage/app/`.
+- `make` — every component uses `make <target>` as the entry point. See `make help` in `apps/kensan/` and `backstage/`.
 - Node.js 22.x + Yarn — only for Backstage frontend development (Yarn 4 is bundled in `.yarn/releases/`, no global install needed)
 
 ## Accounts & Credentials

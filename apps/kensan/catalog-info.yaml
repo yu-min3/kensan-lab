@@ -1,6 +1,6 @@
 # App-owned descriptor (Backstage Golden Path): this app repo declares its own
 # Component/API here. Backstage fetches it via a `type: url` catalog location
-# (see backstage/app/app-config.kubernetes.yaml). Edits here update the catalog live.
+# (see backstage/app-config.kubernetes.yaml). Edits here update the catalog live.
 apiVersion: backstage.io/v1alpha1
 kind: Component
 metadata:

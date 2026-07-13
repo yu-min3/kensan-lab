@@ -1,6 +1,6 @@
 # Backstage Build and Deployment Makefile
 # Load environment variables from .env file if it exists
--include ../.env
+-include .env
 export
 
 # GHCR token split (.env で使い分ける):
@@ -57,7 +57,7 @@ help:
 	@echo "  make preview       - Show current image in the manifest"
 	@echo "  (deploy 手順: worktree を切る → update-image → commit-deploy → gh pr create)"
 	@echo ""
-	@echo "Environment Variables (set in ../.env):"
+	@echo "Environment Variables (set in .env):"
 	@echo "  GITHUB_USER        - GitHub username"
 	@echo "  WRITE_GHCR_PAT     - PAT (write:packages) for image push / login"
 	@echo "  READ_GHCR_PAT      - PAT (read) for runtime GITHUB_TOKEN (dev/run)"
@@ -123,11 +123,11 @@ build-backend:
 build: build-backend
 	@echo "Building container image: $(FULL_IMAGE)"
 	@echo "Using container runtime: $(CONTAINER_RUNTIME)"
-	@echo "Build context: parent directory (to include templates/)"
+	@echo "Build context: backstage/ (this directory)"
 	@echo "Note: This may take several minutes and use significant memory"
-	cd .. && $(CONTAINER_RUNTIME) build \
+	$(CONTAINER_RUNTIME) build \
 		--platform $(PLATFORM) \
-		-f app/packages/backend/Dockerfile \
+		-f packages/backend/Dockerfile \
 		-t $(FULL_IMAGE) \
 		.
 
@@ -163,7 +163,7 @@ clean:
 
 ## Flat manifest 運用 (kustomize overlays は retired)。image tag は
 ## kubernetes/backstage/backstage-deployment.yaml を直接書き換える (ADR-018 で移設)。
-MANIFEST := ../../kubernetes/backstage/backstage-deployment.yaml
+MANIFEST := ../kubernetes/backstage/backstage-deployment.yaml
 
 .PHONY: update-image
 update-image: build push
@@ -187,7 +187,7 @@ deploy:
 	@echo ""
 	@echo "代わりに:"
 	@echo "  1. worktree を切る:  git worktree add ~/kensan-lab.worktrees/deploy-backstage-\$$TAG -b deploy-backstage-\$$TAG origin/main"
-	@echo "  2. その worktree の backstage/app で:  make update-image TAG=<tag>"
+	@echo "  2. その worktree の backstage で:  make update-image TAG=<tag>"
 	@echo "  3. 同 worktree で:  make commit-deploy TAG=<tag> && gh pr create"
 	@exit 1
 

@@ -39,7 +39,7 @@ Fill in:
 - **Application Name** — lowercase / digits / hyphens. Becomes the Argo CD Application name (`app-<name>`), the catalog component name, and the image name.
 - **Owner** — picked from the catalog (Group/User).
 - **Repository Location** — where the new app repo is created. Argo CD authenticates to any repo under the org prefix via credential templates, so no per-repo secret setup is needed.
-- **Domain / System** — catalog placement ([`backstage/app/catalog/`](https://github.com/yu-min3/kensan-lab/tree/main/backstage/app/catalog) defines the domains).
+- **Domain / System** — catalog placement ([`backstage/catalog/`](https://github.com/yu-min3/kensan-lab/tree/main/backstage/catalog) defines the domains).
 
 ### 2. The scaffolder runs three actions
 
