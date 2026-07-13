@@ -33,6 +33,12 @@ Each domain has an architecture page — design thesis, component map, diagrams,
 
 Cross-cutting overviews: [Infrastructure](architecture/infrastructure.md) and [Cluster health monitoring](architecture/cluster-health-monitoring.md).
 
+## Showcase
+
+The repository describes a live platform. Start with the [Showcase](showcase.md)
+to see the visual proof points: Argo CD app health, Grafana cluster health, and
+Hubble network visibility (Backstage and kensan views coming).
+
 ## How to use this site
 
 This site is the **single source of truth** for the current state of kensan-lab. Articles on Zenn / dev.to are point-in-time deep dives — they capture the journey but may go stale. Always cross-check against the docs here.
@@ -40,6 +46,7 @@ This site is the **single source of truth** for the current state of kensan-lab.
 | If you want to… | Start here |
 |---|---|
 | Understand the platform | [Architecture](#architecture) above, then [ADRs](adr/index.md) |
+| See the running system | [Showcase](showcase.md) |
 | Bring up a similar cluster | [Installation](getting-started/installation.md) → [Configuration](getting-started/configuration.md) → [Bootstrapping](bootstrapping/index.md) |
 | Operate it day-to-day | [Secret Management](secret-management/index.md), [Runbooks](runbooks/index.md) |
 | Read the back-stories | [Articles](articles.md) — Zenn / dev.to deep-dive index |

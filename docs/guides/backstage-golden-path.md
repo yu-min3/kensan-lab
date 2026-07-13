@@ -4,7 +4,16 @@ The end-to-end walkthrough of the platform's fully-automated App Developer (AD) 
 
 This is the human-facing counterpart to the architecture page ([`kubernetes/backstage/README.md`](https://github.com/yu-min3/kensan-lab/blob/main/kubernetes/backstage/README.md)) and the role model ([PE / AD split](https://github.com/yu-min3/kensan-lab/blob/main/.claude/rules/environment-separation.md)).
 
-<!-- TODO(screenshots): template form / scaffolder run / catalog page — capture from the live Backstage once convenient -->
+```mermaid
+flowchart LR
+    AD["App Developer"] -->|one form| BS["Backstage template"]
+    BS --> REPO["App repository<br/>code · CI · manifests · TechDocs"]
+    BS --> PR["Platform PR<br/>Argo CD Application"]
+    BS --> CAT["Catalog entry"]
+    PR -->|PE review + merge| ARGO["Argo CD"]
+    REPO --> ARGO
+    ARGO --> LIVE["Running app<br/>SSO · zero trust · observability"]
+```
 
 ## What one form submission produces
 
@@ -13,6 +22,11 @@ This is the human-facing counterpart to the architecture page ([`kubernetes/back
 | App repository (code, Dockerfile, CI, `manifests/`, TechDocs) | `github.com/<owner>/<repo>` (new) | AD |
 | Argo CD `Application` CR | PR against `kensan-lab` → `kubernetes/argocd/applications/apps/<name>/` | PE reviews, then Argo CD |
 | Catalog entry + TechDocs | Backstage (`catalog-info.yaml` auto-registered) | AD |
+
+<figure markdown>
+  ![Backstage entity page for the kensan component — ownership, system, tags, relations, source, and TechDocs](../assets/showcase/backstage-catalog.png){ width="900" }
+  <figcaption>A live catalog entry on this platform: the component is discoverable with ownership, system relations, source, and TechDocs in one place.</figcaption>
+</figure>
 
 ## Walkthrough
 

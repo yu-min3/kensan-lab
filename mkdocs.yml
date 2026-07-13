@@ -10,7 +10,6 @@ docs_dir: docs
 
 exclude_docs: |
   bootstrapping/scripts/
-  refactoring_master_plan.md
 
 validation:
   nav:
@@ -79,6 +78,7 @@ plugins:
       sections:
         Getting started:
           - index.md
+          - showcase.md
           - getting-started/*.md
         Architecture:
           - architecture/*.md
@@ -146,6 +146,7 @@ extra_css:
 
 nav:
   - Home: index.md
+  - Showcase: showcase.md
   - Getting Started:
       - Installation: getting-started/installation.md
       - Configuration: getting-started/configuration.md
@@ -219,6 +220,7 @@ nav:
       - 017 — Remove kensan-legacy (tag archive): adr/017-kensan-legacy-removal.md
       - 018 — Backstage Manifests Placement: adr/018-backstage-manifests-placement.md
       - 019 — Keycloak DB Credentials → Revert to Static: adr/019-keycloak-db-credentials-revert-to-static.md
+      - 020 — Namespace Lifecycle App Cleanup: adr/020-namespace-lifecycle-app-cleanup.md
   - Incidents:
       - incidents/index.md
       - 2026-03-02 system-infra Sync Blocked: incidents/2026-03-02-system-infra-sync-blocked.md
