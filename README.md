@@ -103,6 +103,12 @@ The platform uses Cilium LoadBalancer with L2 announcements for local network ac
 
 4 nodes, multi-architecture. Managed by kubeadm with CRI-O runtime.
 
+<div align="center">
+<img src="docs/assets/showcase/hardware-cluster.png" alt="The physical cluster — a stacked Raspberry Pi 5 trio, the M4 Neo, and a TP-Link TL-SG116E switch" width="640">
+<br>
+<sub>The actual cluster: the Raspberry Pi 5 stack and M4 Neo behind a TP-Link TL-SG116E switch</sub>
+</div>
+
 <details>
 <summary><b>Scheduling Strategy</b></summary>
 
