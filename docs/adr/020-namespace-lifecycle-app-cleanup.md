@@ -13,9 +13,34 @@ Applications, to avoid the two apps fighting over ownership in a loop). Ownershi
 transferred with a one-time manual `kubectl annotate namespace reloader
 argocd.argoproj.io/tracking-id=reloader:/Namespace:reloader/reloader --overwrite`, confirmed
 `reloader` app went `Synced`/`Healthy` and the Reloader controller pod was undisturbed
-throughout. Phase 2 (this change: delete `reloader-namespace` app + duplicate `namespace.yaml`)
-completes the migration. Part 2 (`backstage/app` flatten) is still pending, now unblocked since
-#437 merged.
+throughout. Phase 2 (delete `reloader-namespace` app + duplicate `namespace.yaml`, #441)
+completed the migration cleanly.
+
+**Part 2 executed** (2026-07-13): `backstage/app/*` flattened to `backstage/*`. Beyond the
+mechanical `Makefile` path fixes anticipated in the plan below, actually reading the files
+surfaced one more real path dependency the plan hadn't named: `packages/backend/Dockerfile`'s
+`COPY` instructions were all prefixed `app/...`, because the Docker build context was
+`backstage/` (one `cd ..` from the old `backstage/app/`) with the Dockerfile itself living
+inside that context at `app/packages/backend/Dockerfile`. Post-flatten the context is
+`backstage/` directly with no `cd ..` needed, so every `COPY` source lost its `app/` prefix.
+Verified by checking each `COPY` source path exists relative to the new `backstage/` root
+(all present except the two `dist/*.tar.gz` build outputs, which are expected to not exist
+pre-build).
+
+The `app-config.yaml` catalog `target:` paths, by contrast, needed **no changes** — on inspection
+they're documented as relative to the backend's own runtime execution directory
+(`packages/backend/dist/packages/backend`), which is an internal detail of the app's package
+layout, not of where `backstage/` itself sits in the outer repo. Moving the app root doesn't
+change that internal relative structure.
+
+Local dev-server verification (`make dev`, to empirically confirm the catalog paths as planned)
+could not be completed in this environment: `yarn install` failed building the native
+`isolated-vm` module against the host's Node v25 (project `engines` pins `20 || 22`). This is a
+pre-existing host/toolchain mismatch, reproducible identically on the pre-flatten layout — not
+something this change introduced or could fix. `make dev` / `make build` should be run once
+before relying on this in production, on a host with a matching Node version (or accept that the
+`packages/backend/Dockerfile` build, which pins `node:22-bookworm-slim` itself, is the more
+reliable check but still requires `build-backend` to succeed on the host first).
 
 ## Date
 

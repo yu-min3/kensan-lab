@@ -153,7 +153,7 @@ make k8s-release-prod TAG=v0.1.0     # build + push + PR (prod)
 make k8s-release TAG=v0.1.0          # build + push + PR (both)
 ```
 
-See `make help` for the full target list. Backstage uses its own `backstage/app/Makefile` (`make all TAG=...`).
+See `make help` for the full target list. Backstage uses its own `backstage/Makefile` (`make all TAG=...`).
 
 ### 3.3 Dockerfile Requirements for Multi-Arch
 

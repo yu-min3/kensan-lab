@@ -33,7 +33,7 @@ platform-{component}  # 例: platform-auth-prod, platform-keycloak（既存命�
 | Repository | Owner | Content |
 |-----------|-------|---------|
 | **kensan-lab** (this repo) | Platform Engineers | Cluster infra, Helm values, Argo CD Projects/Apps |
-| **backstage/app/templates/** | Platform Engineers | Scaffolding template (flat YAML, no kustomize) |
+| **backstage/templates/** | Platform Engineers | Scaffolding template (flat YAML, no kustomize) |
 | **kensan-lab-apps-\<name\>** (per app) | App Developers | App code, Dockerfile, `manifests/` |
 
 ## New App Flow (via Backstage)

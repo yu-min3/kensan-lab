@@ -34,10 +34,10 @@ USER node
 WORKDIR /app
 
 # Copy files needed by Yarn
-# Note: Build context is now kensan-lab/ (parent dir)
-COPY --chown=node:node app/.yarn ./.yarn
-COPY --chown=node:node app/.yarnrc.yml ./
-COPY --chown=node:node app/backstage.json ./
+# Note: Build context is backstage/ (this Makefile's directory)
+COPY --chown=node:node .yarn ./.yarn
+COPY --chown=node:node .yarnrc.yml ./
+COPY --chown=node:node backstage.json ./
 
 # This switches many Node.js dependencies to production mode.
 ENV NODE_ENV=production
@@ -48,7 +48,7 @@ ENV NODE_OPTIONS="--no-node-snapshot"
 # Copy repo skeleton first, to avoid unnecessary docker cache invalidation.
 # The skeleton contains the package.json of each package in the monorepo,
 # and along with yarn.lock and the root package.json, that's enough to run yarn install.
-COPY --chown=node:node app/yarn.lock app/package.json app/packages/backend/dist/skeleton.tar.gz ./
+COPY --chown=node:node yarn.lock package.json packages/backend/dist/skeleton.tar.gz ./
 RUN tar xzf skeleton.tar.gz && rm skeleton.tar.gz
 
 RUN yarn workspaces focus --all --production && rm -rf "$(yarn cache clean)"
@@ -57,13 +57,13 @@ RUN yarn workspaces focus --all --production && rm -rf "$(yarn cache clean)"
 # They are only available in local development environment (make dev)
 
 # Copy production catalog (domains and organizations)
-COPY --chown=node:node app/catalog ./catalog
+COPY --chown=node:node catalog ./catalog
 
 # Copy templates directory (Backstage templates)
-COPY --chown=node:node app/templates ./templates
+COPY --chown=node:node templates ./templates
 
 # Then copy the rest of the backend bundle, along with any other files we might want.
-COPY --chown=node:node app/packages/backend/dist/bundle.tar.gz app/app-config*.yaml ./
+COPY --chown=node:node packages/backend/dist/bundle.tar.gz app-config*.yaml ./
 RUN tar xzf bundle.tar.gz && rm bundle.tar.gz
 
 CMD ["node", "packages/backend", "--config", "app-config.yaml", "--config", "app-config.kubernetes.yaml"]

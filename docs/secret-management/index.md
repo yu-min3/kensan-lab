@@ -82,7 +82,7 @@ GHCR 用 PAT はスコープで 2 本に分ける:
 | **WRITE** | `write:packages` | local `.env` `WRITE_GHCR_PAT` のみ | image **push**（`make login` / `make push`） |
 
 - **WRITE トークンはクラスタ・Vault に置かない**。push はビルドマシン専用の操作で、in-cluster は全て READ で足りる。
-- 各 Makefile（`backstage/app`, `apps/kensan`, scaffold 雛形）は login/push に `WRITE_GHCR_PAT`、実行時 `GITHUB_TOKEN` に `READ_GHCR_PAT` を使う。旧 `GITHUB_GHCR_PAT` は後方互換 fallback。
+- 各 Makefile（`backstage`, `apps/kensan`, scaffold 雛形）は login/push に `WRITE_GHCR_PAT`、実行時 `GITHUB_TOKEN` に `READ_GHCR_PAT` を使う。旧 `GITHUB_GHCR_PAT` は後方互換 fallback。
 
 ### Vault Transit (アプリ側で encrypt/decrypt API を直叩き)
 

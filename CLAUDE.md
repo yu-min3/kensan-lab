@@ -11,7 +11,7 @@
 ## Mandatory Constraints
 
 1. **GitOps only**: ALL infrastructure changes via Git → Argo CD. No direct `kubectl apply`（例外: push 前の動作確認の一時適用のみ。→ `.claude/rules/gitops-workflow.md` Verification Exception）.
-2. **Container runtime**: Default は Docker (`docker buildx` で multi-arch build)。`backstage/app/Makefile` の `CONTAINER_RUNTIME ?= docker` パターンで Podman 切替も可。
+2. **Container runtime**: Default は Docker (`docker buildx` で multi-arch build)。`backstage/Makefile` の `CONTAINER_RUNTIME ?= docker` パターンで Podman 切替も可。
 3. **No rendered manifests**: Argo CD renders Helm charts natively. Never commit `helm template` output.
 4. **Secrets**: dynamic creds via Vault + External Secrets; bootstrap creds via Sealed Secrets. Raw secrets in `temp/` only — commit only sealed/encrypted YAMLs.
 5. **No .env commits**: Sensitive tokens stay out of Git.
@@ -26,7 +26,7 @@ kubectl get certificate -A                 # Certificates
 kubectl get pods -A --field-selector=status.phase!=Running,status.phase!=Succeeded
 ```
 
-Backstage: `cd backstage/app && make {install,dev,all TAG=...}`
+Backstage: `cd backstage && make {install,dev,all TAG=...}`
 
 ## Skills (Slash Commands)
 
