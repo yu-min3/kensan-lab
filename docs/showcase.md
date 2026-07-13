@@ -38,13 +38,10 @@ visibility (Hubble) — plus the app the platform exists to run.
 
 ## kensan — the app that runs on the platform
 
-_Screenshot pending._
-<!-- Save to: docs/assets/showcase/kensan-app.png · then replace the line above with:
 <figure markdown>
-  ![kensan app UI — file-based knowledge & goal manager running on the platform](assets/showcase/kensan-app.png){ width="900" }
-  <figcaption>Dogfooding: kensan (Go + Whetstone SPA) is a real workload deployed by Argo CD, cataloged in Backstage, and observed like any other service.</figcaption>
+  ![kensan dashboard — North Star and quarterly focus, a today lane, a prioritized backlog, memos, and a whiteboard, rendered in the Whetstone design system](assets/showcase/kensan-app.png){ width="900" }
+  <figcaption>Dogfooding: kensan (Go single binary + Whetstone SPA) is a real workload deployed by Argo CD, cataloged in Backstage, and observed like any other service. Shown here with a sample workspace — the app reads Markdown files as its single source of truth.</figcaption>
 </figure>
--->
 
 ## Capture guidelines
 
