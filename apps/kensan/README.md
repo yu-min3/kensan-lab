@@ -36,6 +36,22 @@ go test ./...
 | `KENSAN_ADDR` | `:8080` | リッスンアドレス |
 | `OTEL_EXPORTER_OTLP_ENDPOINT` | （未設定 = 無効） | 設定すると OTLP trace export が有効化 |
 
+### お試し（サンプル workspace）
+
+`KENSAN_DATA_DIR` の既定 `~/kensan-workspace` は作者の個人 workspace。手元で動きを見るだけなら、リポジトリ同梱の **架空のデモ workspace**（[`demo-workspace/`](./demo-workspace/)）を指す:
+
+```bash
+cd frontend && npm install && npm run build   # SPA を frontend/dist へ（初回のみ）
+cd ../backend
+KENSAN_DATA_DIR=../demo-workspace \
+KENSAN_STATIC_DIR=../frontend/dist \
+KENSAN_ADDR=:8899 \
+go run ./cmd/kensan
+# → http://localhost:8899/
+```
+
+デモデータは全てフィクション（実在の予定・個人情報なし）。[`docs/showcase.md`](../../docs/showcase.md) のダッシュボードのスクショはこの workspace から撮っている。
+
 ## API
 
 ルート定義は `backend/internal/api/server.go`（`Handler()`）が単一の真実。
