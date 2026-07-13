@@ -49,7 +49,12 @@ Fixed to `../../../../../templates/fastapi-template/template.yaml` (5 levels, ma
 other two) as part of this PR. Re-running `make dev` after the fix showed zero
 `does not exist` warnings and normal catalog/search collation.
 
-## Date
+The Node v25/v22 mismatch that blocked the first verification attempt exposed a real gap:
+`package.json` declares `engines: "20 || 22"` and CI pins `node-version: 22`
+(`.github/workflows/app-ci.yml`), but no local pin ever existed — no `.nvmrc`, `.tool-versions`,
+or `.mise.toml` anywhere in git history. Only Yarn was actually pinned (bundled binary at
+`.yarn/releases/`, `packageManager: yarn@4.4.1`). Added `backstage/.tool-versions` (`node 22`,
+matching CI) so `mise install` picks the right version automatically going forward.
 
 2026-07-12
 

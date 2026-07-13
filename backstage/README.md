@@ -19,7 +19,7 @@ make update-image TAG=v0.0.7   # build + push + bump kubernetes/backstage/backst
 
 | Requirement | Version | Notes |
 |-------------|---------|-------|
-| Node.js | 22.x | Use nvm for version management |
+| Node.js | 20.x or 22.x | Pinned in `.tool-versions` (`mise install` picks it up); `nvm use` also works |
 | Docker | latest | `CONTAINER_RUNTIME=podman` to switch |
 | GitHub PAT | `packages:write` | GHCR push + GitHub integration |
 | Memory | 2 GB+ free | For dependency installation (`NODE_OPTIONS=--max-old-space-size=4096` if low) |
