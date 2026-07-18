@@ -2,9 +2,9 @@
 
 Authentication and authorization for humans and services — built around one idea: **complete browser authentication once, at the Istio Gateway, so the apps behind it never implement login.**
 
-**Design thesis:** **Keycloak is the single IdP; the Gateway is the single browser chokepoint.** oauth2-proxy sits on the Gateway as an `ext_authz` check — every platform UI (including ones with no native auth at all) gets OIDC for free, and apps downstream simply trust the authenticated headers. Paths that *can't* ride through a browser proxy — CLI logins like `vault login -method=oidc` — get their own OIDC client against the same Keycloak realm. One identity source, two kinds of consumers.
+**Design thesis:** **Keycloak is the single IdP; the Gateway is the single browser chokepoint — for apps that need it.** oauth2-proxy sits on the Gateway as an `ext_authz` check and gives apps with no native auth at all (Backstage, Prometheus, Hubble, Longhorn) OIDC for free. Apps that already have a real auth surface (Vault, Argo CD, Grafana, Keycloak itself) are explicitly **excluded** from that Gateway check and authenticate natively against the same Keycloak realm instead — the Gateway passes their traffic straight through. One identity source, two enforcement tiers.
 
-**What you'll find here:** how the SSO flow actually moves between Gateway, oauth2-proxy, and Keycloak; why Gateway-level auth won over per-service OIDC and Istio-native filters; and how LAN and internet traffic get different session friction on the same infrastructure.
+**What you'll find here:** how the SSO flow actually moves between Gateway, oauth2-proxy, and Keycloak; which apps bypass the Gateway check entirely and why; why Gateway-level auth won over per-service OIDC and Istio-native filters; and how LAN and internet traffic get different session friction on the same infrastructure.
 
 ## Components
 
@@ -23,7 +23,7 @@ sequenceDiagram
     participant GW as Istio Gateway<br/>(gateway-platform)
     participant O2P as oauth2-proxy<br/>(ext_authz)
     participant KC as Keycloak
-    participant APP as Backstage / Grafana<br/>/ ArgoCD UI etc.
+    participant APP as Backstage / Prometheus<br/>/ Hubble / Longhorn
 
     U->>GW: HTTPS /
     GW->>O2P: ext_authz check
@@ -41,16 +41,23 @@ sequenceDiagram
     APP-->>U: 200
 ```
 
-## CLI path (Vault) — no proxy in between
+## App-native bypass (Vault, Argo CD, Grafana, Keycloak)
 
-Vault has its own OIDC client (`vault`) against the same Keycloak realm and never touches oauth2-proxy:
+`vault.platform...`, `argocd.platform...`, `grafana.platform...`, and `auth.platform...` (Keycloak itself) are not in the oauth2-proxy `CUSTOM` policy's host list at all — the Gateway's `ALLOW` policy passes their traffic straight through (see `kubernetes/network/istio/authorizationpolicy-gateway-platform-allow.yaml`, Category 1). Each has its own reason:
+
+- **Vault** — has its own Keycloak OIDC client (`vault`) and issues Vault tokens directly; both the CLI (`vault login -method=oidc`) and the browser UI use this, never oauth2-proxy.
+- **Argo CD** — has its own OIDC config and issues its own JWT (`argocd login --sso`); same shape as Vault.
+- **Grafana** — authenticates via `auth.generic_oauth` straight to Keycloak. It has to bypass the Gateway check for a concrete reason: oauth2-proxy would inject an `Authorization: Bearer <id_token>` header, and Grafana misreads that as its own API key, returning 403 before its native OIDC handler ever runs.
+- **Keycloak** — is the IdP; gating it behind oauth2-proxy would be circular.
+
+Because these hosts skip the Gateway `ext_authz` check entirely, `notPaths`/CLI carve-outs aren't needed — pre-authenticated Bearer tokens and browser logins land on the app the same way:
 
 ```
 yu (local) → vault login -method=oidc role=admin
             └─ opens browser → authenticate at Keycloak → callback returns a Vault token
 ```
 
-oauth2-proxy passes pre-authenticated Bearer tokens through (`--skip-jwt-bearer-tokens`), so CLI flows (`vault login`, `argocd login --sso`) coexist with browser flows on the same hosts.
+Apps that *are* behind the Gateway check (Category 2/3: Backstage, Prometheus, Hubble, Longhorn) instead receive oauth2-proxy's `X-Auth-Request-*` headers and trust those — that's the flow in the diagram above.
 
 ## Design rationale
 
@@ -62,7 +69,7 @@ oauth2-proxy passes pre-authenticated Bearer tokens through (`--skip-jwt-bearer-
 
 Concrete choices:
 
-- **One tier of auth for reachability, a second for identity.** The Gateway gate answers "may this request enter at all"; apps that need real user identity and RBAC (ArgoCD, Grafana, Vault) additionally run their own OIDC client against the same realm — still one IdP, zero duplicate user stores.
+- **Bypass at the Gateway when the app has its own auth surface.** Apps with real native auth (Vault, Argo CD, Grafana, Keycloak) are excluded from the Gateway's `ext_authz` check entirely — see "App-native bypass" above — and authenticate against Keycloak on their own. Apps with no native auth ride the Gateway's oauth2-proxy check instead. Either way it's the same Keycloak realm — one IdP, zero duplicate user stores.
 - **The IdP's own dependencies are treated as critical path.** Keycloak's DB credentials are Vault dynamic with explicit cascade mitigations ([ADR-013](https://github.com/yu-min3/kensan-lab/blob/main/docs/adr/013-keycloak-db-credentials-vault-dynamic.md)); its availability directly gates every login above.
 - **Vault's OIDC mount is GitOps too.** The `vault-oidc-auth/` CRs (auth role, identity group, group alias) are reconciled by Vault Config Operator, so SSO wiring for Vault is reviewable in a PR like everything else ([ADR-015](https://github.com/yu-min3/kensan-lab/blob/main/docs/adr/015-vco-setup-script-hybrid.md) covers the one scripted exception).
 
