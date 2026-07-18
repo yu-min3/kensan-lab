@@ -1,66 +1,66 @@
 # Components — kensan-lab Design System
 
-> プラットフォーム上のすべての app が共通で使うコンポーネントの **完全な仕様**。
-> 実装の正本は各 app の `src/components/ui/`（shadcn/ui ベース）。
-> 新しい app は shadcn CLI で生成し、ここの仕様に合わせる。共通 package 化（`@kensan-lab/ui`）は follow-up。
+> The **complete specification** for the components every app on the platform shares.
+> The implementation source of truth is each app's own `src/components/ui/` (shadcn/ui based).
+> New apps generate these via the shadcn CLI and conform to the spec here. Packaging a shared library (`@kensan-lab/ui`) is a follow-up.
 
 ---
 
-## 設計原則
+## Design principles
 
-1. **一つの形に2つの密度**（comfortable / compact）。app 側で `data-density` を1箇所だけ指定すれば自動追従
-2. **variant は最小限**。優先順位は variant ではなく **配置と1画面の主役性** で表現する
-3. **色だけに頼らない**。状態は dot + ラベル、エラーは色 + 文章
-4. **アイコンライブラリは lucide-react 一択**
+1. **One shape, two densities** (comfortable / compact). Set `data-density` once on the app side and everything follows automatically
+2. **Minimal variants**. Priority is expressed through **placement and single-protagonist-per-screen**, not through variants
+3. **Never rely on color alone**. State = dot + label; errors = color + text
+4. **One icon library, always**: lucide-react
 
 ---
 
 ## 00. Density
 
 ```html
-<html data-density="comfortable">   <!-- app 全体 -->
-<div  data-density="compact">…</div> <!-- 一部だけ密に -->
+<html data-density="comfortable">   <!-- the whole app -->
+<div  data-density="compact">…</div> <!-- just a subtree, made denser -->
 ```
 
-| | comfortable（既定） | compact |
+| | comfortable (default) | compact |
 |---|---|---|
 | `--row-h` | 2.75rem | 2rem |
 | `--control-h` | 2.25rem | 1.875rem |
 | `--card-pad-y/x` | 1.25 / 1.5 rem | 0.75 / 1 rem |
 | `--text-size` | 0.875rem | 0.8125rem |
-| 用途 | 生産性アプリ・読み物・設定 | ダッシュボード・監視・密一覧 |
+| Use case | Productivity apps, reading-oriented UI, settings | Dashboards, monitoring, dense lists |
 
-**切替コスト ゼロ**。CSS 変数が、それを **消費するコンポーネント** を引き連れて追従する。
+**Zero cost to switch**. The CSS variables carry the **components that consume them** along for the ride.
 
-### 密度を「実際に効かせる」消費クラス
+### The utility classes that make density actually take effect
 
-トークンを定義しただけでは何も起きない。下の `.ds-*` クラス（`tokens.css` で定義）を実コンポーネントに付けて初めて `data-density` が見た目に反映される。
+Defining the tokens alone does nothing. `data-density` only changes anything visually once the `.ds-*` classes below (defined in `tokens.css`) are applied to real components.
 
-| クラス | 効果 | 主な用途 |
+| Class | Effect | Primary use |
 |---|---|---|
-| `.ds-page` | `padding: var(--page-pad)` | ページ最外コンテナ |
+| `.ds-page` | `padding: var(--page-pad)` | The outermost page container |
 | `.ds-card` | `padding: var(--card-pad-y/x)` | Card / Panel |
-| `.ds-row` | `height: var(--row-h)` | テーブル行・リスト行・メニュー項目 |
-| `.ds-control` | `height: var(--control-h)` | Button / Input の高さ |
-| `.ds-section` | 縦 flex + `gap: var(--section-gap)` | カード間 |
-| `.ds-stack` | 縦 flex + `gap: var(--gap-stack)` | カード内の縦並び |
-| `.ds-inline` | 横 flex + `gap: var(--gap-inline)` | 隣接コントロール |
-| `.ds-text` / `.ds-label` | `font-size`/`line-height` を密度連動 | 本文 / uppercase ラベル |
+| `.ds-row` | `height: var(--row-h)` | Table rows, list rows, menu items |
+| `.ds-control` | `height: var(--control-h)` | Button / Input height |
+| `.ds-section` | Vertical flex + `gap: var(--section-gap)` | Between cards |
+| `.ds-stack` | Vertical flex + `gap: var(--gap-stack)` | Vertical stacking inside a card |
+| `.ds-inline` | Horizontal flex + `gap: var(--gap-inline)` | Adjacent controls |
+| `.ds-text` / `.ds-label` | Density-linked `font-size`/`line-height` | Body text / uppercase labels |
 
 ```html
 <div data-density="compact">
-  <div class="ds-card ds-stack"> … </div>   <!-- compact の padding/gap で描画 -->
+  <div class="ds-card ds-stack"> … </div>   <!-- renders with compact padding/gap -->
 </div>
 ```
 
-ビジュアル証明: [`density-demo.html`](./density-demo.html)（同じカードが comfortable / compact で変わる）。
+Visual proof: [`density-demo.html`](./density-demo.html) (the same card, comfortable vs. compact).
 
 ---
 
 ## 01. Button
 
 ```tsx
-<Button variant="primary" size="md">タスクを追加</Button>
+<Button variant="primary" size="md">Add task</Button>
 ```
 
 ### Props
@@ -72,12 +72,12 @@
 | `loading` | `boolean` | `false` |
 | `disabled` | `boolean` | `false` |
 
-### ルール
-- **1画面 = primary 1つ。** 残りは ghost / outline で
-- destructive の最終ボタンには **必ずキャンセル**（ghost）を併置
-- アイコンは lucide-react、サイズは 14 / 16 / 18px（sm/md/lg）
-- icon-only は **必ず** `aria-label` を付与
-- link variant はテキストフローの中だけ。スタンドアロンのアクションには使わない
+### Rules
+- **One primary per screen.** Everything else is ghost / outline
+- Always pair the final button of a destructive action with a **Cancel** (ghost)
+- Icons come from lucide-react, sized 14 / 16 / 18px (sm/md/lg)
+- icon-only buttons **must** carry an `aria-label`
+- The link variant is for inline text flow only — never a standalone action
 
 ---
 
@@ -90,10 +90,10 @@
 ### Variants
 `brand` / `success` / `warning` / `destructive` / `muted` / `outline`
 
-### ルール
-- 状態列（status column）は **dot variant + ラベル文字** を必ずセットで
-- text-only badge と dot badge を **1コンテキストで混在させない**
-- ラベルは全角3〜6文字 or 半角6〜12文字を目安（はみ出すならカテゴリ設計が雑）
+### Rules
+- A status column must always pair the **dot variant with a text label**
+- Never mix text-only badges and dot badges **within one context**
+- Keep labels to roughly 6–12 characters (if it overflows, the category design is probably too loose)
 
 ---
 
@@ -101,36 +101,36 @@
 
 ```tsx
 <div className="field">
-  <label htmlFor="title">タスク名</label>
+  <label htmlFor="title">Task name</label>
   <input id="title" className="input" />
-  <div className="hint">空白を含めずに入力</div>
+  <div className="hint">Don't include leading/trailing whitespace</div>
 </div>
 ```
 
 ### States
 default / `:focus` / `[disabled]` / `.field.error`
 
-### ルール
-- **label → field → hint の3層** を必ず守る
-- ラベル省略は不可（`aria-label` で代替可）。プレースホルダはラベル代わりにならない
-- エラーは色だけでなく **hint の文章**で何が悪いか伝える
-- 数値入力は **mono + tabular-nums** 推奨（揃いが綺麗になる）
+### Rules
+- Always keep the **three-layer label → field → hint** structure
+- Never omit the label (an `aria-label` can substitute). A placeholder is never a substitute for a label
+- Errors communicate what's wrong **through the hint text**, not color alone
+- Numeric inputs should use **mono + tabular-nums** (keeps digits aligned cleanly)
 
 ---
 
 ## 04. Checkbox / Switch
 
 ```tsx
-<label className="check"><input type="checkbox" /><span className="box" />通知を有効化</label>
-<label className="switch"><input type="checkbox" /><span className="track" />自動保存</label>
+<label className="check"><input type="checkbox" /><span className="box" />Enable notifications</label>
+<label className="switch"><input type="checkbox" /><span className="track" />Auto-save</label>
 ```
 
-### 使い分け（**混用禁止**）
+### When to use which (**never mix them**)
 | | Checkbox | Switch |
 |---|---|---|
-| 意味 | **複数選択 / 任意フラグ** | **即時反映される設定** |
-| 例 | 利用規約に同意 / 配信先選択 | 自動保存 / 通知 ON/OFF / ダークモード |
-| 保存 | フォーム送信時 | 切替の瞬間 |
+| Meaning | **Multi-select / an optional flag** | **A setting that applies immediately** |
+| Example | Agree to terms / choose recipients | Auto-save / notifications on-off / dark mode |
+| Persisted | On form submit | The instant it's toggled |
 
 ---
 
@@ -138,17 +138,17 @@ default / `:focus` / `[disabled]` / `.field.error`
 
 ```tsx
 <Card>
-  <CardHead title="今週のフォーカス" sub="2026-05-12 週" badge={<Badge>進行中</Badge>} />
+  <CardHead title="This week's focus" sub="Week of 2026-05-12" badge={<Badge>In progress</Badge>} />
   <CardBody>…</CardBody>
   <CardFoot>…</CardFoot>
 </Card>
 ```
 
-### ルール
-- 既定は **border のみ、影なし**
-- `:hover` の subtle な `shadow-sm` は許容（クリック可能なカードのみ）
-- head / body / foot の3パートが基本構成。foot は任意
-- h3 は **h-serif**
+### Rules
+- Default is **border only, no shadow**
+- A subtle `shadow-sm` on `:hover` is acceptable (clickable cards only)
+- head / body / foot is the base structure; foot is optional
+- h3 uses **h-serif**
 
 ---
 
@@ -156,15 +156,15 @@ default / `:focus` / `[disabled]` / `.field.error`
 
 ```tsx
 <Tabs defaultValue="overview">
-  <Tab value="overview">概要</Tab>
-  <Tab value="tasks">タスク</Tab>
+  <Tab value="overview">Overview</Tab>
+  <Tab value="tasks">Tasks</Tab>
 </Tabs>
 ```
 
-### ルール
-- **下線型のみ**。pill 型は brand 色と競合するため不採用
-- active は `font-weight: 600` + `border-bottom: 2px solid hsl(var(--brand))`
-- 6個以上になるなら設計を疑え（Sidebar に出すかカテゴリ分割を検討）
+### Rules
+- **Underline style only**. Pill-style tabs conflict visually with the brand color and aren't used
+- Active state: `font-weight: 600` + `border-bottom: 2px solid hsl(var(--brand))`
+- Six or more tabs is a sign to reconsider the design (consider moving it to the sidebar, or splitting into categories)
 
 ---
 
@@ -183,12 +183,12 @@ default / `:focus` / `[disabled]` / `.field.error`
 </table>
 ```
 
-### ルール
-- ダッシュボードでは **`data-density="compact"`** を親に（行高32px、font 13px）
-- 数値・時刻・ID は **`.num-cell`** クラス（右寄せ + mono + tnum）
-- 状態列は **dot badge** で
-- **行全体クリック不可**。最終列にメニューボタン（`btn-ghost btn-icon`）を置く
-- 横スクロールが発生するなら列構成を再考。固定列は最後の手段
+### Rules
+- On dashboards, put **`data-density="compact"`** on the parent (32px row height, 13px font)
+- Numbers, timestamps, and IDs get the **`.num-cell`** class (right-aligned + mono + tnum)
+- Status columns use a **dot badge**
+- **The whole row is never clickable**. Put a menu button (`btn-ghost btn-icon`) in the final column instead
+- If horizontal scrolling shows up, reconsider the column layout. A frozen column is a last resort
 
 ---
 
@@ -196,50 +196,50 @@ default / `:focus` / `[disabled]` / `.field.error`
 
 ```tsx
 <Dialog open={open} onOpenChange={setOpen}>
-  <DialogHead title="削除しますか？" desc="この操作は取り消せません。" />
+  <DialogHead title="Delete this?" desc="This action cannot be undone." />
   <DialogBody>…</DialogBody>
   <DialogFoot>
-    <Button variant="ghost">キャンセル</Button>
-    <Button variant="destructive">削除</Button>
+    <Button variant="ghost">Cancel</Button>
+    <Button variant="destructive">Delete</Button>
   </DialogFoot>
 </Dialog>
 ```
 
-### いつ使う
-- **破壊的・不可逆**な操作（削除・上書き）
-- 警告を読まずに進ませたくない場面
-- 複数フィールド入力（API key 発行など）
+### When to use it
+- **Destructive, irreversible** actions (delete, overwrite)
+- Situations where the user must not proceed without reading a warning
+- Multi-field input (e.g. issuing an API key)
 
-### いつ使わない
-- 軽い設定変更 → **インライン**で
-- 完了/未完了の切替・保存・並び替え → **Toast + Undo** で
-- 連続して行う操作 → **Toast** で
+### When not to use it
+- A minor settings change → do it **inline**
+- Toggling done/undone, saving, reordering → use **Toast + Undo** instead
+- Actions performed repeatedly, in sequence → use a **Toast** instead
 
-### ルール
-- 危険系の最終ボタンは **destructive**、キャンセルは **ghost**
-- primary は使わない（誤クリック誘発）
-- 見出しは「○○しますか？」と疑問形で、本文は影響範囲を具体的に
+### Rules
+- The final button for a dangerous action is **destructive**; cancel is **ghost**
+- Never use primary here (invites misclicks)
+- Phrase the heading as a question ("Delete this?"); state the concrete impact in the body
 
 ---
 
 ## 09. Alert
 
 ```tsx
-<Alert variant="warning" title="証明書の期限が近づいています" desc="…" />
+<Alert variant="warning" title="A certificate is nearing expiry" desc="…" />
 ```
 
 ### Variants
 `info` / `success` / `warning` / `destructive`
 
-### Alert vs Toast（背反）
+### Alert vs. Toast (mutually exclusive)
 | | Alert | Toast |
 |---|---|---|
-| 寿命 | 画面に残る | 自動消滅（6–8s） |
-| 用途 | 持続的な状態通知 | 操作の完了/失敗通知 |
-| 閉じて | また戻ってくる | 戻ってこない |
-| 例 | 証明書期限・障害情報 | 保存完了・同期失敗 |
+| Lifetime | Stays on screen | Auto-dismisses (6–8s) |
+| Use | Ongoing state notification | Notifying completion/failure of an action |
+| After dismissal | Comes back | Never comes back |
+| Example | Certificate expiry, an incident | Save complete, sync failed |
 
-**両方で同じ事象を出すのは禁止**。
+**Never surface the same event through both.**
 
 ---
 
@@ -248,59 +248,59 @@ default / `:focus` / `[disabled]` / `.field.error`
 ```tsx
 <Empty
   icon={<Inbox />}
-  title="まだタスクがありません"
-  desc="今日の予定を1つ追加して、研鑽の習慣を始めましょう。"
-  actions={[<Button variant="primary">＋ 追加</Button>, <Button variant="outline">AIに任せる</Button>]}
+  title="No tasks yet"
+  desc="Add one thing for today and start the habit of honing your craft."
+  actions={[<Button variant="primary">＋ Add</Button>, <Button variant="outline">Hand it to the AI</Button>]}
 />
 ```
 
-### ルール（**3点セット必須**）
-1. **状態の説明**（何が無いのか）
-2. **次の一手**（どうしたら状況が変わるか）
-3. **主アクション**（最低1つ、最大2つ）
+### Rules (**the three-part combo is mandatory**)
+1. **A description of the state** (what's missing)
+2. **The next move** (how the situation changes)
+3. **A primary action** (at least 1, at most 2)
 
-「データがありません」**だけ**は禁止。
+"No data" **on its own** is forbidden.
 
 ---
 
 ## 11. Tooltip · Avatar · Skeleton
 
 ### Tooltip
-- 短いラベル（マウスオーバーで補足が必要なアイコンボタン等）に
-- 12文字以上の説明文を入れるなら **Popover** を使う（未実装、必要時に追加）
+- For short labels (e.g. an icon button whose meaning needs a hover hint)
+- If the explanation runs past ~12 words, use a **Popover** instead (not yet implemented; add when needed)
 
 ### Avatar
-- 既定 32px、`-sm` 24px、`-lg` 44px
-- 画像がないときは **イニシャル2文字**（姓名 or ハンドル先頭）
-- AI / システム発のものは brand 色背景 + ✦ アイコン
+- Default 32px, `-sm` 24px, `-lg` 44px
+- When there's no image, show **two-letter initials** (from a name or handle)
+- AI/system-originated avatars get a brand-color background + a ✦ icon
 
 ### Skeleton
-- **本物のレイアウトを模す**こと（行数・幅・高さを実体に近づける）
-- ロード時間が 200ms 未満なら表示しない（チラつき防止）
-- spinner は最後の手段（位置情報が失われるため）
+- **Mimic the real layout** (match row count, width, and height to the actual content)
+- Don't show it if load time is under 200ms (prevents flicker)
+- A spinner is the last resort (it loses positional information)
 
 ---
 
-## アクセシビリティ最低限
+## Accessibility baseline
 
-- フォーカスリングは必ず表示（`focus-visible` で `--ring`）
-- 状態を色だけで伝えない（色 + アイコン or テキスト）
-- インタラクティブ要素のヒット領域: **最低 32×32 px**（compact）、推奨 **44×44 px**（comfortable）
-- フォームには必ず `<label>`（または `aria-label`）
+- Always show a focus ring (`focus-visible` using `--ring`)
+- Never convey state through color alone (color + icon or text)
+- Interactive hit targets: **minimum 32×32px** (compact), **recommended 44×44px** (comfortable)
+- Every form field needs a `<label>` (or `aria-label`)
 
 ---
 
-## やってはいけないこと（NG リスト）
+## Don't (the NG list)
 
-| NG | 代わりに |
+| Don't | Instead |
 |---|---|
-| `bg-[#0EA5E9]` 等の hex 直書き | `bg-brand` |
-| 1画面で primary 2つ以上 | 1つに絞り残りは ghost / outline |
-| 色だけで状態を表現 | dot badge + テキスト |
-| 数値を proportional font で | `font-mono` + `.tnum` |
-| カードに常時 shadow-lg | 罫線のみ、hover で `shadow-sm` |
-| 同画面で角丸混在（4px と 12px） | 同じ `--radius` ファミリーに揃える |
-| 「データなし」だけ | 説明 + 次の一手 + ボタン |
-| spinner だけのローディング | 実レイアウトを模した Skeleton |
-| 絵文字を UI に使う | lucide-react のアイコン |
-| アイコンライブラリ混在 | lucide-react 一択 |
+| A raw hex like `bg-[#0EA5E9]` | `bg-brand` |
+| Two or more primary buttons on one screen | Pick one; make the rest ghost / outline |
+| Conveying state with color alone | Dot badge + text |
+| Numbers in a proportional font | `font-mono` + `.tnum` |
+| A card with a persistent `shadow-lg` | Hairline border only; `shadow-sm` on hover |
+| Mixed corner radii on one screen (4px and 12px together) | Stay within the same `--radius` family |
+| An empty state that's just "No data" | Description + next action + button |
+| A loading state that's just a spinner | A Skeleton that mimics the real layout |
+| Emoji in the UI | A lucide-react icon |
+| Mixing icon libraries | lucide-react, and only lucide-react |
