@@ -36,6 +36,11 @@ data:
             192.168.0.242 prometheus.platform.yu-min3.com
             192.168.0.242 hubble.platform.yu-min3.com
             192.168.0.242 longhorn.platform.yu-min3.com
+            # auth.yu-mins.com: Keycloak issuer 統一先。cluster 内から叩く OIDC
+            # client（oauth2-proxy の token 交換 / istiod の jwks / Grafana・Vault の
+            # backend）を Cloudflare へ hairpin させず gateway .242 に直接向ける
+            # split-horizon。public DNS では Cloudflare edge に解決される（外部経路）。
+            192.168.0.242 auth.yu-mins.com
             fallthrough
         }
         kubernetes cluster.local in-addr.arpa ip6.arpa {
