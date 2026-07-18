@@ -1,58 +1,58 @@
-# Incident: system-infra ArgoCD 自動 sync ブロック
+# Incident: system-infra ArgoCD auto-sync blocked
 
-## 概要
+## Summary
 
-| 項目 | 内容 |
+| Item | Detail |
 |------|------|
-| 発生日 | 2026-03-02 |
-| 検知日 | 2026-03-23 |
-| 影響 | kube-system namespace のラベル更新が約3週間反映されず、hubble-route の HTTPRoute が Gateway に拒否され Cilium アプリが Degraded |
-| 根本原因 | ArgoCD が kube-system namespace を prune しようとし DeletionError でブロック |
+| Occurred | 2026-03-02 |
+| Detected | 2026-03-23 |
+| Impact | Label updates to the `kube-system` namespace went unapplied for ~3 weeks; the `hubble-route` HTTPRoute was rejected by the Gateway and the Cilium app went Degraded |
+| Root cause | Argo CD attempted to prune the `kube-system` namespace and got blocked by a DeletionError |
 
-## タイムライン
+## Timeline
 
-| 日時 | イベント |
+| Time | Event |
 |------|---------|
-| 2025-11-17 | system-infra 最後の成功 sync（ディレクトリ再配置） |
-| 2026-02-21 | PSS baseline ラベル追加（system-infra 最後のファイル変更） |
-| 2026-03-02 11:37 UTC | DeletionError 発生: `namespaces "kube-system" is forbidden: this namespace may not be deleted` |
-| 2026-03-19 | goldship → kensan-lab ラベルリネームがコミットされるも sync されず |
-| 2026-03-23 | Backstage 調査中に Cilium Degraded を検知、原因調査で発覚 |
+| 2025-11-17 | Last successful sync of `system-infra` (a directory reorganization) |
+| 2026-02-21 | Added PSS baseline label (`system-infra`'s last file change) |
+| 2026-03-02 11:37 UTC | DeletionError occurs: `namespaces "kube-system" is forbidden: this namespace may not be deleted` |
+| 2026-03-19 | The goldship → kensan-lab label rename is committed but never syncs |
+| 2026-03-23 | Cilium's Degraded state is noticed while investigating Backstage; root-caused from there |
 
-## 影響の連鎖
+## Chain of impact
 
 ```
-DeletionError (kube-system prune 失敗)
-  → system-infra の自動 sync が全停止
-    → goldship.platform/* ラベルが kube-system に残留
-      → Gateway の allowedRoutes selector (kensan-lab.platform/*) にマッチせず
-        → hubble-route HTTPRoute が NotAllowedByListeners
-          → ArgoCD が Cilium アプリを Degraded と判定
+DeletionError (kube-system prune fails)
+  → system-infra's auto-sync stops entirely
+    → the goldship.platform/* labels stay on kube-system
+      → they no longer match the Gateway's allowedRoutes selector (kensan-lab.platform/*)
+        → the hubble-route HTTPRoute becomes NotAllowedByListeners
+          → Argo CD marks the Cilium app Degraded
 ```
 
-## 根本原因の分析
+## Root cause analysis
 
-### 直接原因
+### Direct cause
 
-ArgoCD の ApplicationSet generator（environments）が一時的に system-infra の config.json 読み取りに失敗したか、repo-server のキャッシュ不整合により、kube-system namespace が管理対象から外れたと推測される。`prune: true` 設定により削除を試行したが、Kubernetes API が kube-system の削除を拒否し DeletionError が発生。
+Argo CD's ApplicationSet generator (environments) likely failed to read `system-infra`'s `config.json` momentarily, or a repo-server cache inconsistency dropped the `kube-system` namespace out of the managed set. With `prune: true` set, Argo CD attempted to delete it, and the Kubernetes API rejected the deletion, producing the DeletionError.
 
-### なぜ長期間検知できなかったか
+### Why it went undetected for so long
 
-- system-infra は namespace ラベルのみを管理しており、ラベルの差分だけでは実害が見えにくい
-- DeletionError は ArgoCD UI の conditions に表示されるが、アプリ一覧では OutOfSync 表示のみ
-- Cilium の Degraded は hubble-route（監視 UI）の問題であり、CNI 自体は正常動作していた
+- `system-infra` only manages namespace labels, so a label diff alone doesn't produce visible damage
+- The DeletionError shows up in the Argo CD UI's conditions, but the app list itself just shows OutOfSync
+- Cilium's Degraded state was a problem with `hubble-route` (a monitoring UI) — the CNI itself kept working normally
 
-### なぜ 3/2 にコミットなしで発生したか
+### Why it happened on 3/2 with no corresponding commit
 
-3/2 にはリポジトリへのコミットがない。ArgoCD の定期 reconciliation（デフォルト3分間隔）で ApplicationSet generator が Git をスキャンした際の一時的な不整合が原因と推測される。repo-server の再起動やネットワーク瞬断なども可能性としてあるが、ログが残っておらず特定不能。
+There's no repository commit on 3/2. This is presumed to be a transient inconsistency hit during one of Argo CD's periodic reconciliations (default 3-minute interval) while the ApplicationSet generator was scanning Git. A repo-server restart or a brief network blip are also possible, but no logs survived to confirm either.
 
-## 対応
+## Response
 
-1. `kubectl annotate application system-infra argocd.argoproj.io/refresh=hard` で手動 refresh
-2. prune=false で手動 sync トリガー → Synced に復帰
-3. kube-system の namespace.yaml に `argocd.argoproj.io/sync-options: Prune=false` アノテーションを追加（再発防止）
+1. Manually refreshed via `kubectl annotate application system-infra argocd.argoproj.io/refresh=hard`
+2. Triggered a manual sync with `prune=false` → returned to Synced
+3. Added the `argocd.argoproj.io/sync-options: Prune=false` annotation to `kube-system`'s `namespace.yaml` (to prevent recurrence)
 
-## 再発防止
+## Prevention
 
-- kube-system 等の Kubernetes 保護 namespace には `Prune=false` sync option を付与する
-- ArgoCD で管理するが削除されてはならないリソースには防御的にアノテーションを設定する
+- Attach the `Prune=false` sync option to Kubernetes-protected namespaces like `kube-system`
+- Defensively annotate any Argo CD-managed resource that must never be deleted

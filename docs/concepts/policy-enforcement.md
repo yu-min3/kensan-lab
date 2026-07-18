@@ -1,140 +1,145 @@
-# Policy Enforcement (Kyverno 統一設計)
+# Policy Enforcement (Kyverno-unified design)
 
-クラスタの Policy as Code の SoT。設計判断の経緯は [ADR-012](../adr/012-policy-enforcement-kyverno.md) を参照。
+The source of truth for Policy as Code across the cluster. See [ADR-012](../adr/012-policy-enforcement-kyverno.md) for the design rationale.
 
-**v2 統一設計**: PSS の強制は Kyverno に一本化する。PSA (Pod Security Admission) は
-label を撤去して不活性化し、ns の PSS level は Kyverno 専用 label
-`kensan-lab.platform/pss-level` で宣言する (PSA の label key を流用すると PSA 本体が
-再活性化するため、独自 key を使う)。
+**v2 unified design**: PSS enforcement is consolidated onto Kyverno. PSA (Pod Security
+Admission) is deactivated by removing its label, and a namespace's PSS level is instead
+declared via the Kyverno-only label `kensan-lab.platform/pss-level` (using PSA's own
+label key would re-activate PSA itself, hence the dedicated key).
 
-## pss-level label のセマンティクス
+## Semantics of the pss-level label
 
-| `kensan-lab.platform/pss-level` | 意味 | 宣言できる条件 | 現在の対象 |
+| `kensan-lab.platform/pss-level` | Meaning | Conditions to declare it | Current targets |
 |---|---|---|---|
-| (無印 = デフォルト) | `pss-baseline` の床が適用 | — | 大多数の ns |
-| `privileged` | 床から除外 (host アクセス前提の PE 専管 ns) | `tier=platform` のみ (`ns-label-contract` rule 3 が強制) | kube-system / istio-system / longhorn-system / local-path-storage |
-| `restricted` | 床より厳格な PSS restricted を適用 (opt-in) | — | app-kensan |
+| (unset = default) | The `pss-baseline` floor applies | — | Most namespaces |
+| `privileged` | Excluded from the floor (PE-exclusive namespaces that require host access) | Only `tier=platform` (enforced by `ns-label-contract` rule 3) | kube-system / istio-system / longhorn-system / local-path-storage |
+| `restricted` | Applies PSS restricted, stricter than the floor (opt-in) | — | app-kensan |
 
-未知の値は何にも match せず床に落ちる (安全側フォールバック)。
+Unknown values match nothing and fall back to the floor (a safe default).
 
-## 構成
+## Structure
 
-| 要素 | 場所 | Argo CD app |
+| Element | Location | Argo CD app |
 |---|---|---|
-| kyverno ns | `kubernetes/policy/namespace.yaml` | `kyverno-namespace` (environments パターン、wave -4) |
-| Engine (Helm) | `kubernetes/policy/kyverno/values.yaml` | `kyverno` (Pattern A、wave -2) |
-| ポリシー本体 | `kubernetes/policy/kyverno-policies/*.yaml` | `kyverno-policies` (Pattern B、wave -1) |
-| 例外 | `kubernetes/policy/kyverno-policies/exceptions/` | 同上 |
+| kyverno namespace | `kubernetes/policy/namespace.yaml` | `kyverno-namespace` (environments pattern, wave -4) |
+| Engine (Helm) | `kubernetes/policy/kyverno/values.yaml` | `kyverno` (Pattern A, wave -2) |
+| Policy bundle | `kubernetes/policy/kyverno-policies/*.yaml` | `kyverno-policies` (Pattern B, wave -1) |
+| Exceptions | `kubernetes/policy/kyverno-policies/exceptions/` | Same as above |
 
-- engine とポリシーは **別 app** — ポリシー変更の PR が engine の Helm sync に触れない
-- `PolicyException` は **kyverno ns のみ受理** (`features.policyExceptions.namespace=kyverno`)。例外の追加は必ず Git 経由
+- The engine and the policies are **separate apps** — a policy-change PR never touches the engine's Helm sync
+- `PolicyException` is **only accepted in the `kyverno` namespace** (`features.policyExceptions.namespace=kyverno`). Every exception addition goes through Git
 
-## ポリシー Inventory
+## Policy inventory
 
-| ポリシー | scope | mode | 内容 |
+| Policy | Scope | Mode | What it does |
 |---|---|---|---|
-| `pss-baseline` | `pss-level=privileged` の ns **以外すべて** (床) | **Audit** | PSS baseline (`validate.podSecurity`) |
-| `pss-restricted` | `pss-level=restricted` の ns (opt-in) | **Audit** | PSS restricted (旧 PSA enforce=restricted の引き継ぎ) |
-| `disallow-latest-tag` | app tier | **Audit** | `:latest` / tag 省略禁止 (ADR-011 の教訓) |
-| `require-requests` | app tier | **Audit** | cpu / memory requests 必須 |
-| `ns-label-contract` (3 rules) | rule1: 全 ns (K8s 組み込み除く) / rule2: `app-*` (app-prod 除外) / rule3: `pss-level=privileged` の ns | **Audit** | rule1: environment + tier (値域込み) 必須 / rule2: ADR-006 3-axis + tier=application / rule3: privileged 宣言は tier=platform のみ |
+| `pss-baseline` | **All namespaces except** those with `pss-level=privileged` (the floor) | **Audit** | PSS baseline (`validate.podSecurity`) |
+| `pss-restricted` | Namespaces with `pss-level=restricted` (opt-in) | **Audit** | PSS restricted (carries forward the old PSA `enforce=restricted`) |
+| `disallow-latest-tag` | Application tier | **Audit** | Forbids `:latest` / an omitted tag (the ADR-011 lesson) |
+| `require-requests` | Application tier | **Audit** | Requires cpu / memory requests |
+| `ns-label-contract` (3 rules) | rule1: all namespaces (excluding K8s built-ins) / rule2: `app-*` (excluding app-prod) / rule3: namespaces with `pss-level=privileged` | **Audit** | rule1: requires `environment` + `tier` (with a fixed value domain) / rule2: ADR-006's 3-axis labels + `tier=application` / rule3: only `tier=platform` namespaces may declare `privileged` |
 
-「app tier」= `kensan-lab.platform/tier=application` label の ns ∪ ns 名 `app-*` / `kensan`。
-label が SoT で、name match は label 欠落 ns が静かに scope 外へ落ちるのを防ぐ defense-in-depth
-(label 欠落自体は ns-label-contract が検出する)。scope 定義は disallow-latest-tag /
-require-requests の match block と本 doc の 3 ヶ所にあり、変更時は同期すること。
+"Application tier" = namespaces with the `kensan-lab.platform/tier=application` label ∪ namespace names matching `app-*` / `kensan`.
+The label is the source of truth; the name match exists as defense-in-depth so a namespace
+missing its label doesn't quietly fall out of scope (a missing label is itself caught by
+`ns-label-contract`). The scope definition is duplicated across the `disallow-latest-tag` /
+`require-requests` match blocks and this doc in 3 places — keep them in sync when changing it.
 
-全ポリシー `webhookConfiguration.failurePolicy: Ignore` (admission controller replica 1 のため。ADR-012 §3)。
+Every policy sets `webhookConfiguration.failurePolicy: Ignore` (because the admission controller runs 1 replica; see ADR-012 §3).
 
-## PolicyException Inventory
+## PolicyException inventory
 
-| 例外 | 対象 | exempt する control | 理由 |
+| Exception | Target | Exempted control | Reason |
 |---|---|---|---|
-| `node-exporter-host-access` | monitoring / label selector (`prometheus-node-exporter`) | Host Namespaces / Host Ports (images 限定) / HostPath Volumes | node metrics 収集に host アクセスが必須 |
+| `node-exporter-host-access` | `monitoring` / label selector (`prometheus-node-exporter`) | Host Namespaces / Host Ports (scoped to specific images) / HostPath Volumes | Host access is required to collect node metrics |
 
-**PolicyException の podSecurity 指定の注意**: container レベルの control (Host Ports /
-Capabilities 等) は `controlName` だけでは exempt されず **`images` の併記が必須**
-(pod レベルの Host Namespaces / HostPath Volumes は controlName のみで効く)。
-exception を書いたら `kyverno apply <policy> --resource <live pod> --exceptions <polex>`
-のオフライン評価で skip になることを確認してから commit する (background scan の 1h を待たずに検証できる)。
+**Note on PolicyException's podSecurity targeting**: container-level controls (Host Ports /
+Capabilities, etc.) are **not** exempted by `controlName` alone — **`images` must also be
+specified** (pod-level controls like Host Namespaces / HostPath Volumes work with
+`controlName` alone). After writing an exception, verify it produces a skip via an offline
+evaluation — `kyverno apply <policy> --resource <live pod> --exceptions <polex>` — before
+committing (this avoids waiting out the 1h background-scan interval to confirm).
 
-## 運用
+## Operations
 
-### violation の確認
+### Checking violations
 
 ```bash
-kubectl get cpol                                  # ClusterPolicy の Ready 状態
-kubectl get polr -A                               # namespaced リソースの PolicyReport
-kubectl get cpolr                                 # cluster-scoped リソース (Namespace 等) は
-                                                  # ClusterPolicyReport — ns-label-contract はこちら
-kubectl get polr -A -o wide | grep -v " 0 *$"     # FAIL を含む report に絞る
-kubectl describe polr -n <ns> <name>              # violation の詳細
+kubectl get cpol                                  # ClusterPolicy Ready status
+kubectl get polr -A                               # PolicyReport for namespaced resources
+kubectl get cpolr                                 # cluster-scoped resources (e.g. Namespace) show up as
+                                                  # ClusterPolicyReport — this is where ns-label-contract lands
+kubectl get polr -A -o wide | grep -v " 0 *$"     # narrow down to reports containing a FAIL
+kubectl describe polr -n <ns> <name>              # violation details
 ```
 
-PolicyReport は background scan (1h 間隔、values.yaml で明示 pin) 由来。admission 毎の
-レポートは microSD etcd 保護のため無効化している (`features.admissionReports: false`) —
-検出は最大 1h 遅延する。background scan の PolicyReport 生成は reports-controller の担当
-(background-controller は generate / mutateExisting 専任のため無効化済み)。
+PolicyReports come from the background scan (1h interval, explicitly pinned in values.yaml).
+Per-admission reports are disabled to protect the microSD-backed etcd
+(`features.admissionReports: false`) — detection can lag by up to 1h. Background-scan
+PolicyReport generation is handled by the reports-controller (the background-controller
+is disabled since it only handles generate / mutateExisting).
 
-### 孤児 PolicyReport の掃除 (ns を scope 外に変更した後)
+### Cleaning up orphaned PolicyReports (after moving a namespace out of scope)
 
-ns に `pss-level=privileged` を付与する等で**リソースが policy の scope 外になると、
-既存の PolicyReport は自動では消えない** (Phase 1 で実測 — 2026-06-07):
-scan は scope 内のリソースしか巡回せず、report の ownerReference は対象リソース本体
-なので GC も発火しない。古い FAIL が「孤児」として残り続ける。
+When a resource falls out of a policy's scope — e.g. adding `pss-level=privileged` to a
+namespace — **its existing PolicyReport doesn't disappear on its own** (observed in
+practice during Phase 1, 2026-06-07): the scan only walks resources currently in scope, and
+a report's ownerReference points at the target resource itself, so garbage collection
+never fires either. Old FAILs linger as "orphans."
 
 ```bash
-# 孤児の見分け方: 対象 ns が scope 外なのに FAIL が残っている + timestamp が古い
+# How to spot an orphan: FAILs remain even though the target namespace is now out of scope, and the timestamp is stale
 kubectl get polr -n <ns> -o json | jq '[.items[].results[].timestamp.seconds] | max'
-# 掃除 (scope 内のリソースなら次の scan で勝手に再生成されるだけなので安全)
+# Cleanup (safe — if the resource is still in scope, the next scan just regenerates the report)
 kubectl get polr -n <ns> -o json | jq -r '.items[] | select(.summary.fail>0) | .metadata.name' \
   | xargs -n10 kubectl delete polr -n <ns>
 ```
 
-### Argo CD hook リソースの violation は「次の本物の sync」まで残る
+### Violations on Argo CD hook resources persist until the "next real sync"
 
-PostSync hook (kensan の minio-init / polaris-init 等) は **Argo CD の diff 比較対象外**。
-hook の manifest だけを修正しても app は Synced のままで auto-sync が発火せず、
-live の hook リソース (旧 spec) も violation も残り続ける。解消には Argo CD UI からの
-手動 Sync (hook 再実行) か、同 app 内の non-hook リソースの変更が必要 (Phase 1 で実測)。
+PostSync hooks (e.g. kensan's minio-init / polaris-init) are **excluded from Argo CD's diff
+comparison**. Fixing only the hook's manifest leaves the app Synced with no auto-sync
+trigger, so both the live hook resource (the old spec) and its violation persist. Resolving
+this requires either a manual Sync from the Argo CD UI (which re-runs the hook) or a change
+to a non-hook resource within the same app (observed in practice during Phase 1).
 
-### ポリシーの追加
+### Adding a policy
 
-1. `kubernetes/policy/kyverno-policies/<name>.yaml` に ClusterPolicy を置く (`failureAction: Audit` で開始、`webhookConfiguration.failurePolicy: Ignore`)
+1. Place a ClusterPolicy at `kubernetes/policy/kyverno-policies/<name>.yaml` (start with `failureAction: Audit`, `webhookConfiguration.failurePolicy: Ignore`)
 2. commit → push → Argo CD sync
-3. PolicyReport で violation を観測してから Enforce を検討
+3. Observe violations via PolicyReport before considering Enforce
 
-### 例外の追加
+### Adding an exception
 
-1. `kubernetes/policy/kyverno-policies/exceptions/<workload>.yaml` に PolicyException を置く (namespace は `kyverno` 固定)
-2. `podSecurity` の `controlName` で exempt 範囲を最小に絞る
-3. Pod controller を exempt する場合は `ruleNames` に `autogen-<rule>` も併記する
+1. Place a PolicyException at `kubernetes/policy/kyverno-policies/exceptions/<workload>.yaml` (namespace is always `kyverno`)
+2. Use `podSecurity`'s `controlName` to scope the exemption as narrowly as possible
+3. When exempting a Pod controller, also list `autogen-<rule>` in `ruleNames`
 
-### ns の PSS level を変える
+### Changing a namespace's PSS level
 
-1. 対象 ns の `namespace.yaml` で `kensan-lab.platform/pss-level` label を設定 (`privileged` / `restricted`。無印 = baseline の床)
-2. `privileged` は `tier=platform` の ns でないと `ns-label-contract` rule 3 に違反する (Enforce 後は拒否)
+1. Set the `kensan-lab.platform/pss-level` label in the target namespace's `namespace.yaml` (`privileged` / `restricted`; unset = the baseline floor)
+2. `privileged` requires the namespace to have `tier=platform`, or it violates `ns-label-contract` rule 3 (rejected once Enforce is active)
 3. PR → Argo CD sync
 
-### Enforce 昇格 (Phase 3)
+### Promoting to Enforce (Phase 3)
 
-1. 対象ポリシーの violation が PolicyReport 上でゼロであることを確認
-2. **`ns-label-contract` を最初に Enforce する** (他 policy の scope が label に依存するため、土台から)
-3. `validate.failureAction: Audit` → `Enforce` に変更して PR — pss-baseline / pss-restricted → latest / requests の順
-4. **PSA label の撤去は Enforce 昇格と同じ PR で行う** (atomic swap — 強制の空白期間を作らない)
-5. app-tier policy の name match (`app-*` / `kensan`) を撤去して label selector に一本化
-6. webhook `failurePolicy: Fail` への昇格条件 (ADR-012 改訂): Enforce 安定数週間 + `replicas: 2` + `config.webhooks` で kube-system を webhook レベル除外 + Fail は app-tier policy のみ
+1. Confirm zero violations for the target policy in PolicyReport
+2. **Enforce `ns-label-contract` first** (other policies' scope depends on its labels, so start with the foundation)
+3. PR changing `validate.failureAction: Audit` → `Enforce`, in order: pss-baseline / pss-restricted → latest-tag / requests
+4. **Remove the PSA label in the same PR as the Enforce promotion** (an atomic swap — never leave a gap in enforcement)
+5. Remove the app-tier policies' name match (`app-*` / `kensan`) and consolidate onto the label selector alone
+6. Conditions for promoting the webhook to `failurePolicy: Fail` (per the ADR-012 revision): Enforce stable for several weeks + `replicas: 2` + `config.webhooks` excludes `kube-system` at the webhook level + `Fail` applies only to application-tier policies
 
-## 既知の残課題
+## Known remaining work
 
-- **PSA label の撤去** (kube-system / istio-system / longhorn-system / local-path-storage / app-kensan / app-prod / kensan / argocd / auth 系 / secrets 系 / kyverno ns): Phase 3 の Enforce 昇格と同時に実施 (atomic swap)。それまでは pss-level label と併存
-- ~~**bare ns の label remediation**~~ → **Phase 2 で解消済み** (初回 scan の実測 4 ns):
-  - `reloader` / `sealed-secrets` / `local-path-storage`: **ns lifecycle app** (`namespace.yaml` をコンポーネント本体ディレクトリに同居 + `applications/namespaces/<ns>/app.yaml` の `directory.include` で抜く統一パターン) で既存 ns を SSA adopt して label を宣言。component 本体には触れない
-  - `cilium-secrets`: cilium chart が render する ns (cilium app tracking 済み) だが chart が ns への label 注入に非対応 (`secretsNamespace` は create/name のみ)、かつ同一 ns の二重 app 管理は Argo CD の ownership 競合になるため、**rule 1 の exclude で対応** (chart が labels 対応したら外す)
-  - ※ `backstage` / `kensan` は実測で**準拠を確認** (どちらも live に environment + tier あり)
-- **blackbox-exporter の pss-baseline FAIL は履歴ノイズ** (実測 2026-06-07): violator は旧 revision の ReplicaSet (replicas=0、template に NET_RAW が残存)。**現行 Pod は NET_RAW を落とした準拠版**のため PolicyException は作らない (live が不要な権限の恒久付与になる)。Deployment の revision rotation で自然消滅する。**Phase 3 の「violation ゼロ」判定は replicas=0 の履歴 ReplicaSet を除外して行う**
-- ~~**app-kensan の unprefixed labels**~~ → **Phase 2 で削除済み**: live の全 namespaceSelector 保有リソース (CCNP / CNP / NetworkPolicy / Gateway / AuthorizationPolicy / webhook configs) を網羅し、unprefixed key の参照ゼロを実測してから削除
-- **app-kensan/syncthing の require-requests violation** (実測 2026-06-07): initContainer に requests なし。manifest は本 repo 外 (apps repo 側) — そちらで requests を追記する
-- **kensan の hook Job 2 件の violation 残存**: 修正済み manifest (PR #368) が hook の diff 対象外問題で live に未反映。Argo CD UI から kensan app を手動 Sync すれば解消 (上記運用セクション参照)
-- **platform 側の requests 未設定** (~50 container: argocd / cert-manager / longhorn 等): mutate ではなく各 values.yaml への追記で解消する (ADR-012 §2)
-- **verifyImages (image 署名検証)**: 将来課題。Backstage CI への cosign 導入とセットで検討
+- **Removing the PSA label** (kube-system / istio-system / longhorn-system / local-path-storage / app-kensan / app-prod / kensan / argocd / the auth namespaces / the secrets namespaces / kyverno): to be done in the same PR as the Phase 3 Enforce promotion (an atomic swap). Coexists with the pss-level label until then
+- ~~**Remediating labels on bare namespaces**~~ → **resolved in Phase 2** (4 namespaces found during the first live scan):
+  - `reloader` / `sealed-secrets` / `local-path-storage`: adopted the existing namespace via SSA and declared its labels using the **ns-lifecycle-app pattern** (co-locating `namespace.yaml` inside the component's own directory, picked up by `applications/namespaces/<ns>/app.yaml`'s `directory.include`) — the component itself is untouched
+  - `cilium-secrets`: a namespace rendered by the Cilium chart (already tracked by the cilium app), but the chart doesn't support injecting labels onto it (`secretsNamespace` only supports create/name), and having two Applications manage the same namespace would create an Argo CD ownership conflict — so this is handled via an **exclude in rule 1** (to be removed once the chart supports labels)
+  - Note: `backstage` / `kensan` were confirmed **already compliant** on inspection (both have `environment` + `tier` live)
+- **`blackbox-exporter`'s `pss-baseline` FAIL is stale-history noise** (observed 2026-06-07): the violator is an old-revision ReplicaSet (replicas=0, whose template still has NET_RAW). **The current Pod is a compliant revision with NET_RAW dropped**, so no PolicyException is created (that would be a permanent grant of a permission the live workload doesn't need). It disappears naturally as Deployment revisions rotate out. **Phase 3's "zero violations" check should exclude replicas=0 historical ReplicaSets**
+- ~~**Unprefixed labels on `app-kensan`**~~ → **removed in Phase 2**: confirmed zero live references to the unprefixed keys across every resource carrying a namespaceSelector (CCNP / CNP / NetworkPolicy / Gateway / AuthorizationPolicy / webhook configs) before deleting them
+- **`require-requests` violation on `app-kensan`/syncthing** (observed 2026-06-07): its initContainer has no requests. The manifest lives outside this repo (in the apps repo) — requests need to be added there
+- **2 remaining violations on kensan's hook Jobs**: the fix (PR #368) is already in the manifest but hasn't landed live, due to hooks being excluded from diff comparison. A manual Sync of the kensan app from the Argo CD UI resolves it (see the Operations section above)
+- **Missing requests on the platform side** (~50 containers: argocd / cert-manager / longhorn, etc.): resolved by adding them to each `values.yaml`, not via mutate (ADR-012 §2)
+- **verifyImages (image signature verification)**: future work, to be considered alongside introducing cosign into Backstage CI

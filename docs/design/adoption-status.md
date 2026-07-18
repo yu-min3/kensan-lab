@@ -1,25 +1,25 @@
 # Adoption Status — Whetstone Design System
 
-## このコミットの範囲（design system 本体のみ）
+## Scope of this commit (the design system itself, only)
 
-| 内容 | 状態 |
+| Content | Status |
 |---|---|
-| `packages/design-tokens/`（tokens.css / tokens.json / README） | ✅ 追加。色・タイポ・余白・影・動き・密度の単一の真実 |
-| `docs/design/`（DESIGN_SYSTEM / components / patterns / brand） | ✅ 追加。憲法 + 仕様 + ブランド資産 |
-| density トークンを消費する `.ds-*` utility | ✅ tokens.css に実装。`data-density` が実際に寸法へ反映（`density-demo.html` で証明） |
-| `.claude/rules/design-system.md`（エージェント入口） | ✅ CLAUDE.md から参照。UI 作業前に自動で読まれる |
+| `packages/design-tokens/` (tokens.css / tokens.json / README) | ✅ Added. The single source of truth for color, typography, spacing, shadows, motion, and density |
+| `docs/design/` (the Whetstone overview / components / patterns / brand pages) | ✅ Added. The constitution + spec + brand assets |
+| The `.ds-*` utilities that consume the density tokens | ✅ Implemented in tokens.css. `data-density` actually changes rendered dimensions (proven in `density-demo.html`) |
+| `.claude/rules/design-system.md` (the agent entry point) | ✅ Referenced from CLAUDE.md; auto-read before any UI work |
 
-density の動作確認: [`density-demo.html`](./density-demo.html)（同一マークアップが comfortable / compact で変わる）。
+Verifying density behavior: [`density-demo.html`](./density-demo.html) (the same markup renders differently under comfortable / compact).
 
-## まだやっていない（follow-up — 別 PR）
+## Not done yet (follow-up — separate PR)
 
-| 課題 | 内容 | 優先 |
+| Gap | Details | Priority |
 |---|---|---|
-| **アプリへの採用** | まだどの app も未採用。`apps/kensan/` は frontend 未着手。next の frontend ができ次第 **最初から Whetstone で構築**するのが筋（旧 kensan は削除済み — tag `kensan-legacy-final`） | 中 |
-| **monorepo / toolchain** | tokens は当面 **相対 import**（`@import "…/packages/design-tokens/tokens.css"`）で共有する想定。pnpm workspace 化 or npm workspaces 化して `@kensan-lab/design-tokens` の package 指定にするかは別途決定（pnpm は未導入） | 中 |
-| **共通コンポーネント package 化** | `@kensan-lab/ui` は未作成。実装の正本は各 app の `components/ui/`（shadcn）。app が増えたら package 化を検討 | 低 |
+| **Adoption by apps** | No app has adopted it yet. `apps/kensan/`'s frontend hasn't started. Once the next frontend exists, **building it on Whetstone from day one** is the plan (the old kensan is already removed — tag `kensan-legacy-final`) | Medium |
+| **Monorepo / toolchain** | For now, tokens are shared via a **relative import** (`@import "…/packages/design-tokens/tokens.css"`). Whether to move to a pnpm or npm workspace setup and reference it as the `@kensan-lab/design-tokens` package is a separate decision (pnpm isn't adopted yet) | Medium |
+| **Packaging shared components** | `@kensan-lab/ui` doesn't exist yet. The implementation source of truth is each app's own `components/ui/` (shadcn). Consider packaging once more apps exist | Low |
 
-## 検証メモ
+## Verification notes
 
-- `density-demo.html` を Whetstone トークンで描画し、`data-density` の comfortable / compact 切替が寸法へ反映されることを screenshot で確認済み。
-- tokens の値（パレット・タイポ・density）は設計フェーズで確定済み。本コミットはそれを実装・結線したもの。
+- Rendered `density-demo.html` with the Whetstone tokens and confirmed via screenshot that toggling `data-density` between comfortable / compact actually changes rendered dimensions.
+- Token values (palette, typography, density) were finalized during the design phase. This commit implements and wires them up.

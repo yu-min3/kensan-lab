@@ -1,84 +1,81 @@
 # Infrastructure
 
-Argo CD で同期される全 platform component の Git source。
+The Git source for every platform component synced by Argo CD.
 
-## ディレクトリ構成
+## Directory layout
 
-| ディレクトリ | 用途 |
+| Directory | Purpose |
 |---|---|
-| `argocd/` | Argo CD 自身 (root-app, projects, applications, AppProject 等) |
+| `argocd/` | Argo CD itself (root-app, projects, applications, AppProject, etc.) |
 | `network/` | CNI (Cilium), Service Mesh (Istio), Gateway API, CoreDNS, Cloudflare Tunnel, NetworkPolicy |
-| `apps/` | platform 管理下の app component (例: `apps/app-kensan` = 新 kensan の ns/PVC/syncthing 等) |
+| `apps/` | App components under platform management (e.g. `apps/app-kensan` = the new kensan's namespace/PVC/syncthing, etc.) |
 | `observability/` | Prometheus, Grafana, Loki, Tempo, OTel Collector |
 | `auth/` | Keycloak (OIDC IdP), oauth2-proxy (Gateway ext_authz), Vault OIDC auth |
 | `secrets/` | Vault + Vault Config Operator + Vault Database/Transit engines, External Secrets, Sealed Secrets, cert-manager, Reloader |
 | `storage/` | Longhorn |
-| `policy/` | Kyverno (policy engine + ClusterPolicy / PolicyException 群) |
-| `backstage/` | Backstage (developer portal) の deploy 定義 — Pattern B。ソースは repo top-level `backstage/`（ADR-018 / ADR-020） |
-| `kube-system/` | kube-system ns の label / PSA / 共通リソース管理 |
+| `policy/` | Kyverno (policy engine + the ClusterPolicy / PolicyException set) |
+| `backstage/` | Deploy definitions for Backstage (developer portal) — Pattern B. Source lives at the repo top-level `backstage/` (ADR-018 / ADR-020) |
+| `kube-system/` | Label / PSA / shared-resource management for the `kube-system` namespace |
 
-## コンポーネントのレイアウト規則
+## Component layout rules
 
-各 component dir のファイル配置は **`values.yaml` の有無** で 2 つに分岐する。判定基準は「Argo CD app が Helm chart を render するかどうか」。
+Each component directory's file layout branches into two shapes depending on **whether a `values.yaml` is present**. The deciding question: does the Argo CD app render a Helm chart?
 
-### Pattern A: Helm chart 系 (`values.yaml` + `resources/`)
+### Pattern A: Helm-chart-based (`values.yaml` + `resources/`)
 
-Argo CD multi-source app で **upstream Helm chart + values.yaml + 追加生 YAML** を組み合わせるコンポーネント。
+Components where an Argo CD multi-source app combines an **upstream Helm chart + values.yaml + additional raw YAML**.
 
 ```
 <component>/
 ├── values.yaml           # Helm values
-└── resources/            # chart 外の生 YAML (namespace, ServiceMonitor, HTTPRoute, SealedSecret 等)
+└── resources/            # Raw YAML outside the chart (namespace, ServiceMonitor, HTTPRoute, SealedSecret, etc.)
     └── *.yaml
 ```
 
-例: `secrets/vault/`, `network/cilium/`, `observability/grafana/`, `observability/prometheus/`, `secrets/cert-manager/`, `secrets/external-secrets/`, `secrets/vault-config-operator/`, `observability/otel-collector/`, `observability/loki/`, `observability/tempo/`
+Examples: `secrets/vault/`, `network/cilium/`, `observability/grafana/`, `observability/prometheus/`, `secrets/cert-manager/`, `secrets/external-secrets/`, `secrets/vault-config-operator/`, `observability/otel-collector/`, `observability/loki/`, `observability/tempo/`
 
-`resources/` は **「Helm が render しない方の YAML」を分離する**役割。`values.yaml` と並ぶときだけ意味があるので、`values.yaml` が無いコンポーネントには作らない。
+`resources/` exists to **separate out the YAML that Helm doesn't render**. It only makes sense alongside a `values.yaml`, so don't create it for components that have none.
 
-### Pattern B: 生 YAML のみ (フラット)
+### Pattern B: raw YAML only (flat)
 
-Helm chart を使わず、raw manifest だけを Argo CD app が読むコンポーネント。
+Components with no Helm chart, where the Argo CD app reads raw manifests directly.
 
 ```
 <component>/
 └── *.yaml
 ```
 
-例: `network/network-policy/`, `network/cloudflare-tunnel/`, `network/gateway-api/`, `secrets/sealed-secrets/`, `network/istio/` 直下の Gateway / PeerAuthentication / namespace 等
+Examples: `network/network-policy/`, `network/cloudflare-tunnel/`, `network/gateway-api/`, `secrets/sealed-secrets/`, and the Gateway / PeerAuthentication / namespace, etc. directly under `network/istio/`
 
-トップレベルにそのまま .yaml を置く。`resources/` で 1 段挟まない。
+Place `.yaml` files directly at the top level. No `resources/` indirection.
 
-## 例外的な構成
+## Exceptional structures
 
-- **`istio/`**: 複数 chart (`base/`, `cni/`, `istiod/`) を内包する多 component dir。各 subchart は Pattern A に従い `<subchart>/values.yaml` を持つ。istio 全体に紐付く chart 外の生 YAML (Gateway, PeerAuthentication, istio-system namespace 等) は `istio/` 直下にフラットに置く (Pattern B)。
-- **`network-policy/`**: NetworkPolicy / CiliumClusterwideNetworkPolicy を ns 横断で集約した特殊コンポーネント。PE の専管リソースを 1 ヶ所に集めるため、各 ns owning app からは分離して network-policy app に集約している。
-- **`observability/`**: `app.yaml` を持たず、`argocd/applications/observability/applicationset.yaml` の ApplicationSet が各 `observability/*/config.json` (chartVersion 等を保持) を git generator で拾って component ごとの Application を生成する。chart 版数の SoT は各 `config.json`。
-- **`secrets/vault-database-engine/`, `secrets/vault-transit-engine/`**: 自作 chart (`chart/`) + 全インスタンス共通の生 YAML (`shared/`) + インスタンス別 values (`platform-values/`) の 3 構成。`argocd/applications/secrets/<engine>/` の `app-shared.yaml` (shared/ を sync) と `applicationset-instances.yaml` (platform-values/ の各ファイルから ApplicationSet がインスタンスを生成) のペアで構成され、単一の `app.yaml` は持たない。
+- **`istio/`**: a multi-component directory bundling several charts (`base/`, `cni/`, `istiod/`). Each subchart follows Pattern A with its own `<subchart>/values.yaml`. Raw YAML that belongs to Istio as a whole but sits outside any chart (Gateway, PeerAuthentication, the `istio-system` namespace, etc.) is placed flat directly under `istio/` (Pattern B).
+- **`network-policy/`**: a special component that aggregates NetworkPolicy / CiliumClusterwideNetworkPolicy across namespaces. To keep PE-exclusive resources in one place, these are split out from each namespace-owning app and consolidated into the `network-policy` app.
+- **`observability/`**: has no `app.yaml`. The ApplicationSet at `argocd/applications/observability/applicationset.yaml` uses a git generator to pick up each `observability/*/config.json` (which holds the chartVersion etc.) and generates one Application per component. Each `config.json` is the source of truth for that component's chart version.
+- **`secrets/vault-database-engine/`, `secrets/vault-transit-engine/`**: a three-part structure of a homegrown chart (`chart/`) + raw YAML shared across all instances (`shared/`) + per-instance values (`platform-values/`). Configured as a pair — `argocd/applications/secrets/<engine>/app-shared.yaml` (syncs `shared/`) and `applicationset-instances.yaml` (an ApplicationSet that generates one instance per file under `platform-values/`) — with no single `app.yaml`.
 
-## Namespace のライフサイクル管理
+## Namespace lifecycle management
 
-ほとんどの component は自分の Application に `resources/namespace.yaml`（Pattern A）または
-フラット直下の `namespace.yaml`（Pattern B）を持たせ、`CreateNamespace=true` で ns 作成 + label
-付与を自己完結させる（例: `secrets/cert-manager/`, `secrets/external-secrets/`, `secrets/reloader/`,
-`backstage/`, `network/cloudflare-tunnel/`）。
+Most components carry `resources/namespace.yaml` (Pattern A) or a flat `namespace.yaml` (Pattern B) inside their own Application and self-contain namespace creation + labeling via `CreateNamespace=true` (e.g. `secrets/cert-manager/`, `secrets/external-secrets/`, `secrets/reloader/`, `backstage/`, `network/cloudflare-tunnel/`).
 
-`kubernetes/argocd/applications/namespaces/` に専用の ns-lifecycle app が存在するのは、以下3パターンのどれかに当てはまる場合のみ（ADR-020）:
+A dedicated ns-lifecycle app under `kubernetes/argocd/applications/namespaces/` only exists when one of these three patterns applies (ADR-020):
 
-| パターン | 理由 | 例 |
+| Pattern | Reason | Example |
 |---|---|---|
-| **owning component が無い** | この repo に対応する component が存在しない ns（kubeadm 等、GitOps 外で作られた ns を label 目的だけで adopt する） | `kube-system` |
-| **複数 component が ns を共有** | 単一の owning Application が決められない（`policy/kyverno` + `policy/kyverno-policies` が `policy/namespace.yaml` を共有、`observability/*` の6 component が `observability/namespace.yaml` を共有） | `kyverno`, `monitoring` |
-| **意図的なライフサイクル分離** | 単一 owner はいるが、保護のため意図的に app を分離（例: sealed-secrets — finalizer なし + `Prune=false` で sealing key を守る） | `sealed-secrets` |
+| **No owning component** | No component in this repo corresponds to the namespace (e.g. one created by kubeadm outside GitOps, adopted here purely to attach labels) | `kube-system` |
+| **Multiple components share the namespace** | No single owning Application can be designated (`policy/kyverno` + `policy/kyverno-policies` share `policy/namespace.yaml`; the 6 `observability/*` components share `observability/namespace.yaml`) | `kyverno`, `monitoring` |
+| **Deliberate lifecycle isolation** | There is a single owner, but the app is deliberately split off for protection (e.g. `sealed-secrets` — no finalizer + `Prune=false` to protect the sealing key) | `sealed-secrets` |
 
-上記に当てはまらない「単一 owner だが分離されている」ケースは統合対象（`reloader` は2026-07 に統合済み、ADR-020）。
+Cases that are "single-owner but split off" without matching one of the above are consolidation candidates (`reloader` was consolidated in 2026-07, per ADR-020).
 
-## Argo CD Application 配置
+## Argo CD Application placement
 
-各 component の Argo CD Application CR は `argocd/applications/<category>/<component>/app.yaml` に置く。`platform-root` (App-of-Apps) が `argocd/applications/` を recurse して全 child app を発見・管理する。
+Each component's Argo CD Application CR lives at `argocd/applications/<category>/<component>/app.yaml`. `platform-root` (the App-of-Apps) recurses `argocd/applications/` to discover and manage every child app.
 
-## 関連ドキュメント
+## Related documents
 
-- `.claude/rules/helm-multisource.md`: Pattern A の詳細 (Argo CD multi-source の 3 ファイル構成)
-- `.claude/rules/gitops-workflow.md`: GitOps 運用ルール
-- `docs/`: ADR、アーキテクチャ図
+- `.claude/rules/helm-multisource.md`: details of Pattern A (the 3-file structure for Argo CD multi-source)
+- `.claude/rules/gitops-workflow.md`: GitOps operating rules
+- `docs/`: ADRs, architecture diagrams

@@ -1,17 +1,17 @@
 # ArgoCD ↔ Keycloak OIDC integration (Path B)
 
-ArgoCD は Keycloak realm `kensan` を IdP として、Dex を経由しない直接 OIDC 統合を採用している。Vault / Grafana と同じ "app native auth" pattern。
+Argo CD uses the Keycloak realm `kensan` as its IdP via direct OIDC integration, bypassing Dex. Same "app-native auth" pattern as Vault / Grafana.
 
-## 構成
+## Components
 
-| 要素 | 場所 | 補足 |
+| Element | Location | Notes |
 |---|---|---|
-| Keycloak client `argocd` | `bootstrap/keycloak/setup.sh` で作成 | redirect URI: `https://argocd.platform.yu-min3.com/auth/callback` |
-| client_secret | Vault KV `secret/security/argocd/oidc` | bootstrap TF で投入 |
-| Kubernetes Secret `argocd-oidc-secret` | ESO (ExternalSecret) で生成 | namespace: `argocd` |
-| `argocd-cm` の `oidc.config` | `kubernetes/argocd/values.yaml` | `$argocd-oidc-secret:client-secret` で参照 |
+| Keycloak client `argocd` | Created by `bootstrap/keycloak/setup.sh` | redirect URI: `https://argocd.platform.yu-min3.com/auth/callback` |
+| client_secret | Vault KV `secret/security/argocd/oidc` | Seeded by bootstrap Terraform |
+| Kubernetes Secret `argocd-oidc-secret` | Generated via ESO (ExternalSecret) | namespace: `argocd` |
+| `argocd-cm`'s `oidc.config` | `kubernetes/argocd/values.yaml` | Referenced via `$argocd-oidc-secret:client-secret` |
 
-## values.yaml の主要部
+## Key parts of values.yaml
 
 ```yaml
 configs:
@@ -36,31 +36,31 @@ configs:
     scopes: '[groups]'
 ```
 
-## scope と claim の取り扱い
+## Handling scopes and claims
 
-`requestedScopes` に `groups` を**含めない**。Keycloak で `groups` は scope ではなく claim 名なので、scope に入れると "Invalid scopes: groups" で reject される。
+`requestedScopes` deliberately **does not include** `groups`. In Keycloak, `groups` is a claim name, not a scope — including it in scopes gets rejected with "Invalid scopes: groups".
 
-`argocd` client に直付けした `oidc-group-membership-mapper` (`bootstrap/keycloak/setup.sh` で作成) が id_token に `groups` claim を乗せる。ArgoCD は `requestedIDTokenClaims` で `groups: { essential: true }` を指定し受け取る。
+An `oidc-group-membership-mapper` attached directly to the `argocd` client (created by `bootstrap/keycloak/setup.sh`) puts the `groups` claim onto the id_token. Argo CD picks it up by declaring `requestedIDTokenClaims` with `groups: { essential: true }`.
 
 ## RBAC mapping
 
-| Keycloak group | ArgoCD role |
+| Keycloak group | Argo CD role |
 |---|---|
 | `platform-admin` | `role:admin` |
 | `platform-dev` | `role:readonly` |
 
-既存 admin user (`admin.enabled: true` 既定) は break-glass として残す。
+The built-in admin user (`admin.enabled: true` by default) is kept as a break-glass account.
 
-## なぜ Path B (直接統合) か
+## Why Path B (direct integration)
 
-Dex 経由 (Path A) と比べた採択理由:
+Reasons for choosing this over going through Dex (Path A):
 
-- Vault / Grafana が同じ "Keycloak 直接統合" pattern を採用済み。ArgoCD だけ Dex を挟むと統一感がない
-- Dex 経由は config が二段になる ((argocd → dex → keycloak) のため debug が複雑
-- ArgoCD は Dex を内部依存しているが、外部 IdP との統合では `oidc.config` で直接 Keycloak を向ければ Dex を起動しなくて済む
+- Vault / Grafana already use the same "direct Keycloak integration" pattern. Putting Dex in front of Argo CD alone would break that consistency
+- Going through Dex adds a second config hop (argocd → dex → keycloak), complicating debugging
+- Argo CD depends on Dex internally, but for external IdP integration, pointing `oidc.config` directly at Keycloak means Dex never needs to run at all
 
-## 関連
+## Related
 
-- [Gateway OIDC](./gateway-oidc.md): Istio Gateway 側の OIDC 認証 (oauth2-proxy)
-- [oauth2-proxy 構成](./oauth2-proxy.md)
+- [Gateway OIDC](./gateway-oidc.md): OIDC authentication at the Istio Gateway (oauth2-proxy)
+- [oauth2-proxy configuration](./oauth2-proxy.md)
 - ADR-002: Authentication and Authorization Architecture

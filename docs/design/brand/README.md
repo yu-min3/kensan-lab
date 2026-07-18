@@ -1,50 +1,50 @@
 # Brand assets — kensan-lab
 
-ロゴ・ファビコン・OGP の単一の真実。**ここ以外でロゴを書き直さない**。
+The single source of truth for the logo, favicon, and OGP. **Never redraw the logo anywhere else.**
 
-## ファイル
+## Files
 
-| ファイル | 用途 | サイズ |
+| File | Purpose | Size |
 |---|---|---|
-| `kensan-logo-mark.svg` | マークのみ（light 背景向け） | 100×100（ViewBox） |
-| `kensan-logo-mark-dark.svg` | マークのみ（dark 背景向け） | 100×100 |
-| `kensan-logo-wordmark.svg` | マーク + "kensan-lab" + PLATFORM DESIGN SYSTEM | 320×100 |
-| `favicon.svg` | ファビコン（簡略版） | 32×32 |
+| `kensan-logo-mark.svg` | Mark only (for light backgrounds) | 100×100 (ViewBox) |
+| `kensan-logo-mark-dark.svg` | Mark only (for dark backgrounds) | 100×100 |
+| `kensan-logo-wordmark.svg` | Mark + "kensan-lab" + PLATFORM DESIGN SYSTEM | 320×100 |
+| `favicon.svg` | Favicon (simplified) | 32×32 |
 | `og-image.svg` | OGP / Twitter Card | 1200×630 |
 
-## シンボルの意味
+## What the symbol means
 
 ```
-         ✦  ← スパークル：研鑽の瞬間、AI と人の協働で技を研ぐ
+         ✦  ← Sparkle: the moment of refinement — human and AI sharpening a skill together
         ╱
        ╱
-      ╱     ← 成長曲線（sky blue）：研ぎ澄まされて伸びる
+      ╱     ← Growth curve (sky blue): honed and rising
      ╱
-  ▔▔▔▔▔▔▔  ← 砥石（warm brown）：プラットフォームの基礎
+  ▔▔▔▔▔▔▔  ← Whetstone (warm brown): the platform's foundation
 ```
 
-**砥石（whetstone）で道具を研ぐように、プラットフォーム上のあらゆる app を同じ言語で磨き上げる**——というのがブランドの中核メタファー。
+The brand's core metaphor: **just as a whetstone sharpens a tool, this hones every app on the platform to the same visual language.**
 
-## カラー
+## Colors
 
-| 要素 | Light | Dark | Token |
+| Element | Light | Dark | Token |
 |---|---|---|---|
-| 砥石 | `#7A6E5D` | `#A89C8A` | `--muted-foreground` 系 |
-| 成長曲線 + ✦ | `#0284C7` | `#38BDF8` | `--brand` |
-| 背景（OG/favicon） | `#F5F2EC` | — | `--background` |
-| ワードマーク | `#171411` | `#F5F2EC` | `--foreground` |
+| Whetstone | `#7A6E5D` | `#A89C8A` | `--muted-foreground` family |
+| Growth curve + ✦ | `#0284C7` | `#38BDF8` | `--brand` |
+| Background (OG/favicon) | `#F5F2EC` | — | `--background` |
+| Wordmark | `#171411` | `#F5F2EC` | `--foreground` |
 
-## 使い方
+## Usage
 
 ### React + Tailwind
 
 ```tsx
-// vite-plugin-svgr 等で SVG を component import（パスは各 app から brand/ への相対 or alias）
+// Import the SVG as a component via vite-plugin-svgr etc. (path is relative or aliased from each app to brand/)
 import Logo from "@/assets/kensan-logo-mark.svg?react";
 <Logo className="w-6 h-6" />
 ```
 
-> ロゴ SVG の正本はこの `docs/design/brand/` のみ。app へは build 時にコピー or alias で参照し、**app 内で再描画しない**。
+> The only source of truth for the logo SVGs is this `docs/design/brand/` directory. Apps reference it via a build-time copy or alias — **never redraw it inside the app**.
 
 ### HTML
 ```html
@@ -52,16 +52,16 @@ import Logo from "@/assets/kensan-logo-mark.svg?react";
 <meta property="og:image" content="https://platform.yu-min3.com/og-image.png" />
 ```
 
-> OGP は **PNG での配信を推奨**（一部 SNS は SVG 非対応）。`og-image.svg` から `og-image.png` (1200×630) をエクスポートして配信。
+> **Serve OGP as PNG** (some social platforms don't support SVG). Export `og-image.svg` to `og-image.png` (1200×630) for delivery.
 
-## NG
+## Don't
 
-- ❌ マークの **色を任意に変える**（青→緑など）。brand 色は `--brand` 経由でのみ
-- ❌ 砥石の上下を **崩す**（成長曲線の起点は砥石上面に接していること）
-- ❌ 角丸を増やす・減らす（砥石の `rx="2.5"` は固定）
-- ❌ スパークルだけを単独で使う（マークの一部）
-- ❌ PNG ラスタライズ済みのロゴを **ベクター用途で**使う
+- ❌ **Change the mark's color** arbitrarily (e.g. blue → green). Brand color only ever flows through `--brand`
+- ❌ **Break the whetstone's alignment** (the growth curve must start touching the top of the whetstone)
+- ❌ Add or remove corner rounding (the whetstone's `rx="2.5"` is fixed)
+- ❌ Use the sparkle on its own (it's part of the mark, not a standalone element)
+- ❌ Use a rasterized PNG of the logo **where a vector is needed**
 
-## 由来
+## History
 
-- v1.0 (2026-05) — 初版。Whetstone テーマ確定時に作成。
+- v1.0 (2026-05) — Initial version, created when the Whetstone theme was finalized.

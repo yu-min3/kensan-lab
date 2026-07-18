@@ -1,44 +1,44 @@
 # Storage roadmap: local-path → Longhorn
 
-> **✅ 完了** — Longhorn 移行は 2026-05 に完了し、`local-path` は 2026-07 に全廃（provisioner / StorageClass とも撤去）。現行のストレージ構成・StorageClass・R2 backup は `kubernetes/storage/README.md` が SoT。本ページは計画当時のロードマップを残すアーカイブ文書。
+> **✅ Done** — the Longhorn migration completed in 2026-05, and `local-path` was fully retired in 2026-07 (both the provisioner and the StorageClass were removed). `kubernetes/storage/README.md` is the source of truth for the current storage setup, StorageClasses, and R2 backups. This page is an archived record of the roadmap as originally planned.
 >
-> 実装上の差分: 当時想定した `longhorn-single` という StorageClass は採用せず、**`longhorn`（default、replicated block）と `longhorn-workspace`** の 2 つとして実現した。以降「`longhorn-single`」への言及は実装では `longhorn` / `longhorn-workspace` に読み替えること。
+> Where the implementation diverged: the `longhorn-single` StorageClass envisioned at the time was never adopted. It shipped instead as two classes, **`longhorn`** (the default, replicated block) **and `longhorn-workspace`**. Read any mention of "`longhorn-single`" below as `longhorn` / `longhorn-workspace` in the actual implementation.
 
-以下は計画当時の歴史的記述（実態は上記の通り）。
+What follows is the historical record as written at planning time (see above for how it actually turned out).
 
-現状 PV は全て `local-path-provisioner` (node-local) で運用している。HA stateful workload (Vault raft, Keycloak PostgreSQL) は **形式上 HA** だが、PVC が作成ノードに張り付くため node 障害時の data 喪失リスクを許容している状態。
+Every PV currently runs on `local-path-provisioner` (node-local). HA stateful workloads (Vault raft, Keycloak PostgreSQL) are **HA in name only** — since the PVC is pinned to the node it was created on, we're accepting the risk of data loss on node failure.
 
-Longhorn 導入で分散ストレージに切り替える計画。
+Adopting Longhorn will switch this to distributed storage.
 
-## 現状の制約
+## Current constraints
 
-- **node-local**: PVC は最初に bind されたノードに張り付く。Pod を別ノードへ移動するには PVC 再作成 = data 喪失
-- **HA は形式上**: vault-0/1/2 は anti-affinity で別ノードに分散しているので「3 中 1 ノード障害なら quorum 維持」は成立する。ただし障害ノード上の Vault raft 1 peer 分のデータは喪失するため、復旧は raft 再 join (peer データ自動 sync) で対応
+- **Node-local**: a PVC is pinned to whichever node it first bound to. Moving a pod to a different node means recreating the PVC — i.e. data loss
+- **HA in name only**: `vault-0/1/2` are spread across separate nodes via anti-affinity, so "quorum survives a single-node failure out of 3" does hold. However, the Vault raft peer data on the failed node is lost; recovery relies on the raft rejoin process (which auto-syncs peer data)
 
-## 影響を受けているコンポーネント
+## Affected components
 
-| Component | PVC | 現 storageClass | 切替先 |
+| Component | PVC | Current storageClass | Migrating to |
 |---|---|---|---|
-| Vault raft | `data-vault-{0,1,2}` (10Gi × 3) | `local-path` | `longhorn-single` (replica 1、Vault raft 自体が 3 重化済み) |
+| Vault raft | `data-vault-{0,1,2}` (10Gi × 3) | `local-path` | `longhorn-single` (replica 1 — Vault raft itself already provides 3x redundancy) |
 | Vault audit | `audit-vault-{0,1,2}` (10Gi × 3) | `local-path` | `longhorn-single` |
-| Keycloak PostgreSQL | TBD | `local-path` | `longhorn-single` (主は Keycloak HA replica) |
-| Prometheus / Loki / Tempo | (未調査) | `local-path` | TBD |
+| Keycloak PostgreSQL | TBD | `local-path` | `longhorn-single` (primary redundancy comes from Keycloak HA replicas) |
+| Prometheus / Loki / Tempo | (not yet surveyed) | `local-path` | TBD |
 
-`longhorn-single` を選ぶ理由: Vault raft / Keycloak は app 層で多重化済みなので、storage 層でも replicate すると合計 9 倍になり homelab スケールには重い。`longhorn-single` (replica=1) で「ノード障害でも PVC が他ノードで復旧する」だけ得たい。
+Why `longhorn-single`: Vault raft and Keycloak already replicate at the app layer, so replicating again at the storage layer would multiply to 9x total copies — too heavy for homelab scale. `longhorn-single` (replica=1) buys just the one property we actually want: "a PVC recovers on a different node after a node failure."
 
-## Phase
+## Phases
 
-1. Longhorn 導入 (別 ADR / 別 PR)
-2. 各 component の `storageClass` を `local-path` → `longhorn-single` に切替
-3. PVC migration (data の Longhorn volume への移行)
-4. local-path-provisioner を削除 (`kubernetes/storage/`)
+1. Adopt Longhorn (separate ADR / separate PR)
+2. Switch each component's `storageClass` from `local-path` to `longhorn-single`
+3. Migrate PVC data onto Longhorn volumes
+4. Remove local-path-provisioner (`kubernetes/storage/`)
 
-## 既知の前提
+## Known prerequisites
 
-- Longhorn は kernel module (iscsi_tcp) と open-iscsi が必要 → Pi 5 と Bosgame M4 Neo 全ノードで事前確認
-- Pi 5 の microSD は IO 性能が低い → Longhorn replica 配置は AMD64 ノード優先で検討
+- Longhorn requires the `iscsi_tcp` kernel module and open-iscsi → verify on every Pi 5 and the Bosgame M4 Neo node beforehand
+- The Pi 5's microSD has weak I/O performance → prefer AMD64 nodes when placing Longhorn replicas
 
-## 関連
+## Related
 
-- [Stage 1 Bootstrap](../bootstrapping/12-vault-stage1.md): Vault が `local-path` を使っている現状
-- [Longhorn restore test](../runbooks/longhorn-restore-test.md): 既存の Longhorn restore runbook
+- [Stage 1 Bootstrap](../bootstrapping/12-vault-stage1.md): the current state where Vault runs on `local-path`
+- [Longhorn restore test](../runbooks/longhorn-restore-test.md): the existing Longhorn restore runbook
