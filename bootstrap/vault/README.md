@@ -139,7 +139,7 @@ $EDITOR terraform.tfvars
 ```hcl
 vault_address               = "http://localhost:8200"  # port-forward 経由
 vault_token                 = "<initial root token>"
-keycloak_realm_url          = "https://auth.platform.yu-min3.com/realms/kensan"
+keycloak_realm_url          = "https://auth.yu-mins.com/realms/kensan"
 keycloak_oidc_client_id     = "vault"
 keycloak_oidc_client_secret = "<from Keycloak admin UI>"
 emergency_admin_password    = "<generated, store in 1Password>"

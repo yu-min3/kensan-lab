@@ -36,4 +36,4 @@ spec:
         - https://prometheus.platform.yu-min3.com/
         - https://hubble.platform.yu-min3.com/
         - https://longhorn.platform.yu-min3.com/
-        - https://auth.platform.yu-min3.com/realms/kensan/.well-known/openid-configuration
+        - https://auth.yu-mins.com/realms/kensan/.well-known/openid-configuration

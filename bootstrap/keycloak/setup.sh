@@ -12,7 +12,7 @@
 #
 # 前提:
 #   - kubectl context が kensan-lab cluster
-#   - Keycloak が platform-auth-prod ns で稼働中 (auth.platform.yu-min3.com)
+#   - Keycloak が platform-auth-prod ns で稼働中 (auth.yu-mins.com)
 #   - bw login + unlock 済み (BW_SESSION 設定済み)
 #   - host 側に jq, openssl install 済み
 #
@@ -71,7 +71,7 @@ if bw get item "$BW_CLIENT_ITEM" &> /dev/null; then
   echo "  ※ client 'vault' の secret が変わった場合、Vault の auth/oidc/config への"
   echo "    反映が別途必要 (bootstrap TF の state は廃棄済みのため vault write で直接):"
   echo "    vault write auth/oidc/config \\"
-  echo "      oidc_discovery_url=\"https://auth.platform.yu-min3.com/realms/$REALM\" \\"
+  echo "      oidc_discovery_url=\"https://auth.yu-mins.com/realms/$REALM\" \\"
   echo "      oidc_client_id=\"$CLIENT_ID\" \\"
   echo "      oidc_client_secret=\"\$(bw get password '$BW_CLIENT_ITEM')\""
   echo ""
@@ -406,7 +406,7 @@ echo "==> Saving secrets to Bitwarden..."
 CLIENT_NOTES="Vault Stage 1 OIDC client.
 Realm: $REALM
 ClientID: $CLIENT_ID
-DiscoveryURL: https://auth.platform.yu-min3.com/realms/$REALM
+DiscoveryURL: https://auth.yu-mins.com/realms/$REALM
 Created by: bootstrap/keycloak/setup.sh"
 save_bw "$BW_CLIENT_ITEM" "$CLIENT_ID" "$CLIENT_SECRET" "$CLIENT_NOTES"
 
@@ -423,7 +423,7 @@ echo "    gateway client_secret 取得 OK (${GATEWAY_CLIENT_SECRET:0:8}...)"
 GATEWAY_NOTES="Istio Gateway Platform OIDC client (Phase 1 Gateway-level auth).
 Realm: $REALM
 ClientID: istio-gateway-platform
-DiscoveryURL: https://auth.platform.yu-min3.com/realms/$REALM
+DiscoveryURL: https://auth.yu-mins.com/realms/$REALM
 Used by: oauth2-proxy in auth-system namespace
 Created by: bootstrap/keycloak/setup.sh"
 save_bw "kensan-lab/keycloak/oidc-client-istio-gateway-platform" \
@@ -442,7 +442,7 @@ echo "    grafana client_secret 取得 OK (${GRAFANA_CLIENT_SECRET:0:8}...)"
 GRAFANA_NOTES="Grafana OIDC client (Path B — gateway bypass + Grafana 自前 generic_oauth).
 Realm: $REALM
 ClientID: grafana
-DiscoveryURL: https://auth.platform.yu-min3.com/realms/$REALM
+DiscoveryURL: https://auth.yu-mins.com/realms/$REALM
 Used by: Grafana in monitoring namespace (auth.generic_oauth)
 Created by: bootstrap/keycloak/setup.sh"
 save_bw "kensan-lab/keycloak/oidc-client-grafana" \
@@ -461,7 +461,7 @@ echo "    argocd client_secret 取得 OK (${ARGOCD_CLIENT_SECRET:0:8}...)"
 ARGOCD_NOTES="ArgoCD OIDC client (Path B — gateway bypass + argocd-cm.oidc.config 直結).
 Realm: $REALM
 ClientID: argocd
-DiscoveryURL: https://auth.platform.yu-min3.com/realms/$REALM
+DiscoveryURL: https://auth.yu-mins.com/realms/$REALM
 Used by: ArgoCD in argocd namespace (configs.cm.oidc.config)
 Created by: bootstrap/keycloak/setup.sh"
 save_bw "kensan-lab/keycloak/oidc-client-argocd" \
@@ -472,7 +472,7 @@ if [ -n "${USER_PW:-}" ]; then
 Realm: $REALM
 Email: $USER_EMAIL
 Group: $ADMIN_GROUP
-Login URL: https://auth.platform.yu-min3.com/realms/$REALM/account
+Login URL: https://auth.yu-mins.com/realms/$REALM/account
 Created by: bootstrap/keycloak/setup.sh"
   save_bw "$BW_USER_ITEM" "$USER_NAME" "$USER_PW" "$USER_NOTES"
 fi
@@ -631,14 +631,14 @@ echo ""
 echo "==> Done."
 echo ""
 echo "==> 確認:"
-echo "    OIDC discovery: https://auth.platform.yu-min3.com/realms/$REALM/.well-known/openid-configuration"
+echo "    OIDC discovery: https://auth.yu-mins.com/realms/$REALM/.well-known/openid-configuration"
 echo "    bw get item \"$BW_CLIENT_ITEM\" | jq '{name, login: {username: .login.username}}'"
 echo ""
 echo "==> 次のステップ (Vault Stage 1, 未実施なら):"
 echo "    1. vault operator init (manual)"
 echo "    2. root token + Recovery Keys を Bitwarden に保存"
 echo "    3. bootstrap/vault/ で terraform.tfvars に下記を書く:"
-echo "       keycloak_oidc_discovery_url = \"https://auth.platform.yu-min3.com/realms/$REALM\""
+echo "       keycloak_oidc_discovery_url = \"https://auth.yu-mins.com/realms/$REALM\""
 echo "       keycloak_oidc_client_id     = \"$CLIENT_ID\""
 echo "       keycloak_oidc_client_secret = \"<bw get item $BW_CLIENT_ITEM | jq -r .login.password>\""
 echo "    4. cd bootstrap/vault && terraform init && terraform apply"

@@ -23,9 +23,9 @@ spec:
     matchLabels:
       app: backstage
   jwtRules:
-    - issuer: "https://auth.platform.yu-min3.com/realms/kensan"
-      jwksUri: "https://auth.platform.yu-min3.com/realms/kensan/protocol/openid-connect/certs"
+    - issuer: "https://auth.yu-mins.com/realms/kensan"
+      jwksUri: "https://auth.yu-mins.com/realms/kensan/protocol/openid-connect/certs"
       forwardOriginalToken: false
-    - issuer: "https://auth.platform.yu-min3.com/realms/master"
-      jwksUri: "https://auth.platform.yu-min3.com/realms/master/protocol/openid-connect/certs"
+    - issuer: "https://auth.yu-mins.com/realms/master"
+      jwksUri: "https://auth.yu-mins.com/realms/master/protocol/openid-connect/certs"
       forwardOriginalToken: false

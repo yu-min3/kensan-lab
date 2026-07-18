@@ -15,5 +15,5 @@ spec:
     kind: Gateway
     name: gateway-prod
   jwtRules:
-    - issuer: "https://auth.platform.yu-min3.com/realms/kensan"
-      jwksUri: "https://auth.platform.yu-min3.com/realms/kensan/protocol/openid-connect/certs"
+    - issuer: "https://auth.yu-mins.com/realms/kensan"
+      jwksUri: "https://auth.yu-mins.com/realms/kensan/protocol/openid-connect/certs"
