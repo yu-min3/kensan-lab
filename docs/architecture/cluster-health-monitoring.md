@@ -1,125 +1,125 @@
-# Cluster Health Monitoring 設計
+# Cluster Health Monitoring design
 
-kensan-lab の健全性（ノード死活・リソース・エンドポイント疎通）を Grafana で一望し、異常を Slack に通知するための設計。既存の observability スタック（[observability.md](./observability.md)）の上に 3 フェーズで積む。
+A design for surfacing kensan-lab's health (node liveness, resources, endpoint reachability) in a single Grafana view and notifying Slack on anomalies. Builds in three phases on top of the existing observability stack ([observability.md](./observability.md)).
 
-## 背景と課題
+## Background and gaps
 
-既存スタックで **データとアラート経路はすでに揃っている**:
+The existing stack **already has the data path and alert path in place**:
 
-- node-exporter（DaemonSet）+ kube-state-metrics → Prometheus（retention 7d）
-- kube-prometheus-stack の defaultRules（`node` / `nodeExporterAlerting` 有効）→ NodeNotReady 等は Slack `#k8s-alerts` に通知済み
-- Grafana sidecar による ConfigMap ダッシュボード自動取込（既存: controlplane / longhorn / claude-code / otel-apm）
+- node-exporter (DaemonSet) + kube-state-metrics → Prometheus (7d retention)
+- kube-prometheus-stack's defaultRules (`node` / `nodeExporterAlerting` enabled) → NodeNotReady and similar already notify Slack's `#k8s-alerts`
+- Grafana's sidecar auto-imports ConfigMap dashboards (existing: controlplane / longhorn / claude-code / otel-apm)
 
-欠けているもの:
+What's missing:
 
-| # | 課題 | 対応 Phase |
+| # | Gap | Phase |
 |---|------|-----------|
-| 1 | クラスタ健全性を一望するダッシュボードがない（ノード死活・温度・microSD 残量・有線/WiFi 状態） | Phase 1 |
-| 2 | 死活監視が「Prometheus が scrape できたか」のみ。kubelet 死亡と OS 死亡、有線断と完全断の区別ができない。Gateway 経由の各 UI の HTTP 疎通も未監視 | Phase 2 |
-| 3 | **監視スタック自体が m4neo SPOF**。Prometheus / Alertmanager / Grafana は `hardware-class=high-performance` 必須 = m4neo 固定。m4neo が死ぬと監視ごと沈黙し、アラートも飛ばない | Phase 3 |
+| 1 | No single dashboard for overall cluster health (node liveness, temperature, remaining microSD capacity, wired/WiFi state) | Phase 1 |
+| 2 | Liveness monitoring only means "could Prometheus scrape it." Can't distinguish a dead kubelet from a dead OS, or a wired-link drop from a total outage. HTTP reachability of each UI through the Gateway is also unmonitored | Phase 2 |
+| 3 | **The monitoring stack itself is an m4neo SPOF**. Prometheus / Alertmanager / Grafana all require `hardware-class=high-performance`, which pins them to m4neo. If m4neo dies, monitoring goes silent along with it — no alert fires | Phase 3 |
 
-## Phase 1 — Cluster Health ダッシュボード
+## Phase 1 — Cluster Health dashboard
 
-デプロイ変更なし。既存メトリクスのみでダッシュボードを 1 枚追加する。
+No deployment changes. Adds a single dashboard using only existing metrics.
 
-- **配置**: `kubernetes/observability/grafana/resources/cluster-health-dashboard.yaml`（ConfigMap、`grafana_dashboard: "1"` + `grafana_folder: "Platform"`。controlplane-dashboard と同形式）
-- **方針**: コミュニティ製（Node Exporter Full 等）の import ではなく自作。4 ノード homelab に合わせ「一目で全体が分かる」密度に絞る
+- **Location**: `kubernetes/observability/grafana/resources/cluster-health-dashboard.yaml` (a ConfigMap with `grafana_dashboard: "1"` + `grafana_folder: "Platform"`; same shape as the controlplane-dashboard)
+- **Approach**: hand-built rather than importing a community dashboard (e.g. Node Exporter Full) — tuned to a density where a 4-node homelab is legible at a glance
 
-### パネル構成
+### Panel layout
 
-**Row 1: ノード死活**
+**Row 1: Node liveness**
 
-| パネル | クエリ | 型 |
+| Panel | Query | Type |
 |--------|--------|----|
-| Node Ready | `kube_node_status_condition{condition="Ready",status="true"}` | stat（ノード別、緑/赤） |
-| node-exporter up 履歴 | `up{job="node-exporter"}` | state timeline |
+| Node Ready | `kube_node_status_condition{condition="Ready",status="true"}` | stat (per node, green/red) |
+| node-exporter up history | `up{job="node-exporter"}` | state timeline |
 | Node Uptime | `node_time_seconds - node_boot_time_seconds` | stat |
 | Pressure conditions | `kube_node_status_condition{condition=~"MemoryPressure\|DiskPressure\|PIDPressure",status="true"}` | table / stat |
 
-**Row 2: リソース**
+**Row 2: Resources**
 
-| パネル | クエリ | 備考 |
+| Panel | Query | Notes |
 |--------|--------|------|
-| CPU 使用率 | `1 - avg by(instance)(rate(node_cpu_seconds_total{mode="idle"}[5m]))` | ノード別 timeseries |
-| メモリ使用率 | `1 - node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes` | ノード別 timeseries |
-| Disk 使用率 (root) | `1 - node_filesystem_avail_bytes{mountpoint="/",fstype!="tmpfs"} / node_filesystem_size_bytes{...}` | **Pi の microSD 枯渇検知が主目的**。閾値 80% 黄 / 90% 赤 |
-| CPU 温度 | `node_hwmon_temp_celsius` （Pi で取れない場合 `node_thermal_zone_temp` に fallback） | Pi のサーマルスロットリング監視（80°C 閾値） |
+| CPU usage | `1 - avg by(instance)(rate(node_cpu_seconds_total{mode="idle"}[5m]))` | Per-node timeseries |
+| Memory usage | `1 - node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes` | Per-node timeseries |
+| Disk usage (root) | `1 - node_filesystem_avail_bytes{mountpoint="/",fstype!="tmpfs"} / node_filesystem_size_bytes{...}` | **Primary purpose: catching microSD exhaustion on the Pis**. Thresholds: yellow at 80%, red at 90% |
+| CPU temperature | `node_hwmon_temp_celsius` (falls back to `node_thermal_zone_temp` if unavailable on the Pis) | Watches for thermal throttling on the Pis (80°C threshold) |
 
-**Row 3: ネットワーク（有線/WiFi 2 系統運用の可視化）**
+**Row 3: Network (visualizing the wired/WiFi dual-path setup)**
 
-| パネル | クエリ | 備考 |
+| Panel | Query | Notes |
 |--------|--------|------|
-| 有線リンク状態 | `node_network_carrier{device=~"eth0\|eno1\|enp4s0"}` | 有線断で WiFi fallback に落ちたことを検知 |
-| WiFi リンク状態 | `node_network_carrier{device=~"wlan0\|wlp3s0"}` | |
-| Interface トラフィック | `rate(node_network_receive_bytes_total{device=~"eth.*\|en.*\|wlan.*\|wlp.*"}[5m])` | どの経路でトラフィックが流れているか |
+| Wired link state | `node_network_carrier{device=~"eth0\|eno1\|enp4s0"}` | Detects a wired drop that fell back to WiFi |
+| WiFi link state | `node_network_carrier{device=~"wlan0\|wlp3s0"}` | |
+| Interface traffic | `rate(node_network_receive_bytes_total{device=~"eth.*\|en.*\|wlan.*\|wlp.*"}[5m])` | Shows which path traffic is actually flowing over |
 
-**Row 4: クラスタ概況**
+**Row 4: Cluster overview**
 
-| パネル | クエリ | 備考 |
+| Panel | Query | Notes |
 |--------|--------|------|
-| 異常 Pod 数 | `sum(kube_pod_status_phase{phase=~"Pending\|Failed\|Unknown"})` | stat、0 で緑 |
-| コンテナ再起動 | `sum by(namespace)(increase(kube_pod_container_status_restarts_total[1h]))` | CrashLoop の早期発見 |
-| PVC 使用率 | `kubelet_volume_stats_used_bytes / kubelet_volume_stats_capacity_bytes` | Longhorn / local-path 双方 |
-| Pod 数 / ノード | `sum by(node)(kube_pod_info)` | 偏り確認 |
+| Abnormal pod count | `sum(kube_pod_status_phase{phase=~"Pending\|Failed\|Unknown"})` | stat, green at 0 |
+| Container restarts | `sum by(namespace)(increase(kube_pod_container_status_restarts_total[1h]))` | Early detection of CrashLoops |
+| PVC usage | `kubelet_volume_stats_used_bytes / kubelet_volume_stats_capacity_bytes` | Covers both Longhorn and local-path |
+| Pods per node | `sum by(node)(kube_pod_info)` | Checking for scheduling skew |
 
-実装時の確認事項:
+Things to confirm during implementation:
 
-- [ ] Pi 上の温度メトリクス名（`node_hwmon_temp_celsius` か `node_thermal_zone_temp`）を実機 Prometheus で確認
-- [ ] `node_network_carrier` が WiFi インターフェースで取れるか確認（取れなければ `node_network_up`）
+- [ ] Confirm the actual temperature metric name on the Pis (`node_hwmon_temp_celsius` vs `node_thermal_zone_temp`) against live Prometheus
+- [ ] Confirm `node_network_carrier` is available on the WiFi interfaces (fall back to `node_network_up` if not)
 
-## Phase 2 — blackbox-exporter（probe ベースの死活監視）
+## Phase 2 — blackbox-exporter (probe-based liveness monitoring)
 
-Prometheus 内部視点に加え、ICMP / HTTP の能動 probe を追加する。
+Adds active ICMP / HTTP probes on top of Prometheus's internal-view scraping.
 
-- **配置**: `kubernetes/observability/blackbox-exporter/`（`config.json` + `values.yaml`）。observability ApplicationSet（git file generator）が自動検出
+- **Location**: `kubernetes/observability/blackbox-exporter/` (`config.json` + `values.yaml`). Auto-discovered by the observability ApplicationSet (git file generator)
 - **Chart**: `prometheus-community/prometheus-blackbox-exporter`
-- **注意**: ICMP probe には `NET_RAW` capability が必要（chart の `securityContext` で付与）
+- **Note**: ICMP probes need the `NET_RAW` capability (granted via the chart's `securityContext`)
 
-### Probe 対象
+### Probe targets
 
-Prometheus Operator の `Probe` CRD で定義（`resources/` に配置）:
+Defined via the Prometheus Operator's `Probe` CRD (placed in `resources/`):
 
-| 種別 | 対象 | 分かること |
+| Type | Target | What it reveals |
 |------|------|-----------|
-| ICMP | 有線 IP: 192.168.0.107–110 | OS レベルの死活（kubelet 死亡と区別） |
-| ICMP | WiFi IP: 192.168.0.207–210 | 有線断時に WiFi fallback が生きているか |
-| HTTP | `https://{grafana,argocd,backstage,vault,prometheus}.platform.yu-min3.com` | Gateway → cert → backend のエンドツーエンド疎通 |
+| ICMP | Wired IPs: 192.168.0.107–110 | OS-level liveness (distinguishes this from a dead kubelet) |
+| ICMP | WiFi IPs: 192.168.0.207–210 | Whether the WiFi fallback is alive when the wired link drops |
+| HTTP | `https://{grafana,argocd,backstage,vault,prometheus}.platform.yu-min3.com` | End-to-end reachability through Gateway → cert → backend |
 
-### アラート追加（PrometheusRule）
+### New alerts (PrometheusRule)
 
-| アラート | 条件 | severity |
+| Alert | Condition | Severity |
 |----------|------|----------|
-| NodeICMPUnreachable | 有線 + WiFi 両系統の ICMP probe 失敗 5 分継続 | critical |
-| NodeWiredLinkDown | 有線 probe 失敗 & WiFi probe 成功 10 分継続 | warning（fallback 運用中） |
-| PlatformEndpointDown | HTTP probe 失敗 5 分継続 | warning |
+| NodeICMPUnreachable | Both wired and WiFi ICMP probes fail, sustained 5 minutes | critical |
+| NodeWiredLinkDown | Wired probe fails & WiFi probe succeeds, sustained 10 minutes | warning (running on fallback) |
+| PlatformEndpointDown | HTTP probe fails, sustained 5 minutes | warning |
 
-ダッシュボードに probe 結果の Row を追加（Phase 1 の JSON を更新）。
+Add a probe-results row to the dashboard (update the Phase 1 JSON).
 
-## Phase 3 — Grafana Cloud remote_write（m4neo SPOF 対策）
+## Phase 3 — Grafana Cloud remote_write (mitigating the m4neo SPOF)
 
-「監視の監視 + 障害時も見えるダッシュボード」をクラスタ外部に置く。当初案の healthchecks.io（Watchdog 転送のみ）から、**Grafana Cloud free tier への filtered remote_write** に変更 — dead-man's switch（no-data アラート）に加えて「クラスタ全停止後も直前までのメトリクスを外部から閲覧できる」が手に入るため。
+Puts "monitoring the monitoring, plus a dashboard that stays visible during an outage" outside the cluster. Changed from the original plan of healthchecks.io (Watchdog forwarding only) to a **filtered remote_write into Grafana Cloud's free tier** — this adds a dead-man's-switch (no-data alert) plus the ability to "view metrics from just before a total cluster outage, from outside the cluster."
 
-- **仕組み**: ローカル Prometheus の scrape は今まで通りクラスタ内で完結し、`remote_write`（外向き HTTPS push、インバウンド不要）で厳選 series だけを Grafana Cloud（Tokyo region）の Mimir に複製
-- **無料枠**: 10k active series / 14 日保持 / 3 ユーザー。allowlist 実測 ~1.4k series（14%）
-- **実装**:
-  1. Grafana Cloud アカウント + stack 作成（手動、クレカ不要）。remote_write 用トークン（`metrics:write` scope）を発行し Vault static（`secret/monitoring/grafana-cloud/remote-write`）へ
-  2. ESO で `grafana-cloud-remote-write` Secret（monitoring ns）に同期
-  3. `prometheusSpec.remoteWrite` に endpoint + basicAuth + `writeRelabelConfigs`（cluster-health ダッシュボードの系列の keep + 非 idle cpu mode の drop）
-  4. Cloud 側に Cluster Health ダッシュボードを複製（datasource uid 差し替えのみ）
-  5. Cloud 側で **no-data アラート**（`up{job="node-exporter"}` が届かなくなったら通知）= dead-man's switch
-- **カバーされる障害**: m4neo ダウン、Prometheus / Alertmanager 停止、クラスタ全体停止、宅内ネットワーク / 回線断
-- **Phase 4 候補（任意）**: Cloudflare Workers cron による外部 HTTP probe + 公開 status page（宅内回線断と Gateway 障害の外部視点での切り分け）
+- **Mechanism**: local Prometheus scraping stays entirely in-cluster as before; `remote_write` (outbound HTTPS push, no inbound needed) replicates a carefully-chosen subset of series to Mimir on Grafana Cloud (Tokyo region)
+- **Free tier**: 10k active series / 14-day retention / 3 users. The allowlist measures out to ~1.4k series (14%) in practice
+- **Implementation**:
+  1. Create a Grafana Cloud account + stack (manual, no credit card required). Issue a remote_write token (`metrics:write` scope) into Vault static (`secret/monitoring/grafana-cloud/remote-write`)
+  2. Sync it into a `grafana-cloud-remote-write` Secret (`monitoring` namespace) via ESO
+  3. Add the endpoint + basicAuth + `writeRelabelConfigs` to `prometheusSpec.remoteWrite` (keep the cluster-health dashboard's series, drop non-idle CPU modes)
+  4. Replicate the Cluster Health dashboard on the Cloud side (only the datasource uid needs to change)
+  5. Set up a **no-data alert** on the Cloud side (`up{job="node-exporter"}` no longer arriving) — this is the dead-man's-switch
+- **Failure modes covered**: m4neo going down, Prometheus / Alertmanager stopping, a total cluster outage, home network / ISP outage
+- **Candidate Phase 4 (optional)**: an external HTTP probe via Cloudflare Workers cron + a public status page (to distinguish a home-ISP outage from a Gateway failure from an outside vantage point)
 
-## PR 分割
+## PR split
 
-| PR | 内容 | デプロイ影響 |
+| PR | Content | Deploy impact |
 |----|------|-------------|
-| 1 | 本設計 doc + Phase 1 ダッシュボード | なし（ConfigMap 追加のみ） |
-| 2 | Phase 2 blackbox-exporter + Probe + アラート + ダッシュボード更新 | 新 Pod 1（Deployment） |
-| 3 | Phase 3 Grafana Cloud remote_write（ES + values.yaml） | Prometheus config reload |
+| 1 | This design doc + Phase 1 dashboard | None (ConfigMap addition only) |
+| 2 | Phase 2 blackbox-exporter + Probes + alerts + dashboard update | One new Pod (Deployment) |
+| 3 | Phase 3 Grafana Cloud remote_write (ExternalSecret + values.yaml) | Prometheus config reload |
 
-## 関連
+## Related
 
-- 既存スタック全体像: [observability.md](./observability.md)
-- ノード構成・ラベル: `.claude/rules/kubernetes-cluster.md`
-- ネットワーク 2 系統運用: [network.md](./network.md)
+- Overview of the existing stack: [observability.md](./observability.md)
+- Node topology and labels: `.claude/rules/kubernetes-cluster.md`
+- The wired/WiFi dual-path setup: [network.md](./network.md)
