@@ -9,6 +9,9 @@ hide:
 
 A bare-metal Kubernetes homelab built with technologies typical of enterprise platform engineering — Argo CD for GitOps, Istio for service mesh, Backstage for developer self-service, and observability with Prometheus, Grafana, Loki, and Tempo. All running on Raspberry Pis and a mini PC.
 
+[Get Started](getting-started/installation.md){ .md-button .md-button--primary }
+[See the Showcase](showcase.md){ .md-button }
+
 !!! note "Reference architecture, not a turnkey solution"
     Bootstrap automation (Ansible + Makefile) is planned. Adapt secrets, domains, and IP ranges to your environment — see the [Configuration Guide](getting-started/configuration.md).
 
@@ -47,10 +50,11 @@ This site is the **single source of truth** for the current state of kensan-lab.
 |---|---|
 | Understand the platform | [Architecture](#architecture) above, then [ADRs](adr/index.md) |
 | See the running system | [Showcase](showcase.md) |
-| Bring up a similar cluster | [Installation](getting-started/installation.md) → [Configuration](getting-started/configuration.md) → [Bootstrapping](bootstrapping/index.md) |
+| Bring up a similar cluster | [Prerequisites](getting-started/installation.md) → [Configuration](getting-started/configuration.md) → [Bootstrapping](bootstrapping/index.md) |
 | Operate it day-to-day | [Secret Management](secret-management/index.md), [Runbooks](runbooks/index.md) |
 | Read the back-stories | [Articles](articles.md) — Zenn / dev.to deep-dive index |
 | See what broke and why | [Incidents](incidents/index.md) |
+| Feed this site to an LLM | <a href="llms.txt"><code>llms.txt</code></a> (curated) / <a href="llms-full.txt"><code>llms-full.txt</code></a> (full content) |
 
 ## Tech Stack & Hardware
 

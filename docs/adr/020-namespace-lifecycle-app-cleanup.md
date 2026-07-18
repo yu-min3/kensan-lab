@@ -137,39 +137,41 @@ found:
    a component-shaped directory).
 
 3. **Merge `reloader` namespace ownership into `secrets/reloader`'s own Application**,
-   matching the `cert-manager`/`external-secrets` pattern — executed as **two phases, two
-   PRs**, because a plain `git mv` is unsafe here:
+    matching the `cert-manager`/`external-secrets` pattern — executed as **two phases, two
+    PRs**, because a plain `git mv` is unsafe here:
 
-   **Why not a plain move**: `reloader-namespace`'s source is `path: kubernetes/secrets/reloader`,
-   `directory: {recurse: false, include: 'namespace.yaml'}`. Moving the file out from under
-   that path (even in the same commit that adds it elsewhere) makes that app's desired
-   resource set empty *immediately on merge*. With `automated: {prune: true}` and a
-   `resources-finalizer.argocd.argoproj.io` finalizer, ArgoCD would prune the live `reloader`
-   Namespace as soon as it reconciles — taking the Reloader controller down — regardless of
-   whether `secrets/reloader`'s new source has already taken over tracking. There's no
-   git-commit-ordering trick that avoids this within a single merge, since both Applications
-   reconcile independently and the prune isn't gated on the other Application's state.
+    **Why not a plain move**: `reloader-namespace`'s source is `path: kubernetes/secrets/reloader`,
+    `directory: {recurse: false, include: 'namespace.yaml'}`. Moving the file out from under
+    that path (even in the same commit that adds it elsewhere) makes that app's desired
+    resource set empty *immediately on merge*. With `automated: {prune: true}` and a
+    `resources-finalizer.argocd.argoproj.io` finalizer, ArgoCD would prune the live `reloader`
+    Namespace as soon as it reconciles — taking the Reloader controller down — regardless of
+    whether `secrets/reloader`'s new source has already taken over tracking. There's no
+    git-commit-ordering trick that avoids this within a single merge, since both Applications
+    reconcile independently and the prune isn't gated on the other Application's state.
 
-   **Phase 1 (this PR) — duplicate, don't move**:
-   - Add `kubernetes/secrets/reloader/resources/namespace.yaml` as a **copy** (same content)
-     of the existing `kubernetes/secrets/reloader/namespace.yaml`. The original stays in place,
-     untouched, marked with a comment explaining it's a deliberate temporary duplicate.
-   - Add a third source to `kubernetes/argocd/applications/secrets/reloader/app.yaml` pointing
-     at `kubernetes/secrets/reloader/resources`, and flip `CreateNamespace=false` →
-     `CreateNamespace=true`.
-   - `reloader-namespace`'s source is completely untouched by this PR — it still finds its
-     file at the original path, so it keeps syncing normally with zero risk of pruning.
-     Both apps briefly co-own the same Namespace object (each sync flips the ArgoCD tracking
-     annotation to itself) — expected, harmless flapping for the transfer window, not a
-     steady state.
-   - After merging, confirm in the live cluster that `secrets/reloader`'s Application is
-     `Synced`/`Healthy` and applying the Namespace without errors.
+    **Phase 1 (this PR) — duplicate, don't move**:
 
-   **Phase 2 (follow-up PR, after Phase 1 is confirmed live)**:
-   - Delete `kubernetes/argocd/applications/namespaces/reloader/app.yaml` (and the now-empty
-     dir) **and** the duplicate `kubernetes/secrets/reloader/namespace.yaml` **in the same
-     commit**. With `reloader-namespace` gone, nothing reads the old path anymore, so removing
-     both together is safe and leaves no dangling duplicate.
+    - Add `kubernetes/secrets/reloader/resources/namespace.yaml` as a **copy** (same content)
+      of the existing `kubernetes/secrets/reloader/namespace.yaml`. The original stays in place,
+      untouched, marked with a comment explaining it's a deliberate temporary duplicate.
+    - Add a third source to `kubernetes/argocd/applications/secrets/reloader/app.yaml` pointing
+      at `kubernetes/secrets/reloader/resources`, and flip `CreateNamespace=false` →
+      `CreateNamespace=true`.
+    - `reloader-namespace`'s source is completely untouched by this PR — it still finds its
+      file at the original path, so it keeps syncing normally with zero risk of pruning.
+      Both apps briefly co-own the same Namespace object (each sync flips the ArgoCD tracking
+      annotation to itself) — expected, harmless flapping for the transfer window, not a
+      steady state.
+    - After merging, confirm in the live cluster that `secrets/reloader`'s Application is
+      `Synced`/`Healthy` and applying the Namespace without errors.
+
+    **Phase 2 (follow-up PR, after Phase 1 is confirmed live)**:
+
+    - Delete `kubernetes/argocd/applications/namespaces/reloader/app.yaml` (and the now-empty
+      dir) **and** the duplicate `kubernetes/secrets/reloader/namespace.yaml` **in the same
+      commit**. With `reloader-namespace` gone, nothing reads the old path anymore, so removing
+      both together is safe and leaves no dangling duplicate.
 
 ### Part 2 — backstage/app flatten
 

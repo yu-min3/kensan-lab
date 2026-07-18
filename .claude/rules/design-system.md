@@ -8,7 +8,7 @@ globs: "apps/**, packages/design-tokens/**, backstage/**, docs/design/**"
 プラットフォーム上の **全 UI（apps/*, Backstage plugin, 内部ダッシュボード）** が従う視覚言語。
 UI を書く / 直す前に必ずこのルールを読む。
 
-- 完全仕様: [`docs/design/DESIGN_SYSTEM.md`](../../docs/design/DESIGN_SYSTEM.md)（憲法）
+- 完全仕様: [`docs/design/index.md`](../../docs/design/index.md)（憲法、旧 DESIGN_SYSTEM.md）
 - 実装の真実: [`packages/design-tokens/`](../../packages/design-tokens/)（tokens.css / tokens.json）
 - コンポーネント仕様: [`docs/design/components.md`](../../docs/design/components.md)
 - 画面パターン: [`docs/design/patterns.md`](../../docs/design/patterns.md)
