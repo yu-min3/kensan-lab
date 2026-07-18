@@ -14,7 +14,7 @@ variable "vault_token" {
 
 # Keycloak 連携 (事前に Keycloak realm + OIDC client 作成済みの前提)
 variable "keycloak_realm_url" {
-  description = "Keycloak realm の OIDC discovery URL。例: https://auth.platform.yu-min3.com/realms/kensan"
+  description = "Keycloak realm の OIDC discovery URL。例: https://auth.yu-mins.com/realms/kensan"
   type        = string
 }
 

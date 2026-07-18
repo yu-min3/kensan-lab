@@ -8,8 +8,15 @@ data:
   KC_DB_URL_HOST: postgresql
   KC_DB_URL_DATABASE: keycloak
   KC_DB_USERNAME: keycloak
-  KC_HOSTNAME: auth.platform.yu-min3.com
-  KC_HOSTNAME_ADMIN: auth.platform.yu-min3.com
+  # issuer 統一先。旧 auth.platform.yu-min3.com（Route53, Tunnel 不可）から Tunnel 可能な
+  # auth.yu-mins.com へ移行し、外部（kensan.yu-mins.com）からも OIDC login が成立するように
+  # した。host は 1 本なので STRICT=true のまま。到達性は split-horizon:
+  #   - LAN: CoreDNS hosts / Mac /etc/hosts が .242 gateway へ（HTTPS listener + wildcard-yu-mins-tls）
+  #   - 外部: Cloudflare Tunnel（TLS は edge 終端、CF Access が前段ゲート）
+  # この flip に全 OIDC client（oauth2-proxy / istio RequestAuthentication / argocd / grafana /
+  # backstage / Vault OIDC config）の issuer 追随が必須（同一 PR + Vault は runtime write）。
+  KC_HOSTNAME: auth.yu-mins.com
+  KC_HOSTNAME_ADMIN: auth.yu-mins.com
   KC_HOSTNAME_STRICT: "true"
   KC_HOSTNAME_STRICT_HTTPS: "true"
   KC_HTTP_ENABLED: "true"

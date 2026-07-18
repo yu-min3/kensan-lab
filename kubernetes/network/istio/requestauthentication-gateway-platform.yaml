@@ -24,14 +24,14 @@ spec:
     kind: Gateway
     name: gateway-platform
   jwtRules:
-    - issuer: "https://auth.platform.yu-min3.com/realms/kensan"
-      jwksUri: "https://auth.platform.yu-min3.com/realms/kensan/protocol/openid-connect/certs"
+    - issuer: "https://auth.yu-mins.com/realms/kensan"
+      jwksUri: "https://auth.yu-mins.com/realms/kensan/protocol/openid-connect/certs"
       forwardOriginalToken: true
     # Keycloak admin console (realm master) のトークンも検証可能にする。
     # これが無いと console の admin API call が "Jwt issuer is not configured"
     # で 401 になる (RA は JWT 持ちリクエストの issuer 未登録を reject するため)。
     # master realm トークンには platform-admin groups claim が無いので、
     # Category 2/3 host (groups claim 必須) には通らない。
-    - issuer: "https://auth.platform.yu-min3.com/realms/master"
-      jwksUri: "https://auth.platform.yu-min3.com/realms/master/protocol/openid-connect/certs"
+    - issuer: "https://auth.yu-mins.com/realms/master"
+      jwksUri: "https://auth.yu-mins.com/realms/master/protocol/openid-connect/certs"
       forwardOriginalToken: true

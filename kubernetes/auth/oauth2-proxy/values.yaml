@@ -57,7 +57,7 @@ config:
   # configFile を渡すと chart の `emailDomains` 値は無視される (configFile 優先)。
   configFile: |-
     provider                       = "keycloak-oidc"
-    oidc_issuer_url                = "https://auth.platform.yu-min3.com/realms/kensan"
+    oidc_issuer_url                = "https://auth.yu-mins.com/realms/kensan"
     insecure_oidc_allow_unverified_email = false
 
     email_domains                  = ["*"]
@@ -104,7 +104,7 @@ config:
 
     # CLI Bearer token (vault login -method=oidc 等) は素通り。
     skip_jwt_bearer_tokens         = true
-    extra_jwt_issuers              = ["https://auth.platform.yu-min3.com/realms/kensan=istio-gateway-platform"]
+    extra_jwt_issuers              = ["https://auth.yu-mins.com/realms/kensan=istio-gateway-platform"]
 
     ping_path                      = "/ping"
     metrics_address                = "0.0.0.0:44180"

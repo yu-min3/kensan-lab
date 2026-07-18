@@ -49,7 +49,7 @@ if [ -z "$VAULT_OIDC_CLIENT_SECRET" ] || [ "$VAULT_OIDC_CLIENT_SECRET" = "null" 
   echo "ERROR: BW から vault client_secret 取得失敗"; exit 1
 fi
 vault write auth/oidc/config \
-  oidc_discovery_url="https://auth.platform.yu-min3.com/realms/kensan" \
+  oidc_discovery_url="https://auth.yu-mins.com/realms/kensan" \
   oidc_client_id="vault" \
   oidc_client_secret="$VAULT_OIDC_CLIENT_SECRET" \
   default_role="default"
