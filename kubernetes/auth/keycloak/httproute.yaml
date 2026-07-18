@@ -10,6 +10,9 @@ spec:
     name: gateway-platform
     namespace: istio-system
   hostnames:
+  # issuer 統一先。外部(http-tunnel :80) / LAN(https-yumins :443) 両 listener から
+  # この host で Keycloak に到達する。auth.platform は Phase 2 で撤去予定（移行中は併存）。
+  - "auth.yu-mins.com"
   - "auth.platform.yu-min3.com"
   rules:
   - matches:

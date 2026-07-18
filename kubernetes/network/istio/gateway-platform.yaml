@@ -51,6 +51,25 @@ spec:
     allowedRoutes:
       namespaces:
         from: All
+
+  # LAN 直アクセス用 HTTPS listener (yu-mins.com)。
+  # auth.yu-mins.com を issuer に統一した結果、LAN は split-horizon DNS で .242 に
+  # 直接来る（CoreDNS hosts / Mac /etc/hosts）。この経路は gateway で TLS 終端するため
+  # in-cluster 証明書 wildcard-yu-mins-tls が必要（外部経路の http-tunnel は edge 終端で別物）。
+  # allowedRoutes: All は http-tunnel と対称（Keycloak httproute は platform-auth-prod ns）。
+  - name: https-yumins
+    protocol: HTTPS
+    port: 443
+    hostname: "*.yu-mins.com"
+    allowedRoutes:
+      namespaces:
+        from: All
+    tls:
+      mode: Terminate
+      certificateRefs:
+      - group: ""
+        kind: Secret
+        name: wildcard-yu-mins-tls
 ---
 # LoadBalancer Service for Platform Gateway
 apiVersion: v1

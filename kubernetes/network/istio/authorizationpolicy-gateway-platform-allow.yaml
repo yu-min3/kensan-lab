@@ -47,6 +47,9 @@ spec:
     - to:
         - operation:
             hosts:
+              # auth.yu-mins.com は IdP 自身（issuer 統一先）。ext_authz を当てると
+              # ログインページ到達に認証が要る chicken-and-egg になるため無条件 bypass。
+              - auth.yu-mins.com
               - auth.platform.yu-min3.com
               - vault.platform.yu-min3.com
               - argocd.platform.yu-min3.com
