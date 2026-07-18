@@ -109,6 +109,14 @@ body {
   background-color: hsl(var(--card));
 }
 
+/* Material's placeholder color assumes a dark indigo header; ours is light in
+   the default scheme, so the inherited white-on-light placeholder is
+   unreadable until the search box is focused. */
+[data-md-color-scheme="default"] .md-search__input::placeholder {
+  color: hsl(var(--muted-foreground));
+  opacity: 1;
+}
+
 .md-nav__link--active,
 .md-nav__link[aria-current="page"] {
   color: hsl(var(--brand));
@@ -119,6 +127,26 @@ body {
   background-color: hsl(var(--brand-muted) / 0.34);
   border-radius: calc(var(--whetstone-radius) - 2px);
   padding-inline: 0.4rem;
+}
+
+/* Sticky section titles only mask their own line height; long nav labels
+   that wrap to two lines can peek out from underneath as the sidebar
+   scrolls. Same-color blur widens the masked area without looking like a
+   shadow. */
+.md-nav__title {
+  background-color: hsl(var(--background));
+  box-shadow: 0 0 0.4rem 0.4rem hsl(var(--background));
+}
+
+/* Search results reuse .md-typeset for teaser formatting, which also pulls
+   in the h1/h2 serif rule below — reset it so result titles stay UI (sans),
+   matching the 3-typeface rule (serif is for document headings only). */
+.md-search-result__article.md-typeset h1,
+.md-search-result__article.md-typeset h2,
+.md-search-result__article.md-typeset h3 {
+  font-family: var(--whetstone-font-sans);
+  font-size: inherit;
+  font-weight: 700;
 }
 
 .md-typeset {
@@ -156,6 +184,35 @@ body {
 
 .md-typeset a {
   color: hsl(var(--brand));
+}
+
+/* Material's .md-button inherits --md-primary-fg-color, which we point at
+   the header's card background (not a real "primary" fill) — override with
+   the actual brand/outline pairing from the Button component spec. */
+.md-typeset .md-button {
+  background-color: transparent;
+  border: 1px solid hsl(var(--border-strong));
+  border-radius: var(--whetstone-radius);
+  color: hsl(var(--foreground));
+  font-weight: 600;
+}
+
+.md-typeset .md-button:hover {
+  background-color: hsl(var(--muted));
+  border-color: hsl(var(--border-strong));
+  color: hsl(var(--foreground));
+}
+
+.md-typeset .md-button--primary {
+  background-color: hsl(var(--brand));
+  border-color: hsl(var(--brand));
+  color: hsl(var(--brand-foreground));
+}
+
+.md-typeset .md-button--primary:hover {
+  background-color: hsl(var(--brand) / 0.88);
+  border-color: hsl(var(--brand) / 0.88);
+  color: hsl(var(--brand-foreground));
 }
 
 .md-typeset a:hover {
@@ -198,6 +255,28 @@ body {
 
 .md-typeset table:not([class]) td {
   border-top: 1px solid hsl(var(--border));
+}
+
+.md-typeset table:not([class]) code {
+  word-break: keep-all;
+}
+
+.md-typeset figure {
+  background-color: hsl(var(--card));
+  border: 1px solid hsl(var(--border));
+  border-radius: var(--whetstone-radius);
+  margin-inline: 0;
+  padding: 1rem;
+}
+
+.md-typeset figure img {
+  border-radius: calc(var(--whetstone-radius) - 4px);
+}
+
+.md-typeset figure figcaption {
+  color: hsl(var(--muted-foreground));
+  font-size: 0.9rem;
+  margin-top: 0.75rem;
 }
 
 .md-typeset .admonition,

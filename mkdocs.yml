@@ -33,15 +33,15 @@ theme:
   palette:
     - media: "(prefers-color-scheme: light)"
       scheme: default
-      primary: indigo
-      accent: indigo
+      primary: custom
+      accent: custom
       toggle:
         icon: material/weather-night
         name: Switch to dark mode
     - media: "(prefers-color-scheme: dark)"
       scheme: slate
-      primary: indigo
-      accent: indigo
+      primary: custom
+      accent: custom
       toggle:
         icon: material/weather-sunny
         name: Switch to light mode
@@ -61,6 +61,13 @@ theme:
 
 plugins:
   - search
+  - glightbox:
+      touchNavigation: true
+      loop: false
+      effect: fade
+      slide_effect: slide
+      zoomable: true
+      draggable: true
   - git-revision-date-localized:
       enable_creation_date: true
       type: timeago
@@ -137,8 +144,6 @@ extra:
   social:
     - icon: fontawesome/brands/github
       link: https://github.com/yu-min3/kensan-lab
-    - icon: fontawesome/brands/dev
-      link: https://dev.to/
   generator: false
 
 extra_css:
@@ -148,7 +153,7 @@ nav:
   - Home: index.md
   - Showcase: showcase.md
   - Getting Started:
-      - Installation: getting-started/installation.md
+      - Prerequisites: getting-started/installation.md
       - Configuration: getting-started/configuration.md
       - Bootstrapping:
           - Overview: bootstrapping/index.md
@@ -157,14 +162,14 @@ nav:
           - Add worker node (M4 Neo): bootstrapping/add-worker-node-m4neo.md
   - Architecture:
       - Infrastructure overview: architecture/infrastructure.md
-      - argocd/: architecture/argocd.md
-      - auth/: architecture/auth.md
-      - secrets/: architecture/secrets.md
-      - network/: architecture/network.md
-      - network/ · Cloudflare Tunnel & Access: architecture/cloudflare-tunnel.md
-      - observability/: architecture/observability.md
-      - storage/: architecture/storage.md
-      - backstage/: architecture/backstage.md
+      - Argo CD (GitOps): architecture/argocd.md
+      - Auth (Keycloak + oauth2-proxy): architecture/auth.md
+      - Secrets (Vault): architecture/secrets.md
+      - Network (Cilium + Istio): architecture/network.md
+      - Cloudflare Tunnel & Access: architecture/cloudflare-tunnel.md
+      - Observability (Prometheus/Loki/Tempo): architecture/observability.md
+      - Storage (Longhorn): architecture/storage.md
+      - Backstage (IDP): architecture/backstage.md
       - Cluster health monitoring: architecture/cluster-health-monitoring.md
   - Concepts:
       - Documentation Layout: concepts/doc-layout.md
@@ -172,7 +177,7 @@ nav:
       - Network Policy: concepts/network-policy-guide.md
       - Policy Enforcement: concepts/policy-enforcement.md
   - Design System:
-      - Overview: design/DESIGN_SYSTEM.md
+      - Overview: design/index.md
       - Components: design/components.md
       - Patterns: design/patterns.md
       - Adoption Status: design/adoption-status.md

@@ -18,7 +18,7 @@ As operations progressed, the following problems became apparent:
 
 1. **Boilerplate duplication**: Apps within the same category have similar structures, but settings are scattered across individual `app.yaml` files
 2. **Configuration inconsistency**: Presence of finalizer, retry, and ServerSideApply varies per app
-   - Example: grafana has no SSA with retry, loki has SSA with retry, env-kensan-* has no finalizer
+    - Example: grafana has no SSA with retry, loki has SSA with retry, env-kensan-* has no finalizer
 3. **Effort for new additions**: Adding a new component requires copying and editing an entire `app.yaml`
 
 ### Options Considered
@@ -74,11 +74,11 @@ A category moves to ApplicationSet when **all** of the following hold; otherwise
 Zero-downtime migration achieved through a 2-commit strategy:
 
 1. **Commit 1**: Remove `resources-finalizer.argocd.argoproj.io` from target Application CRs
-   - After Argo CD sync, the finalizer is removed (no impact on managed resources)
+    - After Argo CD sync, the finalizer is removed (no impact on managed resources)
 2. **Commit 2**: Add ApplicationSet CR and delete the old Application CRs
-   - root-app prunes the old Applications (no finalizer = no cascade deletion)
-   - ApplicationSet controller regenerates Application CRs with the same names
-   - Cluster workloads continue without interruption
+    - root-app prunes the old Applications (no finalizer = no cascade deletion)
+    - ApplicationSet controller regenerates Application CRs with the same names
+    - Cluster workloads continue without interruption
 
 ## Consequences
 

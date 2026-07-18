@@ -78,7 +78,7 @@ semver。**ブレイキングチェンジ**は以下に該当する変更：
 
 ## 関連ドキュメント
 
-- `docs/design/DESIGN_SYSTEM.md` — エージェント向け憲法（トークン使用ルールは §3）
+- `docs/design/index.md` — エージェント向け憲法（旧 DESIGN_SYSTEM.md、トークン使用ルールは §3）
 - `docs/design/components.md` — コンポーネント仕様
 - `docs/design/patterns.md` — 画面パターン
 - `docs/design/density-demo.html` — 密度切替の視覚リファレンス

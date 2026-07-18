@@ -55,12 +55,11 @@ the platform is proven against something real rather than a toy.
   <figcaption>kensan (Go single binary + Whetstone SPA), a file-based knowledge & goal manager that reads Markdown as its single source of truth. Shown with a <strong>sample workspace</strong> — fictional data, not a live view. The UI is the author's personal tool and is currently Japanese-only (see <a href="https://github.com/yu-min3/kensan-lab/blob/main/apps/kensan/demo-workspace/">demo-workspace</a> to run it locally).</figcaption>
 </figure>
 
-## Capture guidelines
-
-- Use real running screens only. No mock dashboards or generated images.
-- Redact domains, user names, tokens, cluster IDs, and IP addresses that are not
-  already public.
-- Prefer a 16:9 browser viewport around 1440px wide; save as PNG.
-- Keep captions outcome-focused: what the screen *proves*, not how to operate the
-  tool (the captions above already follow this — adjust only if the shot
-  differs).
+??? note "Capture guidelines (for contributors adding new screenshots)"
+    - Use real running screens only. No mock dashboards or generated images.
+    - Redact domains, user names, tokens, cluster IDs, and IP addresses that are not
+      already public.
+    - Prefer a 16:9 browser viewport around 1440px wide; save as PNG.
+    - Keep captions outcome-focused: what the screen *proves*, not how to operate the
+      tool (the captions above already follow this — adjust only if the shot
+      differs).

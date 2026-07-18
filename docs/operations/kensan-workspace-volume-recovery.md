@@ -28,9 +28,9 @@ PV: pvc-cd6553e2-2bd6-4b7c-b43d-18b0a600b707   ← 3 箇所がこの名前に依
 
 1. R2 backup から新 volume を restore（Longhorn UI: Backup → Restore）
 2. 新 PV 名を確認し、**3 箇所を同時に更新**:
-   - pvc-workspace.yaml の `spec.volumeName`
-   - service-workspace-nfs.yaml の selector `longhorn.io/share-manager`
-   - Mac: `/etc/auto_kensan` の export path → `sudo automount -vc`
+    - pvc-workspace.yaml の `spec.volumeName`
+    - service-workspace-nfs.yaml の selector `longhorn.io/share-manager`
+    - Mac: `/etc/auto_kensan` の export path → `sudo automount -vc`
 3. PR → merge → app 復帰を確認
 
 ## ケース C: クラスタ全損

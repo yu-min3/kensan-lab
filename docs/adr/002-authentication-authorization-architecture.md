@@ -50,10 +50,12 @@ Browser -> Prometheus (no auth)
 ```
 
 **Pros:**
+
 - Maximizes each service's native capabilities
 - Failure isolation per service
 
 **Cons:**
+
 - OIDC configuration needed for each service (operational burden)
 - Cannot protect non-OIDC services like Prometheus/Hubble
 - Configuration required for each new service
@@ -69,6 +71,7 @@ Browser -> Istio Gateway -> OAuth2 Proxy -> Keycloak
 ```
 
 **Pros:**
+
 - Authentication managed in one place (easy operations)
 - All services automatically protected
 - No configuration needed when adding new services
@@ -76,6 +79,7 @@ Browser -> Istio Gateway -> OAuth2 Proxy -> Keycloak
 - Single login provides access to all services (cookie sharing)
 
 **Cons:**
+
 - Cannot use each service's native auth features
 - Fine-grained authorization must be implemented at the app level
 - OAuth2 Proxy is a single point of failure (redundancy needed)
@@ -97,12 +101,14 @@ Browser -> Istio Gateway -> OAuth2 Proxy (Auth Layer 1)
 ```
 
 **Pros:**
+
 - All benefits of Pattern B
 - Fine-grained authorization can be added only where needed
 - Easy phased adoption (Phase 2 -> Phase 3)
 - OAuth2 Proxy forwards JWT, allowing downstream services to reuse it
 
 **Cons:**
+
 - Most complex (but can be built incrementally)
 
 ## Decision
@@ -134,6 +140,7 @@ Browser -> Istio Gateway (gateway-platform)
 ```
 
 **Implementation:**
+
 - Deploy OAuth2 Proxy (auth-system namespace)
 - Configure Istio ExtAuthz (EnvoyFilter)
 - Create Keycloak Realm `platform`
@@ -141,11 +148,13 @@ Browser -> Istio Gateway (gateway-platform)
 - Basic Role/Group setup (platform-admin)
 
 **Benefits:**
+
 - All services automatically protected
 - Single login provides access to all services
 - Minimal operational burden
 
 **Per-Service Handling:**
+
 - Receives `Authorization: Bearer <JWT>` header from OAuth2 Proxy
 - Trusts `X-Auth-Request-User`, `X-Auth-Request-Email` headers
 - No authorization performed (everyone has full access)
@@ -193,9 +202,10 @@ Browser -> Istio Gateway -> OAuth2 Proxy (Auth Layer 1)
    ```
 
 4. **Prometheus/Hubble**:
-   - No changes (OAuth2 Proxy from Phase 2 is sufficient)
+    - No changes (OAuth2 Proxy from Phase 2 is sufficient)
 
 **Benefits:**
+
 - No changes needed to OAuth2 Proxy configuration
 - Fine-grained authorization added only to services that need it
 - JWT verification occurs twice (defense in depth)
@@ -273,6 +283,7 @@ args:
 ```
 
 Each service receives the `Authorization: Bearer <JWT>` header:
+
 - Phase 2: Just reads the header (no verification)
 - Phase 3: Verifies JWT + authorizes based on groups claim
 
@@ -290,28 +301,28 @@ Each service receives the `Authorization: Bearer <JWT>` header:
 ### Why Pattern A (Per-Service Authentication) Was Not Chosen
 
 1. **Cannot protect Prometheus/Hubble**
-   - No OIDC implementation
-   - Basic auth is insufficient
+    - No OIDC implementation
+    - Basic auth is insufficient
 
 2. **High operational burden**
-   - OIDC configuration needed for each service
-   - Configuration required for each new service
+    - OIDC configuration needed for each service
+    - Configuration required for each new service
 
 3. **Poor user experience**
-   - Potential redirects per service
-   - Cookies/Sessions not shared
+    - Potential redirects per service
+    - Cookies/Sessions not shared
 
 ### Why Pattern B (Gateway Authentication Only) Was Not Chosen
 
 Pattern B is adopted for Phase 2, but has the following limitations long-term:
 
 1. **Cannot do fine-grained authorization**
-   - Cannot control "only developers can execute templates" in Backstage
-   - Cannot control "only Platform Engineers can deploy to production" in Argo CD
+    - Cannot control "only developers can execute templates" in Backstage
+    - Cannot control "only Platform Engineers can deploy to production" in Argo CD
 
 2. **Cannot leverage service-specific features**
-   - Cannot use Backstage Permission Framework
-   - Cannot use Argo CD RBAC
+    - Cannot use Backstage Permission Framework
+    - Cannot use Argo CD RBAC
 
 -> **Resolved by hybridizing in Phase 3**
 
@@ -542,47 +553,47 @@ export class PlatformPermissionPolicy implements PermissionPolicy {
 ### Benefits
 
 1. **Phased Adoption**
-   - Phase 1: No authentication (development)
-   - Phase 2: Gateway authentication (blanket protection)
-   - Phase 3: Multi-layer authentication (fine-grained permissions)
+    - Phase 1: No authentication (development)
+    - Phase 2: Gateway authentication (blanket protection)
+    - Phase 3: Multi-layer authentication (fine-grained permissions)
 
 2. **Minimal Operational Burden**
-   - Phase 2: Authentication managed in one place
-   - Phase 3: Additional configuration only for services that need it
-   - No changes to OAuth2 Proxy configuration
+    - Phase 2: Authentication managed in one place
+    - Phase 3: Additional configuration only for services that need it
+    - No changes to OAuth2 Proxy configuration
 
 3. **Flexibility**
-   - Authentication methods suited to service characteristics
-   - Prometheus/Hubble stay at Phase 2
-   - Backstage/Argo CD get fine-grained authorization in Phase 3
+    - Authentication methods suited to service characteristics
+    - Prometheus/Hubble stay at Phase 2
+    - Backstage/Argo CD get fine-grained authorization in Phase 3
 
 4. **Defense in Depth**
-   - Gateway: Early rejection of invalid JWTs
-   - Application: Resource-level authorization
+    - Gateway: Early rejection of invalid JWTs
+    - Application: Resource-level authorization
 
 5. **User Experience**
-   - Single login provides access to all services
-   - Cookie sharing (.platform.your-org.com)
+    - Single login provides access to all services
+    - Cookie sharing (.platform.your-org.com)
 
 ### Drawbacks and Mitigations
 
 1. **Increased Complexity**
-   - Mitigation: Build incrementally (Phase 1 -> 2 -> 3)
-   - Very simple up through Phase 2
+    - Mitigation: Build incrementally (Phase 1 -> 2 -> 3)
+    - Very simple up through Phase 2
 
 2. **OAuth2 Proxy as Single Point of Failure**
-   - Mitigation: 2 replicas for redundancy
-   - PodDisruptionBudget for availability
+    - Mitigation: 2 replicas for redundancy
+    - PodDisruptionBudget for availability
 
 3. **Performance Overhead**
-   - ExtAuthz call latency
-   - Mitigation: Place OAuth2 Proxy in istio-system namespace (proximity)
-   - Mitigation: Cookie caching makes authenticated requests fast
+    - ExtAuthz call latency
+    - Mitigation: Place OAuth2 Proxy in istio-system namespace (proximity)
+    - Mitigation: Cookie caching makes authenticated requests fast
 
 4. **Debugging Difficulty**
-   - Mitigation: Log output at each layer
-   - OAuth2 Proxy: `--auth-logging=true`
-   - Backstage: Permission Framework logs
+    - Mitigation: Log output at each layer
+    - OAuth2 Proxy: `--auth-logging=true`
+    - Backstage: Permission Framework logs
 
 ### Trade-offs
 
@@ -598,6 +609,7 @@ export class PlatformPermissionPolicy implements PermissionPolicy {
 - Not adopted: Single verification only (reduced security)
 
 The hybrid approach is appropriate for this environment because:
+
 - Platform services are used by administrators and developers (security matters)
 - Phased adoption reduces burden during early development
 - Supports fine-grained permission control in the future
@@ -624,6 +636,7 @@ The hybrid approach is appropriate for this environment because:
 5. Verify functionality
 
 **Outcome:**
+
 - All services protected
 - Single login provides access to all services
 
@@ -646,6 +659,7 @@ The hybrid approach is appropriate for this environment because:
 3. Verify functionality
 
 **Prometheus/Hubble:**
+
 - No changes (stays at Phase 2)
 
 ## References

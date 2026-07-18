@@ -59,7 +59,7 @@ UI を書く / 直す前に **必ず守る** 5 つだけ：
                           │
 ┌─────────────────────────────────────────────────────────┐
 │  docs/design/                                             │
-│   ├─ DESIGN_SYSTEM.md  ← 本書                             │
+│   ├─ index.md          ← 本書（旧 DESIGN_SYSTEM.md）      │
 │   ├─ components.md     ← コンポーネント仕様              │
 │   ├─ patterns.md       ← 画面パターン                     │
 │   └─ brand/            ← ロゴ・OGP                        │
