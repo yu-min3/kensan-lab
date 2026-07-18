@@ -1,28 +1,28 @@
 # Longhorn Restore Test Runbook
 
-Longhorn backup → restore 経路の月次検証手順。Phase 1 終了時 (2026-05-04) に CR ベースで実証した手順をそのまま runbook 化。
+Monthly verification procedure for the Longhorn backup → restore path. Turned directly into a runbook from the CR-based procedure proven out at the end of Phase 1 (2026-05-04).
 
-## 目的
+## Purpose
 
-- backup target (Cloudflare R2) からのリストアが現実に動くことを定期検証
-- 新 token rotation や Longhorn upgrade 後の retrograde 互換確認
-- バイト一致確認まで通すことで「backup あるけど壊れてた」事故を排除
+- Regularly verify that restoring from the backup target (Cloudflare R2) actually works
+- Confirm backward compatibility after a token rotation or a Longhorn upgrade
+- Rule out the "we have a backup, but it was broken" failure mode by checking byte-for-byte equality
 
-## 推奨頻度
+## Recommended frequency
 
-月次。`/reflection` 月次レビューに組み込み。Phase 3 で RecurringJob backup-monthly に同期させると自然。
+Monthly. Fold it into the `/reflection` monthly review. Once Phase 3's `backup-monthly` RecurringJob exists, it's natural to sync this with it.
 
-## 前提
+## Prerequisites
 
-- ArgoCD で Longhorn Application が `Synced/Healthy`
-- BackupTarget CR `default` の `AVAILABLE=true`
-- m4neo (`hardware-class=high-performance`) が Schedulable
+- The Longhorn Application is `Synced/Healthy` in Argo CD
+- The `default` BackupTarget CR shows `AVAILABLE=true`
+- m4neo (`hardware-class=high-performance`) is Schedulable
 
-## 手順
+## Procedure
 
-### 1. テスト PVC + 書込 Pod 作成
+### 1. Create a test PVC + a writer pod
 
-`temp/longhorn-restore-test.yaml` (gitignored、毎回再生成 OK):
+`temp/longhorn-restore-test.yaml` (gitignored, safe to regenerate every time):
 
 ```yaml
 ---
@@ -60,10 +60,10 @@ spec:
 kubectl apply -f temp/longhorn-restore-test.yaml
 kubectl wait pod restore-test-writer -n default --for=condition=Ready --timeout=180s
 kubectl logs restore-test-writer -n default
-# 期待: hello.txt の内容が出る (タイムスタンプ付き) — この文字列を控える
+# Expected: prints hello.txt's content (with a timestamp) — note this string down
 ```
 
-PVC bind 後の Longhorn Volume 名 (PV 名と同じ):
+The Longhorn Volume name after the PVC binds (same as the PV name):
 
 ```bash
 VOL=$(kubectl get pvc restore-test-pvc -n default -o jsonpath='{.spec.volumeName}')
@@ -77,7 +77,7 @@ apiVersion: longhorn.io/v1beta2
 kind: Snapshot
 metadata: { name: restore-test-snap, namespace: longhorn-system }
 spec:
-  volume: <PV 名>
+  volume: <PV name>
   createSnapshot: true
 ```
 
@@ -87,7 +87,7 @@ kubectl wait snapshot.longhorn.io/restore-test-snap -n longhorn-system \
   --for=jsonpath='{.status.readyToUse}'=true --timeout=60s
 ```
 
-### 3. Backup CR (R2 へ push)
+### 3. Backup CR (push to R2)
 
 ```yaml
 apiVersion: longhorn.io/v1beta2
@@ -95,19 +95,19 @@ kind: Backup
 metadata:
   name: restore-test-backup
   namespace: longhorn-system
-  labels: { backup-volume: <PV 名> }
+  labels: { backup-volume: <PV name> }
 spec:
   snapshotName: restore-test-snap
 ```
 
 ```bash
 kubectl apply -f -
-# 完了まで待つ (1GB 未使用なら数十秒)
+# Wait for completion (a few dozen seconds for an under-1GB volume)
 until [ "$(kubectl -n longhorn-system get backup restore-test-backup -o jsonpath='{.status.state}')" = "Completed" ]; do sleep 5; done
 echo "Backup URL: $(kubectl -n longhorn-system get backup restore-test-backup -o jsonpath='{.status.url}')"
 ```
 
-### 4. Restore: 新 Volume CR (`fromBackup`) + PV + PVC + Reader Pod
+### 4. Restore: a new Volume CR (`fromBackup`) + PV + PVC + reader pod
 
 ```yaml
 ---
@@ -115,7 +115,7 @@ apiVersion: longhorn.io/v1beta2
 kind: Volume
 metadata: { name: restore-test-restored, namespace: longhorn-system }
 spec:
-  fromBackup: "<status.url の値>"
+  fromBackup: "<the value of status.url>"
   size: "1073741824"
   numberOfReplicas: 1
   frontend: blockdev
@@ -168,38 +168,38 @@ kubectl apply -f -
 kubectl wait pod restore-test-reader -n default --for=condition=Ready --timeout=300s
 ```
 
-### 5. ファイル一致確認
+### 5. Verify the file matches
 
 ```bash
 W=$(kubectl exec restore-test-writer -n default -- cat /data/hello.txt)
 R=$(kubectl exec restore-test-reader -n default -- cat /data/hello.txt)
 echo "writer:  $W"
 echo "reader:  $R"
-[ "$W" = "$R" ] && echo "✓ MATCH" || echo "✗ MISMATCH (要調査)"
+[ "$W" = "$R" ] && echo "✓ MATCH" || echo "✗ MISMATCH (needs investigation)"
 ```
 
-### 6. クリーンアップ
+### 6. Cleanup
 
 ```bash
 kubectl delete pod restore-test-writer restore-test-reader -n default --ignore-not-found
 kubectl delete pvc restore-test-pvc restore-test-restored-pvc -n default --ignore-not-found
-kubectl delete pv pv-of-original-pvc restore-test-restored --ignore-not-found  # PV は Retain なので明示削除
-kubectl -n longhorn-system delete volume <元 PV 名> restore-test-restored --ignore-not-found
+kubectl delete pv pv-of-original-pvc restore-test-restored --ignore-not-found  # PVs use Retain, so delete explicitly
+kubectl -n longhorn-system delete volume <original PV name> restore-test-restored --ignore-not-found
 kubectl -n longhorn-system delete snapshot restore-test-snap --ignore-not-found
 kubectl -n longhorn-system delete backup restore-test-backup --ignore-not-found
-# Backup CR 削除で R2 上のオブジェクトも Longhorn が削除する
+# Deleting the Backup CR also has Longhorn delete the corresponding object on R2
 ```
 
-## 失敗時のトリアージ
+## Failure triage
 
-| 症状 | 原因候補 | 確認 |
+| Symptom | Likely cause | How to check |
 |---|---|---|
-| Backup CR `state=Error` | R2 認証失敗 (token revoke 済み等) | `kubectl -n longhorn-system get backuptarget` の `AVAILABLE`、`status.message` |
-| Backup CR が `state=` (空)で進まない | engine image 起動待ち、または node detach | `kubectl -n longhorn-system get pods -l app=longhorn-manager` |
-| Restore Volume が `robustness=faulted` | R2 上の backup が破損 / R2 へのアクセス権限消失 | `kubectl -n longhorn-system describe volume restore-test-restored` |
-| Reader pod `MountVolume.MountDevice failed` | volumeHandle 不一致、staleReplicaTimeout 短すぎ | PV manifest の volumeAttributes 再確認 |
-| ファイル不一致 | Backup/Restore のチェックサム異常 (要 escalate) | Longhorn manager logs、R2 オブジェクト manual download で diff |
+| Backup CR `state=Error` | R2 authentication failure (e.g. a revoked token) | `AVAILABLE` and `status.message` from `kubectl -n longhorn-system get backuptarget` |
+| Backup CR stuck with `state=` (empty), no progress | Waiting on the engine image to start, or a node detach | `kubectl -n longhorn-system get pods -l app=longhorn-manager` |
+| Restore Volume shows `robustness=faulted` | The backup on R2 is corrupted / access to R2 was lost | `kubectl -n longhorn-system describe volume restore-test-restored` |
+| Reader pod: `MountVolume.MountDevice failed` | volumeHandle mismatch, or staleReplicaTimeout too short | Re-check the PV manifest's volumeAttributes |
+| File mismatch | A checksum anomaly during backup/restore (escalate this) | Longhorn manager logs; manually download the R2 object and diff |
 
-## 履歴
+## History
 
-- 2026-05-04: Phase 1 終了時に手順実証、Yes 動作。所要時間 backup 約 10s + restore 約 90s (1GiB 未使用、初回 R2 write/read)
+- 2026-05-04: procedure proven out at the end of Phase 1, worked correctly. Timing: backup ~10s + restore ~90s (under 1GiB, first R2 write/read)

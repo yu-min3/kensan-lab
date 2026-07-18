@@ -1,14 +1,14 @@
 # ArgoCD repo-server probe timeout tuning
 
-## 症状
+## Symptom
 
-Pi 5 worker が NotReady から復帰した直後に ArgoCD repo-server が CrashLoopBackOff に入る。chart render burst が瞬間的に走ることで livenessProbe / readinessProbe の `timeoutSeconds: 1` (chart default) が短すぎて probe 失敗扱いになる。
+Right after a Pi 5 worker recovers from NotReady, the Argo CD repo-server drops into CrashLoopBackOff. A burst of chart rendering fires all at once, and the chart default `timeoutSeconds: 1` for the liveness/readiness probes is too short, so the probes get marked as failed.
 
-## 原因
+## Cause
 
-repo-server は Helm template / git clone を担当しており、reschedule 時には複数 Application の chart render が短時間に集中する。Pi 5 群の CPU 容量に対して default 1 秒の probe timeout が厳しい。
+The repo-server handles Helm template rendering and git clones, and a reschedule triggers chart rendering for several Applications in a short window. Against the Pi 5 fleet's CPU capacity, the default 1-second probe timeout is too tight.
 
-## 設定 (現状)
+## Configuration (current)
 
 `kubernetes/argocd/values.yaml`:
 
@@ -20,13 +20,13 @@ repoServer:
     timeoutSeconds: 5
 ```
 
-5 秒に伸ばすと負荷スパイク中も probe が通る。通常時の検知遅延は数秒延びるだけなので運用影響は軽微。
+Stretching it to 5 seconds lets probes pass through the load spike. Normal-case detection latency only grows by a few seconds, a minor operational cost.
 
-## 関連設定
+## Related configuration
 
-`controller.diff.server.side: "true"`: K8s API server に diff を計算させて field manager 情報を尊重する。K8s API / admission webhook が注入する default 値 (StatefulSet `dnsPolicy`、HTTPRoute `backendRefs[].kind`、ESO `deletionPolicy` 等) を drift と誤検知しなくなる。
+`controller.diff.server.side: "true"`: has the K8s API server compute the diff, respecting field-manager ownership. This stops the K8s API / admission webhooks from injecting default values (StatefulSet `dnsPolicy`, HTTPRoute `backendRefs[].kind`, ESO `deletionPolicy`, etc.) that would otherwise be misdetected as drift.
 
-ESO admission webhook の default 値注入を drift と誤検知させないため、以下を ignoreDifferences で除外している:
+To keep the ESO admission webhook's injected defaults from being misdetected as drift, the following are excluded via `ignoreDifferences`:
 
 ```yaml
 resource.customizations.ignoreDifferences.external-secrets.io_ExternalSecret: |
@@ -38,6 +38,6 @@ resource.customizations.ignoreDifferences.external-secrets.io_ExternalSecret: |
     - .spec.data[].remoteRef.nullBytePolicy
 ```
 
-## 関連
+## Related
 
 - [ArgoCD Keycloak integration](../auth/argocd-keycloak-integration.md)

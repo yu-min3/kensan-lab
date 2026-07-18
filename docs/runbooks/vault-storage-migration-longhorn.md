@@ -1,156 +1,164 @@
 # Vault storage migration: local-path → Longhorn
 
-> **Status: 実行済み（2026-07-06）。** 全 Phase を本手順どおり実施し、ダウンタイムゼロ・
-> quorum 維持で完了（leader は step-down で vault-2 に移動）。以後は Vault ノードの
-> storage 作り直し全般の参考手順として残す。
+> **Status: executed (2026-07-06).** Every phase below was carried out exactly as
+> written and completed with zero downtime and quorum maintained throughout
+> (the leader stepped down and moved to vault-2). Kept from here on as a reference
+> procedure for rebuilding storage on any Vault node in general.
 
-## 背景
+## Background
 
-PR #324（災害復旧）で `kubernetes/secrets/vault/values.yaml` の storageClass は `longhorn` に
-変更されたが、**live の StatefulSet は `local-path` のまま**動き続けている。
-`volumeClaimTemplates` は immutable のため Argo CD の server-side diff が恒久的に失敗し、
-`vault` Application は **SYNC STATUS: Unknown**（ComparisonError）を表示し続けている。
+PR #324 (disaster recovery) changed the storageClass in
+`kubernetes/secrets/vault/values.yaml` to `longhorn`, but **the live StatefulSet
+kept running on `local-path`**. Since `volumeClaimTemplates` is immutable, Argo CD's
+server-side diff fails permanently, and the `vault` Application shows
+**SYNC STATUS: Unknown** (ComparisonError) indefinitely.
 
 ```
 StatefulSet.apps "vault" is invalid: spec: Forbidden: updates to statefulset spec for fields
 other than 'replicas', 'ordinals', 'template', ... are forbidden
 ```
 
-さらに `local-path` は node-local（Pod を別ノードに移せない）かつ **reclaim=Delete**
-（PVC 削除 = 物理データ即消滅）であり、Vault raft データの置き場として不適切。
+On top of that, `local-path` is node-local (a Pod can't move to a different node) and
+uses **reclaim=Delete** (deleting the PVC instantly destroys the physical data) —
+an unsuitable place to keep Vault's raft data.
 
-## 現状（2026-07-06 実機確認）
+## Current state (confirmed live, 2026-07-06)
 
-| 項目 | 値 |
+| Item | Value |
 |---|---|
-| StatefulSet | `vault` ns、replicas=3、live VCT: `local-path` 10Gi / git: `longhorn` |
-| PVC | `data-vault-{0,1,2}` + `audit-vault-{0,1,2}`（worker2 / m4neo / worker1） |
-| Unseal | AWS KMS auto-unseal（`alias/vault-unseal-kensan`）— **手動 unseal 不要** |
-| Raft join | `retry_join` ×3 設定済み（`docs/runbooks/vault-raft-join.md`）— **手動 join 不要** |
+| StatefulSet | `vault` namespace, replicas=3, live VCT: `local-path` 10Gi / git: `longhorn` |
+| PVC | `data-vault-{0,1,2}` + `audit-vault-{0,1,2}` (on worker2 / m4neo / worker1) |
+| Unseal | AWS KMS auto-unseal (`alias/vault-unseal-kensan`) — **no manual unseal needed** |
+| Raft join | `retry_join` ×3 already configured (`docs/runbooks/vault-raft-join.md`) — **no manual join needed** |
 
-この 2 点（auto-unseal + retry_join）により、**データを空にした member は Pod 再作成だけで
-自動的に unseal → raft 再 join → leader からスナップショット同期**される。ノード単位の
-「剥がして再 join」戦略が成立する。
+Thanks to these two things (auto-unseal + retry_join), **a member whose data was wiped
+recovers automatically just by recreating its Pod — it unseals itself, rejoins the raft
+cluster, and syncs a snapshot from the leader**. That makes a per-node "strip it and
+rejoin" strategy viable.
 
-## 戦略
+## Strategy
 
-- **Phase A**: STS を `--cascade=orphan` で削除 → Argo CD が longhorn VCT の STS を再作成
-  （Pod は無停止）。→ ComparisonError 解消、`vault` app が Synced に戻る
-- **Phase B**: member を 1 台ずつ（quorum 2/3 を常に維持）: raft remove-peer → PVC/Pod 削除 →
-  新 Pod が longhorn PVC で起動し自動 re-join
-- **Phase C**: 検証と後片付け
+- **Phase A**: delete the StatefulSet with `--cascade=orphan` → Argo CD recreates the
+  StatefulSet using the longhorn VCT (the Pods stay running throughout). → clears the
+  ComparisonError, `vault` app returns to Synced
+- **Phase B**: migrate members one at a time (always keeping quorum at 2/3): raft
+  remove-peer → delete PVC/Pod → the new Pod comes up on a longhorn PVC and auto-rejoins
+- **Phase C**: verification and cleanup
 
-## 事前チェック（全て pass してから開始）
+## Pre-flight checks (all must pass before starting)
 
 ```bash
-# 1. raft が 3 peers で健全（leader 1 + follower 2）
+# 1. raft is healthy with 3 peers (1 leader + 2 followers)
 kubectl exec -n vault vault-0 -c vault -- sh -c 'VAULT_TOKEN=$(cat /tmp/token 2>/dev/null || echo $VAULT_TOKEN) vault operator raft list-peers'
-# ※ 要ログイン。OIDC admin か root token で vault login してから実行
+# NOTE: requires login first. Run `vault login` with an OIDC admin or the root token before this
 
-# 2. raft スナップショットを取得して手元に退避（最後の保険）
+# 2. Take a raft snapshot and stash it locally (a last-resort safety net)
 kubectl exec -n vault vault-0 -c vault -- vault operator raft snapshot save /tmp/pre-migration.snap
 kubectl cp vault/vault-0:/tmp/pre-migration.snap ./temp/vault-pre-migration-$(date +%Y%m%d).snap -c vault
 
-# 3. KMS auto-unseal が機能している（直近の Pod 再起動で Sealed:false になった実績 or）
+# 3. Confirm KMS auto-unseal is working (e.g. it went Sealed:false after a recent Pod restart)
 kubectl exec -n vault vault-0 -c vault -- vault status | grep -E "Sealed|Total Shares"   # Sealed: false / Recovery Seed
 
-# 4. Longhorn が健全（全 volume healthy、空き容量 >30Gi）
+# 4. Longhorn is healthy (every volume healthy, >30Gi free)
 kubectl get volumes.longhorn.io -n longhorn-system --no-headers | awk '$3!="attached" && $2!="detached"' | head
 
-# 5. ESO / dynamic secret が正常（移行中に切れると気づけるようベースライン確認)
-kubectl get externalsecret -A --no-headers | grep -cv SecretSynced   # → 0 ならOK
+# 5. ESO / dynamic secrets are healthy (a baseline check so a break during migration is noticeable)
+kubectl get externalsecret -A --no-headers | grep -cv SecretSynced   # → should be 0
 ```
 
-## Phase A: StatefulSet の再作成（Pod 無停止・ComparisonError 解消）
+## Phase A: recreate the StatefulSet (no Pod downtime, clears ComparisonError)
 
 ```bash
-# 1. STS だけ削除（Pod と PVC は残る）
+# 1. Delete only the StatefulSet (Pods and PVCs stay)
 kubectl delete sts vault -n vault --cascade=orphan
 
-# 2. Argo CD が git（longhorn VCT）から STS を再作成するのを待つ
-kubectl get application vault -n argocd -w   # → Synced / Healthy になること
+# 2. Wait for Argo CD to recreate the StatefulSet from Git (the longhorn VCT)
+kubectl get application vault -n argocd -w   # → should become Synced / Healthy
 kubectl get sts vault -n vault -o jsonpath='{.spec.volumeClaimTemplates[0].spec.storageClassName}'  # → longhorn
 
-# 3. Pod が採用され再起動していないこと（AGE が維持されている）
+# 3. Confirm the Pods weren't picked up and restarted (AGE is unchanged)
 kubectl get pods -n vault
 ```
 
-**確認**: `vault` app の SYNC STATUS が Unknown → **Synced** に変わる。
-既存 Pod は古い local-path PVC のまま動き続ける（VCT は新規 Pod にのみ効く）。
+**Check**: the `vault` app's SYNC STATUS flips from Unknown to **Synced**.
+Existing Pods keep running on their old local-path PVCs (the VCT only takes effect for new Pods).
 
-## Phase B: member を 1 台ずつ移行（vault-2 → vault-1 → vault-0）
+## Phase B: migrate members one at a time (vault-2 → vault-1 → vault-0)
 
-leader を最後にする。`vault status | grep "HA Mode"` で active ノードを確認し、
-active が vault-2/1 だったら先に `vault operator step-down` で leader を移す。
+Save the leader for last. Check the active node with `vault status | grep "HA Mode"` —
+if vault-2 or vault-1 is active, run `vault operator step-down` on it first to move leadership away.
 
-各 member について（例: vault-2）:
+For each member (using vault-2 as the example):
 
 ```bash
-# 1. peer を raft から除名（クリーンな離脱）
+# 1. Cleanly remove the peer from raft
 kubectl exec -n vault vault-0 -c vault -- vault operator raft remove-peer vault-2
 
-# 2. PVC を削除予約（Pod が使用中なので Terminating で待機する）
+# 2. Schedule the PVCs for deletion (they're in use, so this waits in Terminating)
 kubectl delete pvc data-vault-2 audit-vault-2 -n vault --wait=false
 
-# 3. Pod を削除 → PVC 削除が完了し、STS が新 Pod + longhorn PVC を作る
+# 3. Delete the Pod → the PVC deletion completes, and the StatefulSet creates a new Pod + longhorn PVCs
 kubectl delete pod vault-2 -n vault
 
-# 4. 新 Pod の起動と自動復帰を確認（KMS auto-unseal + retry_join で全自動）
-kubectl get pvc -n vault | grep vault-2          # → longhorn になっている
-kubectl get pod vault-2 -n vault -w              # → 2/2 Running
-kubectl exec -n vault vault-2 -c vault -- vault status | grep Sealed   # → false
+# 4. Confirm the new Pod comes up and recovers automatically (fully automatic via KMS auto-unseal + retry_join)
+kubectl get pvc -n vault | grep vault-2          # → should now be longhorn
+kubectl get pod vault-2 -n vault -w              # → should reach 2/2 Running
+kubectl exec -n vault vault-2 -c vault -- vault status | grep Sealed   # → should be false
 
-# 5. raft に 3 peers 揃ったこと・同期済みを確認してから次の member へ
+# 5. Confirm all 3 raft peers are present and synced before moving to the next member
 kubectl exec -n vault vault-0 -c vault -- vault operator raft list-peers
 kubectl exec -n vault vault-0 -c vault -- vault operator raft autopilot state | grep -A5 Servers  # healthy: true
 ```
 
-**やってはいけない**: 2 台同時に作業（quorum 喪失 = 全停止）。
-1 台の再同期が完全に終わる（autopilot healthy）まで次に進まない。
+**Never do this**: work on 2 members at the same time (loses quorum = total outage).
+Don't move to the next member until the current one's re-sync is fully complete (autopilot healthy).
 
-vault-0 の番では、active leader なら先に step-down:
+When it's vault-0's turn, if it's the active leader, step it down first:
 
 ```bash
 kubectl exec -n vault vault-0 -c vault -- vault operator step-down
-# active が vault-1/2 に移ったのを確認してから vault-0 に同じ手順を適用
-# remove-peer は新 leader に対して実行する:
+# Confirm the active leader moved to vault-1/2, then apply the same procedure to vault-0
+# Run remove-peer against the new leader:
 kubectl exec -n vault vault-1 -c vault -- vault operator raft remove-peer vault-0
 ```
 
-## Phase C: 検証・後片付け
+## Phase C: verification and cleanup
 
 ```bash
-# 全 PVC が longhorn
-kubectl get pvc -n vault    # 6 本すべて STORAGECLASS=longhorn
+# All PVCs are longhorn
+kubectl get pvc -n vault    # all 6 should show STORAGECLASS=longhorn
 
-# raft 3 peers / autopilot healthy / app Synced
+# raft has 3 peers / autopilot healthy / app Synced
 kubectl exec -n vault vault-0 -c vault -- vault operator raft list-peers
 kubectl get application vault -n argocd
 
-# 消費者が無事（ESO 同期・Keycloak dynamic cred・cert-manager）
-kubectl get externalsecret -A --no-headers | grep -cv SecretSynced   # → 0
+# Consumers are unaffected (ESO sync, Keycloak dynamic creds, cert-manager)
+kubectl get externalsecret -A --no-headers | grep -cv SecretSynced   # → should be 0
 
-# Longhorn 側: vault volume 6 本が healthy + RecurringJob (R2 backup) の対象になっているか
+# Longhorn side: confirm all 6 vault volumes are healthy and picked up by the RecurringJob (R2 backup)
 kubectl get volumes.longhorn.io -n longhorn-system | grep -c healthy
 ```
 
-- 事前退避した raft snapshot は 1 週間程度残してから破棄
-- local-path の PV はreclaim=Delete のため PVC 削除時に自動消滅（ノード上の残骸は
-  `/opt/local-path-provisioner/` を目視確認）
+- Keep the pre-migration raft snapshot around for about a week, then discard it
+- local-path PVs use reclaim=Delete, so they vanish automatically when their PVC is
+  deleted (visually confirm no leftovers remain under `/opt/local-path-provisioner/` on the node)
 
-## ロールバック
+## Rollback
 
-- **Phase A で失敗**（STS 再作成が変な状態）: `kubectl delete sts vault --cascade=orphan` →
-  git revert 無しでも旧 VCT の STS を手で apply し直せる（ただし基本は前進あるのみ。
-  Pod は生きているので落ち着いて対処できる）
-- **Phase B で member が復帰しない**: 残り 2 peers で quorum は生きている。
-  `vault-raft-join.md` の手動 join 手順 → それでもダメなら PVC/Pod をもう一度作り直す。
-  **最悪時**は事前スナップショットから `vault operator raft snapshot restore`
-- **絶対にやらないこと**: 復帰失敗の状態で次の member に手を付ける
+- **If Phase A fails** (the StatefulSet recreation ends up in a bad state):
+  `kubectl delete sts vault --cascade=orphan` → the old-VCT StatefulSet can be
+  hand-applied again even without a git revert (though the default plan is to always
+  move forward — the Pods stay alive throughout, so there's no rush)
+- **If a member fails to recover in Phase B**: quorum is still alive on the remaining 2
+  peers. Try the manual join procedure in `vault-raft-join.md` → if that still doesn't
+  work, recreate the PVC/Pod once more. **As a last resort**, restore from the
+  pre-migration snapshot via `vault operator raft snapshot restore`
+- **Never do this**: start on the next member while the current one is still in a failed-recovery state
 
-## 残作業（このrunbookのスコープ外）
+## Remaining work (out of scope for this runbook)
 
-- `monitoring` ns の local-path PVC 5 本（prometheus / loki / tempo / grafana / alertmanager）
-  の移行 — retention データなので「STS 再作成 + データ捨て」の割り切りも選択肢
-- 全 local-path PVC 消滅後: `local-path-provisioner` と
-  `applications/namespaces/local-path-storage` の撤去（W15 完了条件）
+- Migrating the 5 local-path PVCs in the `monitoring` namespace (prometheus / loki /
+  tempo / grafana / alertmanager) — since this is retention data, "recreate the
+  StatefulSet and accept data loss" is also a viable option
+- Once every local-path PVC is gone: remove `local-path-provisioner` and
+  `applications/namespaces/local-path-storage` (the W15 completion condition)

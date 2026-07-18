@@ -1,18 +1,18 @@
-# Vault Raft auto-join (retry_join 必須化の経緯)
+# Vault Raft auto-join (why retry_join became mandatory)
 
-## 症状
+## Symptom
 
-`vault-0` を init した後、`vault-1` / `vault-2` が Sealed のまま raft cluster に join できない。`vault status` で `Initialized: false` のまま放置される。
+After initializing `vault-0`, `vault-1` / `vault-2` stay Sealed and can't join the raft cluster. `vault status` sits at `Initialized: false` indefinitely.
 
-## 原因
+## Cause
 
-`storage "raft"` ブロックに `retry_join` が含まれていないと、各 Pod は自動で peer を発見しない。chart の StatefulSet headless service `vault-internal` は名前解決可能だが、raft プロトコル側で能動的に join しに行く設定がないと cluster に参加できない。
+Without `retry_join` in the `storage "raft"` block, each Pod never auto-discovers peers. The chart's StatefulSet headless service `vault-internal` is resolvable by name, but without an active join configuration on the raft-protocol side, that alone isn't enough to join the cluster.
 
-PR #228 までこの設定が漏れており、毎回手動で `vault operator raft join` を実行していた。
+This setting was missing until PR #228, so `vault operator raft join` had to be run manually every time.
 
-## 設定 (現状)
+## Configuration (current)
 
-`kubernetes/secrets/vault/values.yaml` の `server.ha.raft.config` に以下を含める:
+Include the following in `server.ha.raft.config` in `kubernetes/secrets/vault/values.yaml`:
 
 ```hcl
 storage "raft" {
@@ -29,15 +29,15 @@ storage "raft" {
 }
 ```
 
-3 Pod 全てに対して `retry_join` を書く。各 Pod は自分自身に対しても join 試行するが noop なので問題ない。
+Write a `retry_join` entry for all 3 pods. Each pod also attempts to join itself, which is a harmless no-op.
 
-## chart config の注意点
+## A chart config gotcha
 
-`server.ha.raft.config` は HCL 文字列で chart default を**完全置換** (deep merge できない)。chart upgrade 時は default 内容を確認し、必要な要素 (ui / listener / storage / service_registration) が落ちていないかチェックする必要がある。
+`server.ha.raft.config` is an HCL string that **fully replaces** the chart default (it can't be deep-merged). When upgrading the chart, check the new default content and confirm nothing required (ui / listener / storage / service_registration) got dropped.
 
-`server.affinity` は map syntax なので Helm の deep merge 対象 (chart default の podAntiAffinity を上書きする形になる)。
+`server.affinity` uses map syntax, so it *is* subject to Helm's deep merge (it ends up overriding the chart default's podAntiAffinity).
 
-## 関連
+## Related
 
 - [Stage 1 Bootstrap](../bootstrapping/12-vault-stage1.md)
-- PR #228: retry_join 追加
+- PR #228: added `retry_join`

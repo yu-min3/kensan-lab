@@ -1,35 +1,34 @@
-# VCO drift: Vault 再構築後に CR が再適用されない
+# VCO drift: CRs don't get re-applied after a Vault rebuild
 
-## 症状
+## Symptom
 
-Vault Config Operator の CR（Policy / JWTOIDCAuthEngineRole 等）が `ReconcileSuccessful: True` を示しているのに、**Vault 側に対応するオブジェクトが存在しない**。
+A Vault Config Operator CR (Policy / JWTOIDCAuthEngineRole, etc.) shows `ReconcileSuccessful: True`, but **the corresponding object doesn't actually exist in Vault**.
 
-実例（2026-07-06 発見）: `JWTOIDCAuthEngineRole/default` が Successful 表示のまま、`vault list auth/oidc/role` に `default` が無い → Vault UI の Role 空欄ログインが「claim "groups" does not match」で失敗。
+Concrete example (found 2026-07-06): `JWTOIDCAuthEngineRole/default` shows Successful, but `default` is missing from `vault list auth/oidc/role` → logging in with an empty Role in the Vault UI fails with "claim \"groups\" does not match."
 
-## 原因
+## Cause
 
-VCO は **generation ベースの reconcile**。CR の spec が変わらない限り再適用せず、**Vault 側の状態消失（再 init・災害復旧での再構築）を検知しない**。`observedGeneration == generation` なら「完了」のまま。
+VCO does **generation-based reconciliation**. It never re-applies unless the CR's spec changes, so it **never detects state loss on the Vault side** (e.g. a re-init, or a rebuild during disaster recovery). As long as `observedGeneration == generation`, it stays reported as "done."
 
-- annotation の付与では発火しない（metadata 変更は generation を上げない）
+- Adding an annotation doesn't trigger it either (a metadata-only change doesn't bump generation)
 
-## 復旧手順
+## Recovery procedure
 
 ```bash
-# 1. 症状確認: CR は Successful だが Vault に実体が無い
+# 1. Confirm the symptom: the CR is Successful but nothing exists in Vault
 kubectl get jwtoidcauthenginerole <name> -n vault -o jsonpath='{.status.conditions}'
-# (Vault 側の確認は vault ns の default SA で k8s auth login → vault list)
+# (to check the Vault side: log in via the vault namespace's default SA using k8s auth, then vault list)
 
-# 2. CR を削除 → ArgoCD selfHeal が再作成 → 新規 CR として fresh reconcile が走る
+# 2. Delete the CR → Argo CD selfHeal recreates it → a fresh reconcile runs as if it were new
 kubectl delete jwtoidcauthenginerole <name> -n vault
-# (Vault 側に実体が無いので deletion finalizer は no-op。ArgoCD が数十秒で再作成)
+# (since nothing exists in Vault, the deletion finalizer is a no-op; Argo CD recreates it within seconds)
 
-# 3. 実体の再作成を確認
+# 3. Confirm the object was actually recreated
 kubectl get jwtoidcauthenginerole <name> -n vault \
   -o jsonpath='{.status.conditions[?(@.type=="ReconcileSuccessful")].status}'
 ```
 
-## 予防・注意
+## Prevention and notes
 
-- **Vault を再構築したら、全 VCO CR を delete → selfHeal 再作成で総なめする**（disaster recovery 手順に追加すべき項目）
-- `auth/oidc/config`（default_role 等）は VCO 管理外（TF/手動）。partial update 不可のため、
-  変更には client_secret 込みの full-write が必要（PR #298 / `temp/switch-vault-default-role.sh` 参照）
+- **After rebuilding Vault, sweep every VCO CR — delete each and let selfHeal recreate it** (this should be added as a step in the disaster-recovery procedure)
+- `auth/oidc/config` (default_role, etc.) is outside VCO's management (Terraform/manual). It can't be partially updated — changing it requires a full write including the client_secret (see PR #298 / `temp/switch-vault-default-role.sh`)

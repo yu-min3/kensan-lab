@@ -1,12 +1,12 @@
 # Cilium WiFi cluster stability tuning
 
-> **2026-05-07 更新**: kensan-lab は有線 LAN メイン運用に移行済み。WiFi は fallback として残しているため、ここに記載した緩和値（`leaseDuration: 60s` 等）はそのまま維持している（fallback 切替時のゆとり）。本ドキュメントは過去 WiFi only 運用時の経緯を残す参考資料。
+> **Updated 2026-05-07**: kensan-lab has since moved to wired LAN as the primary network. WiFi is kept as a fallback, so the relaxed values documented here (`leaseDuration: 60s`, etc.) are still in effect (they give breathing room during a fallback failover). This document is kept as historical reference from the WiFi-only era.
 
-WiFi 経由で接続する homelab cluster (RPi 5 群が `wlan0`、Bosgame M4 Neo が `wlp3s0`) では、レイテンシスパイクで lease renewal や API 呼び出しが頻繁に timeout する。`kubernetes/network/cilium/values.yaml` でデフォルト値より緩めに調整している。
+On a homelab cluster connecting over WiFi (the RPi 5 fleet on `wlan0`, the Bosgame M4 Neo on `wlp3s0`), latency spikes frequently time out lease renewals and API calls. `kubernetes/network/cilium/values.yaml` relaxes several defaults to accommodate this.
 
 ## API client rate limit
 
-Cilium → API server の client rate limit を上げる。デフォルト (qps=10 / burst=20) では WiFi スパイク中にスロットリングが発生し、Pod 復帰後の reconcile burst が apiserver 到達不能を起こす。
+Raise Cilium's client rate limit against the API server. At the default (qps=10 / burst=20), a WiFi spike causes throttling, and the reconcile burst after a Pod recovers then makes the apiserver unreachable.
 
 ```yaml
 k8sClientRateLimit:
@@ -16,7 +16,7 @@ k8sClientRateLimit:
 
 ## L2 announcement lease timing
 
-LoadBalancer IP の lease renewal が WiFi 経由で頻繁に `context deadline exceeded` を出していたため、段階的に緩めて以下に着地した。
+The LoadBalancer IP's lease renewal was frequently throwing `context deadline exceeded` over WiFi, so these were relaxed step by step until landing here:
 
 ```yaml
 l2announcements:
@@ -26,19 +26,19 @@ l2announcements:
   leaseRetryPeriod: 8s
 ```
 
-### 試行履歴
+### Trial history
 
-| 設定 | 結果 |
+| Setting | Result |
 |---|---|
-| Cilium chart default (15s / 10s / 2s) | 数分おきに lease renewal failure → LoadBalancer IP 不通 |
-| 30s / 20s / 4s | 改善するが数十分に 1 回 timeout 残る |
-| 60s / 40s / 8s (現在) | 安定稼働 |
+| Cilium chart default (15s / 10s / 2s) | Lease renewal failures every few minutes → LoadBalancer IP unreachable |
+| 30s / 20s / 4s | Improved, but a timeout still occurred roughly once every few dozen minutes |
+| 60s / 40s / 8s (current) | Stable |
 
-### トレードオフ
+### Trade-off
 
-renewDeadline を伸ばす = lease holder Pod がクラッシュした際に IP take-over までの遅延が長くなる。homelab スケール (4 ノード) では十分許容範囲。production グレードのクラスタでは default に近い値を推奨。
+Extending renewDeadline means a longer delay before IP take-over if the lease-holder Pod crashes. At homelab scale (4 nodes), that's well within tolerance. On a production-grade cluster, staying closer to the default is recommended.
 
-## 関連
+## Related
 
 - [Cilium update strategy](./cilium-update-strategy.md)
-- 既知問題: WiFi 経由での Cilium L2 lease 不安定 (CLAUDE.md の Known Issue にも記載)
+- Known issue: Cilium L2 lease instability over WiFi (also documented in CLAUDE.md's Known Issue section)
