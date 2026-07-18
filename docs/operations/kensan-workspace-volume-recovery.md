@@ -1,47 +1,50 @@
-# kensan-workspace volume 復旧 runbook
+# kensan-workspace volume recovery runbook
 
-kensan の生活データ SSoT volume（`app-kensan/kensan-workspace`、Longhorn RWX）が
-壊れた / 作り直しが必要になったときの手順。PR #365 レビュー指摘 H-1 への回答。
+Procedure for when kensan's life-data source-of-truth volume
+(`app-kensan/kensan-workspace`, Longhorn RWX) is broken or needs to be
+recreated. Written in response to PR #365 review finding H-1.
 
-## 構成の前提
+## Assumed setup
 
 ```
-PV: pvc-cd6553e2-2bd6-4b7c-b43d-18b0a600b707   ← 3 箇所がこの名前に依存
- ├─ PVC spec.volumeName（kubernetes/apps/app-kensan/resources/pvc-workspace.yaml）
- ├─ NFS Service selector（kubernetes/storage/longhorn/resources/service-workspace-nfs.yaml）
- └─ Mac の autofs map（/etc/auto_kensan の export path）
+PV: pvc-cd6553e2-2bd6-4b7c-b43d-18b0a600b707   ← 3 places depend on this exact name
+ ├─ the PVC's spec.volumeName (kubernetes/apps/app-kensan/resources/pvc-workspace.yaml)
+ ├─ the NFS Service's selector (kubernetes/storage/longhorn/resources/service-workspace-nfs.yaml)
+ └─ the Mac's autofs map (the export path in /etc/auto_kensan)
 ```
 
-- SC `longhorn-workspace`: replica 2 / **Retain** — PVC を消しても PV とデータは残る
-- バックアップ: snapshot-daily(14d) / backup-weekly(R2, 8w) / backup-monthly(R2, 12m)
-  （SC の recurringJobSelector: default group で自動加入）
-- Mac ローカルミラー: `~/kensan-workspace-mirror`（launchd 日次 03:30）
+- StorageClass `longhorn-workspace`: 2 replicas / **Retain** — deleting the PVC leaves the PV and its data intact
+- Backups: snapshot-daily (14d) / backup-weekly (R2, 8w) / backup-monthly (R2, 12m)
+  (auto-enrolled via the StorageClass's `recurringJobSelector: default` group)
+- Mac-side local mirror: `~/kensan-workspace-mirror` (launchd, daily at 03:30)
 
-## ケース A: PVC を誤削除した（PV は Released で残存）
+## Case A: the PVC was deleted by mistake (the PV survives as Released)
 
-1. PV の claimRef をクリアして再 bind 可能にする:
+1. Clear the PV's `claimRef` so it can be re-bound:
    `kubectl patch pv pvc-cd6553e2-… --type=json -p '[{"op":"remove","path":"/spec/claimRef"}]'`
-2. PVC manifest（pvc-workspace.yaml、volumeName pin 済み）を再 apply → 同じ PV に bind
-3. app pod 再起動・NFS Service は selector 不変なのでそのまま復帰
+2. Re-apply the PVC manifest (`pvc-workspace.yaml`, which already pins `volumeName`) → it binds to the same PV
+3. Restart the app pod — the NFS Service's selector is unchanged, so it recovers on its own
 
-## ケース B: volume を新規作成し直す（PV 名が変わる）
+## Case B: recreating the volume from scratch (the PV name changes)
 
-1. R2 backup から新 volume を restore（Longhorn UI: Backup → Restore）
-2. 新 PV 名を確認し、**3 箇所を同時に更新**:
-    - pvc-workspace.yaml の `spec.volumeName`
-    - service-workspace-nfs.yaml の selector `longhorn.io/share-manager`
-    - Mac: `/etc/auto_kensan` の export path → `sudo automount -vc`
-3. PR → merge → app 復帰を確認
+1. Restore a new volume from an R2 backup (Longhorn UI: Backup → Restore)
+2. Note the new PV name, and **update all 3 places at once**:
+    - `pvc-workspace.yaml`'s `spec.volumeName`
+    - `service-workspace-nfs.yaml`'s selector `longhorn.io/share-manager`
+    - The Mac: the export path in `/etc/auto_kensan` → `sudo automount -vc`
+3. PR → merge → confirm the app recovers
 
-## ケース C: クラスタ全損
+## Case C: total cluster loss
 
-- 第一候補: Mac ミラー `~/kensan-workspace-mirror`（git 履歴込み・最大 24h 古い）から再出発
-- 第二候補: R2 backup を新クラスタに restore
+- First choice: rebuild from the Mac mirror `~/kensan-workspace-mirror` (includes git history; up to 24h stale)
+- Second choice: restore an R2 backup into the new cluster
 
-## mount オプションの設計判断（L-1 への記録）
+## Mount option design rationale (recorded for finding L-1)
 
-Mac 側は `soft` を採用している。`hard` はデータ整合に強いが、クラスタ停止時に
-Finder / シェルが永久ハングし Mac ごと人質になる（生活への影響が大きい）。
-`soft` のリスク（ネットワーク断中の書き込みが I/O error → git index 破損等）は
-①日次ミラー ②Longhorn snapshot ③workspace 自体の git 履歴、の三重で受ける。
-体験が安定して「ハングしても困らない」運用が見えたら hard + timeo 再検討の余地あり。
+The Mac side uses `soft`. `hard` is more resilient for data consistency, but during a
+cluster outage it makes Finder / the shell hang permanently, holding the whole Mac
+hostage (a significant impact on daily life). The risk that `soft` carries (a write
+during a network drop returns an I/O error, which could corrupt the git index, etc.) is
+absorbed three ways: ① the daily mirror ② Longhorn snapshots ③ the workspace's own git
+history. If experience shows a stable "hanging is fine" operating pattern, revisiting
+`hard` + `timeo` is worth reconsidering.
