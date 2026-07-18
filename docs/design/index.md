@@ -2,42 +2,42 @@
 
 **Whetstone — kensan-lab platform design system, v1.0**
 
-> 砥石 (whetstone) で道具を研ぐように、プラットフォーム上のあらゆる app を同じ言語で磨き上げるための単一の真実。
+> Just as a whetstone sharpens a tool, this is the single source of truth for honing every app on the platform to the same visual language.
 
-このドキュメントは **AI コーディングエージェントが最初に読む**こと、そして **人間の設計判断の根拠を残す**ことの両方を目的としている。
-
----
-
-## TL;DR — エージェントへの命令書
-
-UI を書く / 直す前に **必ず守る** 5 つだけ：
-
-1. **トークン以外の色・サイズを使わない。** `bg-brand`, `text-muted-foreground` のような Tailwind の semantic クラスだけ。`#0EA5E9` や `bg-[#fff]` は禁止。
-2. **新しいコンポーネント variant を発明しない。** Button / Badge / Card 等の variant は本ドキュメントに列挙したものだけ。足りないと思ったら**まず議論**。
-3. **見出しは `.h-serif`、本文は sans 既定、数値・コード・ID は `font-mono` + `.tnum`。** 混ぜない。
-4. **密度は `data-density` で切替。** 各コンポーネントの padding / 高さ / フォントサイズを個別に上書きしない。
-5. **新しいコンポーネントを作る前に `docs/design/components.md` を読む。** 既存で表現できないか確認する。
+This document exists for two purposes: it's **the first thing an AI coding agent reads**, and it's **the record of the human design rationale behind it**.
 
 ---
 
-## 1. ブランドの軸
+## TL;DR — orders for agents
 
-| 軸 | この値 | 理由 |
+Just **5 rules** to follow, always, before writing or touching UI:
+
+1. **Never use a color or size outside the tokens.** Only Tailwind semantic classes like `bg-brand`, `text-muted-foreground`. `#0EA5E9` or `bg-[#fff]` are forbidden.
+2. **Never invent a new component variant.** Button / Badge / Card etc. variants are limited to what's listed in this document. If you think you need more, **discuss it first**.
+3. **Headings use `.h-serif`, body text defaults to sans, numbers/code/IDs use `font-mono` + `.tnum`.** Never mix these.
+4. **Density switches via `data-density`.** Never override an individual component's padding / height / font size on its own.
+5. **Read `docs/design/components.md` before building a new component.** Check whether an existing combination already covers it.
+
+---
+
+## 1. Brand axes
+
+| Axis | Value | Rationale |
 |---|---|---|
-| 語 | **研鑽** (kensan) | プラットフォーム名そのもの。「磨く・研ぎ澄ます」のメタファー |
-| シンボル | 砥石 + 成長曲線 + スパークル | `docs/design/brand/kensan-logo-*.svg`。AI/手作業の協働で技を研ぐ |
-| 主色 | **Sky 600** `#0284C7`（ライト）/ **Sky 400** `#38BDF8`（ダーク） | 既存ロゴの sky blue を1段絞った彩度 |
-| 紙肌 | 暖色オフホワイト `#F5F2EC` | 青寄りの白（蛍光灯的）を避け、目に優しい温度 |
-| 見出し書体 | **Noto Serif JP** | 研鑽の語の重みを取り戻す。見出しと数値の一部にだけ |
-| 地書体 | **Inter + Noto Sans JP** | 高い可読性。本文・UIラベル |
-| 数値書体 | **JetBrains Mono** | tabular-nums で縦に揃う |
+| Word | **研鑽 / kensan** ("honing/refinement") | The platform's own name. A metaphor for "polishing, sharpening" |
+| Symbol | Whetstone + growth curve + sparkle | `docs/design/brand/kensan-logo-*.svg`. Human and AI collaborating to hone a skill |
+| Primary color | **Sky 600** `#0284C7` (light) / **Sky 400** `#38BDF8` (dark) | The existing logo's sky blue, dialed one step down in saturation |
+| Paper tone | Warm off-white `#F5F2EC` | Avoids a blue-leaning white (fluorescent-lit feel); a warmer, easier-on-the-eyes temperature |
+| Heading typeface | **Noto Serif JP** | Restores the weight of the word 研鑽. Used only for headings and some numerals |
+| Body typeface | **Inter + Noto Sans JP** | High legibility. Body text and UI labels |
+| Numeral typeface | **JetBrains Mono** | tabular-nums keeps digits aligned vertically |
 
-**伝えたい印象**: 知性的 / 落ち着いている / でも研究室っぽい遊び心。
-**伝えたくない印象**: 派手 / ガジェット臭 / 何でもAI / SaaSのテンプレ。
+**Impression we want**: intelligent / calm / with a bit of lab-coat playfulness.
+**Impression we don't want**: flashy / gadget-y / "AI does everything" / a generic SaaS template.
 
 ---
 
-## 2. レイヤー構造
+## 2. Layer structure
 
 ```
 ┌─────────────────────────────────────────────────────────┐
@@ -46,194 +46,196 @@ UI を書く / 直す前に **必ず守る** 5 つだけ：
 │       └─ @import "@kensan-lab/design-tokens/tokens.css"  │
 └─────────────────────────────────────────────────────────┘
                           ▲
-                          │ 参照
+                          │ references
                           │
 ┌─────────────────────────────────────────────────────────┐
 │  packages/design-tokens/                                  │
-│   ├─ tokens.css     ← 色・タイポ・余白・影・動き・密度    │
-│   ├─ tokens.json    ← 同じ内容の構造化版                  │
+│   ├─ tokens.css     ← color, typography, spacing,         │
+│   │                    shadows, motion, density            │
+│   ├─ tokens.json    ← the same content, structured         │
 │   └─ README.md                                            │
 └─────────────────────────────────────────────────────────┘
                           ▲
-                          │ 根拠
+                          │ rationale
                           │
 ┌─────────────────────────────────────────────────────────┐
 │  docs/design/                                             │
-│   ├─ index.md          ← 本書（旧 DESIGN_SYSTEM.md）      │
-│   ├─ components.md     ← コンポーネント仕様              │
-│   ├─ patterns.md       ← 画面パターン                     │
-│   └─ brand/            ← ロゴ・OGP                        │
+│   ├─ index.md          ← this document                    │
+│   │                       (formerly DESIGN_SYSTEM.md)      │
+│   ├─ components.md     ← component spec                   │
+│   ├─ patterns.md       ← screen patterns                  │
+│   └─ brand/            ← logo, OGP                         │
 └─────────────────────────────────────────────────────────┘
 
-.claude/rules/design-system.md  ← Claude Code が全 app で自動読込
+.claude/rules/design-system.md  ← auto-loaded by Claude Code for every app
 ```
 
-**新しい app を立ち上げるとき**: `packages/design-tokens/tokens.css` を `@import` して、shadcn/ui CLI で components を生成すれば、本デザインシステムが効いた状態で開発が始まる。
+**Bringing up a new app**: `@import` `packages/design-tokens/tokens.css`, generate components with the shadcn/ui CLI, and this design system is already wired in from day one.
 
 ---
 
-## 3. トークン使用ルール
+## 3. Token usage rules
 
-詳細は [`packages/design-tokens/README.md`](https://github.com/yu-min3/kensan-lab/blob/main/packages/design-tokens/README.md)（実装の真実）。要点：
+Full detail: [`packages/design-tokens/README.md`](https://github.com/yu-min3/kensan-lab/blob/main/packages/design-tokens/README.md) (the implementation's source of truth). Summary below.
 
-### 3.1 色 — Semantic クラス一覧
+### 3.1 Color — the semantic class list
 
-| Semantic | Tailwind | 用途 |
+| Semantic | Tailwind | Use |
 |---|---|---|
-| `--background` | `bg-background` | ページ全体の背景 |
-| `--foreground` | `text-foreground` | 本文テキスト |
-| `--card` | `bg-card` | カード・パネル |
-| `--muted` | `bg-muted` | 控えめ背景・無効状態 |
-| `--muted-foreground` | `text-muted-foreground` | サブテキスト |
-| `--border` | `border` (auto) | ヘアライン罫線 |
-| `--border-strong` | `border-border-strong` | セクション区切り |
-| `--brand` | `bg-brand` / `text-brand` | **強調にだけ使う** |
-| `--brand-muted` | `bg-brand-muted` | 選択時の淡い帯 |
-| `--accent` / `--accent-foreground` | `bg-accent` / `text-accent-foreground` | ホバー・nav active |
-| `--success` / `--warning` / `--destructive` / `--info` | 同名 | 状態色（dot+text 推奨） |
+| `--background` | `bg-background` | The overall page background |
+| `--foreground` | `text-foreground` | Body text |
+| `--card` | `bg-card` | Cards / panels |
+| `--muted` | `bg-muted` | Understated backgrounds / disabled state |
+| `--muted-foreground` | `text-muted-foreground` | Secondary text |
+| `--border` | `border` (auto) | Hairline rules |
+| `--border-strong` | `border-border-strong` | Section dividers |
+| `--brand` | `bg-brand` / `text-brand` | **Emphasis only** |
+| `--brand-muted` | `bg-brand-muted` | The faint band behind a selected item |
+| `--accent` / `--accent-foreground` | `bg-accent` / `text-accent-foreground` | Hover, active nav state |
+| `--success` / `--warning` / `--destructive` / `--info` | Same names | Status colors (dot + text recommended) |
 
-**Brand 色は1画面に主役を1つだけ。** 全タスクのチェックボックスが青、はNG。「今 NOW」「研鑽AI」「主要アクション」だけに絞る。
+**Only one brand-color protagonist per screen.** Making every task's checkbox blue is a violation. Reserve it for things like "today / NOW", "the AI assistant", or "the primary action" — nothing more.
 
-### 3.2 タイポグラフィ — 3書体ルール
+### 3.2 Typography — the three-typeface rule
 
-- **明朝 (Serif)** = `class="h-serif"`
-  - 用途: h1 / h2 / ページタイトル / セクションタイトル / カード head の h3
-  - **混ぜない**: 本文や UI ラベルに明朝は使わない
-- **サンセリフ (Sans)** = 既定
-  - 用途: 本文・UIラベル・ボタン・密度高い表
-- **モノスペース (Mono)** = `class="font-mono"`
-  - 用途: 数値 / 時刻 / ID / コード / コマンド / IPアドレス
-  - 数値は **必ず** `.tnum` (`tabular-nums`) を併用
+- **Serif** = `class="h-serif"`
+  - Use: h1 / h2 / page titles / section titles / card-head h3
+  - **Never mix**: don't use serif in body text or UI labels
+- **Sans-serif** = the default
+  - Use: body text, UI labels, buttons, dense tables
+- **Monospace** = `class="font-mono"`
+  - Use: numbers / timestamps / IDs / code / commands / IP addresses
+  - Numbers **must always** pair with `.tnum` (`tabular-nums`)
 
-### 3.3 角丸 — `--radius: 0.5rem` 基準
+### 3.3 Corner radius — anchored on `--radius: 0.5rem`
 
-| | 値 | 用途 |
+| | Value | Use |
 |---|---|---|
 | sm | 4px | badge / tag |
 | md | 6px | input / small button |
-| **lg** | **8px** | **既定。card / button** |
+| **lg** | **8px** | **default. card / button** |
 | xl | 12px | dialog / popover |
 | full | 999px | pill / avatar |
 
-**1画面で `--radius` ファミリーを混ぜない。** カードが 8px なら、その中のボタンも 8px (またはbase-2px の 6px)。
+**Never mix `--radius` families on one screen.** If the card is 8px, its buttons should be 8px too (or the base-minus-2px value, 6px).
 
-### 3.4 影 — 最小限
+### 3.4 Shadow — minimal
 
-- **既定: 影なし。** 罫線で区切る。
-- `shadow-xs`: 罫線の代わり（ごく稀に）
-- `shadow-sm`: ホバー時のカード
+- **Default: no shadow.** Use hairline rules for separation instead.
+- `shadow-xs`: a substitute for a hairline rule (rarely)
+- `shadow-sm`: a hovered card
 - `shadow-md`: dropdown / popover / tooltip
 - `shadow-lg`: dialog / drawer
-- **どこかで `shadow-md` 以上を常時表示してたら設計を疑う。**
+- **If `shadow-md` or heavier is shown persistently anywhere, question the design.**
 
-### 3.5 動き — `ease-out` で素早く着地
+### 3.5 Motion — land quickly with `ease-out`
 
 - `duration-fast` (120ms): hover / click feedback
 - `duration-base` (200ms): dialog open / drawer / tab switch
 - `duration-slow` (320ms): page transition / large state change
-- バウンス系 `ease-spring` は **意図的にカジュアルに見せたい時だけ**。AI承認ダイアログなど真面目な場面では `ease-out`
+- Bouncy `ease-spring` easing is **only for when a deliberately casual feel is wanted**. For serious moments like an AI-approval dialog, use `ease-out`
 
-### 3.6 密度 — `data-density="comfortable" | "compact"`
+### 3.6 Density — `data-density="comfortable" | "compact"`
 
-- **app の root に1個だけ指定。** コンポーネント側で個別に上書きしない。
-- `comfortable`: kensan のような生産性アプリ / 読み物
-- `compact`: ダッシュボード / 監視 / 密な一覧
+- **Set exactly once, on the app root.** Never override it per-component.
+- `comfortable`: productivity apps / reading-oriented UI like kensan
+- `compact`: dashboards / monitoring / dense lists
 
-部分的に密度を変えたいときは、その親要素に `data-density="compact"` を付ければそのサブツリーだけ追従する。
+To change density for just part of a screen, set `data-density="compact"` on that subtree's parent element.
 
 ---
 
-## 4. コンポーネント — 列挙されたものだけ使う
+## 4. Components — use only what's listed
 
-詳細仕様: [`docs/design/components.md`](./components.md)
+Full spec: [`docs/design/components.md`](./components.md)
 
 | Component | Variants | Sizes |
 |---|---|---|
 | **Button** | primary / secondary / outline / ghost / destructive / link | sm / md / lg + icon-only |
-| **Badge** | brand / success / warning / destructive / muted / outline (+ dot variant) | 単一 |
-| **Input / Textarea / Select** | default / error / disabled | 密度連動 |
-| **Checkbox / Switch** | Checkbox=複数選択。Switch=即時反映 | — |
-| **Card** | head / body / foot（任意組み合わせ） | — |
-| **Tabs** | 下線型のみ | — |
-| **Table** | 既定 / `compact` | 密度連動 |
-| **Dialog** | 破壊的操作・確認 | — |
+| **Badge** | brand / success / warning / destructive / muted / outline (+ dot variant) | Single |
+| **Input / Textarea / Select** | default / error / disabled | Density-linked |
+| **Checkbox / Switch** | Checkbox = multi-select. Switch = takes effect immediately | — |
+| **Card** | head / body / foot (any combination) | — |
+| **Tabs** | Underline style only | — |
+| **Table** | default / `compact` | Density-linked |
+| **Dialog** | Destructive actions, confirmations | — |
 | **Alert** | info / success / warning / destructive | — |
-| **Empty State** | 既定 | — |
-| **Tooltip / Avatar / Skeleton** | 既定 | — |
+| **Empty State** | Default | — |
+| **Tooltip / Avatar / Skeleton** | Default | — |
 
-**ここにないものを作るときは：**
-1. 既存の組み合わせで表現できないか検証
-2. それでも必要なら、`components.md` を更新する PR を出す
-3. variant は最大限既存と一貫させる
-
----
-
-## 5. 画面パターン — `patterns.md` 参照
-
-主要パターンの索引：
-
-- **App Shell**: サイドナビ + メイン（kensan 既定）／トップバー + メイン（ダッシュボード向け）
-- **Header**: eyebrow + h-serif タイトル + 主アクション + サブテキストの4層
-- **Empty / Loading / Error**: 必ず3状態をデザインする。「データなし」だけで終わらせない
-- **Form**: label → field → hint の3層、エラーは色＋文章で
-- **Confirmation**: 破壊的操作は Dialog。それ以外はインライン承認
-- **Notification**: 永続→Alert、一時→Toast（未実装、必要に応じて追加）
+**Before building something not on this list:**
+1. Check whether an existing combination can express it
+2. If it's genuinely needed, open a PR updating `components.md`
+3. Keep the variant as consistent as possible with existing ones
 
 ---
 
-## 6. やってはいけないこと（NG リスト）
+## 5. Screen patterns — see `patterns.md`
 
-| NG | 代わりに |
+An index of the main patterns:
+
+- **App Shell**: side-nav + main (kensan's default) / top-bar + main (for dashboards)
+- **Header**: a four-layer stack of eyebrow + h-serif title + primary action + subtext
+- **Empty / Loading / Error**: always design all three states. Never stop at "no data"
+- **Form**: a three-layer label → field → hint stack; errors get both color and text
+- **Confirmation**: a Dialog for destructive actions; inline approval for everything else
+- **Notification**: persistent → Alert, ephemeral → Toast (not yet implemented; add when needed)
+
+---
+
+## 6. Don't (the NG list)
+
+| Don't | Instead |
 |---|---|
-| `bg-[#0EA5E9]` のような hex 直書き | `bg-brand` |
+| A raw hex like `bg-[#0EA5E9]` | `bg-brand` |
 | `style={{ color: "#1A1814" }}` | `className="text-foreground"` |
-| `bg-blue-500` のような Tailwind raw palette | semantic（`bg-brand` 等） |
-| 1画面で primary ボタンを 2 つ以上 | 1つに絞る（残りは ghost / outline） |
-| 状態を色だけで表現（赤丸/黄丸/緑丸） | `<Badge dot>Synced</Badge>` で必ずラベルも |
-| 数値を proportional font で並べる | `font-mono` + `.tnum` |
-| カードに常時 shadow-lg | 罫線のみ、ホバーで `shadow-sm` |
-| 同画面で角丸が混在（4px と 12px） | 同じ `--radius` ファミリーに揃える |
-| 「タスクがありません」だけの空状態 | 説明 + 次の一手 + ボタンの3点セット |
-| アイコンライブラリの混在 | **lucide-react** 一択 |
-| 絵文字をUIに使う | 使わない。lucide のアイコンで表現 |
+| Tailwind's raw palette, like `bg-blue-500` | A semantic class (`bg-brand`, etc.) |
+| Two or more primary buttons on one screen | Pick one; make the rest ghost / outline |
+| Conveying state with color alone (red/yellow/green dots) | `<Badge dot>Synced</Badge>` — always pair color with a label |
+| Lining up numbers in a proportional font | `font-mono` + `.tnum` |
+| A card with a persistent `shadow-lg` | Hairline border only; `shadow-sm` on hover |
+| Mixed corner radii on one screen (4px and 12px together) | Stay within the same `--radius` family |
+| An empty state that just says "No tasks" | Pair it with a description + next action + button |
+| Mixing icon libraries | **lucide-react**, and only lucide-react |
+| Emoji in the UI | Don't. Use a lucide icon instead |
 
 ---
 
-## 7. アクセシビリティの最低限
+## 7. Accessibility baseline
 
-- フォーカスリングは必ず表示（`focus-visible` で `--ring`）
-- color contrast は WCAG AA を満たす（本トークンは既に満たしている）
-- 状態を色だけで伝えない（色 + アイコン or テキスト）
-- インタラクティブ要素のヒット領域は **最低 32×32 px**（compact密度時）、推奨 **44×44 px**（comfortable）
-- フォームには必ず `<label>`（または `aria-label`）
-
----
-
-## 8. バージョニング
-
-- **major**: semantic 名の削除・改名 / brand hue を 30deg 以上動かす
-- **minor**: トークン追加 / ステータス色の微調整 / 新コンポーネント追加
-- **patch**: 値のごく軽微な調整
-
-各 app は `package.json` で `@kensan-lab/design-tokens` のバージョンを固定し、minor 以上は意図的にバンプする。
+- Always show a focus ring (`focus-visible` using `--ring`)
+- Color contrast must meet WCAG AA (these tokens already do)
+- Never convey state through color alone (color + icon or text)
+- Interactive hit targets: **minimum 32×32px** (compact density), **recommended 44×44px** (comfortable)
+- Every form field needs a `<label>` (or `aria-label`)
 
 ---
 
-## 9. 参考リンク
+## 8. Versioning
 
-- [`packages/design-tokens/`](https://github.com/yu-min3/kensan-lab/tree/main/packages/design-tokens) — 実装の真実
-- [`docs/design/components.md`](./components.md) — コンポーネント詳細仕様
-- [`docs/design/patterns.md`](./patterns.md) — 画面パターン
-- [`docs/design/brand/`](./brand/) — ロゴ・ファビコン・OGP
-- [`.claude/rules/design-system.md`](https://github.com/yu-min3/kensan-lab/blob/main/.claude/rules/design-system.md) — Claude Code 向けルール
-- [`docs/design/density-demo.html`](./density-demo.html) — 密度切替の視覚リファレンス
+- **major**: removing/renaming a semantic name, or shifting the brand hue by 30° or more
+- **minor**: adding a token, tweaking a status color, adding a new component
+- **patch**: a minor value adjustment
+
+Each app pins its `@kensan-lab/design-tokens` version in `package.json`; minor-or-above bumps are always deliberate.
 
 ---
 
-## 由来 (Changelog)
+## 9. References
 
-- **v1.0 "Whetstone"** (2026-05) — 初版。
-  - AB-1 ハイブリッド（A骨格 + B肌）を採用
-  - Sky 600/400 (light/dark) + 暖色オフホワイト #F5F2EC
-  - Density 2モード (comfortable / compact)
-  - 主要コンポーネント仕様確定
+- [`packages/design-tokens/`](https://github.com/yu-min3/kensan-lab/tree/main/packages/design-tokens) — the implementation's source of truth
+- [`docs/design/components.md`](./components.md) — the full component spec
+- [`docs/design/patterns.md`](./patterns.md) — screen patterns
+- [`docs/design/brand/`](./brand/) — logo, favicon, OGP
+- [`.claude/rules/design-system.md`](https://github.com/yu-min3/kensan-lab/blob/main/.claude/rules/design-system.md) — the rules Claude Code follows
+- [`docs/design/density-demo.html`](./density-demo.html) — a visual reference for the density toggle
+
+---
+
+## History (Changelog)
+
+- **v1.0 "Whetstone"** (2026-05) — Initial version.
+  - Adopted the AB-1 hybrid (an A-shaped skeleton with B-shaped skin)
+  - Sky 600/400 (light/dark) + warm off-white #F5F2EC
+  - Two density modes (comfortable / compact)
+  - The core component spec finalized
