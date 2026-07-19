@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { fetchRecipes, formatDuration, RecipeMeta } from "../api";
+import { normalizeQuery } from "../session";
 
 // Recipe browser + session builder: tap cards to put recipes "on the stove",
 // then start the cooking session.
@@ -20,15 +21,16 @@ export function RecipesPage({ onStart }: { onStart: (files: string[]) => void })
     return [...count.entries()].sort((a, b) => b[1] - a[1]).slice(0, 12).map(([t]) => t);
   }, [recipes]);
 
-  const shown = useMemo(
-    () =>
-      recipes.filter(
-        (r) =>
-          (!tag || (r.tags ?? []).includes(tag)) &&
-          (!q || r.title.includes(q) || (r.tags ?? []).some((t) => t.includes(q))),
-      ),
-    [recipes, q, tag],
-  );
+  const shown = useMemo(() => {
+    const nq = normalizeQuery(q);
+    return recipes.filter(
+      (r) =>
+        (!tag || (r.tags ?? []).includes(tag)) &&
+        (!nq ||
+          normalizeQuery(r.title).includes(nq) ||
+          (r.tags ?? []).some((t) => normalizeQuery(t).includes(nq))),
+    );
+  }, [recipes, q, tag]);
 
   const toggle = (file: string) =>
     setSelected((sel) => (sel.includes(file) ? sel.filter((f) => f !== file) : [...sel, file]));
@@ -57,6 +59,15 @@ export function RecipesPage({ onStart }: { onStart: (files: string[]) => void })
       </header>
 
       {error && <p className="error">{error}</p>}
+
+      {!error && recipes.length > 0 && shown.length === 0 && (
+        <div className="empty-state">
+          <p>「{q || tag}」に合うレシピが見つかりませんでした</p>
+          <button className="chip" onClick={() => { setQ(""); setTag(""); }}>
+            検索をクリア
+          </button>
+        </div>
+      )}
 
       <ul className="recipe-grid">
         {shown.map((r) => {

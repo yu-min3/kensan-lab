@@ -283,30 +283,44 @@ button {
   color: var(--muted);
 }
 
+/* compact 2-col grid: median 9 lines must fit in ~3 rows, not fill the
+   screen (max is 31 lines) */
 .ingredients {
   list-style: none;
   margin: 0;
-  padding: 0;
+  padding: 4px 6px;
   background: var(--panel);
   border: 1px solid var(--line);
   border-radius: 12px;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  column-gap: 4px;
 }
 
-.ingredients li + li {
-  border-top: 1px solid var(--line);
+.ing-group {
+  grid-column: 1 / -1;
+  padding: 6px 6px 2px;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--accent);
+  border-bottom: 1px dashed var(--line);
+  margin-bottom: 2px;
 }
 
 .ingredients label {
   display: flex;
   align-items: center;
-  gap: 10px;
-  padding: 11px 12px;
-  font-size: 15px;
+  gap: 7px;
+  padding: 5px 6px;
+  font-size: 14px;
+  line-height: 1.4;
+  border-radius: 8px;
 }
 
 .ingredients input {
-  width: 20px;
-  height: 20px;
+  flex: none;
+  width: 17px;
+  height: 17px;
   accent-color: var(--accent);
 }
 
@@ -408,6 +422,48 @@ button {
   color: var(--muted);
 }
 
+.no-steps {
+  font-size: 14px;
+  color: var(--muted);
+  background: var(--panel);
+  border: 1px dashed var(--line);
+  border-radius: 12px;
+  padding: 12px;
+}
+
+.timer-note {
+  margin-left: 6px;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.timer-fired .timer-note {
+  color: inherit;
+}
+
+.empty-state {
+  text-align: center;
+  color: var(--muted);
+  padding: 40px 0 8px;
+}
+
+.empty-state .chip {
+  margin-top: 10px;
+}
+
+.load-error {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 16px;
+}
+
+.muted-small {
+  color: var(--muted);
+  font-size: 12px;
+  word-break: break-all;
+}
+
 /* ---------- burner tabs ---------- */
 
 .burner-tabs {
@@ -469,4 +525,18 @@ button {
 .burner-timer-fired {
   color: #c0392b;
   animation: pulse 0.9s infinite;
+}
+
+/* night kitchen */
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #1b1713;
+    --panel: #262019;
+    --ink: #f0e9df;
+    --muted: #a2968a;
+    --accent: #f0703d;
+    --accent-soft: #3d2417;
+    --line: #3b332a;
+    --done: #75816f;
+  }
 }

@@ -6,6 +6,7 @@ export type Timer = {
   id: string;
   recipe: string; // recipe file
   label: string; // "20分" etc.
+  note?: string; // step context, e.g. "塩(少々)を…" (absent in old sessions)
   endsAt: number; // epoch ms
   acknowledged: boolean; // user dismissed the fired alarm
 };
@@ -63,6 +64,32 @@ export function timerCandidates(step: string): { label: string; seconds: number 
     }
   }
   return out;
+}
+
+/** Ingredient lines that are group labels (単独A/B, 【ソース】, ■南蛮酢),
+ * rendered as section dividers instead of checkable items. Conservative:
+ * anything carrying a quantity stays a normal ingredient. */
+export function isIngredientGroup(line: string): boolean {
+  const t = line.trim();
+  if (/^[A-ZＡ-Ｚa-z]$/.test(t)) return true;
+  if (/^[【\[（(].*[】\]）)]$/.test(t)) return true;
+  if (/^[■●▼◆☆★◎○]/.test(t) && !/[0-9０-９]/.test(t) && !/適量|少々|お好み/.test(t)) return true;
+  return false;
+}
+
+/** Loose search normalization: lowercase, hiragana→katakana, full→half width. */
+export function normalizeQuery(s: string): string {
+  return s
+    .toLowerCase()
+    .replace(/[ぁ-ん]/g, (c) => String.fromCharCode(c.charCodeAt(0) + 0x60))
+    .replace(/[Ａ-Ｚａ-ｚ０-９]/g, (c) => String.fromCharCode(c.charCodeAt(0) - 0xfee0));
+}
+
+/** Strip decorations (【作り置き】, ☆) so burner tabs spend their ~5 visible
+ * chars on the dish name. */
+export function tabName(title: string): string {
+  const t = title.replace(/【[^】]*】/g, "").replace(/[☆★♪〜~]/g, "").trim();
+  return t || title;
 }
 
 export function formatRemaining(ms: number): string {

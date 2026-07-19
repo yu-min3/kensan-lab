@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { fetchRecipe, formatDuration, Recipe } from "../api";
-import { formatRemaining, Session, timerCandidates } from "../session";
+import { formatRemaining, isIngredientGroup, Session, tabName, timerCandidates } from "../session";
 import { alarm } from "../alerts";
 import { holdWakeLock, releaseWakeLock } from "../wakelock";
 
@@ -15,6 +15,7 @@ export function SessionPage({
   onEnd: () => void;
 }) {
   const [recipes, setRecipes] = useState<Record<string, Recipe>>({});
+  const [loadErrors, setLoadErrors] = useState<Record<string, string>>({});
   const [now, setNow] = useState(Date.now());
   const [confirmEnd, setConfirmEnd] = useState(false);
   const [showIngredients, setShowIngredients] = useState(true);
@@ -25,12 +26,15 @@ export function SessionPage({
     return releaseWakeLock;
   }, []);
 
+  const loadRecipe = (f: string) => {
+    setLoadErrors((e) => ({ ...e, [f]: "" }));
+    fetchRecipe(f)
+      .then((r) => setRecipes((m) => ({ ...m, [f]: r })))
+      .catch((err) => setLoadErrors((e) => ({ ...e, [f]: String(err) })));
+  };
+
   useEffect(() => {
-    for (const f of session.files) {
-      fetchRecipe(f)
-        .then((r) => setRecipes((m) => ({ ...m, [f]: r })))
-        .catch(() => {});
-    }
+    session.files.forEach(loadRecipe);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [session.files.join("|")]);
 
@@ -71,7 +75,7 @@ export function SessionPage({
     onUpdate({ ...session, ingredients: { ...session.ingredients, [active]: ing } });
   };
 
-  const addTimer = (label: string, seconds: number) => {
+  const addTimer = (label: string, seconds: number, note: string) => {
     onUpdate({
       ...session,
       timers: [
@@ -80,6 +84,7 @@ export function SessionPage({
           id: `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
           recipe: active,
           label,
+          note,
           endsAt: Date.now() + seconds * 1000,
           acknowledged: false,
         },
@@ -97,7 +102,7 @@ export function SessionPage({
       <header className="session-header">
         {confirmEnd ? (
           <button className="end-button end-confirm" onClick={onEnd}>
-            本当に終了する
+            終了する（進捗・タイマーは消えます）
           </button>
         ) : (
           <button className="end-button" onClick={() => { setConfirmEnd(true); setTimeout(() => setConfirmEnd(false), 3000); }}>
@@ -116,6 +121,7 @@ export function SessionPage({
                 title={recipes[t.recipe]?.title}
               >
                 {fired ? "🔔" : "⏱"} {t.label} {fired ? "完了!" : formatRemaining(remaining)}
+                {t.note && <span className="timer-note">{t.note}</span>}
               </button>
             );
           })}
@@ -123,7 +129,15 @@ export function SessionPage({
       </header>
 
       <main className="recipe-panel">
-        {!recipe ? (
+        {!recipe && loadErrors[active] ? (
+          <div className="load-error">
+            <p>レシピを読み込めませんでした</p>
+            <p className="muted-small">{loadErrors[active]}</p>
+            <button className="chip" onClick={() => loadRecipe(active)}>
+              再試行
+            </button>
+          </div>
+        ) : !recipe ? (
           <p className="loading">読み込み中…</p>
         ) : (
           <>
@@ -144,24 +158,33 @@ export function SessionPage({
               </button>
               {showIngredients && (
                 <ul className="ingredients">
-                  {(recipe.ingredients ?? []).map((ing, i) => (
-                    <li key={i}>
-                      <label className={session.ingredients[active]?.[i] ? "done" : ""}>
-                        <input
-                          type="checkbox"
-                          checked={session.ingredients[active]?.[i] ?? false}
-                          onChange={() => toggleIngredient(i)}
-                        />
+                  {(recipe.ingredients ?? []).map((ing, i) =>
+                    isIngredientGroup(ing) ? (
+                      <li key={i} className="ing-group">
                         {ing}
-                      </label>
-                    </li>
-                  ))}
+                      </li>
+                    ) : (
+                      <li key={i} className="ing-item">
+                        <label className={session.ingredients[active]?.[i] ? "done" : ""}>
+                          <input
+                            type="checkbox"
+                            checked={session.ingredients[active]?.[i] ?? false}
+                            onChange={() => toggleIngredient(i)}
+                          />
+                          {ing}
+                        </label>
+                      </li>
+                    ),
+                  )}
                 </ul>
               )}
             </section>
 
             <section>
               <h3 className="section-label">手順</h3>
+              {(recipe.steps ?? []).length === 0 && (
+                <p className="no-steps">Recipe Keeper に手順が未登録のレシピです（材料のみ）。出典リンクから手順を確認してください。</p>
+              )}
               <ol className="steps">
                 {(recipe.steps ?? []).map((step, i) => (
                   <li
@@ -177,7 +200,11 @@ export function SessionPage({
                     {i === currentStep && timerCandidates(step).length > 0 && (
                       <div className="step-timers">
                         {timerCandidates(step).map((c) => (
-                          <button key={c.label} className="chip" onClick={() => addTimer(c.label, c.seconds)}>
+                          <button
+                            key={c.label}
+                            className="chip"
+                            onClick={() => addTimer(c.label, c.seconds, step.slice(0, 8))}
+                          >
                             ⏱ {c.label}
                           </button>
                         ))}
@@ -210,9 +237,9 @@ export function SessionPage({
               className={`burner-tab ${i === session.active ? "burner-active" : ""}`}
               onClick={() => onUpdate({ ...session, active: i })}
             >
-              <span className="burner-name">{r?.title ?? f}</span>
+              <span className="burner-name">{tabName(r?.title ?? f)}</span>
               <span className="burner-sub">
-                {steps.length > 0 ? `${done}/${steps.length}` : "–"}
+                {loadErrors[f] && !r ? "⚠" : steps.length > 0 ? `${done}/${steps.length}` : r ? "材料のみ" : "–"}
                 {nextFire !== null && (
                   <em className={nextFire <= 0 ? "burner-timer burner-timer-fired" : "burner-timer"}>
                     {nextFire <= 0 ? "🔔" : ` ${formatRemaining(nextFire)}`}
