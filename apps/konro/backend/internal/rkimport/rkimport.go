@@ -26,12 +26,14 @@ import (
 )
 
 type Recipe struct {
+	RKID        string // Recipe Keeper internal UUID — stable upsert key for re-imports
 	Title       string
 	Ingredients []string
 	Steps       []string
 	PrepTime    string // ISO8601 duration (PT15M)
 	CookTime    string
 	Yield       string
+	Collections []string // user-curated collections (the primary tags)
 	Categories  []string
 	Courses     []string
 	Rating      string
@@ -139,16 +141,22 @@ func parseRecipe(sel *goquery.Selection, res *Result) Recipe {
 		switch {
 		case prop == "name":
 			rec.Title = strings.TrimSpace(val)
+		case prop == "recipeId":
+			rec.RKID = strings.TrimSpace(val)
 		case prop == "recipeIngredient" || prop == "recipeIngredients":
 			rec.Ingredients = append(rec.Ingredients, splitLines(val)...)
 		case prop == "recipeInstructions" || prop == "recipeDirections":
 			rec.Steps = append(rec.Steps, splitSteps(val)...)
 		case prop == "prepTime":
-			rec.PrepTime = val
+			rec.PrepTime = strings.TrimSpace(val)
 		case prop == "performTime" || prop == "cookTime":
-			rec.CookTime = val
+			rec.CookTime = strings.TrimSpace(val)
 		case prop == "recipeYield":
-			rec.Yield = val
+			rec.Yield = strings.TrimSpace(val)
+		case prop == "recipeCollection":
+			if v := strings.TrimSpace(val); v != "" {
+				rec.Collections = append(rec.Collections, v)
+			}
 		case prop == "recipeCategory":
 			if v := strings.TrimSpace(val); v != "" {
 				rec.Categories = append(rec.Categories, v)
@@ -160,7 +168,12 @@ func parseRecipe(sel *goquery.Selection, res *Result) Recipe {
 		case prop == "recipeRating":
 			rec.Rating = strings.TrimSpace(val)
 		case prop == "recipeSource":
-			rec.Source = strings.TrimSpace(val)
+			// real exports wrap the source in <span><a href=...>; prefer the href
+			if href, ok := s.Find("a[href]").First().Attr("href"); ok {
+				rec.Source = strings.TrimSpace(href)
+			} else {
+				rec.Source = strings.TrimSpace(val)
+			}
 		case prop == "recipeNotes":
 			rec.Notes = strings.TrimSpace(val)
 		case photoProp.MatchString(prop):

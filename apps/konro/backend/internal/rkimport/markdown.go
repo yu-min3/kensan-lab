@@ -14,8 +14,19 @@ func Markdown(r Recipe, imageDir, date string) string {
 	b.WriteString("---\n")
 	b.WriteString("type: recipe\n")
 	fmt.Fprintf(&b, "title: %s\n", yamlString(r.Title))
+	if r.RKID != "" {
+		fmt.Fprintf(&b, "rk_id: %s\n", r.RKID)
+	}
 
-	tags := append(append([]string{}, r.Categories...), r.Courses...)
+	// collections are the user's own organization — they lead the tag list
+	var tags []string
+	seen := map[string]bool{}
+	for _, t := range append(append(append([]string{}, r.Collections...), r.Categories...), r.Courses...) {
+		if !seen[t] {
+			seen[t] = true
+			tags = append(tags, t)
+		}
+	}
 	if len(tags) > 0 {
 		quoted := make([]string, len(tags))
 		for i, t := range tags {
@@ -26,16 +37,17 @@ func Markdown(r Recipe, imageDir, date string) string {
 	if r.Yield != "" {
 		fmt.Fprintf(&b, "servings: %s\n", yamlString(r.Yield))
 	}
-	if r.PrepTime != "" {
+	// PT0S is Recipe Keeper's "not set"
+	if r.PrepTime != "" && r.PrepTime != "PT0S" {
 		fmt.Fprintf(&b, "prep_time: %s\n", r.PrepTime)
 	}
-	if r.CookTime != "" {
+	if r.CookTime != "" && r.CookTime != "PT0S" {
 		fmt.Fprintf(&b, "cook_time: %s\n", r.CookTime)
 	}
 	if r.Source != "" {
 		fmt.Fprintf(&b, "source: %s\n", yamlString(r.Source))
 	}
-	if r.Rating != "" {
+	if r.Rating != "" && r.Rating != "0" {
 		fmt.Fprintf(&b, "rating: %s\n", r.Rating)
 	}
 	if len(r.Images) > 0 {

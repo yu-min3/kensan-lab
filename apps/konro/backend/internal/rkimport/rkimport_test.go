@@ -32,6 +32,12 @@ func TestParseHTML(t *testing.T) {
 	if r.Title != "鶏むね肉の南蛮漬け" {
 		t.Errorf("title = %q", r.Title)
 	}
+	if r.RKID != "aaaa-1111" {
+		t.Errorf("rkid = %q", r.RKID)
+	}
+	if len(r.Collections) != 2 || r.Collections[0] != "鶏肉" {
+		t.Errorf("collections = %#v", r.Collections)
+	}
 	if len(r.Ingredients) != 4 || r.Ingredients[0] != "鶏むね肉 2枚" || r.Ingredients[2] != "■南蛮酢" {
 		t.Errorf("ingredients = %#v", r.Ingredients)
 	}
@@ -55,10 +61,17 @@ func TestParseHTML(t *testing.T) {
 		t.Errorf("notes = %q", r.Notes)
 	}
 
-	// second recipe exercises the singular/instructions aliases + cookTime
+	// second recipe exercises the singular/instructions aliases, cookTime,
+	// and the real-export span shapes (source anchor, whitespace-padded yield)
 	r2 := res.Recipes[1]
 	if len(r2.Ingredients) != 2 || len(r2.Steps) != 2 || r2.CookTime != "PT45M" {
 		t.Errorf("recipe2 = %#v", r2)
+	}
+	if r2.Source != "https://example.com/sauce" {
+		t.Errorf("recipe2 source = %q (want href, not anchor text)", r2.Source)
+	}
+	if r2.Yield != "2 servings" {
+		t.Errorf("recipe2 yield = %q", r2.Yield)
 	}
 
 	// known-but-ignored props must not appear; the planted unknown must
@@ -116,7 +129,9 @@ func TestMarkdown(t *testing.T) {
 	for _, want := range []string{
 		"type: recipe\n",
 		`title: "鶏むね肉の南蛮漬け"`,
-		`tags: ["作り置き", "主菜"]`,
+		"rk_id: aaaa-1111",
+		// collections lead, deduped against category 作り置き
+		`tags: ["鶏肉", "作り置き", "主菜"]`,
 		`servings: "4人分"`,
 		"prep_time: PT15M",
 		"cook_time: PT20M",
@@ -129,6 +144,12 @@ func TestMarkdown(t *testing.T) {
 		if !strings.Contains(md, want) {
 			t.Errorf("markdown missing %q\n---\n%s", want, md)
 		}
+	}
+
+	// rating 0 means "unrated" in Recipe Keeper — must be omitted
+	md2 := Markdown(res.Recipes[1], "images", "2026-07-19")
+	if strings.Contains(md2, "rating:") {
+		t.Errorf("unrated recipe should have no rating line\n---\n%s", md2)
 	}
 }
 
