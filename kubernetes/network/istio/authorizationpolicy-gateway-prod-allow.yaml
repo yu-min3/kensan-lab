@@ -38,6 +38,7 @@ spec:
             hosts:
               - kensan.app.yu-min3.com # 本番 host（Phase 7 で legacy から継承）
               - kensan.yu-mins.com # Cloudflare Tunnel 経由の外部公開。同じ platform-admin 認可を当てる
+              - konro.app.yu-min3.com # konro。当面 Yu のみ利用のため platform-admin（家族利用時に要再設計）
       when:
         - key: request.auth.claims[groups]
           values:
@@ -50,3 +51,4 @@ spec:
             notHosts:
               - kensan.app.yu-min3.com # protected。ここに無いと無認証素通しに落ちる
               - kensan.yu-mins.com
+              - konro.app.yu-min3.com

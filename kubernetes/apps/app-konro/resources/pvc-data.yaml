@@ -1,0 +1,18 @@
+# konro レシピデータの本番 volume。
+# raw manifest にする理由は kensan-workspace PVC と同じ（helm release の改廃から
+# 独立させる）。データは Recipe Keeper エクスポートから再インポート可能なので
+# kensan ほどクリティカルではないが、防御の型は揃える。
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: konro-data
+  namespace: app-konro
+  annotations:
+    # リソース個別の prune 防御。Application メタデータの Prune=false は効かない
+    argocd.argoproj.io/sync-options: Prune=false
+spec:
+  accessModes: ["ReadWriteOnce"]
+  storageClassName: longhorn
+  resources:
+    requests:
+      storage: 1Gi

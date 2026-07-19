@@ -5,7 +5,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
     <meta name="theme-color" content="#e85d2f" />
     <link rel="manifest" href="/manifest.webmanifest" />
-    <link rel="icon" href="/icon.svg" type="image/svg+xml" />
+    <!-- favicon.svg 固定: gateway authz の PWA 用 notPaths（/manifest.webmanifest,
+         /favicon.svg）に乗るための名前。変えると認証壁で icon が取れなくなる -->
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
     <title>konro</title>
   </head>
   <body>
