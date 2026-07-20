@@ -1,0 +1,13 @@
+{
+  "name": "konro",
+  "short_name": "konro",
+  "description": "作り置き並行調理サポート",
+  "start_url": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#faf7f2",
+  "theme_color": "#e85d2f",
+  "icons": [
+    { "src": "/favicon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }
+  ]
+}

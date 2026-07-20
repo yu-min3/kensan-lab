@@ -2,7 +2,34 @@
 
 作り置き調理サポートアプリ。調理セッション中に複数レシピを「コンロの口を切り替えるように」タブで並行閲覧・進行管理する。kensan と同じファイルベース設計（レシピ 1 品 = Markdown + frontmatter、DB なし）。
 
-**Status: Phase 0 PoC** — Recipe Keeper エクスポート zip → レシピ md 変換のインポータのみ。アプリ本体（調理セッション UI）は Phase 1。
+**Status: Phase 1 MVP（ローカル評価中）** — インポータ + レシピ一覧 + 調理セッション UI（コンロタブ・ステップ進行・タブ横断タイマー・Wake Lock・PWA manifest）。本番デプロイ（app-konro ns）は Phase 2。
+
+## 構成
+
+```
+backend/   Go 単一サービス（REST API + ビルド済み SPA 配信 + konro-import CLI）
+frontend/  React SPA（Vite。design system 非依存の軽量キッチン UI）
+```
+
+## 開発・ローカル実行
+
+```bash
+# 1) レシピデータ投入（初回のみ）
+cd backend && go build -o konro-import ./cmd/konro-import
+./konro-import -zip RecipeKeeper_export.zip -out ~/konro-data
+
+# 2) frontend ビルド → Go が配信
+cd ../frontend && npm install && npm run build
+cd ../backend && KONRO_STATIC_DIR=../frontend/dist go run ./cmd/konro
+# → http://localhost:8090
+
+# 開発時は vite dev server（API は :8090 に proxy）
+cd frontend && npm run dev   # localhost:5173
+```
+
+環境変数: `KONRO_DATA_DIR`（既定 `~/konro-data`）、`KONRO_ADDR`（既定 `:8090`）、`KONRO_STATIC_DIR`（未設定 = API のみ）。
+
+Android 実機評価: 同一 LAN で `http://<MacのIP>:8090`。**Wake Lock は secure context 限定**なので、通し評価は USB + `adb reverse tcp:8090 tcp:8090` → スマホから `http://localhost:8090`。
 
 ## konro-import（PoC CLI）
 

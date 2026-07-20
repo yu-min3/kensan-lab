@@ -1,0 +1,38 @@
+# app-konro — app-base chart の values（kensan に続く 2 番目の消費者）
+# chart: charts/app-base / Application CR: kubernetes/argocd/applications/apps/app-konro/app.yaml
+
+nameOverride: konro
+image:
+  repository: ghcr.io/yu-min3/konro
+  tag: v0.1.0
+env:
+  # レシピ frontmatter の created/updated と将来のインポート endpoint が
+  # time.Now() 依存になるため JST を明示（kensan と同じ理由）
+  - name: TZ
+    value: Asia/Tokyo
+ghcrPullSecret:
+  enabled: true
+pvc:
+  enabled: true
+  # 本番 volume は resources/pvc-data.yaml（raw manifest、Prune=false）。
+  # chart には既存 claim 名だけ渡す
+  create: false
+  name: konro-data
+  mountPath: /data
+httproute:
+  enabled: true
+  # ⚠️ host 追加時の不変条件: 追加する host は必ず
+  # AuthorizationPolicy（gateway-prod-oauth2-authz の hosts / gateway-prod-allow の
+  # hosts と notHosts）にも同時に載せること。載せ忘れは無認証素通しになる。
+  hostnames:
+    - konro.app.yu-min3.com
+# gateway 層 Keycloak SSO（ext_authz）。LAN 内でも認証必須にする
+auth:
+  gatewayOAuth2:
+    enabled: true
+resources:
+  requests:
+    cpu: 25m
+    memory: 32Mi
+  limits:
+    memory: 128Mi

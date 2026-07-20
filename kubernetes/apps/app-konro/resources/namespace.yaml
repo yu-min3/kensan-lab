@@ -1,0 +1,14 @@
+# ADR-006: app-{name} flat + 3-axis labels（app-kensan/resources/namespace.yaml と同型）
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: app-konro
+  labels:
+    pod-security.kubernetes.io/enforce: restricted
+    # gateway-prod の allowedRoutes namespace selector（これが無いと HTTPRoute が
+    # NotAllowedByListeners で拒否される）
+    kensan-lab.platform/environment: production
+    kensan-lab.platform/team: yu
+    kensan-lab.platform/app: konro
+    kensan-lab.platform/tier: application
+    kensan-lab.platform/pss-level: restricted
