@@ -1,15 +1,19 @@
-# gateway-prod の protected host に oauth2-proxy ext_authz を強制する CUSTOM policy。
+# gateway-prod の全 host に oauth2-proxy ext_authz を強制する CUSTOM policy。
 # gateway-platform 版（authorizationpolicy-gateway-platform-oauth2.yaml）の兄弟。
 #
-# 背景: gateway-prod は元々「app が自前認証を持つ」前提で素通しだった（legacy kensan
-# の JWT）。新 kensan（ファイルベース統合版）は自前認証を持たないため、gateway 層の
-# Keycloak SSO に統一する（unification-plan.md の公開前ブロッカーの解）。
+# ADR-021: protected host の opt-in 列挙（旧設計）を廃止し、デフォルト保護に反転。
+# 旧設計は「hosts への載せ忘れ = 無認証素通し」という危険な向きに倒れていた。
+# 現設計では新 host は HTTPRoute を生やした時点で自動的に ext_authz 配下に入る
+# （アプリ追加でこのファイルを編集する必要はない）。公開したい host が現れたら
+# opt-out として明示 rule を足し、ADR に判断を残すこと。
 #
 # 注意:
-# - hosts は opt-in 列挙。ここに無い host（legacy kensan 等）は従来どおり素通し
 # - /oauth2/* は notPaths で除外し、app-base chart が生成する oauth2 HTTPRoute が
 #   oauth2-proxy へ直送する（callback の code 交換を ext_authz に通さない）
-# - kensan.app.yu-min3.com は Phase 7 cutover で追記済み（legacy から継承した本番 host）
+# - PWA manifest / favicon は認証なしで配信する（app 名とアイコンのみで秘匿性なし）。
+#   ブラウザの manifest fetch は Keycloak への cross-origin redirect を CORS で
+#   ブロックするため、ext_authz に通すと manifest が一切取得できない。
+#   ALLOW 側（gateway-prod-allow）にも同じ paths の素通し rule が必要（セット運用）。
 apiVersion: security.istio.io/v1
 kind: AuthorizationPolicy
 metadata:
@@ -26,16 +30,8 @@ spec:
   rules:
     - to:
         - operation:
-            hosts:
-              - kensan.app.yu-min3.com # 本番 host（Phase 7 で legacy から継承）
-              - kensan.yu-mins.com # Cloudflare Tunnel 経由の外部公開（gateway-prod http-tunnel listener）
-              - konro.app.yu-min3.com # konro（作り置き並行調理アプリ、LAN のみ）
             notPaths:
               - /oauth2
               - /oauth2/*
-              # PWA manifest / favicon は認証なしで配信する（app 名とアイコンのみで秘匿性なし）。
-              # ブラウザの manifest fetch は Keycloak への cross-origin redirect を CORS で
-              # ブロックするため、ext_authz に通すと manifest が一切取得できない。
-              # ALLOW 側（gateway-prod-allow）にも同じ paths の素通し rule が必要（セット運用）。
               - /manifest.webmanifest
               - /favicon.svg

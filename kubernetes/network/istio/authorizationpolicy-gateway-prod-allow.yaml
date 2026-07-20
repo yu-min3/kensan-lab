@@ -1,11 +1,16 @@
-# gateway-prod の protected host の認可（gateway-platform-allow の gateway-prod 版）。
+# gateway-prod の認可（gateway-platform-allow の gateway-prod 版）。
 #
-# kensan は個人 workspace（日記含む）なので「Keycloak 認証済み」では不十分で、
-# platform-admin group まで要求する。/oauth2/* は OIDC flow 自体の path なので
-# claim 検査なしで通す（oauth2-proxy が code 交換・cookie set を行うため）。
+# ADR-021: デフォルト保護（opt-out）。gateway-prod を通る全 request は
+# 「Keycloak 認証済み + platform-admin group」を要求する。旧設計の
+# 「protected host を列挙し、それ以外は素通し」という catch-all rule は廃止
+# （notHosts への載せ忘れ = 無認証素通し、という罠の温床だった）。
 #
-# 非 protected host（legacy kensan 等、CUSTOM policy の hosts に無いもの）は
-# 最初の rule で従来どおり素通しする。
+# 公開 host（認証なしで通したいもの）が現れたら、当該 host の明示 ALLOW rule を
+# opt-out として追加し、CUSTOM 側にも対応する除外を入れ、ADR に判断を残すこと。
+# 現時点で opt-out は存在しない。
+#
+# /oauth2/* は OIDC flow 自体の path なので claim 検査なしで通す
+# （oauth2-proxy が code 交換・cookie set を行うため）。
 apiVersion: security.istio.io/v1
 kind: AuthorizationPolicy
 metadata:
@@ -32,23 +37,8 @@ spec:
             paths:
               - /manifest.webmanifest
               - /favicon.svg
-    # protected host は platform-admin group 必須
-    - to:
-        - operation:
-            hosts:
-              - kensan.app.yu-min3.com # 本番 host（Phase 7 で legacy から継承）
-              - kensan.yu-mins.com # Cloudflare Tunnel 経由の外部公開。同じ platform-admin 認可を当てる
-              - konro.app.yu-min3.com # konro。当面 Yu のみ利用のため platform-admin（家族利用時に要再設計）
-      when:
+    # 上記以外の全 request は platform-admin group 必須（host 不問のデフォルト）
+    - when:
         - key: request.auth.claims[groups]
           values:
             - platform-admin
-    # それ以外の host（legacy kensan 等）は従来どおり制限なし。
-    # ⚠️ protected host を増やしたら必ずこの notHosts にも足すこと
-    #    （足さないと catch-all の無認証素通しに落ちて workspace が露出する）
-    - to:
-        - operation:
-            notHosts:
-              - kensan.app.yu-min3.com # protected。ここに無いと無認証素通しに落ちる
-              - kensan.yu-mins.com
-              - konro.app.yu-min3.com
