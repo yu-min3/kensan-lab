@@ -13,9 +13,10 @@ spec:
   - "https://github.com/yu-min3/*"
 
   destinations:
-  # ADR-006 の app-{name} flat namespace（新 kensan が第 1 号）
-  # (旧 kensan ns / app-prod landing zone は撤去済み — PR #394 / ADR-017)
-  - namespace: app-kensan
+  # ADR-006 の app-{name} flat namespace。個別列挙ではなく glob（app-konro 追加時に
+  # ns 単位の列挙が per-app プラットフォーム編集になっていたため、ADR-021 と同じ
+  # 「パターンで受ける」方針に統一。app-* 以外へは置けないままなので制約は維持）
+  - namespace: "app-*"
     server: "https://kubernetes.default.svc"
 
   # Apps own their own namespace (per-app namespace design)
