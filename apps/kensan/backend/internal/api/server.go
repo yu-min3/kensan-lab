@@ -45,6 +45,8 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("POST /api/v1/projects", s.handleProjectCreate)
 	mux.HandleFunc("GET /api/v1/projects/{name}", s.handleProjectDetail)
 	mux.HandleFunc("PATCH /api/v1/projects/{name}", s.handleProjectUpdate)
+	mux.HandleFunc("GET /api/v1/projects/{name}/metrics", s.handleProjectMetrics)
+	mux.HandleFunc("POST /api/v1/projects/{name}/metrics/refresh", s.handleProjectMetricsRefresh)
 	mux.HandleFunc("POST /api/v1/tasks/save", s.handleTaskSave)
 	mux.HandleFunc("GET /api/v1/tags", s.handleTags)
 	mux.HandleFunc("GET /api/v1/reviews", s.handleReviews)
