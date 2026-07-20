@@ -15,6 +15,9 @@ spec:
     - group: gateway.networking.k8s.io
       kind: HTTPRoute
       namespace: app-kensan
+    - group: gateway.networking.k8s.io
+      kind: HTTPRoute
+      namespace: app-konro
   to:
     - group: ""
       kind: Service

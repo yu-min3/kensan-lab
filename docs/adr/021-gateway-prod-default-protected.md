@@ -54,8 +54,15 @@ an **unauthenticated exposure** — the dangerous direction. The kensan Phase 7 
 
 ## Consequences
 
-- App onboarding on gateway-prod is now: app manifests + Application CR + one setup.sh host
-  line (redirect URI). No shared AuthorizationPolicy edits.
+- App onboarding on gateway-prod is now: app manifests + Application CR + two one-line
+  platform touches — a setup.sh host entry (redirect URI) and a `from:` entry in the
+  `allow-app-oauth2-routes` ReferenceGrant (the per-app `/oauth2` HTTPRoute lives in the app
+  namespace because gateway-prod's allowedRoutes selector rejects auth-system). No shared
+  AuthorizationPolicy edits. Konro onboarding also surfaced and removed a third touch:
+  AppProject destinations now use an `app-*` glob (#452). A future follow-up could remove
+  the ReferenceGrant touch by serving a wildcard `*.app.yu-min3.com` oauth2 route from
+  auth-system, but that requires widening the gateway-prod allowedRoutes selector — a
+  separate decision.
 - Every host on gateway-prod requires platform-admin. Per-host authorization tiers (e.g. a
   family-members group for konro) will need a host-scoped ALLOW rule when the need arises —
   that reintroduces enumeration for those hosts only, which is the correct trade.
