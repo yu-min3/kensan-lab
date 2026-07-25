@@ -4,19 +4,31 @@
 Markdown importと全ProjectのGitHub Stars更新を同じprocessで実行する。
 kensan DeploymentにはGoogle/GitHub credentialを渡さない。
 
-## 初回Secret作成
+## 初回Secret登録
 
-Google Service Account JSONとDrive output folder IDはGitにcommitせず、
-clusterへ直接登録する。
+Google Service Account JSONはVault KV v2へ登録し、External Secrets Operatorで
+`app-kensan/feed-google-drive`からKubernetes Secretへ同期する。
+Kubernetes Secretを手動作成しない。
 
 ```bash
-kubectl -n app-kensan create secret generic feed-google-drive \
-  --from-file=credentials.json=/path/to/service-account.json \
-  --from-literal=output-folder-id='<drive-folder-id>'
+vault kv put secret/app-kensan/feed-google-drive \
+  credentials.json=@/path/to/service-account.json \
+  output-folder-id='<drive-folder-id>'
 ```
 
-対象SecretはこのCronJobだけがmountする。Service AccountにはDrive output
-folderのViewer権限だけを付与する。
+`feed-google-drive-external-secret.yaml`をArgo CDで同期すると、ESOが
+`feed-google-drive` Secretを作成する。対象SecretはCronJobだけがread-only
+mountする。Service AccountにはDrive output folderのViewer権限だけを付与する。
+
+Drive output folder ID自体はcredentialではないが、公開repoへ識別子を露出させず
+一つの受け渡し契約にまとめるため、同じVault pathで管理する。
+
+同期確認:
+
+```bash
+kubectl -n app-kensan get externalsecret feed-google-drive
+kubectl -n app-kensan get secret feed-google-drive
+```
 
 ## 手動実行
 

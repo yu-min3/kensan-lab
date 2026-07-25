@@ -84,6 +84,7 @@ for how to add a consumer.
 | platform-auth-prod | keycloak-secret | KEYCLOAK_ADMIN_PASSWORD / KC_DB_PASSWORD | Keycloak admin + DB password (`KC_DB_PASSWORD` is synced from `platform-auth/prod/postgresql.POSTGRES_PASSWORD`, [ADR-019](../adr/019-keycloak-db-credentials-revert-to-static.md)) |
 | platform-auth-prod | postgresql-secret | POSTGRES_USER/PASSWORD/DB | Keycloak Postgres boot |
 | {backstage, app-kensan} | ghcr-pull-secret | `.dockerconfigjson` (GHCR image pull token) | imagePullSecrets in each namespace. Shares the Vault path `secret/ghcr/pull-token` (app-kensan gets it via the app-base chart's externalsecret-ghcr.yaml) |
+| app-kensan | feed-google-drive | `credentials.json` / `output-folder-id` | Google Drive read-only settings for the Daily Briefing Job (`secret/app-kensan/feed-google-drive`) |
 
 (The old `kensan` namespace's 6 secrets and the shared `app-prod` ghcr-pull-secret
 disappeared in 2026-07 along with the kensan-legacy removal / the per-app namespace migration.)
