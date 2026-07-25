@@ -108,12 +108,12 @@ func TestReadEndpoints(t *testing.T) {
 		t.Errorf("daily missing: want 404, got %d", code)
 	}
 
-	var board struct{ Today, Stock []json.RawMessage }
+	var board struct{ Today, Later []json.RawMessage }
 	if code := getJSON(t, ts.URL+"/api/v1/tasks", &board); code != 200 {
 		t.Fatalf("tasks: %d", code)
 	}
-	if len(board.Today) != 1 || len(board.Stock) != 1 {
-		t.Errorf("board: today=%d stock=%d", len(board.Today), len(board.Stock))
+	if len(board.Today) != 1 || len(board.Later) != 1 {
+		t.Errorf("board: today=%d later=%d", len(board.Today), len(board.Later))
 	}
 
 	var search struct{ Total int }
@@ -178,18 +178,18 @@ func TestTaskMoveAPI(t *testing.T) {
 
 	// board API から実際の位置を取得（手で行番号を数えない）
 	var board struct {
-		Stock []struct {
+		Later []struct {
 			File    string `json:"file"`
 			Line    int    `json:"line"`
 			Text    string `json:"text"`
 			Project string `json:"project"`
-		} `json:"stock"`
+		} `json:"later"`
 	}
 	getJSON(t, ts.URL+"/api/v1/tasks", &board)
-	if len(board.Stock) != 1 || board.Stock[0].Text != "タスクB" {
+	if len(board.Later) != 1 || board.Later[0].Text != "タスクB" {
 		t.Fatalf("unexpected board: %+v", board)
 	}
-	srcLine := board.Stock[0].Line
+	srcLine := board.Later[0].Line
 
 	// ストック → 今日（@today タグ付与。project ファイルのまま）
 	var res struct {

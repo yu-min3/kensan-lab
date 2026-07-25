@@ -130,8 +130,9 @@ func printBoard(b tasks.Board) {
 		}
 	}
 	section("今日やる", b.Today)
-	section("ストック", b.Stock)
-	section("いつかやる", b.Someday)
+	section("今週", b.Week)
+	section("今月", b.Month)
+	section("いつか", b.Later)
 	section("マイルストーン", b.Milestones)
 }
 

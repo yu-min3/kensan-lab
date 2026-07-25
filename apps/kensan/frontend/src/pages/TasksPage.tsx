@@ -8,16 +8,16 @@ import { TaskBoard } from "../components/TaskBoard";
 import { Card, CardBody } from "../components/ui/card";
 import { Badge } from "../components/ui/badge";
 
-// タスクページ = ダッシュボードと同じ二層かんばん（今日やる ⇄ ストック）。
-// ストックは project の ## タスク を Project→Milestone でまとめたもの。
-// その下にいつかやる・マイルストーンを折りたたみで補助表示する。
+// タスクページ = 時間軸バンドのかんばん（今日 / 今週 / 今月 / いつか）。
+// タスクは project の ## タスク に住み、行内タグ（@today/@week/@month）でバンドが決まる。
+// その下にマイルストーンを折りたたみで補助表示する。
 export function TasksPage() {
   return (
     <>
       <PageHeader
         eyebrow="タスク"
         title="かんばん"
-        sub="ストック（project のタスク）から今日へドラッグ = @today タグの付与。行は project ファイルのまま動かない。"
+        sub="レーン間ドラッグ = バンドの張り替え（今日/今週/今月/中期）。行は project ファイルのまま動かない。"
       />
       <div className="ds-section">
         <TaskBoard />
@@ -29,15 +29,9 @@ export function TasksPage() {
 
 function Backlog() {
   const board = useQuery({ queryKey: ["board"], queryFn: api.board });
-  const someday = board.data?.someday ?? [];
   const milestones = board.data?.milestones ?? [];
-  if (someday.length === 0 && milestones.length === 0) return null;
-  return (
-    <>
-      <Collapsible title="いつかやる" tasks={someday} />
-      <Collapsible title="マイルストーン" tasks={milestones} />
-    </>
-  );
+  if (milestones.length === 0) return null;
+  return <Collapsible title="マイルストーン" tasks={milestones} />;
 }
 
 function Collapsible({ title, tasks }: { title: string; tasks: Task[] }) {

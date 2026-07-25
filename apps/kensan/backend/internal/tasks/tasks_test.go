@@ -84,17 +84,17 @@ func TestCollect(t *testing.T) {
 	if len(b.Today) != 2 {
 		t.Errorf("today: want 2 (todo.md ## Now), got %d: %+v", len(b.Today), b.Today)
 	}
-	// ストック = project の ## タスク のうち未完了かつ today でないもの
-	// （原稿レビュー依頼 のみ。アブストラクト確定=done / 没ネタ調査=skipped は除外、_archive も除外）
-	if len(b.Stock) != 1 {
-		t.Errorf("stock: want 1 (未完了の ## タスク のみ), got %d: %+v", len(b.Stock), b.Stock)
+	// いつか(Later) = バンドタグ無しの未完了。## タスク の「原稿レビュー依頼」＋
+	// ## いつかやる の「デモ環境の自動化」の 2 件（done/skipped は除外、_archive も除外）
+	if len(b.Later) != 2 {
+		t.Errorf("later: want 2 (## タスク + ## いつかやる の未完了), got %d: %+v", len(b.Later), b.Later)
 	}
-	if len(b.Milestones) != 2 || len(b.Someday) != 1 {
-		t.Errorf("milestones/someday: got %d/%d", len(b.Milestones), len(b.Someday))
+	if len(b.Milestones) != 2 {
+		t.Errorf("milestones: got %d", len(b.Milestones))
 	}
-	for _, task := range b.Stock {
+	for _, task := range b.Later {
 		if task.Project != "demo" {
-			t.Errorf("stock task must carry project, got %+v", task)
+			t.Errorf("later task must carry project, got %+v", task)
 		}
 	}
 }
@@ -139,8 +139,50 @@ type: project
 	if len(b.Today) != 1 || b.Today[0].Display != "期限切れ" {
 		t.Errorf("due<=today should surface in today: %+v", b.Today)
 	}
-	if len(b.Stock) != 1 || b.Stock[0].Display != "まだ先" {
-		t.Errorf("future due should stay in stock: %+v", b.Stock)
+	if len(b.Later) != 1 || b.Later[0].Display != "まだ先" {
+		t.Errorf("future due should stay in stock: %+v", b.Later)
+	}
+}
+
+// 時間軸バンド: @week / @month の手動タグと @due による自動昇格の振り分け。
+// today=2026-07-25(土)。今週末(日)=2026-07-26、月末=2026-07-31。
+func TestCollectBands(t *testing.T) {
+	root := t.TempDir()
+	mustWrite(t, filepath.Join(root, "projects", "demo", "README.md"), `---
+type: project
+---
+## タスク
+
+- [ ] 今週やる @week
+- [ ] 今月やる @month
+- [ ] 中期のタスク
+- [ ] 締切が今週日曜 @due(2026-07-26)
+- [ ] 締切が月内 @due(2026-07-31)
+- [ ] 締切ずっと先だが今週やる @week @due(2099-01-01)
+- [x] 完了は出さない @week
+`)
+	b, _ := collect(root, "2026-07-25")
+	disp := func(ts []Task) []string {
+		out := []string{}
+		for _, t := range ts {
+			out = append(out, t.Display)
+		}
+		return out
+	}
+	// @week + @due≤今週末 + (@week@due先→week が勝つ)
+	if got := disp(b.Week); len(got) != 3 {
+		t.Errorf("week: want 3, got %v", got)
+	}
+	// @month + @due≤月末（今週末より後）
+	if got := disp(b.Month); len(got) != 2 {
+		t.Errorf("month: want 2, got %v", got)
+	}
+	// バンドタグ無し・締切無し
+	if got := disp(b.Later); len(got) != 1 || got[0] != "中期のタスク" {
+		t.Errorf("later: want [中期のタスク], got %v", got)
+	}
+	if len(b.Today) != 0 {
+		t.Errorf("today: want 0, got %v", disp(b.Today))
 	}
 }
 

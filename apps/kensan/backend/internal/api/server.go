@@ -33,6 +33,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /api/v1/tasks", s.handleTasks)
 	mux.HandleFunc("POST /api/v1/tasks/move", s.handleTaskMove)
 	mux.HandleFunc("POST /api/v1/tasks/today", s.handleTaskToday)
+	mux.HandleFunc("POST /api/v1/tasks/band", s.handleTaskBand)
 	mux.HandleFunc("POST /api/v1/tasks/add", s.handleTaskAdd)
 	mux.HandleFunc("POST /api/v1/tasks/due", s.handleTaskDue)
 	mux.HandleFunc("POST /api/v1/tasks/priority", s.handleTaskPriority)

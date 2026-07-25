@@ -148,6 +148,51 @@ func SetToday(ws *workspace.Workspace, file string, line int, expectText string,
 	return out, err
 }
 
+// SetBand は行のバンドタグ（@today/@week/@month）を張り替える。
+// band は "today" / "week" / "month" / "later"（later は全バンドタグを外す = 中期以降）。
+// かんばんでレーン間をドラッグしたときに使う。行はその場（project ファイル）で書き換わる。
+func SetBand(ws *workspace.Workspace, file string, line int, expectText, band string) (Task, error) {
+	if band != "today" && band != "week" && band != "month" && band != "later" {
+		return Task{}, fmt.Errorf("unknown band: %q", band)
+	}
+	var out Task
+	err := ws.Mutate(file, func(content []byte, exists bool) ([]byte, error) {
+		if !exists {
+			return nil, fmt.Errorf("file not found: %s", file)
+		}
+		lines := strings.Split(string(content), "\n")
+		if line < 1 || line > len(lines) {
+			return nil, fmt.Errorf("%w: line %d out of range", ErrLineMismatch, line)
+		}
+		m := checkboxRe.FindStringSubmatch(lines[line-1])
+		if m == nil || strings.TrimSpace(m[2]) != strings.TrimSpace(expectText) {
+			return nil, fmt.Errorf("%w: %s:%d", ErrLineMismatch, file, line)
+		}
+		out = rewriteLine(lines, line, m[1], setBandTag(strings.TrimSpace(m[2]), band), file)
+		return []byte(workspaceTouch(strings.Join(lines, "\n"))), nil
+	})
+	return out, err
+}
+
+// setBandTag は行テキストの既存バンドタグ（@today/@week/@month）を全て外し、band に対応するタグを 1 つだけ付ける。
+// band が "later" なら何も付けない（中期以降）。タグは行末に置く。
+func setBandTag(text, band string) string {
+	t := todayRe.ReplaceAllString(text, "")
+	t = weekRe.ReplaceAllString(t, "")
+	t = monthRe.ReplaceAllString(t, "")
+	t = strings.TrimSpace(multiSpace.ReplaceAllString(t, " "))
+	switch band {
+	case "today":
+		return t + " @today"
+	case "week":
+		return t + " @week"
+	case "month":
+		return t + " @month"
+	default: // later
+		return t
+	}
+}
+
 // projectTarget は project 名から書き込み先（ファイル, セクション）を返す。
 // project が空なら todo.md ## Now（project 外の即席 today）。
 func projectTarget(project string) (file, section string) {
@@ -158,10 +203,16 @@ func projectTarget(project string) (file, section string) {
 }
 
 // buildBody は表示テキストに行内タグを固定順で付けた「- [mark] 」以降の本文を作る。
-func buildBody(display string, today bool, due, ms, pTag string) string {
+// band は "today"/"week"/"month"/"later"（later は無タグ = 中期以降）。
+func buildBody(display, band string, due, ms, pTag string) string {
 	parts := []string{strings.TrimSpace(display)}
-	if today {
+	switch band {
+	case "today":
 		parts = append(parts, "@today")
+	case "week":
+		parts = append(parts, "@week")
+	case "month":
+		parts = append(parts, "@month")
 	}
 	if due != "" {
 		parts = append(parts, "@due("+due+")")
@@ -202,12 +253,12 @@ func AddLine(ws *workspace.Workspace, file, section, display string) (Task, erro
 }
 
 // CreateTask は project（空なら todo.md ## Now）にタスクを 1 件追加する。
-func CreateTask(ws *workspace.Workspace, project, display string, today bool, due, ms string) (Task, error) {
+func CreateTask(ws *workspace.Workspace, project, display, band string, due, ms string) (Task, error) {
 	if strings.TrimSpace(display) == "" {
 		return Task{}, fmt.Errorf("display must not be empty")
 	}
 	destFile, destSection := projectTarget(project)
-	body := buildBody(display, today, due, ms, "")
+	body := buildBody(display, band, due, ms, "")
 	var out Task
 	err := ws.Mutate(destFile, func(content []byte, exists bool) ([]byte, error) {
 		if !exists {
@@ -221,8 +272,8 @@ func CreateTask(ws *workspace.Workspace, project, display string, today bool, du
 }
 
 // EditTask はタスクを編集する。project が変わる場合はファイル間移動になる。
-// 既存の @p（優先度）は引き継ぐ。本文・@today・@due・@ms はフォームの値で置換。
-func EditTask(ws *workspace.Workspace, file string, line int, expectText, project, display string, today bool, due, ms string) (Task, error) {
+// 既存の @p（優先度）は引き継ぐ。本文・バンド・@due・@ms はフォームの値で置換。
+func EditTask(ws *workspace.Workspace, file string, line int, expectText, project, display, band string, due, ms string) (Task, error) {
 	if strings.TrimSpace(display) == "" {
 		return Task{}, fmt.Errorf("display must not be empty")
 	}
@@ -243,7 +294,7 @@ func EditTask(ws *workspace.Workspace, file string, line int, expectText, projec
 			if m == nil || strings.TrimSpace(m[2]) != strings.TrimSpace(expectText) {
 				return nil, fmt.Errorf("%w: %s:%d", ErrLineMismatch, file, line)
 			}
-			body := buildBody(display, today, due, ms, pRe.FindString(strings.TrimSpace(m[2])))
+			body := buildBody(display, band, due, ms, pRe.FindString(strings.TrimSpace(m[2])))
 			out = rewriteLine(lines, line, m[1], body, file)
 			out.Project = project
 			return []byte(workspaceTouch(strings.Join(lines, "\n"))), nil
@@ -266,7 +317,7 @@ func EditTask(ws *workspace.Workspace, file string, line int, expectText, projec
 			return nil, fmt.Errorf("%w: %s:%d", ErrLineMismatch, file, line)
 		}
 		mark = m[1]
-		body = buildBody(display, today, due, ms, pRe.FindString(strings.TrimSpace(m[2])))
+		body = buildBody(display, band, due, ms, pRe.FindString(strings.TrimSpace(m[2])))
 		out := append(lines[:line-1:line-1], lines[line:]...)
 		return []byte(workspaceTouch(strings.Join(out, "\n"))), nil
 	})
@@ -325,11 +376,17 @@ func SetText(ws *workspace.Workspace, file string, line int, expectText, newDisp
 	return out, err
 }
 
-// tagSuffix は行テキストに含まれる行内タグを固定順（today→due→ms→p）で 1 文字列にまとめる。
+// tagSuffix は行テキストに含まれる行内タグを固定順（band→due→ms→p）で 1 文字列にまとめる。
 func tagSuffix(raw string) string {
 	var parts []string
 	if todayRe.MatchString(raw) {
 		parts = append(parts, "@today")
+	}
+	if weekRe.MatchString(raw) {
+		parts = append(parts, "@week")
+	}
+	if monthRe.MatchString(raw) {
+		parts = append(parts, "@month")
 	}
 	if s := dueRe.FindString(raw); s != "" {
 		parts = append(parts, s)

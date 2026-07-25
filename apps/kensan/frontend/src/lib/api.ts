@@ -27,15 +27,21 @@ export interface Task {
   project?: string;
   section?: string;
   today: boolean; // @today
+  week: boolean; // @week
+  month: boolean; // @month
   due?: string; // @due(YYYY-MM-DD)
   milestone?: string; // @ms(slug)
   priority?: number; // @p(N)（小さいほど上。0/未指定は末尾）
 }
 
+// 時間軸バンド。today < week < month < later（中期以降）。ドラッグで張り替え。
+export type Band = "today" | "week" | "month" | "later";
+
 export interface Board {
   today: Task[] | null;
-  stock: Task[] | null;
-  someday: Task[] | null;
+  week: Task[] | null;
+  month: Task[] | null;
+  later: Task[] | null; // いつか（バンドタグ無し。## タスク + ## いつかやる）
   milestones: Task[] | null;
 }
 
@@ -55,7 +61,7 @@ export interface TaskSaveInput {
   text?: string;
   project: string; // "" = todo.md ## Now（今日やる・project 外）
   display: string;
-  today: boolean;
+  band: Band; // 時間軸バンド
   due: string; // "" = なし
   milestone: string; // "" = なし
 }
@@ -151,6 +157,13 @@ export const api = {
     request<{ task: Task }>("/tasks/today", {
       method: "POST",
       body: JSON.stringify({ file: t.file, line: t.line, text: t.text, on }),
+    }),
+
+  // バンドの張り替え（今日/今週/今月/中期）= レーン間のドラッグ移動。行はその場のまま。
+  setBand: (t: Task, band: Band) =>
+    request<{ task: Task }>("/tasks/band", {
+      method: "POST",
+      body: JSON.stringify({ file: t.file, line: t.line, text: t.text, band }),
     }),
 
   // 完了タスクを daily へ退避（/reflection 相当）
