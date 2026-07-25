@@ -307,6 +307,9 @@ function ProjectDetailView({ name }: { name: string }) {
           />
         )}
 
+        {/* Pulse — Hero の要約に対する根拠。直近の前進と、次に手をつけるものを並べる */}
+        <ProjectPulse d={d} openTasks={openTasks} metrics={metrics.data?.metrics ?? []} />
+
         {/* 主指標以外のメトリクス（1 つだけなら Hero に出ているのでここは空） */}
         <ProjectMetrics
           metrics={(metrics.data?.metrics ?? []).slice(1)}
@@ -358,7 +361,7 @@ function ProjectDetailView({ name }: { name: string }) {
               {openTasks.map((t) => (
                 <li key={`${t.file}:${t.line}`} className="flex items-center gap-2 text-sm">
                   <span className="size-1.5 rounded-full bg-warning shrink-0" />
-                  <span className="flex-1">{t.display}</span>
+                  <span className="flex-1">{inlineMd(t.display)}</span>
                   <TaskTags task={t} />
                 </li>
               ))}
@@ -514,13 +517,14 @@ function ProjectHero({
   return (
     <div className="grid grid-cols-1 lg:grid-cols-[1.35fr_1fr] gap-4 items-stretch">
       <div className="ds-stack !gap-3 min-w-0">
-        <div className="flex items-center gap-2 flex-wrap">
+        <div className="flex items-center gap-2">
           <StatusBadge status={d.status} />
-          <span className={clsx("rounded-full border px-2 py-0.5 text-[11px] font-semibold", TONE_CLASS[state.tone])}>
+          <span className={clsx("shrink-0 rounded-full border px-2 py-0.5 text-[11px] font-semibold", TONE_CLASS[state.tone])}>
             {state.label}
           </span>
-          <span className="text-[11px] text-muted-foreground truncate">{state.why}</span>
-          <Button variant="ghost" size="sm" className="ml-auto" onClick={onEditMeta}>
+          {/* 根拠は幅が足りなければ縮める。メタ編集ボタンを追い出して折り返さない */}
+          <span className="min-w-0 flex-1 truncate text-[11px] text-muted-foreground">{state.why}</span>
+          <Button variant="ghost" size="sm" className="shrink-0" onClick={onEditMeta}>
             <Pencil size={13} />
             メタ編集
           </Button>
@@ -635,7 +639,7 @@ function HeroFocus({
         </div>
         <p className="text-sm">
           <span className="text-muted-foreground">次は </span>
-          {openMs[0] ? <span className="font-medium">{openMs[0].display}</span> : <span className="text-success font-medium">すべて完了</span>}
+          {openMs[0] ? <span className="font-medium">{inlineMd(openMs[0].display)}</span> : <span className="text-success font-medium">すべて完了</span>}
         </p>
         <div>
           <div className="h-1.5 rounded-full bg-muted overflow-hidden">
@@ -662,12 +666,112 @@ function HeroFocus({
       </div>
       <p className="text-sm">
         <span className="text-muted-foreground">次は </span>
-        {next ? <span className="font-medium">{next.display}</span> : <span className="text-success font-medium">残っていません</span>}
+        {next ? <span className="font-medium">{inlineMd(next.display)}</span> : <span className="text-success font-medium">残っていません</span>}
       </p>
       <p className="text-[10px] text-muted-foreground">
         今日 {openTasks.filter((t) => t.today).length} · 今週 {openTasks.filter((t) => t.week).length} · 今月 {openTasks.filter((t) => t.month).length}
       </p>
     </div>
+  );
+}
+
+// ---- Pulse ------------------------------------------------------------
+// Hero が「今どうなっているか」の結論なら、Pulse はその根拠。
+// 左に直近の前進（何が終わったか）、右に次の一手（何から手をつけるか）。
+
+function doneDate(t: Task): string | undefined {
+  return /✅\s*(\d{4}-\d{2}-\d{2})/.exec(t.text)?.[1];
+}
+
+type PulseWin = { date: string; text: string; kind: "milestone" | "task" | "log" };
+
+// 完了マイルストーン・完了タスク・ログを日付順に統合する。
+// 近接して並べるだけで、因果は主張しない（Impact Timeline と同じ方針）。
+function recentWins(d: ProjectDetail, limit: number): PulseWin[] {
+  const wins: PulseWin[] = [];
+  for (const m of d.milestones ?? []) {
+    const date = m.state === "done" ? doneDate(m) : undefined;
+    if (date) wins.push({ date, text: m.display, kind: "milestone" });
+  }
+  for (const t of d.tasks ?? []) {
+    const date = t.state === "done" ? doneDate(t) : undefined;
+    if (date) wins.push({ date, text: t.display, kind: "task" });
+  }
+  for (const entry of d.log ?? []) {
+    if (entry.date) wins.push({ date: entry.date, text: entry.text, kind: "log" });
+  }
+  return wins.sort((a, b) => b.date.localeCompare(a.date)).slice(0, limit);
+}
+
+// 次の一手はバンド（今日 → 今週 → 今月 → いつか）を第一キーにする。
+// バンドは「いつやるつもりか」の意図なので、締切より先に効かせる。
+function nextMoves(openTasks: Task[], limit: number): Task[] {
+  const band = (t: Task) => (t.today ? 0 : t.week ? 1 : t.month ? 2 : 3);
+  return [...openTasks]
+    .sort((a, b) =>
+      band(a) - band(b) ||
+      (a.due ?? "9999-99-99").localeCompare(b.due ?? "9999-99-99") ||
+      (a.priority || Number.MAX_SAFE_INTEGER) - (b.priority || Number.MAX_SAFE_INTEGER))
+    .slice(0, limit);
+}
+
+const WIN_ICON: Record<PulseWin["kind"], string> = { milestone: "◆", task: "✓", log: "·" };
+const BAND_LABEL: [keyof Pick<Task, "today" | "week" | "month">, string][] = [
+  ["today", "今日"], ["week", "今週"], ["month", "今月"],
+];
+
+function ProjectPulse({ d, openTasks, metrics }: { d: ProjectDetail; openTasks: Task[]; metrics: ProjectMetric[] }) {
+  const wins = recentWins(d, 4);
+  const moves = nextMoves(openTasks, 3);
+  const activity = lastActivity(d, metrics);
+  const since = activity ? -daysFromToday(activity) : undefined;
+  if (wins.length === 0 && moves.length === 0) return null;
+  return (
+    <Section title="脈拍">
+      {since !== undefined && (
+        <p className="mb-3 text-xs text-muted-foreground">
+          最終前進 <span className="font-mono tnum">{activity}</span>
+          <span className="ml-1">（{since === 0 ? "今日" : `${since} 日前`}）</span>
+        </p>
+      )}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-x-6 gap-y-4">
+        <div>
+          <p className="mb-2 text-[10px] uppercase tracking-[0.12em] text-muted-foreground">最近の前進</p>
+          {wins.length === 0 ? (
+            <p className="text-xs text-muted-foreground">まだ記録がありません。</p>
+          ) : (
+            <ul className="ds-stack !gap-2">
+              {wins.map((w, i) => (
+                <li key={i} className="flex gap-2 text-sm">
+                  <span className="font-mono tnum text-[10px] text-muted-foreground shrink-0 pt-1 w-[68px]">{w.date}</span>
+                  <span className="text-brand shrink-0 pt-0.5 text-xs">{WIN_ICON[w.kind]}</span>
+                  <span className="line-clamp-2 min-w-0">{w.text}</span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+        <div>
+          <p className="mb-2 text-[10px] uppercase tracking-[0.12em] text-muted-foreground">次の一手</p>
+          {moves.length === 0 ? (
+            <p className="text-xs text-success">未完のタスクはありません。</p>
+          ) : (
+            <ul className="ds-stack !gap-2">
+              {moves.map((t) => {
+                const label = BAND_LABEL.find(([key]) => t[key])?.[1] ?? "いつか";
+                return (
+                  <li key={`${t.file}:${t.line}`} className="flex items-start gap-2 text-sm">
+                    <span className="shrink-0 rounded border border-border px-1.5 py-0.5 text-[10px] text-muted-foreground">{label}</span>
+                    <span className="line-clamp-2 min-w-0 flex-1">{inlineMd(t.display)}</span>
+                    {t.due && <span className="shrink-0 font-mono tnum text-[10px] text-muted-foreground pt-1">{t.due.slice(5)}</span>}
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+        </div>
+      </div>
+    </Section>
   );
 }
 

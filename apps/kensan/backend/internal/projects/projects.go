@@ -135,7 +135,10 @@ func Load(root, name string) (Detail, error) {
 		switch t.Section {
 		case "マイルストーン":
 			d.Milestones = append(d.Milestones, t)
-		case "タスク":
+		case "タスク", "いつかやる":
+			// バンド設計（tasks.Board）と揃える: バンドタグの無いタスクは
+			// 「いつか」バンドであり、## いつかやる もその置き場のひとつ。
+			// ここで落とすと Board に出ているタスクが project 詳細から消える。
 			d.Tasks = append(d.Tasks, t)
 		}
 	}
