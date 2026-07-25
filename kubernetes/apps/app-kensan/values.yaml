@@ -4,7 +4,7 @@
 nameOverride: kensan
 image:
   repository: ghcr.io/yu-min3/kensan
-  tag: v0.3.1
+  tag: v0.3.2
 env:
   - name: KENSAN_DATA_DIR
     value: /data
