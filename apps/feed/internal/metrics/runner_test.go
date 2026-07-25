@@ -64,7 +64,7 @@ func writeConfig(t *testing.T, root, project, repo string) {
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	content := "version: 1\nmetrics:\n  - id: github-stars\n    label: GitHub Stars\n    unit: stars\n    direction: increase\n    display: integer\n    collector:\n      type: github-stars\n      repo: " + repo + "\n"
+	content := "version: 1\nmetrics:\n  - id: github-stars\n    label: GitHub Stars\n    unit: stars\n    direction: increase\n    display: integer\n    checkpoints:\n      - value: 10\n        label: 最初の10人\n    collector:\n      type: github-stars\n      repo: " + repo + "\n"
 	if err := os.WriteFile(filepath.Join(dir, "metrics.yaml"), []byte(content), 0o644); err != nil {
 		t.Fatal(err)
 	}

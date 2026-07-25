@@ -32,13 +32,19 @@ type config struct {
 }
 
 type definition struct {
-	ID        string          `yaml:"id"`
-	Label     string          `yaml:"label"`
-	Unit      string          `yaml:"unit"`
-	Target    *float64        `yaml:"target"`
-	Direction string          `yaml:"direction"`
-	Display   string          `yaml:"display"`
-	Collector collectorConfig `yaml:"collector"`
+	ID          string          `yaml:"id"`
+	Label       string          `yaml:"label"`
+	Unit        string          `yaml:"unit"`
+	Target      *float64        `yaml:"target"`
+	Direction   string          `yaml:"direction"`
+	Display     string          `yaml:"display"`
+	Checkpoints []checkpoint    `yaml:"checkpoints"`
+	Collector   collectorConfig `yaml:"collector"`
+}
+
+type checkpoint struct {
+	Value float64 `yaml:"value"`
+	Label string  `yaml:"label"`
 }
 
 type collectorConfig struct {

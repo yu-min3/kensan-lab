@@ -29,7 +29,7 @@ spec:
               type: RuntimeDefault
           containers:
             - name: feed
-              image: ghcr.io/yu-min3/kensan-feed:v0.1.0
+              image: ghcr.io/yu-min3/kensan-feed:v0.1.1
               imagePullPolicy: IfNotPresent
               args: ["run"]
               env:
