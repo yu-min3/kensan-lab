@@ -14,9 +14,11 @@ import {
   Trash2,
   Check,
   X,
+  RefreshCw,
+  TrendingUp,
 } from "lucide-react";
 import clsx from "clsx";
-import { api, ApiError, todayISO, type Doc, type ProjectSummary, type ProjectDetail, type Task } from "../lib/api";
+import { api, ApiError, todayISO, type Doc, type ProjectSummary, type ProjectDetail, type ProjectMetric, type Task } from "../lib/api";
 import { PageHeader } from "../components/PageHeader";
 import { MilkdownEditor } from "../components/editors/MilkdownEditor";
 import { useAutosaveFile } from "../hooks/useAutosaveFile";
@@ -144,6 +146,7 @@ function ProjectDetailView({ name }: { name: string }) {
   const qc = useQueryClient();
   const detail = useQuery({ queryKey: ["project", name], queryFn: () => api.projectDetail(name) });
   const taggedNotes = useQuery({ queryKey: ["files", "note", name], queryFn: () => api.files({ type: "note", tag: name }) });
+  const metrics = useQuery({ queryKey: ["project-metrics", name], queryFn: () => api.projectMetrics(name) });
   const file = `projects/${name}/README.md`;
   const invalidate = () => {
     qc.invalidateQueries({ queryKey: ["project", name] });
@@ -160,6 +163,10 @@ function ProjectDetailView({ name }: { name: string }) {
     mutationFn: (input: { status: string; deadline: string; goal: string }) => api.updateProject(name, input),
     onSuccess: () => setEditingMeta(false),
     onSettled: invalidate,
+  });
+  const refreshMetrics = useMutation({
+    mutationFn: () => api.refreshProjectMetrics(name),
+    onSuccess: (data) => qc.setQueryData(["project-metrics", name], data),
   });
 
   const [editingMeta, setEditingMeta] = useState(false);
@@ -306,6 +313,15 @@ function ProjectDetailView({ name }: { name: string }) {
           </div>
         )}
 
+        <ProjectMetrics
+          metrics={metrics.data?.metrics ?? []}
+          loading={metrics.isPending}
+          error={metrics.error ?? refreshMetrics.error}
+          refreshing={refreshMetrics.isPending}
+          onRefresh={() => refreshMetrics.mutate()}
+          onRetry={() => metrics.refetch()}
+        />
+
         {/* 進捗 */}
         <Section title="進捗">
           <div className="flex items-center gap-4 text-sm">
@@ -393,6 +409,112 @@ function ProjectDetailView({ name }: { name: string }) {
         </Section>
       </CardBody>
     </Card>
+  );
+}
+
+function ProjectMetrics({
+  metrics,
+  loading,
+  error,
+  refreshing,
+  onRefresh,
+  onRetry,
+}: {
+  metrics: ProjectMetric[];
+  loading: boolean;
+  error: Error | null;
+  refreshing: boolean;
+  onRefresh: () => void;
+  onRetry: () => void;
+}) {
+  if (loading) return <Section title="Metrics"><Skeleton className="h-28 w-full" /></Section>;
+  if (error && metrics.length === 0) return <Section title="Metrics"><ErrorState error={error} onRetry={onRetry} /></Section>;
+  if (metrics.length === 0) return null;
+  const canRefresh = metrics.some((metric) => metric.stale || metric.current === undefined);
+  return (
+    <Section title="Metrics">
+      <div className="grid grid-cols-1 xl:grid-cols-2 gap-3">
+        {metrics.map((metric) => <MetricCard key={metric.id} metric={metric} />)}
+      </div>
+      <div className="mt-2 flex min-h-7 items-center justify-end gap-2">
+        {error && <span className="mr-auto text-xs text-destructive">更新に失敗しました。最後の値を表示しています。</span>}
+        {canRefresh && (
+          <Button variant="ghost" size="sm" loading={refreshing} onClick={onRefresh}>
+            <RefreshCw size={13} />
+            外部値を更新
+          </Button>
+        )}
+      </div>
+    </Section>
+  );
+}
+
+function MetricCard({ metric }: { metric: ProjectMetric }) {
+  const current = metric.current;
+  const pct = current !== undefined && metric.target !== undefined && metric.target !== 0
+    ? Math.max(0, Math.min(100, (current / metric.target) * 100))
+    : undefined;
+  const format = (value: number) => metric.display === "integer" ? Math.round(value).toLocaleString() : value.toFixed(1);
+  return (
+    <div className="rounded-lg border border-border bg-card p-3 ds-stack !gap-3">
+      <div className="flex items-start gap-2">
+        <TrendingUp size={16} className="text-brand mt-0.5" />
+        <div className="min-w-0 flex-1">
+          <p className="text-xs font-medium truncate">{metric.label}</p>
+          <p className="text-[10px] text-muted-foreground">
+            {metric.updatedAt ? `${metric.updatedAt.slice(0, 10)} 更新` : "未取得"}
+            {metric.stale && <span className="ml-1">· 要更新</span>}
+          </p>
+        </div>
+      </div>
+      <div className="flex items-end gap-2">
+        <span className="font-mono tnum text-2xl font-semibold">{current === undefined ? "—" : format(current)}</span>
+        <span className="pb-1 text-xs text-muted-foreground">{metric.unit}</span>
+        {metric.target !== undefined && (
+          <span className="ml-auto pb-1 font-mono tnum text-xs text-muted-foreground">/ {format(metric.target)}</span>
+        )}
+      </div>
+      {pct !== undefined && (
+        <div>
+          <div className="h-1.5 rounded-full bg-muted overflow-hidden">
+            <div className="h-full rounded-full bg-brand" style={{ width: `${pct}%` }} />
+          </div>
+          <p className="mt-1 text-right font-mono tnum text-[10px] text-muted-foreground">{Math.round(pct)}%</p>
+        </div>
+      )}
+      <div className="grid grid-cols-[minmax(80px,1fr)_auto] items-end gap-3">
+        <Sparkline series={metric.series} />
+        <div className="text-right text-[10px] text-muted-foreground space-y-0.5">
+          {metric.delta.days30 !== undefined && <p>30日 {signed(metric.delta.days30, format)}</p>}
+          {metric.best && <p>最高 {format(metric.best.value)}</p>}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function signed(value: number, format: (value: number) => string): string {
+  if (value === 0) return "±0";
+  return `${value > 0 ? "+" : "−"}${format(Math.abs(value))}`;
+}
+
+function Sparkline({ series }: { series: ProjectMetric["series"] }) {
+  if (series.length < 2) return <div className="h-10 flex items-end text-[10px] text-muted-foreground">履歴を蓄積中</div>;
+  const width = 180;
+  const height = 40;
+  const values = series.map((point) => point.value);
+  const min = Math.min(...values);
+  const max = Math.max(...values);
+  const span = max - min || 1;
+  const points = series.map((point, index) => {
+    const x = (index / (series.length - 1)) * width;
+    const y = height - 3 - ((point.value - min) / span) * (height - 6);
+    return `${x},${y}`;
+  }).join(" ");
+  return (
+    <svg viewBox={`0 0 ${width} ${height}`} className="h-10 w-full" role="img" aria-label="メトリクスの推移">
+      <polyline points={points} fill="none" stroke="currentColor" strokeWidth="2" vectorEffect="non-scaling-stroke" className="text-brand" />
+    </svg>
   );
 }
 

@@ -101,6 +101,27 @@ export interface ProjectDetail {
   notes: NoteRef[] | null;
 }
 
+export interface MetricPoint {
+  at: string;
+  value: number;
+}
+
+export interface ProjectMetric {
+  id: string;
+  label: string;
+  unit: string;
+  target?: number;
+  direction: "increase" | "decrease" | "maintain";
+  display: "integer" | "decimal" | "percent";
+  current?: number;
+  fields?: Record<string, unknown>;
+  delta: { previous?: number; days30?: number };
+  best?: { value: number; at: string };
+  updatedAt?: string;
+  stale: boolean;
+  series: MetricPoint[];
+}
+
 export class ApiError extends Error {
   constructor(
     public status: number,
@@ -178,6 +199,12 @@ export const api = {
 
   // プロジェクト詳細（目標/マイルストーン/タスク/ログ/関連ノート）
   projectDetail: (name: string) => request<ProjectDetail>(`/projects/${encodeURIComponent(name)}`),
+
+  projectMetrics: (name: string) =>
+    request<{ metrics: ProjectMetric[] }>(`/projects/${encodeURIComponent(name)}/metrics`),
+
+  refreshProjectMetrics: (name: string) =>
+    request<{ metrics: ProjectMetric[] }>(`/projects/${encodeURIComponent(name)}/metrics/refresh`, { method: "POST" }),
 
   // 行の @due(YYYY-MM-DD) を設定（空文字で除去）
   setDue: (t: Task, due: string) =>
