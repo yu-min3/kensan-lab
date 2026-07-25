@@ -16,6 +16,8 @@ import {
   X,
   RefreshCw,
   TrendingUp,
+  AlertTriangle,
+  Minus,
 } from "lucide-react";
 import clsx from "clsx";
 import { api, ApiError, todayISO, type Doc, type ProjectSummary, type ProjectDetail, type ProjectMetric, type Task } from "../lib/api";
@@ -308,7 +310,14 @@ function ProjectDetailView({ name }: { name: string }) {
         )}
 
         {/* Pulse — Hero の要約に対する根拠。直近の前進と、次に手をつけるものを並べる */}
-        <ProjectPulse d={d} openTasks={openTasks} metrics={metrics.data?.metrics ?? []} />
+        <ProjectPulse
+          d={d}
+          milestones={milestones}
+          doneMs={doneMs}
+          openMs={openMs}
+          openTasks={openTasks}
+          metrics={metrics.data?.metrics ?? []}
+        />
 
         {/* 主指標以外のメトリクス（1 つだけなら Hero に出ているのでここは空） */}
         <ProjectMetrics
@@ -445,7 +454,8 @@ function ProjectMetrics({
 // 1 ブロックに固定する。状態は色だけでなく必ずラベルと根拠を併記する。
 
 type HeroTone = "success" | "warn" | "muted";
-type HeroState = { label: string; tone: HeroTone; why: string };
+// why = Hero バッジ横に出す一行の根拠。sentence = Pulse に出す説明文。
+type HeroState = { label: string; tone: HeroTone; why: string; sentence: string };
 
 const DAY_MS = 86_400_000;
 
@@ -475,20 +485,32 @@ function heroState(d: ProjectDetail, openMs: Task[], openTasks: Task[], metrics:
   const sinceActivity = activity ? -daysFromToday(activity) : undefined;
 
   if (toDeadline !== undefined && toDeadline >= 0 && toDeadline <= 14 && openMs.length > 0) {
-    return { label: "仕上げの時期", tone: "warn", why: `締切まで ${toDeadline} 日・未完マイルストーン ${openMs.length}` };
+    return {
+      label: "仕上げの時期", tone: "warn",
+      why: `締切まで ${toDeadline} 日・未完マイルストーン ${openMs.length}`,
+      sentence: `締切まで ${toDeadline} 日。未完のマイルストーンが ${openMs.length} 件残っています。`,
+    };
   }
   if (overdue.length > 0) {
-    return { label: "要整理", tone: "warn", why: `期限切れタスク ${overdue.length} 件` };
+    return {
+      label: "要整理", tone: "warn",
+      why: `期限切れタスク ${overdue.length} 件`,
+      sentence: `期限切れのタスクが ${overdue.length} 件。まず滞留を片付けると動きが戻ります。`,
+    };
   }
   if (sinceActivity !== undefined && sinceActivity <= 30) {
-    return { label: "前進中", tone: "success", why: `${activity} に前進` };
+    return {
+      label: "前進中", tone: "success",
+      why: `${activity} に前進`,
+      sentence: sinceActivity === 0 ? "今日前進しました。" : `${sinceActivity} 日前に前進しています。`,
+    };
   }
   if (sinceActivity !== undefined) {
     return (d.milestones ?? []).length === 0
-      ? { label: "安定運用", tone: "muted", why: `直近の記録は ${activity}` }
-      : { label: "再開待ち", tone: "muted", why: `${sinceActivity} 日動きなし` };
+      ? { label: "安定運用", tone: "muted", why: `直近の記録は ${activity}`, sentence: `終点を置かない project です。直近の記録は ${activity}。` }
+      : { label: "再開待ち", tone: "muted", why: `${sinceActivity} 日動きなし`, sentence: `${sinceActivity} 日動きがありません。小さく再開できる一手を選びます。` };
   }
-  return { label: "観測を開始", tone: "muted", why: "ログもメトリクスもまだありません" };
+  return { label: "観測を開始", tone: "muted", why: "ログもメトリクスもまだありません", sentence: "ログもメトリクスもまだありません。まず記録を 1 つ残すところから。" };
 }
 
 const TONE_CLASS: Record<HeroTone, string> = {
@@ -619,11 +641,7 @@ function HeroFocus({
             </div>
           </div>
         )}
-        <Sparkline series={metric.series} />
-        <div className="flex justify-between text-[10px] text-muted-foreground">
-          <span>{metric.delta.days30 !== undefined ? `30日 ${signed(metric.delta.days30, format)}` : "30日 —"}</span>
-          {metric.best && <span>最高 {format(metric.best.value)}</span>}
-        </div>
+        {metric.best && <p className="text-[10px] text-muted-foreground">最高 {format(metric.best.value)}</p>}
         {metricsError && <p className="text-[10px] text-destructive">更新に失敗しました。最後の値を表示しています。</p>}
       </div>
     );
@@ -715,60 +733,103 @@ function nextMoves(openTasks: Task[], limit: number): Task[] {
     .slice(0, limit);
 }
 
-const WIN_ICON: Record<PulseWin["kind"], string> = { milestone: "◆", task: "✓", log: "·" };
+// ログ本文は段落なので、fact に出すときは最初の 1 文だけにする。
+function firstSentence(text: string): string {
+  const head = text.split("。")[0].trim();
+  return head.length > 0 && head.length < text.length ? `${head}。` : text;
+}
+
 const BAND_LABEL: [keyof Pick<Task, "today" | "week" | "month">, string][] = [
   ["today", "今日"], ["week", "今週"], ["month", "今月"],
 ];
 
-function ProjectPulse({ d, openTasks, metrics }: { d: ProjectDetail; openTasks: Task[]; metrics: ProjectMetric[] }) {
-  const wins = recentWins(d, 4);
-  const moves = nextMoves(openTasks, 3);
+const STATE_ICON: Record<HeroTone, typeof TrendingUp> = {
+  success: TrendingUp,
+  warn: AlertTriangle,
+  muted: Minus,
+};
+const STATE_TEXT: Record<HeroTone, string> = {
+  success: "text-success",
+  warn: "text-warning",
+  muted: "text-muted-foreground",
+};
+
+// 2×2 の fact グリッド。左の状態文が「結論」、こちらが「今の数字」。
+function Fact({ label, value, index }: { label: string; value: React.ReactNode; index: number }) {
+  return (
+    <div className={clsx("px-4 py-3.5 border-border", index < 2 && "border-b", index % 2 === 1 && "border-l")}>
+      <span className="block text-[10px] text-muted-foreground mb-1">{label}</span>
+      <b className="text-xs font-semibold leading-snug line-clamp-2">{value}</b>
+    </div>
+  );
+}
+
+function ProjectPulse({
+  d, milestones, doneMs, openMs, openTasks, metrics,
+}: {
+  d: ProjectDetail;
+  milestones: Task[];
+  doneMs: Task[];
+  openMs: Task[];
+  openTasks: Task[];
+  metrics: ProjectMetric[];
+}) {
+  const state = heroState(d, openMs, openTasks, metrics);
+  const metric = metrics[0];
+  const allWins = recentWins(d, 8);
+  const win = allWins.find((w) => w.kind !== "log") ?? allWins[0];
+  const moves = nextMoves(openTasks, 1);
   const activity = lastActivity(d, metrics);
   const since = activity ? -daysFromToday(activity) : undefined;
-  if (wins.length === 0 && moves.length === 0) return null;
+  if (!win && moves.length === 0 && !metric) return null;
+
+  const Icon = STATE_ICON[state.tone];
+  const format = (v: number) => metric?.display === "integer" ? Math.round(v).toLocaleString() : v.toFixed(1);
+
+  // 現在値と次の到達点は、主指標 → マイルストーン → タスク の順で決める（Hero と同じ判断）。
+  let current: React.ReactNode = `${openTasks.length} 件の未完タスク`;
+  let nextPoint: React.ReactNode = openMs[0] ? inlineMd(openMs[0].display) : "—";
+  if (metric && metric.current !== undefined) {
+    current = `${format(metric.current)}${metric.target !== undefined ? ` / ${format(metric.target)}` : ""} ${metric.unit}`;
+    nextPoint = metric.target !== undefined
+      ? `${format(metric.target)} ${metric.unit} · 残り ${format(Math.max(0, metric.target - metric.current))}`
+      : "目標未設定";
+  } else if (milestones.length > 0) {
+    current = `${doneMs.length} / ${milestones.length} milestones`;
+    nextPoint = openMs[0] ? inlineMd(openMs[0].display) : "すべて完了";
+  }
+
+  const hint = metric?.delta.days30 !== undefined
+    ? `30日 ${signed(metric.delta.days30, format)}`
+    : since !== undefined ? `最終前進 ${since === 0 ? "今日" : `${since}日前`}` : undefined;
+
   return (
-    <Section title="脈拍">
-      {since !== undefined && (
-        <p className="mb-3 text-xs text-muted-foreground">
-          最終前進 <span className="font-mono tnum">{activity}</span>
-          <span className="ml-1">（{since === 0 ? "今日" : `${since} 日前`}）</span>
-        </p>
-      )}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-x-6 gap-y-4">
-        <div>
-          <p className="mb-2 text-[10px] uppercase tracking-[0.12em] text-muted-foreground">最近の前進</p>
-          {wins.length === 0 ? (
-            <p className="text-xs text-muted-foreground">まだ記録がありません。</p>
-          ) : (
-            <ul className="ds-stack !gap-2">
-              {wins.map((w, i) => (
-                <li key={i} className="flex gap-2 text-sm">
-                  <span className="font-mono tnum text-[10px] text-muted-foreground shrink-0 pt-1 w-[68px]">{w.date}</span>
-                  <span className="text-brand shrink-0 pt-0.5 text-xs">{WIN_ICON[w.kind]}</span>
-                  <span className="line-clamp-2 min-w-0">{w.text}</span>
-                </li>
-              ))}
-            </ul>
-          )}
+    <Section title="脈拍" hint={hint}>
+      <div className="rounded-lg border border-border bg-card grid grid-cols-1 lg:grid-cols-[0.8fr_1.2fr] overflow-hidden">
+        <div className="p-5 ds-stack !gap-2 border-b lg:border-b-0 lg:border-r border-border">
+          <p className="h-serif text-lg font-bold flex items-center gap-2">
+            <Icon size={18} className={clsx("shrink-0", STATE_TEXT[state.tone])} />
+            {state.label}
+          </p>
+          <p className="text-sm leading-relaxed text-muted-foreground">{state.sentence}</p>
+          {metric && <Sparkline series={metric.series} />}
         </div>
-        <div>
-          <p className="mb-2 text-[10px] uppercase tracking-[0.12em] text-muted-foreground">次の一手</p>
-          {moves.length === 0 ? (
-            <p className="text-xs text-success">未完のタスクはありません。</p>
-          ) : (
-            <ul className="ds-stack !gap-2">
-              {moves.map((t) => {
-                const label = BAND_LABEL.find(([key]) => t[key])?.[1] ?? "いつか";
-                return (
-                  <li key={`${t.file}:${t.line}`} className="flex items-start gap-2 text-sm">
-                    <span className="shrink-0 rounded border border-border px-1.5 py-0.5 text-[10px] text-muted-foreground">{label}</span>
-                    <span className="line-clamp-2 min-w-0 flex-1">{inlineMd(t.display)}</span>
-                    {t.due && <span className="shrink-0 font-mono tnum text-[10px] text-muted-foreground pt-1">{t.due.slice(5)}</span>}
-                  </li>
-                );
-              })}
-            </ul>
-          )}
+        <div className="grid grid-cols-2">
+          <Fact index={0} label="現在値" value={current} />
+          <Fact index={1} label="次の到達点" value={nextPoint} />
+          <Fact index={2} label="最近の成果" value={win ? inlineMd(firstSentence(win.text)) : "—"} />
+          <Fact
+            index={3}
+            label="次の一手"
+            value={moves[0] ? (
+              <span className="flex items-start gap-1.5">
+                <span className="shrink-0 rounded border border-border px-1 text-[10px] font-normal text-muted-foreground">
+                  {BAND_LABEL.find(([key]) => moves[0][key])?.[1] ?? "いつか"}
+                </span>
+                <span className="min-w-0">{inlineMd(moves[0].display)}</span>
+              </span>
+            ) : "—"}
+          />
         </div>
       </div>
     </Section>
@@ -1022,10 +1083,13 @@ function MetaEditor({
   );
 }
 
-function Section({ title, children }: { title: string; children: React.ReactNode }) {
+function Section({ title, hint, children }: { title: string; hint?: string; children: React.ReactNode }) {
   return (
     <div>
-      <h3 className="text-[10px] uppercase tracking-[0.12em] text-muted-foreground pb-2 border-b border-border mb-3">{title}</h3>
+      <h3 className="flex items-baseline gap-2 text-[10px] uppercase tracking-[0.12em] text-muted-foreground pb-2 border-b border-border mb-3">
+        <span>{title}</span>
+        {hint && <span className="ml-auto font-mono tnum normal-case tracking-normal">{hint}</span>}
+      </h3>
       {children}
     </div>
   );
