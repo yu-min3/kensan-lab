@@ -117,6 +117,8 @@ export interface ProjectMetric {
   fields?: Record<string, unknown>;
   delta: { previous?: number; days30?: number };
   best?: { value: number; at: string };
+  // target までの途中の到達点（値の昇順）。到達判定は current との比較で行う
+  checkpoints?: { value: number; label: string }[];
   updatedAt?: string;
   stale: boolean;
   series: MetricPoint[];

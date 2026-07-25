@@ -319,6 +319,17 @@ function ProjectDetailView({ name }: { name: string }) {
           metrics={metrics.data?.metrics ?? []}
         />
 
+        {/* Journey — 到達点の並び。終点のない project は Horizons に切り替える */}
+        {milestones.length > 0 || (metrics.data?.metrics ?? [])[0]?.checkpoints?.length ? (
+          <ProjectJourney
+            metric={(metrics.data?.metrics ?? [])[0]}
+            milestones={milestones}
+            hint={d.deadline ? `deadline ${d.deadline}` : undefined}
+          />
+        ) : (
+          <ProjectHorizons openTasks={openTasks} />
+        )}
+
         {/* 主指標以外のメトリクス（1 つだけなら Hero に出ているのでここは空） */}
         <ProjectMetrics
           metrics={(metrics.data?.metrics ?? []).slice(1)}
@@ -613,6 +624,7 @@ function HeroFocus({
     const current = metric.current;
     const pct = current !== undefined && metric.target ? Math.max(0, Math.min(100, (current / metric.target) * 100)) : undefined;
     const remaining = current !== undefined && metric.target !== undefined ? metric.target - current : undefined;
+    const next = nextCheckpoint(metric);
     return (
       <div className={shell}>
         <div className="flex items-baseline gap-2">
@@ -636,7 +648,11 @@ function HeroFocus({
             </div>
             <div className="mt-1 flex justify-between font-mono tnum text-[10px] text-muted-foreground">
               <span>0</span>
-              <span className="text-brand font-semibold">あと {format(Math.max(0, remaining ?? 0))}</span>
+              <span className="text-brand font-semibold">
+                {next
+                  ? `次は ${format(next.value)} · 残り ${format(next.value - (current ?? 0))}`
+                  : `あと ${format(Math.max(0, remaining ?? 0))}`}
+              </span>
               <span>{format(metric.target)}</span>
             </div>
           </div>
@@ -791,9 +807,14 @@ function ProjectPulse({
   let nextPoint: React.ReactNode = openMs[0] ? inlineMd(openMs[0].display) : "—";
   if (metric && metric.current !== undefined) {
     current = `${format(metric.current)}${metric.target !== undefined ? ` / ${format(metric.target)}` : ""} ${metric.unit}`;
-    nextPoint = metric.target !== undefined
-      ? `${format(metric.target)} ${metric.unit} · 残り ${format(Math.max(0, metric.target - metric.current))}`
-      : "目標未設定";
+    const next = nextCheckpoint(metric);
+    if (next) {
+      nextPoint = `${format(next.value)} ${metric.unit} · ${next.label}（残り ${format(next.value - metric.current)}）`;
+    } else if (metric.target !== undefined) {
+      nextPoint = `${format(metric.target)} ${metric.unit} · 残り ${format(Math.max(0, metric.target - metric.current))}`;
+    } else {
+      nextPoint = "目標未設定";
+    }
   } else if (milestones.length > 0) {
     current = `${doneMs.length} / ${milestones.length} milestones`;
     nextPoint = openMs[0] ? inlineMd(openMs[0].display) : "すべて完了";
@@ -831,6 +852,114 @@ function ProjectPulse({
             ) : "—"}
           />
         </div>
+      </div>
+    </Section>
+  );
+}
+
+// ---- Journey / Horizons -----------------------------------------------
+// 到達点の並び。growth は metric checkpoint、delivery は README のマイルストーン。
+// 終点を持たない project（maintenance）は Journey を出さず、時間軸の Horizons を出す。
+
+type Step = { value: string; label: string; state: "done" | "now" | "todo" };
+
+// 現在値を超える最初の checkpoint。設計上「target との割合」より
+// 「次に届く一点」を主役にする。checkpoint 未定義なら undefined。
+function nextCheckpoint(metric?: ProjectMetric): { value: number; label: string } | undefined {
+  if (!metric || metric.current === undefined) return undefined;
+  return (metric.checkpoints ?? []).find((cp) => cp.value > metric.current!);
+}
+
+function checkpointSteps(metric: ProjectMetric, format: (v: number) => string): Step[] {
+  const points = metric.checkpoints ?? [];
+  if (points.length === 0) return [];
+  const current = metric.current;
+  const steps: Step[] = [];
+  let nowPlaced = false;
+  for (const cp of points) {
+    const reached = current !== undefined && current >= cp.value;
+    // 現在値は「まだ届いていない最初の checkpoint」の手前に差し込む
+    if (!reached && !nowPlaced && current !== undefined) {
+      steps.push({ value: format(current), label: "NOW", state: "now" });
+      nowPlaced = true;
+    }
+    steps.push({
+      value: format(cp.value),
+      label: metric.target !== undefined && cp.value === metric.target ? "GOAL" : cp.label,
+      state: reached ? "done" : "todo",
+    });
+  }
+  if (!nowPlaced && current !== undefined) steps.push({ value: format(current), label: "NOW", state: "now" });
+  return steps;
+}
+
+function milestoneSteps(milestones: Task[]): Step[] {
+  let nowPlaced = false;
+  return milestones.map((m, i) => {
+    const done = m.state === "done";
+    const state: Step["state"] = done ? "done" : !nowPlaced ? ((nowPlaced = true), "now") : "todo";
+    return { value: String(i + 1).padStart(2, "0"), label: m.display, state };
+  });
+}
+
+const DOT_CLASS: Record<Step["state"], string> = {
+  done: "bg-success border-success",
+  now: "bg-brand border-brand ring-2 ring-brand ring-offset-2 ring-offset-card",
+  todo: "bg-card border-muted-foreground/50",
+};
+
+function ProjectJourney({ metric, milestones, hint }: { metric?: ProjectMetric; milestones: Task[]; hint?: string }) {
+  const format = (v: number) => metric?.display === "integer" ? Math.round(v).toLocaleString() : v.toFixed(1);
+  const steps = metric?.checkpoints?.length ? checkpointSteps(metric, format) : milestoneSteps(milestones);
+  if (steps.length === 0) return null;
+  return (
+    <Section title="到達点の旅" hint={hint}>
+      <div className="rounded-lg border border-border bg-card p-6 overflow-x-auto">
+        <div className="relative grid min-w-[620px]" style={{ gridTemplateColumns: `repeat(${steps.length}, 1fr)` }}>
+          {/* 進行線。両端は最初/最後の dot の中心で止める */}
+          <div className="absolute top-[10px] h-[3px] bg-muted" style={{ left: `${50 / steps.length}%`, right: `${50 / steps.length}%` }} />
+          {steps.map((s, i) => (
+            <div key={i} className="relative text-center px-1">
+              <div className={clsx("mx-auto mb-2.5 size-[22px] rounded-full border-2", DOT_CLASS[s.state])} />
+              <div className="font-mono tnum text-xs font-bold">{s.value}</div>
+              <div className={clsx("mt-1 text-[10px] leading-snug line-clamp-2", s.state === "now" ? "text-brand font-bold" : "text-muted-foreground")}>
+                {s.label}
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </Section>
+  );
+}
+
+// 終点のない project 向け。達成率を出さず、バンドをそのまま Now / Soon / Someday に写す。
+function ProjectHorizons({ openTasks }: { openTasks: Task[] }) {
+  const groups: { title: string; note: string; items: Task[] }[] = [
+    { title: "Now", note: "今日・今週", items: openTasks.filter((t) => t.today || t.week) },
+    { title: "Soon", note: "今月", items: openTasks.filter((t) => t.month && !t.today && !t.week) },
+    { title: "Someday", note: "いつか", items: openTasks.filter((t) => !t.today && !t.week && !t.month) },
+  ];
+  if (groups.every((g) => g.items.length === 0)) return null;
+  return (
+    <Section title="時間軸で見る" hint="Journey は表示しない">
+      <div className="rounded-lg border border-border bg-card grid grid-cols-1 sm:grid-cols-3 overflow-hidden">
+        {groups.map((g, i) => (
+          <div key={g.title} className={clsx("p-5", i > 0 && "border-t sm:border-t-0 sm:border-l border-border")}>
+            <h4 className="h-serif text-base font-bold">{g.title}</h4>
+            <p className="mb-2 text-[10px] text-muted-foreground">{g.note}</p>
+            {g.items.length === 0 ? (
+              <p className="text-xs text-muted-foreground">—</p>
+            ) : (
+              <ul className="ds-stack !gap-1.5">
+                {g.items.slice(0, 5).map((t) => (
+                  <li key={`${t.file}:${t.line}`} className="text-xs leading-snug line-clamp-2">{inlineMd(t.display)}</li>
+                ))}
+                {g.items.length > 5 && <li className="text-[10px] text-muted-foreground">ほか {g.items.length - 5} 件</li>}
+              </ul>
+            )}
+          </div>
+        ))}
       </div>
     </Section>
   );
