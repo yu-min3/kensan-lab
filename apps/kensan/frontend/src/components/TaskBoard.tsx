@@ -15,6 +15,7 @@ import { Inbox, ArchiveRestore, GripVertical, ChevronDown, ChevronRight, Calenda
 import clsx from "clsx";
 import { api, ApiError, todayISO, type Band, type Task, type TaskSaveInput } from "../lib/api";
 import { TaskDialog, taskToDraft, bandOfTask, type TaskDraft } from "./TaskDialog";
+import { ProjectBadge } from "./ProjectBadge";
 import { Card, CardHead, CardBody } from "./ui/card";
 import { Badge } from "./ui/badge";
 import { Button } from "./ui/button";
@@ -267,7 +268,7 @@ function Badges({ task }: { task: Task }) {
     <>
       {task.due && <DueBadge due={task.due} />}
       {task.milestone && <Badge variant="brand">▸ {task.milestone}</Badge>}
-      {task.project && <Badge variant="outline">{task.project}</Badge>}
+      {task.project && <ProjectBadge project={task.project} />}
     </>
   );
 }
@@ -501,7 +502,7 @@ function DoneSection({
                 aria-label={`${t.display} を未完了に戻す`}
               />
               <span className="flex-1 text-sm line-through text-muted-foreground">{t.display}</span>
-              {t.project && <Badge variant="outline">{t.project}</Badge>}
+              {t.project && <ProjectBadge project={t.project} />}
               <Button
                 variant="ghost"
                 size="sm"
