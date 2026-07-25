@@ -406,7 +406,7 @@ function ProjectDetailView({ name }: { name: string }) {
 
         {/* 進行中タスク（編集はタスクボード） */}
         {openTasks.length > 0 && (
-          <Section title={`進行中タスク (${openTasks.length})`}>
+          <Section title="進行中タスク" sub="編集はタスクボードで" hint={`${openTasks.length} 件`}>
             <ul className="ds-stack !gap-1">
               {openTasks.map((t) => (
                 <li key={`${t.file}:${t.line}`} className="flex items-center gap-2 text-sm">
@@ -420,20 +420,13 @@ function ProjectDetailView({ name }: { name: string }) {
         )}
 
         {/* フリースペース（README の ## フリースペース を md 自由編集） */}
-        <Section title="フリースペース">
+        <Section title="フリースペース" sub="自由メモ">
           <FreeSpace name={name} onSaved={invalidate} />
         </Section>
 
-        {/* ログ（日付ごとのタイムライン） */}
-        {(d.log ?? []).length > 0 && (
-          <Section title="ログ">
-            <Timeline entries={d.log ?? []} />
-          </Section>
-        )}
-
         {/* 関連ドキュメント（README ## 関連ノート・リソース。roadmap 俯瞰などへの導線） */}
         {(d.notes ?? []).length > 0 && (
-          <Section title="関連ドキュメント">
+          <Section title="関連ドキュメント" sub="README に手で並べたリンク">
             <ul className="ds-stack !gap-1">
               {(d.notes ?? []).map((n, i) => (
                 <li key={i} className="text-sm">
@@ -452,7 +445,7 @@ function ProjectDetailView({ name }: { name: string }) {
         )}
 
         {/* タグ付きノート（notes/ の frontmatter tags に project 名） */}
-        <Section title={`タグ付きノート #${name}`}>
+        <Section title="関連ノート" sub={`notes/ の tags に #${name} があるもの（自動収集）`}>
           {(taggedNotes.data?.files ?? []).length > 0 ? (
             <NoteLinkList docs={taggedNotes.data?.files ?? []} />
           ) : (
@@ -462,6 +455,13 @@ function ProjectDetailView({ name }: { name: string }) {
             </p>
           )}
         </Section>
+
+        {/* ログは最下部。実績の記録であって、いま判断するための情報ではない */}
+        {(d.log ?? []).length > 0 && (
+          <Section title="Log" sub="やったことの記録" hint={`${(d.log ?? []).length} 件`}>
+            <Timeline entries={d.log ?? []} />
+          </Section>
+        )}
       </CardBody>
     </Card>
   );
@@ -1303,18 +1303,28 @@ function inlineMd(text: string): React.ReactNode[] {
   return out;
 }
 
-const LOG_LIMIT = 10;
+const LOG_LIMIT = 5;
 
+// ログは件数が多く 1 件が長い（段落まるごと）。既定は 5 件 × 1 行に畳み、
+// 行クリックでその 1 件だけ展開する。全文は「他 N 件」で開く。
 function Timeline({ entries }: { entries: { date?: string; text: string }[] }) {
   const [all, setAll] = useState(false);
+  const [open, setOpen] = useState<number | null>(null);
   const shown = all ? entries : entries.slice(0, LOG_LIMIT);
   return (
     <>
-      <ul className="ds-stack !gap-3">
+      <ul className="ds-stack !gap-0">
         {shown.map((e, i) => (
-          <li key={i} className="border-l-2 border-border pl-3">
-            {e.date && <div className="font-mono tnum text-xs text-brand">{e.date}</div>}
-            <p className="text-sm text-muted-foreground leading-relaxed mt-0.5">{inlineMd(e.text)}</p>
+          <li key={i}>
+            <button
+              className="w-full flex items-baseline gap-3 py-1.5 text-left border-b border-border/60 hover:bg-accent/40 transition-colors"
+              onClick={() => setOpen((v) => (v === i ? null : i))}
+            >
+              <span className="shrink-0 font-mono tnum text-[11px] text-muted-foreground w-[74px]">{e.date ?? "—"}</span>
+              <span className={clsx("min-w-0 flex-1 text-[13px] leading-relaxed", open === i ? "" : "truncate")}>
+                {inlineMd(e.text)}
+              </span>
+            </button>
           </li>
         ))}
       </ul>
