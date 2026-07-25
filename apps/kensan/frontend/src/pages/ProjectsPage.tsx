@@ -278,70 +278,42 @@ function ProjectDetailView({ name }: { name: string }) {
     );
   };
 
-  const status = extractStatus(d.overview);
 
   return (
     <Card>
       <CardBody className="ds-section">
-        {/* タイトル */}
-        <div className="flex items-center gap-2 min-w-0">
-          <StatusBadge status={d.status} />
-          <h2 className="h-serif text-xl font-bold truncate">{d.name}</h2>
-        </div>
-
-        {/* メタ */}
+        {/* Hero — 目標・現在地・状態と、いま見るべき 1 つの数字を先頭に固定する */}
         {editingMeta ? (
-          <MetaEditor d={d} busy={saveMeta.isPending} onCancel={() => setEditingMeta(false)} onSave={(v) => saveMeta.mutate(v)} />
-        ) : (
-          <div>
-            <div className="flex items-center gap-2 flex-wrap">
-              {d.deadline && <DeadlineText deadline={d.deadline} withLabel />}
-              {d.repo && (
-                <a href={d.repo} target="_blank" rel="noreferrer" className="text-xs text-brand hover:underline inline-flex items-center gap-1">
-                  repo <ExternalLink size={11} />
-                </a>
-              )}
-              <Button variant="ghost" size="sm" className="ml-auto" onClick={() => setEditingMeta(true)}>
-                <Pencil size={13} />
-                メタ編集
-              </Button>
+          <>
+            <div className="flex items-center gap-2 min-w-0">
+              <StatusBadge status={d.status} />
+              <h2 className="h-serif text-xl font-bold truncate">{d.name}</h2>
             </div>
-            {d.goal && (
-              <p className="mt-3 h-serif text-base font-semibold leading-snug flex items-start gap-2">
-                <Target size={18} className="text-brand mt-0.5 shrink-0" />
-                {d.goal}
-              </p>
-            )}
-          </div>
+            <MetaEditor d={d} busy={saveMeta.isPending} onCancel={() => setEditingMeta(false)} onSave={(v) => saveMeta.mutate(v)} />
+          </>
+        ) : (
+          <ProjectHero
+            d={d}
+            milestones={milestones}
+            doneMs={doneMs}
+            openMs={openMs}
+            openTasks={openTasks}
+            metrics={metrics.data?.metrics ?? []}
+            metricsLoading={metrics.isPending}
+            metricsError={metrics.error ?? refreshMetrics.error}
+            refreshing={refreshMetrics.isPending}
+            onRefresh={() => refreshMetrics.mutate()}
+            onEditMeta={() => setEditingMeta(true)}
+          />
         )}
 
-        {/* 現在地（README ## 概要 の blockquote を「今どのフェーズ・何に注力か」として表示）。
-            目標のすぐ下・指標より前に置き、「どこへ向かうか → 今どこか → 数字」の順で読ませる。 */}
-        {status && (
-          <div className="rounded-md border border-border bg-accent/40 px-3 py-2 text-sm leading-relaxed">
-            {inlineMd(status)}
-          </div>
-        )}
-
+        {/* 主指標以外のメトリクス（1 つだけなら Hero に出ているのでここは空） */}
         <ProjectMetrics
-          metrics={metrics.data?.metrics ?? []}
-          loading={metrics.isPending}
-          error={metrics.error ?? refreshMetrics.error}
-          refreshing={refreshMetrics.isPending}
-          onRefresh={() => refreshMetrics.mutate()}
+          metrics={(metrics.data?.metrics ?? []).slice(1)}
+          loading={false}
+          error={null}
           onRetry={() => metrics.refetch()}
         />
-
-        {/* 進捗 */}
-        <Section title="進捗">
-          <div className="flex items-center gap-4 text-sm">
-            <div className="flex items-center gap-2 flex-1 max-w-xs">
-              <ProgressBar done={doneMs.length} total={milestones.length} />
-              <span className="font-mono tnum text-xs text-muted-foreground shrink-0">MS {doneMs.length}/{milestones.length}</span>
-            </div>
-            <span className="text-muted-foreground">未完タスク {openTasks.length}</span>
-          </div>
-        </Section>
 
         {/* マイルストーン（未完了を上・完了を区切り線の下にまとめる） */}
         <Section title="マイルストーン">
@@ -446,36 +418,256 @@ function ProjectMetrics({
   metrics,
   loading,
   error,
-  refreshing,
-  onRefresh,
   onRetry,
 }: {
   metrics: ProjectMetric[];
   loading: boolean;
   error: Error | null;
-  refreshing: boolean;
-  onRefresh: () => void;
   onRetry: () => void;
 }) {
   if (loading) return <Section title="Metrics"><Skeleton className="h-28 w-full" /></Section>;
   if (error && metrics.length === 0) return <Section title="Metrics"><ErrorState error={error} onRetry={onRetry} /></Section>;
   if (metrics.length === 0) return null;
-  const canRefresh = metrics.some((metric) => metric.stale || metric.current === undefined);
   return (
-    <Section title="Metrics">
+    <Section title="そのほかのメトリクス">
       <div className="grid grid-cols-1 xl:grid-cols-2 gap-3">
         {metrics.map((metric) => <MetricCard key={metric.id} metric={metric} />)}
       </div>
-      <div className="mt-2 flex min-h-7 items-center justify-end gap-2">
-        {error && <span className="mr-auto text-xs text-destructive">更新に失敗しました。最後の値を表示しています。</span>}
-        {canRefresh && (
-          <Button variant="ghost" size="sm" loading={refreshing} onClick={onRefresh}>
-            <RefreshCw size={13} />
-            外部値を更新
-          </Button>
-        )}
-      </div>
     </Section>
+  );
+}
+
+// ---- Hero -------------------------------------------------------------
+// 「どこへ向かうか（目標）→ 今どこか（現在地・状態）→ いま見るべき数字」を
+// 1 ブロックに固定する。状態は色だけでなく必ずラベルと根拠を併記する。
+
+type HeroTone = "success" | "warn" | "muted";
+type HeroState = { label: string; tone: HeroTone; why: string };
+
+const DAY_MS = 86_400_000;
+
+function daysFromToday(iso: string): number {
+  const target = new Date(`${iso}T00:00:00`);
+  const today = new Date(todayISO() + "T00:00:00");
+  return Math.round((target.getTime() - today.getTime()) / DAY_MS);
+}
+
+// README ログの日付・完了マイルストーンの ✅ 日付・メトリクス更新日のうち最も新しいもの。
+function lastActivity(d: ProjectDetail, metrics: ProjectMetric[]): string | undefined {
+  const dates: string[] = [];
+  for (const entry of d.log ?? []) if (entry.date) dates.push(entry.date);
+  for (const m of d.milestones ?? []) {
+    const hit = /✅\s*(\d{4}-\d{2}-\d{2})/.exec(m.text);
+    if (hit) dates.push(hit[1]);
+  }
+  for (const m of metrics) if (m.updatedAt) dates.push(m.updatedAt.slice(0, 10));
+  return dates.sort().at(-1);
+}
+
+// 状態は決定的なルールだけで決める（表示経路に LLM を入れない）。
+function heroState(d: ProjectDetail, openMs: Task[], openTasks: Task[], metrics: ProjectMetric[]): HeroState {
+  const overdue = openTasks.filter((t) => t.due && daysFromToday(t.due) < 0);
+  const toDeadline = d.deadline ? daysFromToday(d.deadline) : undefined;
+  const activity = lastActivity(d, metrics);
+  const sinceActivity = activity ? -daysFromToday(activity) : undefined;
+
+  if (toDeadline !== undefined && toDeadline >= 0 && toDeadline <= 14 && openMs.length > 0) {
+    return { label: "仕上げの時期", tone: "warn", why: `締切まで ${toDeadline} 日・未完マイルストーン ${openMs.length}` };
+  }
+  if (overdue.length > 0) {
+    return { label: "要整理", tone: "warn", why: `期限切れタスク ${overdue.length} 件` };
+  }
+  if (sinceActivity !== undefined && sinceActivity <= 30) {
+    return { label: "前進中", tone: "success", why: `${activity} に前進` };
+  }
+  if (sinceActivity !== undefined) {
+    return (d.milestones ?? []).length === 0
+      ? { label: "安定運用", tone: "muted", why: `直近の記録は ${activity}` }
+      : { label: "再開待ち", tone: "muted", why: `${sinceActivity} 日動きなし` };
+  }
+  return { label: "観測を開始", tone: "muted", why: "ログもメトリクスもまだありません" };
+}
+
+const TONE_CLASS: Record<HeroTone, string> = {
+  success: "border-success/40 bg-success/10 text-success",
+  warn: "border-warning/40 bg-warning/10 text-warning",
+  muted: "border-border bg-muted text-muted-foreground",
+};
+
+function ProjectHero({
+  d, milestones, doneMs, openMs, openTasks, metrics, metricsLoading, metricsError, refreshing, onRefresh, onEditMeta,
+}: {
+  d: ProjectDetail;
+  milestones: Task[];
+  doneMs: Task[];
+  openMs: Task[];
+  openTasks: Task[];
+  metrics: ProjectMetric[];
+  metricsLoading: boolean;
+  metricsError: Error | null;
+  refreshing: boolean;
+  onRefresh: () => void;
+  onEditMeta: () => void;
+}) {
+  const state = heroState(d, openMs, openTasks, metrics);
+  const status = extractStatus(d.overview);
+  return (
+    <div className="grid grid-cols-1 lg:grid-cols-[1.35fr_1fr] gap-4 items-stretch">
+      <div className="ds-stack !gap-3 min-w-0">
+        <div className="flex items-center gap-2 flex-wrap">
+          <StatusBadge status={d.status} />
+          <span className={clsx("rounded-full border px-2 py-0.5 text-[11px] font-semibold", TONE_CLASS[state.tone])}>
+            {state.label}
+          </span>
+          <span className="text-[11px] text-muted-foreground truncate">{state.why}</span>
+          <Button variant="ghost" size="sm" className="ml-auto" onClick={onEditMeta}>
+            <Pencil size={13} />
+            メタ編集
+          </Button>
+        </div>
+
+        <h2 className="h-serif text-xl font-bold truncate">{d.name}</h2>
+
+        {d.goal && (
+          <p className="h-serif text-base font-semibold leading-snug flex items-start gap-2">
+            <Target size={18} className="text-brand mt-0.5 shrink-0" />
+            {d.goal}
+          </p>
+        )}
+
+        {status && <p className="text-sm leading-relaxed text-muted-foreground">{inlineMd(status)}</p>}
+
+        <div className="flex items-center gap-3 flex-wrap text-[11px] text-muted-foreground">
+          {d.deadline && <DeadlineText deadline={d.deadline} withLabel />}
+          {milestones.length > 0 && <span className="font-mono tnum">MS {doneMs.length}/{milestones.length}</span>}
+          <span className="font-mono tnum">未完タスク {openTasks.length}</span>
+          {d.repo && (
+            <a href={d.repo} target="_blank" rel="noreferrer" className="text-brand hover:underline inline-flex items-center gap-1">
+              repo <ExternalLink size={11} />
+            </a>
+          )}
+        </div>
+      </div>
+
+      <HeroFocus
+        metric={metrics[0]}
+        metricsLoading={metricsLoading}
+        metricsError={metricsError}
+        refreshing={refreshing}
+        onRefresh={onRefresh}
+        milestones={milestones}
+        doneMs={doneMs}
+        openMs={openMs}
+        openTasks={openTasks}
+      />
+    </div>
+  );
+}
+
+// Hero 右側。主指標 → マイルストーン → 未完タスク の順で「いま見るべき 1 つ」を選ぶ。
+// preset を持ち込まず、README と metrics に何があるかだけで決める。
+function HeroFocus({
+  metric, metricsLoading, metricsError, refreshing, onRefresh, milestones, doneMs, openMs, openTasks,
+}: {
+  metric?: ProjectMetric;
+  metricsLoading: boolean;
+  metricsError: Error | null;
+  refreshing: boolean;
+  onRefresh: () => void;
+  milestones: Task[];
+  doneMs: Task[];
+  openMs: Task[];
+  openTasks: Task[];
+}) {
+  const shell = "rounded-lg border border-border bg-card p-4 ds-stack !gap-3 justify-center";
+  if (metricsLoading) return <div className={shell}><Skeleton className="h-24 w-full" /></div>;
+
+  if (metric) {
+    const format = (v: number) => metric.display === "integer" ? Math.round(v).toLocaleString() : v.toFixed(1);
+    const current = metric.current;
+    const pct = current !== undefined && metric.target ? Math.max(0, Math.min(100, (current / metric.target) * 100)) : undefined;
+    const remaining = current !== undefined && metric.target !== undefined ? metric.target - current : undefined;
+    return (
+      <div className={shell}>
+        <div className="flex items-baseline gap-2">
+          <span className="font-mono tnum text-4xl font-semibold leading-none">{current === undefined ? "—" : format(current)}</span>
+          <span className="text-xs text-muted-foreground">{metric.unit}</span>
+          {metric.stale && (
+            <Button variant="ghost" size="sm" className="ml-auto" loading={refreshing} onClick={onRefresh}>
+              <RefreshCw size={13} />
+              更新
+            </Button>
+          )}
+        </div>
+        <p className="text-xs text-muted-foreground">
+          {metric.label}
+          {metric.updatedAt && <span className="ml-1">· {metric.updatedAt.slice(0, 10)} 更新</span>}
+        </p>
+        {pct !== undefined && metric.target !== undefined && (
+          <div>
+            <div className="h-1.5 rounded-full bg-muted overflow-hidden">
+              <div className="h-full rounded-full bg-brand" style={{ width: `${pct}%` }} />
+            </div>
+            <div className="mt-1 flex justify-between font-mono tnum text-[10px] text-muted-foreground">
+              <span>0</span>
+              <span className="text-brand font-semibold">あと {format(Math.max(0, remaining ?? 0))}</span>
+              <span>{format(metric.target)}</span>
+            </div>
+          </div>
+        )}
+        <Sparkline series={metric.series} />
+        <div className="flex justify-between text-[10px] text-muted-foreground">
+          <span>{metric.delta.days30 !== undefined ? `30日 ${signed(metric.delta.days30, format)}` : "30日 —"}</span>
+          {metric.best && <span>最高 {format(metric.best.value)}</span>}
+        </div>
+        {metricsError && <p className="text-[10px] text-destructive">更新に失敗しました。最後の値を表示しています。</p>}
+      </div>
+    );
+  }
+
+  if (milestones.length > 0) {
+    const pct = Math.round((doneMs.length / milestones.length) * 100);
+    return (
+      <div className={shell}>
+        <div className="flex items-baseline gap-2">
+          <span className="font-mono tnum text-4xl font-semibold leading-none">{doneMs.length} / {milestones.length}</span>
+          <span className="text-xs text-muted-foreground">milestones</span>
+        </div>
+        <p className="text-sm">
+          <span className="text-muted-foreground">次は </span>
+          {openMs[0] ? <span className="font-medium">{openMs[0].display}</span> : <span className="text-success font-medium">すべて完了</span>}
+        </p>
+        <div>
+          <div className="h-1.5 rounded-full bg-muted overflow-hidden">
+            <div className="h-full rounded-full bg-brand" style={{ width: `${pct}%` }} />
+          </div>
+          <div className="mt-1 flex justify-between font-mono tnum text-[10px] text-muted-foreground">
+            <span>開始</span>
+            <span className="text-brand font-semibold">{pct}%</span>
+            <span>完了</span>
+          </div>
+        </div>
+        {openMs[0]?.due && <p className="text-[10px] text-muted-foreground">次の期限 {openMs[0].due}</p>}
+      </div>
+    );
+  }
+
+  // マイルストーンも指標も持たない project（life など）は、達成率を出さずに残量だけ見せる。
+  const next = openTasks.find((t) => t.today) ?? openTasks.find((t) => t.week) ?? openTasks[0];
+  return (
+    <div className={shell}>
+      <div className="flex items-baseline gap-2">
+        <span className="font-mono tnum text-4xl font-semibold leading-none">{openTasks.length}</span>
+        <span className="text-xs text-muted-foreground">未完タスク</span>
+      </div>
+      <p className="text-sm">
+        <span className="text-muted-foreground">次は </span>
+        {next ? <span className="font-medium">{next.display}</span> : <span className="text-success font-medium">残っていません</span>}
+      </p>
+      <p className="text-[10px] text-muted-foreground">
+        今日 {openTasks.filter((t) => t.today).length} · 今週 {openTasks.filter((t) => t.week).length} · 今月 {openTasks.filter((t) => t.month).length}
+      </p>
+    </div>
   );
 }
 
