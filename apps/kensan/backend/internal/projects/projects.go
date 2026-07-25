@@ -49,6 +49,14 @@ type NoteRef struct {
 	Desc   string `json:"desc,omitempty"`
 }
 
+// CurrentState は `## 現在地`。「今どのフェーズ・何に注力か」の可変情報。
+// 概要（不変）と分けて持つことで、古い記述が概要に residue として残るのを防ぐ。
+// Date が古いこと自体が「棚卸しされていない」というシグナルになる。
+type CurrentState struct {
+	Date string `json:"date,omitempty"`
+	Text string `json:"text"`
+}
+
 // Detail は詳細パネル用。
 type Detail struct {
 	Name       string       `json:"name"`
@@ -56,6 +64,7 @@ type Detail struct {
 	Deadline   string       `json:"deadline,omitempty"`
 	Repo       string       `json:"repo,omitempty"`
 	Overview   string       `json:"overview"`
+	Current    CurrentState `json:"current"`
 	Goal       string       `json:"goal"`
 	Milestones []tasks.Task `json:"milestones"`
 	Tasks      []tasks.Task `json:"tasks"`
@@ -125,6 +134,7 @@ func Load(root, name string) (Detail, error) {
 	d := Detail{
 		Name: name, Status: fm["status"], Deadline: fm["deadline"], Repo: fm["repo"],
 		Overview: strings.TrimSpace(section(content, "概要")),
+		Current:  parseCurrent(section(content, "現在地")),
 		Goal:     strings.TrimSpace(section(content, "目標")),
 		Log:      parseLog(section(content, "ログ")),
 		Notes:    parseNotes(sectionPrefix(content, "関連ノート")),
@@ -177,6 +187,10 @@ updated: %s
 
 ## 概要
 
+## 現在地
+
+%s: 
+
 ## 目標
 
 ## マイルストーン
@@ -186,7 +200,7 @@ updated: %s
 ## ログ
 
 ## 関連ノート・リソース
-`, d, d)
+`, d, d, d)
 	return ws.Create(file, []byte(tmpl))
 }
 
@@ -311,6 +325,21 @@ func firstLine(s string) string {
 }
 
 // parseLog は ## ログ を「- YYYY-MM-DD: 本文」のエントリ単位に分け、日付降順で返す。
+// parseCurrent は `YYYY-MM-DD: 本文` の 1 行目から日付と本文を取り出す。
+// 日付が無い場合も本文だけは返す（規約違反でも表示は壊さない）。
+func parseCurrent(s string) CurrentState {
+	body := strings.TrimSpace(s)
+	if body == "" {
+		return CurrentState{}
+	}
+	if m := currentRe.FindStringSubmatch(body); m != nil {
+		return CurrentState{Date: m[1], Text: strings.TrimSpace(m[2])}
+	}
+	return CurrentState{Text: body}
+}
+
+var currentRe = regexp.MustCompile(`(?s)^(\d{4}-\d{2}-\d{2})\s*[:：]\s*(.*)$`)
+
 func parseLog(s string) []LogEntry {
 	var out []LogEntry
 	for _, line := range strings.Split(s, "\n") {

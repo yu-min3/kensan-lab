@@ -94,6 +94,8 @@ export interface ProjectDetail {
   deadline?: string;
   repo?: string;
   overview: string;
+  // ## 現在地（可変。概要とは分離。date が古い = 棚卸しされていないシグナル）
+  current: { date?: string; text: string };
   goal: string;
   milestones: Task[] | null;
   tasks: Task[] | null;

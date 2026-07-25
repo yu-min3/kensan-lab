@@ -559,7 +559,7 @@ function ProjectHero({
   onEditMeta: () => void;
 }) {
   const state = heroState(d, openMs, openTasks, metrics);
-  const status = extractStatus(d.overview);
+  const staleDays = d.current.date ? -daysFromToday(d.current.date) : undefined;
   return (
     // 1 カラム。かつて右側に置いていた数値カードは、現在値 / 次の到達点を Pulse が、
     // 進み具合を Journey・Milestones が持っており、3 箇所で同じことを言っていたので廃止した。
@@ -586,7 +586,20 @@ function ProjectHero({
           </p>
         )}
 
-        {status && <p className="text-sm leading-relaxed text-muted-foreground">{inlineMd(status)}</p>}
+        {d.current.text && (
+          <div className="rounded-md border border-border bg-accent/30 px-3 py-2">
+            <div className="mb-1 flex items-center gap-2 text-[10px] uppercase tracking-[0.12em] text-muted-foreground">
+              <span>現在地</span>
+              {d.current.date && (
+                <span className={clsx("font-mono tnum normal-case tracking-normal", staleDays !== undefined && staleDays > 30 && "text-warning font-semibold")}>
+                  {d.current.date}
+                  {staleDays !== undefined && staleDays > 30 && `（${staleDays} 日前・要棚卸し）`}
+                </span>
+              )}
+            </div>
+            <p className="text-sm leading-relaxed">{inlineMd(d.current.text)}</p>
+          </div>
+        )}
 
         <div className="flex items-center gap-3 flex-wrap text-[11px] text-muted-foreground">
           {d.deadline && <DeadlineText deadline={d.deadline} withLabel />}
@@ -1297,17 +1310,6 @@ function inlineMd(text: string): React.ReactNode[] {
   }
   if (last < text.length) out.push(text.slice(last));
   return out;
-}
-
-// README ## 概要 の blockquote（`> ...`）を「現在地」テキストとして抽出する。
-// 概要末尾に置く運用（conventions.md）。blockquote が無ければ空文字。
-function extractStatus(overview: string): string {
-  return overview
-    .split("\n")
-    .filter((l) => l.trimStart().startsWith(">"))
-    .map((l) => l.replace(/^\s*>\s?/, ""))
-    .join(" ")
-    .trim();
 }
 
 const LOG_LIMIT = 10;
