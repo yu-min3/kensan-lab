@@ -10,6 +10,8 @@ import (
 	"github.com/yu-min3/kensan-lab/apps/feed/internal/application"
 	"github.com/yu-min3/kensan-lab/apps/feed/internal/briefing"
 	driveintegration "github.com/yu-min3/kensan-lab/apps/feed/internal/integrations/drive"
+	githubintegration "github.com/yu-min3/kensan-lab/apps/feed/internal/integrations/github"
+	"github.com/yu-min3/kensan-lab/apps/feed/internal/metrics"
 )
 
 func main() {
@@ -84,16 +86,22 @@ func runImport(args []string) error {
 	result, err := application.Run(context.Background(), application.Config{
 		WorkspaceRoot: root,
 		Inbox:         inbox,
-		Now:           func() time.Time { return now },
+		Metrics: metrics.Runner{
+			Root:      root,
+			Collector: githubintegration.New(os.Getenv("GITHUB_TOKEN")),
+			Now:       func() time.Time { return now },
+		},
+		Now: func() time.Time { return now },
 	}, date)
 	if err != nil {
 		return err
 	}
-	if result.NoOp {
-		fmt.Printf("report already imported: %s\n", result.Path)
+	if result.Briefing.NoOp {
+		fmt.Printf("report already imported: %s\n", result.Briefing.Path)
 	} else {
-		fmt.Printf("report imported: %s\n", result.Path)
+		fmt.Printf("report imported: %s\n", result.Briefing.Path)
 	}
+	fmt.Printf("metrics updated: projects=%d observations=%d\n", result.Metrics.Projects, result.Metrics.Updated)
 	return nil
 }
 

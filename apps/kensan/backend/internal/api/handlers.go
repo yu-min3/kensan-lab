@@ -172,18 +172,6 @@ func (s *Server) handleProjectMetrics(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, result)
 }
 
-// POST /api/v1/projects/{name}/metrics/refresh — GitHub 等の外部値を取得して履歴化する。
-func (s *Server) handleProjectMetricsRefresh(w http.ResponseWriter, r *http.Request) {
-	result, err := metrics.Refresh(r.Context(), s.ws.Root, r.PathValue("name"), time.Now(), metrics.Env{})
-	if err != nil {
-		s.log.Warn("metric refresh partially failed", "project", r.PathValue("name"), "err", err)
-		// 既存値は利用できるため、部分失敗も view model と共に返す。
-		writeJSON(w, http.StatusBadGateway, map[string]any{"error": err.Error(), "metrics": result.Metrics})
-		return
-	}
-	writeJSON(w, http.StatusOK, result)
-}
-
 // GET /api/v1/goals — goals.md の North Star + 今期のフォーカス（ダッシュボード表示用）
 func (s *Server) handleGoals(w http.ResponseWriter, _ *http.Request) {
 	g, err := goals.Load(s.ws.Root)

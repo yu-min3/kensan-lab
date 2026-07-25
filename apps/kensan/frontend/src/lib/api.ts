@@ -273,9 +273,6 @@ export const api = {
   projectMetrics: (name: string) =>
     request<{ metrics: ProjectMetric[] }>(`/projects/${encodeURIComponent(name)}/metrics`),
 
-  refreshProjectMetrics: (name: string) =>
-    request<{ metrics: ProjectMetric[] }>(`/projects/${encodeURIComponent(name)}/metrics/refresh`, { method: "POST" }),
-
   // 行の @due(YYYY-MM-DD) を設定（空文字で除去）
   setDue: (t: Task, due: string) =>
     request<{ task: Task }>("/tasks/due", { method: "POST", body: JSON.stringify({ file: t.file, line: t.line, text: t.text, due }) }),
