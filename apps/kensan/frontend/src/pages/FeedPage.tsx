@@ -4,7 +4,7 @@ import { useSearchParams } from "react-router-dom";
 import clsx from "clsx";
 import { api, type FeedContent } from "../lib/api";
 import { PageHeader } from "../components/PageHeader";
-import { MarkdownView } from "../components/MarkdownView";
+import { FeedSections } from "../components/FeedSections";
 import { Badge } from "../components/ui/badge";
 import { Card, CardBody, CardHead } from "../components/ui/card";
 import { Empty, ErrorState, Skeleton, SkeletonRows } from "../components/ui/states";
@@ -163,7 +163,7 @@ export function FeedPage() {
                 }
               />
               <CardBody>
-                <MarkdownView content={content.content} />
+                <FeedSections content={content.content} />
               </CardBody>
             </>
           )}
