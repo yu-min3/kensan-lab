@@ -286,8 +286,10 @@ function ProjectDetailView({ name }: { name: string }) {
 
 
   return (
-    <Card>
-      <CardBody className="ds-section">
+    // min-w-0: Journey の min-width が親グリッドの 1fr トラックを押し広げて
+    // ページ全体が横スクロールするのを防ぐ（横に溢れるのは Journey の中だけにする）
+    <Card className="min-w-0">
+      <CardBody className="ds-section min-w-0">
         {/* Hero — 目標・現在地・状態と、いま見るべき 1 つの数字を先頭に固定する */}
         {editingMeta ? (
           <>
@@ -323,16 +325,17 @@ function ProjectDetailView({ name }: { name: string }) {
           metrics={metrics.data?.metrics ?? []}
         />
 
-        {/* Journey — 到達点の並び。終点のない project は Horizons に切り替える */}
-        {milestones.length > 0 || (metrics.data?.metrics ?? [])[0]?.checkpoints?.length ? (
+        {/* Journey は checkpoint を持つ指標のときだけ独立セクションにする。
+            マイルストーン版の Journey は「マイルストーン」節の先頭に置く（同じ情報を 2 箇所に出さない）。
+            どちらも無い project は Horizons。 */}
+        {(metrics.data?.metrics ?? [])[0]?.checkpoints?.length ? (
           <ProjectJourney
             metric={(metrics.data?.metrics ?? [])[0]}
-            milestones={milestones}
             hint={d.deadline ? `deadline ${d.deadline}` : undefined}
           />
-        ) : (
+        ) : milestones.length === 0 ? (
           <ProjectHorizons openTasks={openTasks} />
-        )}
+        ) : null}
 
         {/* 主指標以外のメトリクス（1 つだけなら Hero に出ているのでここは空） */}
         <ProjectMetrics
@@ -343,8 +346,13 @@ function ProjectDetailView({ name }: { name: string }) {
         />
 
         {/* マイルストーン（未完了を上・完了を区切り線の下にまとめる） */}
-        <Section title="マイルストーン">
+        <Section title="Milestones" sub="到達点と進み具合" hint={d.deadline ? `deadline ${d.deadline}` : undefined}>
           {milestones.length === 0 && <p className="text-sm text-muted-foreground">まだありません。下から追加できます。</p>}
+          {milestones.length > 0 && (
+            <div className="mb-4">
+              <JourneyLine steps={milestoneSteps(milestones)} />
+            </div>
+          )}
           {openMs.length > 0 && <ul className="ds-stack !gap-1">{openMs.map(renderMs)}</ul>}
           {doneMs.length > 0 && (
             <>
@@ -456,7 +464,7 @@ function ProjectMetrics({
   if (error && metrics.length === 0) return <Section title="Metrics"><ErrorState error={error} onRetry={onRetry} /></Section>;
   if (metrics.length === 0) return null;
   return (
-    <Section eyebrow="Metrics" title="そのほかの指標">
+    <Section title="Metrics" sub="そのほかの指標">
       <div className="grid grid-cols-1 xl:grid-cols-2 gap-3">
         {metrics.map((metric) => <MetricCard key={metric.id} metric={metric} />)}
       </div>
@@ -835,7 +843,7 @@ function ProjectPulse({
     : since !== undefined ? `最終前進 ${since === 0 ? "今日" : `${since}日前`}` : undefined;
 
   return (
-    <Section eyebrow="Pulse" title="プロジェクトの脈拍" hint={hint}>
+    <Section title="Pulse" sub="最近の活動" hint={hint}>
       <div className="rounded-lg border border-border bg-card grid grid-cols-1 lg:grid-cols-[0.8fr_1.2fr] overflow-hidden">
         <div className="p-5 ds-stack !gap-2 border-b lg:border-b-0 lg:border-r border-border">
           <p className="h-serif text-lg font-bold flex items-center gap-2">
@@ -918,14 +926,17 @@ const DOT_CLASS: Record<Step["state"], string> = {
   todo: "bg-card border-muted-foreground/50",
 };
 
-function ProjectJourney({ metric, milestones, hint }: { metric?: ProjectMetric; milestones: Task[]; hint?: string }) {
-  const format = (v: number) => metric?.display === "integer" ? Math.round(v).toLocaleString() : v.toFixed(1);
-  const steps = metric?.checkpoints?.length ? checkpointSteps(metric, format) : milestoneSteps(milestones);
+// 進行の可視化そのもの。checkpoint 版は独立した Journey セクション、
+// マイルストーン版は「マイルストーン」セクションの先頭に置いて重複を避ける。
+function JourneyLine({ steps }: { steps: Step[] }) {
   if (steps.length === 0) return null;
   return (
-    <Section eyebrow="Journey" title="到達点の旅" hint={hint}>
       <div className="rounded-lg border border-border bg-card p-6 overflow-x-auto">
-        <div className="relative grid min-w-[620px]" style={{ gridTemplateColumns: `repeat(${steps.length}, 1fr)` }}>
+        {/* ステップが増えたら潰さずに横スクロールさせる（1 ステップあたり最低 120px 確保） */}
+        <div
+          className="relative grid"
+          style={{ gridTemplateColumns: `repeat(${steps.length}, 1fr)`, minWidth: `${Math.max(560, steps.length * 120)}px` }}
+        >
           {/* 進行線。両端は最初/最後の dot の中心で止める */}
           <div className="absolute top-[10px] h-[3px] bg-muted" style={{ left: `${50 / steps.length}%`, right: `${50 / steps.length}%` }} />
           {steps.map((s, i) => (
@@ -942,6 +953,16 @@ function ProjectJourney({ metric, milestones, hint }: { metric?: ProjectMetric; 
           ))}
         </div>
       </div>
+  );
+}
+
+function ProjectJourney({ metric, hint }: { metric: ProjectMetric; hint?: string }) {
+  const format = (v: number) => metric.display === "integer" ? Math.round(v).toLocaleString() : v.toFixed(1);
+  const steps = checkpointSteps(metric, format);
+  if (steps.length === 0) return null;
+  return (
+    <Section title="Journey" sub="目標までの到達点" hint={hint}>
+      <JourneyLine steps={steps} />
     </Section>
   );
 }
@@ -955,7 +976,7 @@ function ProjectHorizons({ openTasks }: { openTasks: Task[] }) {
   ];
   if (groups.every((g) => g.items.length === 0)) return null;
   return (
-    <Section eyebrow="Horizons" title="時間軸で見る" hint="Journey は出さない">
+    <Section title="Horizons" sub="いつやるかで見る" hint="終点のない project">
       <div className="rounded-lg border border-border bg-card grid grid-cols-1 sm:grid-cols-3 overflow-hidden">
         {groups.map((g, i) => (
           <div key={g.title} className={clsx("p-5", i > 0 && "border-t sm:border-t-0 sm:border-l border-border")}>
@@ -1225,17 +1246,17 @@ function MetaEditor({
   );
 }
 
-// eyebrow は Project View の block 名（Pulse / Journey ...）。設計上の呼び名を
-// 残しつつ、見出し自体は日本語 + 明朝で読ませる（プロトタイプの .stitle と同じ構成）。
-function Section({ title, eyebrow, hint, children }: { title: string; eyebrow?: string; hint?: string; children: React.ReactNode }) {
+// title は block 名（Pulse / Journey ...）、sub はそれが何かを一言で示す副題。
+// 直訳の日本語を主見出しにすると冗長なので、説明は副題に落とす。
+function Section({ title, sub, hint, children }: { title: string; sub?: string; hint?: string; children: React.ReactNode }) {
   return (
     <div>
-      <div className="flex items-end justify-between gap-3 pb-2 mb-3 border-b border-border">
-        <div className="min-w-0">
-          {eyebrow && <div className="text-[10px] uppercase tracking-[0.14em] text-brand font-bold">{eyebrow}</div>}
-          <h3 className="h-serif text-lg font-bold leading-tight truncate">{title}</h3>
+      <div className="flex items-baseline justify-between gap-3 pb-2 mb-3 border-b border-border">
+        <div className="min-w-0 flex items-baseline gap-2">
+          <h3 className="h-serif text-lg font-bold leading-tight shrink-0">{title}</h3>
+          {sub && <span className="text-[11px] text-muted-foreground truncate">{sub}</span>}
         </div>
-        {hint && <span className="shrink-0 pb-1 font-mono tnum text-[11px] text-muted-foreground">{hint}</span>}
+        {hint && <span className="shrink-0 font-mono tnum text-[11px] text-muted-foreground">{hint}</span>}
       </div>
       {children}
     </div>
