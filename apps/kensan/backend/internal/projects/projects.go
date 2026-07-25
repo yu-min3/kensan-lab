@@ -14,6 +14,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/yu-min3/kensan-lab/apps/kensan/backend/internal/metrics"
 	"github.com/yu-min3/kensan-lab/apps/kensan/backend/internal/tasks"
 	"github.com/yu-min3/kensan-lab/apps/kensan/backend/internal/workspace"
 )
@@ -33,6 +34,9 @@ type Summary struct {
 	MilestonesDone  int    `json:"milestonesDone"`
 	MilestonesTotal int    `json:"milestonesTotal"`
 	OpenTasks       int    `json:"openTasks"`
+	// 一覧でも「今どういう状態か」を出すため、詳細と同じ判定を返す（実装は state.go）
+	State  State        `json:"state"`
+	Metric *MetricBrief `json:"metric,omitempty"`
 }
 
 // LogEntry は ## ログ の 1 エントリ（日付 + 本文）。
@@ -49,18 +53,29 @@ type NoteRef struct {
 	Desc   string `json:"desc,omitempty"`
 }
 
+// CurrentState は `## 現在地`。「今どのフェーズ・何に注力か」の可変情報。
+// 概要（不変）と分けて持つことで、古い記述が概要に residue として残るのを防ぐ。
+// Date が古いこと自体が「棚卸しされていない」というシグナルになる。
+type CurrentState struct {
+	Date string `json:"date,omitempty"`
+	Text string `json:"text"`
+}
+
 // Detail は詳細パネル用。
 type Detail struct {
-	Name       string       `json:"name"`
-	Status     string       `json:"status"`
-	Deadline   string       `json:"deadline,omitempty"`
-	Repo       string       `json:"repo,omitempty"`
-	Overview   string       `json:"overview"`
-	Goal       string       `json:"goal"`
-	Milestones []tasks.Task `json:"milestones"`
-	Tasks      []tasks.Task `json:"tasks"`
-	Log        []LogEntry   `json:"log"`
-	Notes      []NoteRef    `json:"notes"`
+	Name       string        `json:"name"`
+	Status     string        `json:"status"`
+	Deadline   string        `json:"deadline,omitempty"`
+	Repo       string        `json:"repo,omitempty"`
+	Overview   string        `json:"overview"`
+	Current    CurrentState  `json:"current"`
+	State      State         `json:"state"`
+	Goal       string        `json:"goal"`
+	Milestones []tasks.Task  `json:"milestones"`
+	Tasks      []tasks.Task  `json:"tasks"`
+	Log        []LogEntry    `json:"log"`
+	Notes      []NoteRef     `json:"notes"`
+	Related    []RelatedItem `json:"related"`
 }
 
 func readme(root, name string) (string, error) {
@@ -75,6 +90,7 @@ func readme(root, name string) (string, error) {
 // Summaries は全アクティブ含む全プロジェクトのサマリを返す。
 // 並び: active 優先 → 締切が近い順（無しは後ろ）→ 名前。
 func Summaries(root string) []Summary {
+	today := time.Now().Truncate(24 * time.Hour)
 	var out []Summary
 	for _, name := range tasks.Projects(root) {
 		content, err := readme(root, name)
@@ -83,19 +99,29 @@ func Summaries(root string) []Summary {
 		}
 		fm := frontmatter(content)
 		s := Summary{Name: name, Status: fm["status"], Deadline: fm["deadline"], Goal: firstLine(section(content, "目標"))}
+		var ms, ts []tasks.Task
 		for _, t := range tasks.ExtractLines(content, "") {
 			switch t.Section {
 			case "マイルストーン":
+				ms = append(ms, t)
 				s.MilestonesTotal++
 				if t.State == "done" {
 					s.MilestonesDone++
 				}
-			case "タスク":
+			case "タスク", "いつかやる":
+				ts = append(ts, t)
 				if t.State == "todo" {
 					s.OpenTasks++
 				}
 			}
 		}
+		// メトリクスは opt-in。無い project では nil のまま（エラーにしない）。
+		var views []metrics.View
+		if r, err := metrics.Load(root, name, time.Now()); err == nil {
+			views = r.Metrics
+		}
+		s.State = ComputeState(s.Deadline, ms, ts, parseLog(section(content, "ログ")), views, today)
+		s.Metric = briefOf(views)
 		out = append(out, s)
 	}
 	sort.SliceStable(out, func(i, j int) bool {
@@ -125,6 +151,7 @@ func Load(root, name string) (Detail, error) {
 	d := Detail{
 		Name: name, Status: fm["status"], Deadline: fm["deadline"], Repo: fm["repo"],
 		Overview: strings.TrimSpace(section(content, "概要")),
+		Current:  parseCurrent(section(content, "現在地")),
 		Goal:     strings.TrimSpace(section(content, "目標")),
 		Log:      parseLog(section(content, "ログ")),
 		Notes:    parseNotes(sectionPrefix(content, "関連ノート")),
@@ -135,10 +162,20 @@ func Load(root, name string) (Detail, error) {
 		switch t.Section {
 		case "マイルストーン":
 			d.Milestones = append(d.Milestones, t)
-		case "タスク":
+		case "タスク", "いつかやる":
+			// バンド設計（tasks.Board）と揃える: バンドタグの無いタスクは
+			// 「いつか」バンドであり、## いつかやる もその置き場のひとつ。
+			// ここで落とすと Board に出ているタスクが project 詳細から消える。
 			d.Tasks = append(d.Tasks, t)
 		}
 	}
+	var views []metrics.View
+	if r, err := metrics.Load(root, name, time.Now()); err == nil {
+		views = r.Metrics
+	}
+	auto := collectProjectDocs(root, name)
+	d.Related = append(auto, manualRelated(d.Notes, auto)...)
+	d.State = ComputeState(d.Deadline, d.Milestones, d.Tasks, d.Log, views, time.Now().Truncate(24*time.Hour))
 	return d, nil
 }
 
@@ -174,6 +211,10 @@ updated: %s
 
 ## 概要
 
+## 現在地
+
+%s: 
+
 ## 目標
 
 ## マイルストーン
@@ -183,7 +224,7 @@ updated: %s
 ## ログ
 
 ## 関連ノート・リソース
-`, d, d)
+`, d, d, d)
 	return ws.Create(file, []byte(tmpl))
 }
 
@@ -308,6 +349,21 @@ func firstLine(s string) string {
 }
 
 // parseLog は ## ログ を「- YYYY-MM-DD: 本文」のエントリ単位に分け、日付降順で返す。
+// parseCurrent は `YYYY-MM-DD: 本文` の 1 行目から日付と本文を取り出す。
+// 日付が無い場合も本文だけは返す（規約違反でも表示は壊さない）。
+func parseCurrent(s string) CurrentState {
+	body := strings.TrimSpace(s)
+	if body == "" {
+		return CurrentState{}
+	}
+	if m := currentRe.FindStringSubmatch(body); m != nil {
+		return CurrentState{Date: m[1], Text: strings.TrimSpace(m[2])}
+	}
+	return CurrentState{Text: body}
+}
+
+var currentRe = regexp.MustCompile(`(?s)^(\d{4}-\d{2}-\d{2})\s*[:：]\s*(.*)$`)
+
 func parseLog(s string) []LogEntry {
 	var out []LogEntry
 	for _, line := range strings.Split(s, "\n") {

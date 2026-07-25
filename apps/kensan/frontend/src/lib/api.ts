@@ -66,6 +66,23 @@ export interface TaskSaveInput {
   milestone: string; // "" = なし
 }
 
+// 状態判定は backend（projects/state.go）が唯一の実装。一覧・詳細で同じものを使う。
+export interface ProjectState {
+  label: string;
+  tone: "success" | "warn" | "muted";
+  why: string;
+  sentence: string;
+  lastActivity?: string;
+}
+
+export interface MetricBrief {
+  label: string;
+  unit: string;
+  current?: number;
+  target?: number;
+  display: "integer" | "decimal" | "percent";
+}
+
 export interface ProjectSummary {
   name: string;
   status: string;
@@ -74,6 +91,8 @@ export interface ProjectSummary {
   milestonesDone: number;
   milestonesTotal: number;
   openTasks: number;
+  state: ProjectState;
+  metric?: MetricBrief;
 }
 
 export interface LogEntry {
@@ -88,17 +107,31 @@ export interface NoteRef {
   desc?: string;
 }
 
+// project に紐づくリソース。docs/records/articles は自動収集、
+// project/external は README の手書き、note は notes/ のタグ一致（frontend で合流）。
+export interface RelatedItem {
+  kind: "docs" | "records" | "articles" | "note" | "project" | "external";
+  label: string;
+  target?: string;
+  url?: string;
+  desc?: string;
+}
+
 export interface ProjectDetail {
   name: string;
   status: string;
   deadline?: string;
   repo?: string;
   overview: string;
+  // ## 現在地（可変。概要とは分離。date が古い = 棚卸しされていないシグナル）
+  current: { date?: string; text: string };
+  state: ProjectState;
   goal: string;
   milestones: Task[] | null;
   tasks: Task[] | null;
   log: LogEntry[] | null;
   notes: NoteRef[] | null;
+  related: RelatedItem[] | null;
 }
 
 export interface MetricPoint {
@@ -117,6 +150,8 @@ export interface ProjectMetric {
   fields?: Record<string, unknown>;
   delta: { previous?: number; days30?: number };
   best?: { value: number; at: string };
+  // target までの途中の到達点（値の昇順）。到達判定は current との比較で行う
+  checkpoints?: { value: number; label: string }[];
   updatedAt?: string;
   stale: boolean;
   series: MetricPoint[];

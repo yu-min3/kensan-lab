@@ -16,9 +16,13 @@ import {
   X,
   RefreshCw,
   TrendingUp,
+  AlertTriangle,
+  Minus,
+  ChevronRight,
+  ChevronDown,
 } from "lucide-react";
 import clsx from "clsx";
-import { api, ApiError, todayISO, type Doc, type ProjectSummary, type ProjectDetail, type ProjectMetric, type Task } from "../lib/api";
+import { api, ApiError, todayISO, type Doc, type ProjectSummary, type ProjectDetail, type MetricBrief, type ProjectMetric, type ProjectState, type RelatedItem, type Task } from "../lib/api";
 import { PageHeader } from "../components/PageHeader";
 import { MilkdownEditor } from "../components/editors/MilkdownEditor";
 import { useAutosaveFile } from "../hooks/useAutosaveFile";
@@ -119,6 +123,13 @@ export function ProjectsPage() {
   );
 }
 
+// 一覧の主指標チップ。"4 / 100 stars" の形。
+function formatBrief(m: MetricBrief): string {
+  const f = (v: number) => (m.display === "integer" ? Math.round(v).toLocaleString() : v.toFixed(1));
+  if (m.current === undefined) return `— ${m.unit}`;
+  return m.target !== undefined ? `${f(m.current)} / ${f(m.target)} ${m.unit}` : `${f(m.current)} ${m.unit}`;
+}
+
 function ProjectRow({ project, active, onClick }: { project: ProjectSummary; active: boolean; onClick: () => void }) {
   const { milestonesDone: md, milestonesTotal: mt } = project;
   return (
@@ -127,14 +138,20 @@ function ProjectRow({ project, active, onClick }: { project: ProjectSummary; act
       className={clsx("w-full text-left rounded-md px-2 py-2 transition-colors", active ? "bg-accent text-accent-foreground" : "hover:bg-accent/60")}
     >
       <div className="flex items-center gap-2">
-        <StatusBadge status={project.status} />
         <span className="flex-1 truncate text-sm font-medium">{project.name}</span>
+        {/* 状態は詳細と同じ backend 判定。一覧でも「手当てが要るもの」が色で拾える */}
+        <span className={clsx("shrink-0 rounded-full border px-1.5 py-px text-[10px] font-semibold", TONE_CLASS[project.state.tone])}>
+          {project.state.label}
+        </span>
       </div>
       <div className="mt-1.5 flex items-center gap-2">
         <ProgressBar done={md} total={mt} />
         <span className="font-mono tnum text-[10px] text-muted-foreground shrink-0">{md}/{mt}</span>
       </div>
       <div className="mt-1 flex items-center gap-2 text-[10px] text-muted-foreground">
+        {project.metric && (
+          <span className="font-mono tnum text-brand">{formatBrief(project.metric)}</span>
+        )}
         <span>未完 {project.openTasks}</span>
         {project.deadline && <DeadlineText deadline={project.deadline} />}
       </div>
@@ -208,8 +225,12 @@ function ProjectDetailView({ name }: { name: string }) {
   const renderMs = (m: Task) => {
     const k = `${m.file}:${m.line}`;
     const done = m.state === "done";
+    // Journey の連番と対応させる（一覧は未完を上に並べ替えるため、番号が無いと
+    // どのステップの話か分からなくなる）。番号は README の並び順。
+    const step = String(milestones.indexOf(m) + 1).padStart(2, "0");
     return (
       <li key={k} className="flex items-center gap-2 text-sm group">
+        <span className="shrink-0 font-mono tnum text-[11px] text-muted-foreground w-5">{step}</span>
         <button onClick={() => toggleMs.mutate(m)} disabled={busy} aria-label="完了切替">
           <StateIcon state={m.state} />
         </button>
@@ -230,18 +251,25 @@ function ProjectDetailView({ name }: { name: string }) {
           />
         ) : (
           <span
-            className={clsx("flex-1 cursor-text hover:text-brand", m.state !== "todo" && "line-through text-muted-foreground")}
+            className={clsx("flex-1 cursor-text hover:text-brand", m.state !== "todo" && "text-muted-foreground")}
             onClick={() => {
               setEditingMs(k);
               setMsText(m.display);
             }}
           >
-            {m.display}
+            {cleanLabel(m.display)}
+          </span>
+        )}
+        {/* 完了行は完了日だけを静かに出す。期限チップと 完了 バッジを重ねると
+            1 行に日付が 2 つ並んで読みにくいため（未完了行は従来どおり期限を出す）。 */}
+        {done && (
+          <span className="shrink-0 font-mono tnum text-[11px] text-success">
+            {doneDate(m) ? `完了 ${doneDate(m)!.slice(5)}` : "完了"}
           </span>
         )}
         <span className="relative shrink-0">
           {m.due ? (
-            <button onClick={() => setEditingDue(k)} disabled={busy} title="期限を変更">
+            <button onClick={() => setEditingDue(k)} disabled={busy} title="期限を変更" className={clsx(done && "opacity-0 group-hover:opacity-100 transition-opacity")}>
               <MilestoneDue due={m.due} done={done} />
             </button>
           ) : (
@@ -249,7 +277,7 @@ function ProjectDetailView({ name }: { name: string }) {
               onClick={() => setEditingDue(k)}
               disabled={busy}
               title="期限を設定"
-              className="inline-flex items-center gap-1 rounded-md border border-dashed border-border px-1.5 h-6 text-xs text-muted-foreground hover:text-foreground hover:border-border-strong"
+              className="inline-flex items-center gap-1 rounded-md border border-dashed border-border px-1.5 h-6 text-xs text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity hover:text-foreground hover:border-border-strong"
             >
               <Calendar size={12} /> 日付
             </button>
@@ -265,7 +293,6 @@ function ProjectDetailView({ name }: { name: string }) {
             />
           )}
         </span>
-        {done && <Badge variant="success">完了</Badge>}
         <button
           className="size-6 grid place-items-center rounded-md text-destructive hover:bg-destructive/10 opacity-0 group-hover:opacity-100 transition-opacity shrink-0"
           disabled={busy}
@@ -278,69 +305,77 @@ function ProjectDetailView({ name }: { name: string }) {
     );
   };
 
-  return (
-    <Card>
-      <CardBody className="ds-section">
-        {/* タイトル */}
-        <div className="flex items-center gap-2 min-w-0">
-          <StatusBadge status={d.status} />
-          <h2 className="h-serif text-xl font-bold truncate">{d.name}</h2>
-        </div>
 
-        {/* メタ */}
+  return (
+    // min-w-0: Journey の min-width が親グリッドの 1fr トラックを押し広げて
+    // ページ全体が横スクロールするのを防ぐ（横に溢れるのは Journey の中だけにする）
+    <Card className="min-w-0">
+      <CardBody className="ds-section min-w-0">
+        {/* Hero — 目標・現在地・状態と、いま見るべき 1 つの数字を先頭に固定する */}
         {editingMeta ? (
-          <MetaEditor d={d} busy={saveMeta.isPending} onCancel={() => setEditingMeta(false)} onSave={(v) => saveMeta.mutate(v)} />
-        ) : (
-          <div>
-            <div className="flex items-center gap-2 flex-wrap">
-              {d.deadline && <DeadlineText deadline={d.deadline} withLabel />}
-              {d.repo && (
-                <a href={d.repo} target="_blank" rel="noreferrer" className="text-xs text-brand hover:underline inline-flex items-center gap-1">
-                  repo <ExternalLink size={11} />
-                </a>
-              )}
-              <Button variant="ghost" size="sm" className="ml-auto" onClick={() => setEditingMeta(true)}>
-                <Pencil size={13} />
-                メタ編集
-              </Button>
+          <>
+            <div className="flex items-center gap-2 min-w-0">
+              <StatusBadge status={d.status} />
+              <h2 className="h-serif text-xl font-bold truncate">{d.name}</h2>
             </div>
-            {d.goal && (
-              <p className="mt-3 h-serif text-base font-semibold leading-snug flex items-start gap-2">
-                <Target size={18} className="text-brand mt-0.5 shrink-0" />
-                {d.goal}
-              </p>
-            )}
-          </div>
+            <MetaEditor d={d} busy={saveMeta.isPending} onCancel={() => setEditingMeta(false)} onSave={(v) => saveMeta.mutate(v)} />
+          </>
+        ) : (
+          <ProjectHero
+            d={d}
+            milestones={milestones}
+            doneMs={doneMs}
+            openTasks={openTasks}
+            onEditMeta={() => setEditingMeta(true)}
+          />
         )}
 
-        <ProjectMetrics
+        {/* Pulse — Hero の要約に対する根拠。直近の前進と、次に手をつけるものを並べる */}
+        <ProjectPulse
+          d={d}
+          milestones={milestones}
+          doneMs={doneMs}
+          openMs={openMs}
+          openTasks={openTasks}
           metrics={metrics.data?.metrics ?? []}
-          loading={metrics.isPending}
-          error={metrics.error ?? refreshMetrics.error}
+          metricsError={metrics.error ?? refreshMetrics.error}
           refreshing={refreshMetrics.isPending}
           onRefresh={() => refreshMetrics.mutate()}
+        />
+
+        {/* Journey は checkpoint を持つ指標のときだけ独立セクションにする。
+            マイルストーン版の Journey は「マイルストーン」節の先頭に置く（同じ情報を 2 箇所に出さない）。
+            どちらも無い project は Horizons。 */}
+        {(metrics.data?.metrics ?? [])[0]?.checkpoints?.length ? (
+          <ProjectJourney
+            metric={(metrics.data?.metrics ?? [])[0]}
+            hint={d.deadline ? `deadline ${d.deadline}` : undefined}
+          />
+        ) : milestones.length === 0 ? (
+          <ProjectHorizons openTasks={openTasks} />
+        ) : null}
+
+        {/* 主指標以外のメトリクス（1 つだけなら Hero に出ているのでここは空） */}
+        <ProjectMetrics
+          metrics={(metrics.data?.metrics ?? []).slice(1)}
+          loading={false}
+          error={null}
           onRetry={() => metrics.refetch()}
         />
 
-        {/* 進捗 */}
-        <Section title="進捗">
-          <div className="flex items-center gap-4 text-sm">
-            <div className="flex items-center gap-2 flex-1 max-w-xs">
-              <ProgressBar done={doneMs.length} total={milestones.length} />
-              <span className="font-mono tnum text-xs text-muted-foreground shrink-0">MS {doneMs.length}/{milestones.length}</span>
-            </div>
-            <span className="text-muted-foreground">未完タスク {openTasks.length}</span>
-          </div>
-        </Section>
-
         {/* マイルストーン（未完了を上・完了を区切り線の下にまとめる） */}
-        <Section title="マイルストーン">
+        <Section title="Milestones" sub="到達点と進み具合" hint={d.deadline ? `deadline ${d.deadline}` : undefined}>
           {milestones.length === 0 && <p className="text-sm text-muted-foreground">まだありません。下から追加できます。</p>}
+          {milestones.length > 0 && (
+            <div className="mb-4">
+              <JourneyLine steps={milestoneSteps(milestones)} />
+            </div>
+          )}
           {openMs.length > 0 && <ul className="ds-stack !gap-1">{openMs.map(renderMs)}</ul>}
           {doneMs.length > 0 && (
             <>
               <div className="flex items-center gap-2 mt-3 mb-1">
-                <span className="text-[10px] uppercase tracking-[0.12em] text-success">完了 {doneMs.length}</span>
+                <span className="text-[11px] font-semibold tracking-wide text-success">完了 {doneMs.length}</span>
                 <div className="flex-1 h-px bg-border" />
               </div>
               <ul className="ds-stack !gap-1 opacity-65">{doneMs.map(renderMs)}</ul>
@@ -371,12 +406,12 @@ function ProjectDetailView({ name }: { name: string }) {
 
         {/* 進行中タスク（編集はタスクボード） */}
         {openTasks.length > 0 && (
-          <Section title={`進行中タスク (${openTasks.length})`}>
+          <Section title="進行中タスク" sub="編集はタスクボードで" hint={`${openTasks.length} 件`}>
             <ul className="ds-stack !gap-1">
               {openTasks.map((t) => (
                 <li key={`${t.file}:${t.line}`} className="flex items-center gap-2 text-sm">
                   <span className="size-1.5 rounded-full bg-warning shrink-0" />
-                  <span className="flex-1">{t.display}</span>
+                  <span className="flex-1">{inlineMd(t.display)}</span>
                   <TaskTags task={t} />
                 </li>
               ))}
@@ -385,28 +420,23 @@ function ProjectDetailView({ name }: { name: string }) {
         )}
 
         {/* フリースペース（README の ## フリースペース を md 自由編集） */}
-        <Section title="フリースペース">
+        <Section title="フリースペース" sub="自由メモ">
           <FreeSpace name={name} onSaved={invalidate} />
         </Section>
 
-        {/* ログ（日付ごとのタイムライン） */}
+        {/* 関連 — project 内 docs は自動収集、notes/ はタグ一致、外部リンクだけ README 手書き */}
+        <RelatedSection
+          related={d.related ?? []}
+          taggedNotes={taggedNotes.data?.files ?? []}
+          name={name}
+        />
+
+        {/* ログは最下部。実績の記録であって、いま判断するための情報ではない */}
         {(d.log ?? []).length > 0 && (
-          <Section title="ログ">
+          <Section title="Log" sub="やったことの記録" hint={`${(d.log ?? []).length} 件`}>
             <Timeline entries={d.log ?? []} />
           </Section>
         )}
-
-        {/* タグ付きノート（notes/ の frontmatter tags に project 名） */}
-        <Section title={`タグ付きノート #${name}`}>
-          {(taggedNotes.data?.files ?? []).length > 0 ? (
-            <NoteLinkList docs={taggedNotes.data?.files ?? []} />
-          ) : (
-            <p className="text-xs text-muted-foreground">
-              ノートの frontmatter <code className="px-1 rounded bg-muted">tags</code> に{" "}
-              <code className="px-1 rounded bg-muted">{name}</code> を足すと、ここに自動で並びます。
-            </p>
-          )}
-        </Section>
       </CardBody>
     </Card>
   );
@@ -416,34 +446,424 @@ function ProjectMetrics({
   metrics,
   loading,
   error,
-  refreshing,
-  onRefresh,
   onRetry,
 }: {
   metrics: ProjectMetric[];
   loading: boolean;
   error: Error | null;
-  refreshing: boolean;
-  onRefresh: () => void;
   onRetry: () => void;
 }) {
   if (loading) return <Section title="Metrics"><Skeleton className="h-28 w-full" /></Section>;
   if (error && metrics.length === 0) return <Section title="Metrics"><ErrorState error={error} onRetry={onRetry} /></Section>;
   if (metrics.length === 0) return null;
-  const canRefresh = metrics.some((metric) => metric.stale || metric.current === undefined);
   return (
-    <Section title="Metrics">
+    <Section title="Metrics" sub="そのほかの指標">
       <div className="grid grid-cols-1 xl:grid-cols-2 gap-3">
         {metrics.map((metric) => <MetricCard key={metric.id} metric={metric} />)}
       </div>
-      <div className="mt-2 flex min-h-7 items-center justify-end gap-2">
-        {error && <span className="mr-auto text-xs text-destructive">更新に失敗しました。最後の値を表示しています。</span>}
-        {canRefresh && (
-          <Button variant="ghost" size="sm" loading={refreshing} onClick={onRefresh}>
-            <RefreshCw size={13} />
-            外部値を更新
+    </Section>
+  );
+}
+
+// ---- Hero -------------------------------------------------------------
+// 「どこへ向かうか（目標）→ 今どこか（現在地・状態）→ いま見るべき数字」を
+// 1 ブロックに固定する。状態は色だけでなく必ずラベルと根拠を併記する。
+
+const DAY_MS = 86_400_000;
+
+// 日付文字列から今日までの日数（過去は負）。現在地の鮮度と Pulse の経過表示で使う。
+function daysFromToday(iso: string): number {
+  const target = new Date(`${iso}T00:00:00`);
+  const today = new Date(todayISO() + "T00:00:00");
+  return Math.round((target.getTime() - today.getTime()) / DAY_MS);
+}
+
+const TONE_CLASS: Record<ProjectState["tone"], string> = {
+  success: "border-success/40 bg-success/10 text-success",
+  warn: "border-warning/40 bg-warning/10 text-warning",
+  muted: "border-border bg-muted text-muted-foreground",
+};
+
+// 概要は「このプロジェクトが何か」の不変説明。毎日読むものではないので既定は畳み、
+// 現在地（可変）を主役にする。conventions 上も概要は描画対象。
+function OverviewDisclosure({ overview }: { overview: string }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <div>
+      <button
+        onClick={() => setOpen((v) => !v)}
+        className="inline-flex items-center gap-1 text-[11px] text-muted-foreground hover:text-foreground"
+      >
+        {open ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
+        概要
+      </button>
+      {open && (
+        <div className="mt-1.5 ds-stack !gap-1.5 border-l border-border pl-3">
+          {overview.split("\n").map((line) => line.trim()).filter(Boolean).map((line, i) => (
+            <p key={i} className="text-sm leading-relaxed text-muted-foreground">{inlineMd(line)}</p>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function ProjectHero({
+  d, milestones, doneMs, openTasks, onEditMeta,
+}: {
+  d: ProjectDetail;
+  milestones: Task[];
+  doneMs: Task[];
+  openTasks: Task[];
+  onEditMeta: () => void;
+}) {
+  const state = d.state;
+  const staleDays = d.current.date ? -daysFromToday(d.current.date) : undefined;
+  return (
+    // 1 カラム。かつて右側に置いていた数値カードは、現在値 / 次の到達点を Pulse が、
+    // 進み具合を Journey・Milestones が持っており、3 箇所で同じことを言っていたので廃止した。
+    <div className="ds-stack !gap-3 min-w-0">
+        <div className="flex items-center gap-2">
+          <StatusBadge status={d.status} />
+          <span className={clsx("shrink-0 rounded-full border px-2 py-0.5 text-[11px] font-semibold", TONE_CLASS[state.tone])}>
+            {state.label}
+          </span>
+          {/* 根拠は幅が足りなければ縮める。メタ編集ボタンを追い出して折り返さない */}
+          <span className="min-w-0 flex-1 truncate text-[11px] text-muted-foreground">{state.why}</span>
+          <Button variant="ghost" size="sm" className="shrink-0" onClick={onEditMeta}>
+            <Pencil size={13} />
+            メタ編集
           </Button>
+        </div>
+
+        <h2 className="h-serif text-xl font-bold truncate">{d.name}</h2>
+
+        {d.goal && (
+          <p className="h-serif text-base font-semibold leading-snug flex items-start gap-2">
+            <Target size={18} className="text-brand mt-0.5 shrink-0" />
+            {d.goal}
+          </p>
         )}
+
+        {d.overview && <OverviewDisclosure overview={d.overview} />}
+
+        {d.current.text && (
+          <div className="rounded-md border-l-2 border-brand bg-accent/25 px-4 py-3">
+            <div className="mb-1.5 flex items-center gap-2 text-[10px] uppercase tracking-[0.12em] text-muted-foreground">
+              <span>現在地</span>
+              {d.current.date && (
+                <span className={clsx("font-mono tnum normal-case tracking-normal", staleDays !== undefined && staleDays > 30 && "text-warning font-semibold")}>
+                  {d.current.date}
+                  {staleDays !== undefined && staleDays > 30 && `（${staleDays} 日前・要棚卸し）`}
+                </span>
+              )}
+            </div>
+            {/* 原文の改行を段落として保つ（1 行に詰め込むと壁のように読みづらい） */}
+            <div className="ds-stack !gap-1.5">
+              {d.current.text.split("\n").map((line) => line.trim()).filter(Boolean).map((line, i) => (
+                <p key={i} className="text-sm leading-relaxed">{inlineMd(line)}</p>
+              ))}
+            </div>
+          </div>
+        )}
+
+        <div className="flex items-center gap-3 flex-wrap text-[11px] text-muted-foreground">
+          {d.deadline && <DeadlineText deadline={d.deadline} withLabel />}
+          {milestones.length > 0 && <span className="font-mono tnum">MS {doneMs.length}/{milestones.length}</span>}
+          <span className="font-mono tnum">未完タスク {openTasks.length}</span>
+          {d.repo && (
+            <a href={d.repo} target="_blank" rel="noreferrer" className="text-brand hover:underline inline-flex items-center gap-1">
+              repo <ExternalLink size={11} />
+            </a>
+          )}
+        </div>
+    </div>
+  );
+}
+
+// ---- Pulse ------------------------------------------------------------
+// Hero が「今どうなっているか」の結論なら、Pulse はその根拠。
+// 左に直近の前進（何が終わったか）、右に次の一手（何から手をつけるか）。
+
+// README の `✅ YYYY-MM-DD` は完了メタデータ。ラベルとしては読みづらいので
+// 表示から外し、完了バッジ側で日付として見せる（生テキストは編集用にそのまま）。
+function cleanLabel(text: string): string {
+  return text.replace(/\s*✅\s*\d{4}-\d{2}-\d{2}\s*/g, " ").trim();
+}
+
+function doneDate(t: Task): string | undefined {
+  return /✅\s*(\d{4}-\d{2}-\d{2})/.exec(t.text)?.[1];
+}
+
+type PulseWin = { date: string; text: string; kind: "milestone" | "task" | "log" };
+
+// 完了マイルストーン・完了タスク・ログを日付順に統合する。
+// 近接して並べるだけで、因果は主張しない（Impact Timeline と同じ方針）。
+function recentWins(d: ProjectDetail, limit: number): PulseWin[] {
+  const wins: PulseWin[] = [];
+  for (const m of d.milestones ?? []) {
+    const date = m.state === "done" ? doneDate(m) : undefined;
+    if (date) wins.push({ date, text: m.display, kind: "milestone" });
+  }
+  for (const t of d.tasks ?? []) {
+    const date = t.state === "done" ? doneDate(t) : undefined;
+    if (date) wins.push({ date, text: t.display, kind: "task" });
+  }
+  for (const entry of d.log ?? []) {
+    if (entry.date) wins.push({ date: entry.date, text: entry.text, kind: "log" });
+  }
+  return wins.sort((a, b) => b.date.localeCompare(a.date)).slice(0, limit);
+}
+
+// 次の一手はバンド（今日 → 今週 → 今月 → いつか）を第一キーにする。
+// バンドは「いつやるつもりか」の意図なので、締切より先に効かせる。
+function nextMoves(openTasks: Task[], limit: number): Task[] {
+  const band = (t: Task) => (t.today ? 0 : t.week ? 1 : t.month ? 2 : 3);
+  return [...openTasks]
+    .sort((a, b) =>
+      band(a) - band(b) ||
+      (a.due ?? "9999-99-99").localeCompare(b.due ?? "9999-99-99") ||
+      (a.priority || Number.MAX_SAFE_INTEGER) - (b.priority || Number.MAX_SAFE_INTEGER))
+    .slice(0, limit);
+}
+
+// ログ本文は段落なので、fact に出すときは最初の 1 文だけにする。
+function firstSentence(text: string): string {
+  const head = text.split("。")[0].trim();
+  return head.length > 0 && head.length < text.length ? `${head}。` : text;
+}
+
+const BAND_LABEL: [keyof Pick<Task, "today" | "week" | "month">, string][] = [
+  ["today", "今日"], ["week", "今週"], ["month", "今月"],
+];
+
+const STATE_ICON: Record<ProjectState["tone"], typeof TrendingUp> = {
+  success: TrendingUp,
+  warn: AlertTriangle,
+  muted: Minus,
+};
+const STATE_TEXT: Record<ProjectState["tone"], string> = {
+  success: "text-success",
+  warn: "text-warning",
+  muted: "text-muted-foreground",
+};
+
+// 2×2 の fact グリッド。左の状態文が「結論」、こちらが「今の数字」。
+function Fact({ label, value, index }: { label: string; value: React.ReactNode; index: number }) {
+  return (
+    <div className={clsx("px-4 py-3.5 border-border", index < 2 && "border-b", index % 2 === 1 && "border-l")}>
+      <span className="block text-[10px] text-muted-foreground mb-1">{label}</span>
+      <b className="text-xs font-semibold leading-snug line-clamp-2">{value}</b>
+    </div>
+  );
+}
+
+function ProjectPulse({
+  d, milestones, doneMs, openMs, openTasks, metrics, metricsError, refreshing, onRefresh,
+}: {
+  d: ProjectDetail;
+  milestones: Task[];
+  doneMs: Task[];
+  openMs: Task[];
+  openTasks: Task[];
+  metrics: ProjectMetric[];
+  metricsError: Error | null;
+  refreshing: boolean;
+  onRefresh: () => void;
+}) {
+  const state = d.state;
+  const metric = metrics[0];
+  const allWins = recentWins(d, 8);
+  const win = allWins.find((w) => w.kind !== "log") ?? allWins[0];
+  const moves = nextMoves(openTasks, 1);
+  const activity = state.lastActivity;
+  const since = activity ? -daysFromToday(activity) : undefined;
+  if (!win && moves.length === 0 && !metric) return null;
+
+  const Icon = STATE_ICON[state.tone];
+  const format = (v: number) => metric?.display === "integer" ? Math.round(v).toLocaleString() : v.toFixed(1);
+
+  // 現在値と次の到達点は、主指標 → マイルストーン → タスク の順で決める（Hero と同じ判断）。
+  let current: React.ReactNode = `${openTasks.length} 件の未完タスク`;
+  let nextPoint: React.ReactNode = openMs[0] ? inlineMd(openMs[0].display) : "—";
+  if (metric && metric.current !== undefined) {
+    current = `${format(metric.current)}${metric.target !== undefined ? ` / ${format(metric.target)}` : ""} ${metric.unit}`;
+    const next = nextCheckpoint(metric);
+    if (next) {
+      nextPoint = `${format(next.value)} ${metric.unit} · ${next.label}（残り ${format(next.value - metric.current)}）`;
+    } else if (metric.target !== undefined) {
+      nextPoint = `${format(metric.target)} ${metric.unit} · 残り ${format(Math.max(0, metric.target - metric.current))}`;
+    } else {
+      nextPoint = "目標未設定";
+    }
+  } else if (milestones.length > 0) {
+    current = `${doneMs.length} / ${milestones.length} milestones`;
+    nextPoint = openMs[0] ? inlineMd(cleanLabel(openMs[0].display)) : "すべて完了";
+  }
+
+  const hint = metric?.delta.days30 !== undefined
+    ? `30日 ${signed(metric.delta.days30, format)}`
+    : since !== undefined ? `最終前進 ${since === 0 ? "今日" : `${since}日前`}` : undefined;
+
+  return (
+    <Section title="Pulse" sub="最近の活動" hint={hint}>
+      <div className="rounded-lg border border-border bg-card grid grid-cols-1 lg:grid-cols-[0.8fr_1.2fr] overflow-hidden">
+        <div className="p-5 ds-stack !gap-2 border-b lg:border-b-0 lg:border-r border-border">
+          <p className="h-serif text-lg font-bold flex items-center gap-2">
+            <Icon size={18} className={clsx("shrink-0", STATE_TEXT[state.tone])} />
+            {state.label}
+          </p>
+          <p className="text-sm leading-relaxed text-muted-foreground">{state.sentence}</p>
+          {metric && <Sparkline series={metric.series} />}
+          {metric?.stale && (
+            <Button variant="ghost" size="sm" className="self-start !px-1" loading={refreshing} onClick={onRefresh}>
+              <RefreshCw size={13} />
+              外部値を更新
+            </Button>
+          )}
+          {metricsError && <p className="text-[10px] text-destructive">更新に失敗しました。最後の値を表示しています。</p>}
+        </div>
+        <div className="grid grid-cols-2">
+          <Fact index={0} label="現在値" value={current} />
+          <Fact index={1} label="次の到達点" value={nextPoint} />
+          <Fact index={2} label="最近の成果" value={win ? inlineMd(cleanLabel(firstSentence(win.text))) : "—"} />
+          <Fact
+            index={3}
+            label="次の一手"
+            value={moves[0] ? (
+              <span className="flex items-start gap-1.5">
+                <span className="shrink-0 rounded border border-border px-1 text-[10px] font-normal text-muted-foreground">
+                  {BAND_LABEL.find(([key]) => moves[0][key])?.[1] ?? "いつか"}
+                </span>
+                <span className="min-w-0">{inlineMd(moves[0].display)}</span>
+              </span>
+            ) : "—"}
+          />
+        </div>
+      </div>
+    </Section>
+  );
+}
+
+// ---- Journey / Horizons -----------------------------------------------
+// 到達点の並び。growth は metric checkpoint、delivery は README のマイルストーン。
+// 終点を持たない project（maintenance）は Journey を出さず、時間軸の Horizons を出す。
+
+type Step = { value: string; label: string; state: "done" | "now" | "todo" };
+
+// 現在値を超える最初の checkpoint。設計上「target との割合」より
+// 「次に届く一点」を主役にする。checkpoint 未定義なら undefined。
+function nextCheckpoint(metric?: ProjectMetric): { value: number; label: string } | undefined {
+  if (!metric || metric.current === undefined) return undefined;
+  return (metric.checkpoints ?? []).find((cp) => cp.value > metric.current!);
+}
+
+function checkpointSteps(metric: ProjectMetric, format: (v: number) => string): Step[] {
+  const points = metric.checkpoints ?? [];
+  if (points.length === 0) return [];
+  const current = metric.current;
+  const steps: Step[] = [];
+  let nowPlaced = false;
+  for (const cp of points) {
+    const reached = current !== undefined && current >= cp.value;
+    // 現在値は「まだ届いていない最初の checkpoint」の手前に差し込む
+    if (!reached && !nowPlaced && current !== undefined) {
+      steps.push({ value: format(current), label: "NOW", state: "now" });
+      nowPlaced = true;
+    }
+    steps.push({
+      value: format(cp.value),
+      label: metric.target !== undefined && cp.value === metric.target ? "GOAL" : cp.label,
+      state: reached ? "done" : "todo",
+    });
+  }
+  if (!nowPlaced && current !== undefined) steps.push({ value: format(current), label: "NOW", state: "now" });
+  return steps;
+}
+
+function milestoneSteps(milestones: Task[]): Step[] {
+  let nowPlaced = false;
+  return milestones.map((m, i) => {
+    const done = m.state === "done";
+    const state: Step["state"] = done ? "done" : !nowPlaced ? ((nowPlaced = true), "now") : "todo";
+    return { value: String(i + 1).padStart(2, "0"), label: cleanLabel(m.display), state };
+  });
+}
+
+const DOT_CLASS: Record<Step["state"], string> = {
+  done: "bg-success border-success",
+  now: "bg-brand border-brand ring-2 ring-brand ring-offset-2 ring-offset-card",
+  todo: "bg-card border-muted-foreground/50",
+};
+
+// 進行の可視化そのもの。checkpoint 版は独立した Journey セクション、
+// マイルストーン版は「マイルストーン」セクションの先頭に置いて重複を避ける。
+function JourneyLine({ steps }: { steps: Step[] }) {
+  if (steps.length === 0) return null;
+  return (
+      <div className="rounded-lg border border-border bg-card p-6 overflow-x-auto">
+        {/* ステップが増えたら潰さずに横スクロールさせる（1 ステップあたり最低 120px 確保） */}
+        <div
+          className="relative grid"
+          style={{ gridTemplateColumns: `repeat(${steps.length}, 1fr)`, minWidth: `${Math.max(560, steps.length * 120)}px` }}
+        >
+          {/* 進行線。両端は最初/最後の dot の中心で止める */}
+          <div className="absolute top-[10px] h-[3px] bg-muted" style={{ left: `${50 / steps.length}%`, right: `${50 / steps.length}%` }} />
+          {steps.map((s, i) => (
+            <div key={i} className="relative text-center px-1">
+              <div className={clsx("mx-auto mb-2.5 size-[22px] rounded-full border-2", DOT_CLASS[s.state])} />
+              <div className="font-mono tnum text-sm font-bold">{s.value}</div>
+              <div
+                title={s.label}
+                className={clsx("mt-1 text-[11px] leading-snug line-clamp-2", s.state === "now" ? "text-brand font-bold" : "text-foreground/70")}
+              >
+                {s.label}
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+  );
+}
+
+function ProjectJourney({ metric, hint }: { metric: ProjectMetric; hint?: string }) {
+  const format = (v: number) => metric.display === "integer" ? Math.round(v).toLocaleString() : v.toFixed(1);
+  const steps = checkpointSteps(metric, format);
+  if (steps.length === 0) return null;
+  return (
+    <Section title="Journey" sub="目標までの到達点" hint={hint}>
+      <JourneyLine steps={steps} />
+    </Section>
+  );
+}
+
+// 終点のない project 向け。達成率を出さず、バンドをそのまま Now / Soon / Someday に写す。
+function ProjectHorizons({ openTasks }: { openTasks: Task[] }) {
+  const groups: { title: string; note: string; items: Task[] }[] = [
+    { title: "Now", note: "今日・今週", items: openTasks.filter((t) => t.today || t.week) },
+    { title: "Soon", note: "今月", items: openTasks.filter((t) => t.month && !t.today && !t.week) },
+    { title: "Someday", note: "いつか", items: openTasks.filter((t) => !t.today && !t.week && !t.month) },
+  ];
+  if (groups.every((g) => g.items.length === 0)) return null;
+  return (
+    <Section title="Horizons" sub="いつやるかで見る" hint="終点のない project">
+      <div className="rounded-lg border border-border bg-card grid grid-cols-1 sm:grid-cols-3 overflow-hidden">
+        {groups.map((g, i) => (
+          <div key={g.title} className={clsx("p-5", i > 0 && "border-t sm:border-t-0 sm:border-l border-border")}>
+            <h4 className="h-serif text-base font-bold">{g.title}</h4>
+            <p className="mb-2 text-[10px] text-muted-foreground">{g.note}</p>
+            {g.items.length === 0 ? (
+              <p className="text-xs text-muted-foreground">—</p>
+            ) : (
+              <ul className="ds-stack !gap-1.5">
+                {g.items.slice(0, 5).map((t) => (
+                  <li key={`${t.file}:${t.line}`} className="text-xs leading-snug line-clamp-2">{inlineMd(t.display)}</li>
+                ))}
+                {g.items.length > 5 && <li className="text-[10px] text-muted-foreground">ほか {g.items.length - 5} 件</li>}
+              </ul>
+            )}
+          </div>
+        ))}
       </div>
     </Section>
   );
@@ -518,37 +938,53 @@ function Sparkline({ series }: { series: ProjectMetric["series"] }) {
   );
 }
 
-// タグ付きノートのリンク一覧。長寿プロジェクトでは 40 件超の「リンクの壁」になるため、
-// 既定は先頭 8 件 + 「すべて表示」で折りたたむ（新しい順が上に来る前提の一覧をそのまま使う）。
-const NOTE_LIST_COLLAPSED = 8;
-function NoteLinkList({ docs }: { docs: Doc[] }) {
-  const [expanded, setExpanded] = useState(false);
-  const visible = expanded ? docs : docs.slice(0, NOTE_LIST_COLLAPSED);
+const KIND_LABEL: Record<RelatedItem["kind"], string> = {
+  docs: "docs", records: "記録", articles: "記事", note: "ノート", project: "project", external: "外部",
+};
+
+// 出どころの違う 3 系統（project 内 md / タグ付きノート / 手書きリンク）を 1 つに束ねる。
+// 種別ラベルを添えることで「なぜここに出ているか」が分かるようにする。
+function RelatedSection({ related, taggedNotes, name }: { related: RelatedItem[]; taggedNotes: Doc[]; name: string }) {
+  const tagged: RelatedItem[] = taggedNotes.map((d) => ({
+    kind: "note",
+    label: d.meta.title || d.path.split("/").pop()!.replace(/\.md$/, ""),
+    target: d.path,
+  }));
+  const seen = new Set(related.map((r) => r.target).filter(Boolean));
+  const items = [...related, ...tagged.filter((t) => !seen.has(t.target))];
+  if (items.length === 0) {
+    return (
+      <Section title="関連" sub="docs・記録・タグ付きノート">
+        <p className="text-xs text-muted-foreground">
+          <code className="px-1 rounded bg-muted">projects/{name}/docs/</code> に md を置くか、ノートの
+          <code className="px-1 rounded bg-muted">tags</code> に <code className="px-1 rounded bg-muted">{name}</code> を足すと、ここに自動で並びます。
+        </p>
+      </Section>
+    );
+  }
   return (
-    <>
+    <Section title="関連" sub="docs・記録・タグ付きノート" hint={`${items.length} 件`}>
       <ul className="ds-stack !gap-1">
-        {visible.map((doc) => (
-          <li key={doc.path} className="text-sm">
-            <Link to={`/notes?path=${encodeURIComponent(doc.path)}`} className="text-brand hover:underline">
-              {doc.meta.title || doc.path.replace(/^notes\//, "").replace(/\.md$/, "")}
-            </Link>
+        {items.map((r, i) => (
+          <li key={i} className="flex items-baseline gap-2 text-sm">
+            <span className="shrink-0 w-[52px] font-mono text-[10px] text-muted-foreground">{KIND_LABEL[r.kind]}</span>
+            {r.target ? (
+              <Link to={`/notes?path=${encodeURIComponent(r.target)}`} className="text-brand hover:underline">{r.label}</Link>
+            ) : r.url ? (
+              <a href={r.url} target="_blank" rel="noreferrer" className="text-brand hover:underline inline-flex items-center gap-1">
+                {r.label} <ExternalLink size={11} />
+              </a>
+            ) : (
+              <span>{r.label}</span>
+            )}
+            {r.desc && <span className="min-w-0 truncate text-muted-foreground text-xs">— {r.desc}</span>}
           </li>
         ))}
       </ul>
-      {docs.length > NOTE_LIST_COLLAPSED && (
-        <button
-          className="mt-2 text-xs text-muted-foreground hover:text-foreground"
-          onClick={() => setExpanded(!expanded)}
-          aria-expanded={expanded}
-        >
-          {expanded ? "折りたたむ" : `すべて表示（${docs.length} 件）`}
-        </button>
-      )}
-    </>
+    </Section>
   );
 }
 
-// README 内の ## 見出し セクションの境界を返す（同レベル以上の見出しで終端）。
 const HEADING_RE = /^(#{1,6})\s+(.+?)\s*$/;
 function sectionBounds(lines: string[], heading: string): { start: number; end: number; level: number } | null {
   let start = -1;
@@ -696,10 +1132,18 @@ function MetaEditor({
   );
 }
 
-function Section({ title, children }: { title: string; children: React.ReactNode }) {
+// title は block 名（Pulse / Journey ...）、sub はそれが何かを一言で示す副題。
+// 直訳の日本語を主見出しにすると冗長なので、説明は副題に落とす。
+function Section({ title, sub, hint, children }: { title: string; sub?: string; hint?: string; children: React.ReactNode }) {
   return (
     <div>
-      <h3 className="text-[10px] uppercase tracking-[0.12em] text-muted-foreground pb-2 border-b border-border mb-3">{title}</h3>
+      <div className="flex items-baseline justify-between gap-3 pb-2 mb-3 border-b border-border">
+        <div className="min-w-0 flex items-baseline gap-2">
+          <h3 className="h-serif text-lg font-bold leading-tight shrink-0">{title}</h3>
+          {sub && <span className="text-[11px] text-muted-foreground truncate">{sub}</span>}
+        </div>
+        {hint && <span className="shrink-0 font-mono tnum text-[11px] text-muted-foreground">{hint}</span>}
+      </div>
       {children}
     </div>
   );
@@ -818,35 +1262,60 @@ function TaskTags({ task }: { task: Task }) {
   );
 }
 
-// 最小限のインライン markdown（**太字** と `コード` のみ）を React ノードへ。
+// 最小限のインライン markdown（**太字** / `コード` / [ラベル](URL)）を React ノードへ。
+// 外部 URL のみアンカー化。相対パス（docs/*.md 等）はラベルのみ表示（プロジェクト画面からは辿らせない。
+// 内部ドキュメントへの導線は「関連ドキュメント」節で target 付きリンクとして出す）。
 function inlineMd(text: string): React.ReactNode[] {
   const out: React.ReactNode[] = [];
-  const re = /\*\*([^*]+)\*\*|`([^`]+)`/g;
+  const re = /\*\*([^*]+)\*\*|`([^`]+)`|\[([^\]]+)\]\(([^)]+)\)/g;
   let last = 0;
   let key = 0;
   let m: RegExpExecArray | null;
   while ((m = re.exec(text))) {
     if (m.index > last) out.push(text.slice(last, m.index));
     if (m[1]) out.push(<strong key={key++}>{m[1]}</strong>);
-    else out.push(<code key={key++} className="px-1 rounded bg-muted text-xs font-mono">{m[2]}</code>);
+    else if (m[2]) out.push(<code key={key++} className="px-1 rounded bg-muted text-xs font-mono">{m[2]}</code>);
+    else {
+      const label = m[3].replace(/[`*]/g, "");
+      const url = m[4];
+      if (/^https?:\/\//.test(url)) {
+        out.push(
+          <a key={key++} href={url} target="_blank" rel="noreferrer" className="text-brand hover:underline">
+            {label}
+          </a>,
+        );
+      } else {
+        out.push(<span key={key++}>{label}</span>);
+      }
+    }
     last = re.lastIndex;
   }
   if (last < text.length) out.push(text.slice(last));
   return out;
 }
 
-const LOG_LIMIT = 10;
+const LOG_LIMIT = 5;
 
+// ログは件数が多く 1 件が長い（段落まるごと）。既定は 5 件 × 1 行に畳み、
+// 行クリックでその 1 件だけ展開する。全文は「他 N 件」で開く。
 function Timeline({ entries }: { entries: { date?: string; text: string }[] }) {
   const [all, setAll] = useState(false);
+  const [open, setOpen] = useState<number | null>(null);
   const shown = all ? entries : entries.slice(0, LOG_LIMIT);
   return (
     <>
-      <ul className="ds-stack !gap-3">
+      <ul className="ds-stack !gap-0">
         {shown.map((e, i) => (
-          <li key={i} className="border-l-2 border-border pl-3">
-            {e.date && <div className="font-mono tnum text-xs text-brand">{e.date}</div>}
-            <p className="text-sm text-muted-foreground leading-relaxed mt-0.5">{inlineMd(e.text)}</p>
+          <li key={i}>
+            <button
+              className="w-full flex items-baseline gap-3 py-1.5 text-left border-b border-border/60 hover:bg-accent/40 transition-colors"
+              onClick={() => setOpen((v) => (v === i ? null : i))}
+            >
+              <span className="shrink-0 font-mono tnum text-[11px] text-muted-foreground w-[74px]">{e.date ?? "—"}</span>
+              <span className={clsx("min-w-0 flex-1 text-[13px] leading-relaxed", open === i ? "" : "truncate")}>
+                {inlineMd(e.text)}
+              </span>
+            </button>
           </li>
         ))}
       </ul>

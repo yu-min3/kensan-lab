@@ -28,13 +28,21 @@ type Config struct {
 }
 
 type Definition struct {
-	ID        string          `yaml:"id"`
-	Label     string          `yaml:"label"`
-	Unit      string          `yaml:"unit"`
-	Target    *float64        `yaml:"target"`
-	Direction string          `yaml:"direction"`
-	Display   string          `yaml:"display"`
-	Collector CollectorConfig `yaml:"collector"`
+	ID          string          `yaml:"id"`
+	Label       string          `yaml:"label"`
+	Unit        string          `yaml:"unit"`
+	Target      *float64        `yaml:"target"`
+	Direction   string          `yaml:"direction"`
+	Display     string          `yaml:"display"`
+	Checkpoints []Checkpoint    `yaml:"checkpoints"`
+	Collector   CollectorConfig `yaml:"collector"`
+}
+
+// Checkpoint は target までの途中の到達点。Journey / Hero の「次の到達点」に使う。
+// 到達判定は観測値から自動で行い、README の checkbox は書き換えない。
+type Checkpoint struct {
+	Value float64 `yaml:"value" json:"value"`
+	Label string  `yaml:"label" json:"label"`
 }
 
 // CollectorConfig は collector の指定。`type` だけを共通で解釈し、残りの
@@ -90,19 +98,20 @@ type Best struct {
 }
 
 type View struct {
-	ID        string         `json:"id"`
-	Label     string         `json:"label"`
-	Unit      string         `json:"unit"`
-	Target    *float64       `json:"target,omitempty"`
-	Direction string         `json:"direction"`
-	Display   string         `json:"display"`
-	Current   *float64       `json:"current,omitempty"`
-	Fields    map[string]any `json:"fields,omitempty"`
-	Delta     Delta          `json:"delta"`
-	Best      *Best          `json:"best,omitempty"`
-	UpdatedAt string         `json:"updatedAt,omitempty"`
-	Stale     bool           `json:"stale"`
-	Series    []Point        `json:"series"`
+	ID          string         `json:"id"`
+	Label       string         `json:"label"`
+	Unit        string         `json:"unit"`
+	Target      *float64       `json:"target,omitempty"`
+	Direction   string         `json:"direction"`
+	Display     string         `json:"display"`
+	Current     *float64       `json:"current,omitempty"`
+	Fields      map[string]any `json:"fields,omitempty"`
+	Delta       Delta          `json:"delta"`
+	Best        *Best          `json:"best,omitempty"`
+	Checkpoints []Checkpoint   `json:"checkpoints,omitempty"`
+	UpdatedAt   string         `json:"updatedAt,omitempty"`
+	Stale       bool           `json:"stale"`
+	Series      []Point        `json:"series"`
 }
 
 type Result struct {
@@ -213,6 +222,9 @@ func loadObservations(path string) ([]Observation, error) {
 
 func buildView(d Definition, observations []Observation, now time.Time) View {
 	v := View{ID: d.ID, Label: d.Label, Unit: d.Unit, Target: d.Target, Direction: d.Direction, Display: d.Display, Series: []Point{}}
+	// checkpoint は値の昇順で返す（Journey がそのまま左→右に並べられるように）。
+	v.Checkpoints = append(v.Checkpoints, d.Checkpoints...)
+	sort.Slice(v.Checkpoints, func(i, j int) bool { return v.Checkpoints[i].Value < v.Checkpoints[j].Value })
 	for _, o := range observations {
 		v.Series = append(v.Series, Point{At: o.At, Value: o.Value})
 	}
