@@ -107,6 +107,16 @@ export interface NoteRef {
   desc?: string;
 }
 
+// project に紐づくリソース。docs/records/articles は自動収集、
+// project/external は README の手書き、note は notes/ のタグ一致（frontend で合流）。
+export interface RelatedItem {
+  kind: "docs" | "records" | "articles" | "note" | "project" | "external";
+  label: string;
+  target?: string;
+  url?: string;
+  desc?: string;
+}
+
 export interface ProjectDetail {
   name: string;
   status: string;
@@ -121,6 +131,7 @@ export interface ProjectDetail {
   tasks: Task[] | null;
   log: LogEntry[] | null;
   notes: NoteRef[] | null;
+  related: RelatedItem[] | null;
 }
 
 export interface MetricPoint {

@@ -63,18 +63,19 @@ type CurrentState struct {
 
 // Detail は詳細パネル用。
 type Detail struct {
-	Name       string       `json:"name"`
-	Status     string       `json:"status"`
-	Deadline   string       `json:"deadline,omitempty"`
-	Repo       string       `json:"repo,omitempty"`
-	Overview   string       `json:"overview"`
-	Current    CurrentState `json:"current"`
-	State      State        `json:"state"`
-	Goal       string       `json:"goal"`
-	Milestones []tasks.Task `json:"milestones"`
-	Tasks      []tasks.Task `json:"tasks"`
-	Log        []LogEntry   `json:"log"`
-	Notes      []NoteRef    `json:"notes"`
+	Name       string        `json:"name"`
+	Status     string        `json:"status"`
+	Deadline   string        `json:"deadline,omitempty"`
+	Repo       string        `json:"repo,omitempty"`
+	Overview   string        `json:"overview"`
+	Current    CurrentState  `json:"current"`
+	State      State         `json:"state"`
+	Goal       string        `json:"goal"`
+	Milestones []tasks.Task  `json:"milestones"`
+	Tasks      []tasks.Task  `json:"tasks"`
+	Log        []LogEntry    `json:"log"`
+	Notes      []NoteRef     `json:"notes"`
+	Related    []RelatedItem `json:"related"`
 }
 
 func readme(root, name string) (string, error) {
@@ -172,6 +173,8 @@ func Load(root, name string) (Detail, error) {
 	if r, err := metrics.Load(root, name, time.Now()); err == nil {
 		views = r.Metrics
 	}
+	auto := collectProjectDocs(root, name)
+	d.Related = append(auto, manualRelated(d.Notes, auto)...)
 	d.State = ComputeState(d.Deadline, d.Milestones, d.Tasks, d.Log, views, time.Now().Truncate(24*time.Hour))
 	return d, nil
 }

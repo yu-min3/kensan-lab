@@ -22,7 +22,7 @@ import {
   ChevronDown,
 } from "lucide-react";
 import clsx from "clsx";
-import { api, ApiError, todayISO, type Doc, type ProjectSummary, type ProjectDetail, type MetricBrief, type ProjectMetric, type ProjectState, type Task } from "../lib/api";
+import { api, ApiError, todayISO, type Doc, type ProjectSummary, type ProjectDetail, type MetricBrief, type ProjectMetric, type ProjectState, type RelatedItem, type Task } from "../lib/api";
 import { PageHeader } from "../components/PageHeader";
 import { MilkdownEditor } from "../components/editors/MilkdownEditor";
 import { useAutosaveFile } from "../hooks/useAutosaveFile";
@@ -424,37 +424,12 @@ function ProjectDetailView({ name }: { name: string }) {
           <FreeSpace name={name} onSaved={invalidate} />
         </Section>
 
-        {/* 関連ドキュメント（README ## 関連ノート・リソース。roadmap 俯瞰などへの導線） */}
-        {(d.notes ?? []).length > 0 && (
-          <Section title="関連ドキュメント" sub="README に手で並べたリンク">
-            <ul className="ds-stack !gap-1">
-              {(d.notes ?? []).map((n, i) => (
-                <li key={i} className="text-sm">
-                  {n.target ? (
-                    <Link to={`/notes?path=${encodeURIComponent(n.target)}`} className="text-brand hover:underline">
-                      {n.label}
-                    </Link>
-                  ) : (
-                    <span>{n.label}</span>
-                  )}
-                  {n.desc && <span className="text-muted-foreground"> — {n.desc}</span>}
-                </li>
-              ))}
-            </ul>
-          </Section>
-        )}
-
-        {/* タグ付きノート（notes/ の frontmatter tags に project 名） */}
-        <Section title="関連ノート" sub={`notes/ の tags に #${name} があるもの（自動収集）`}>
-          {(taggedNotes.data?.files ?? []).length > 0 ? (
-            <NoteLinkList docs={taggedNotes.data?.files ?? []} />
-          ) : (
-            <p className="text-xs text-muted-foreground">
-              ノートの frontmatter <code className="px-1 rounded bg-muted">tags</code> に{" "}
-              <code className="px-1 rounded bg-muted">{name}</code> を足すと、ここに自動で並びます。
-            </p>
-          )}
-        </Section>
+        {/* 関連 — project 内 docs は自動収集、notes/ はタグ一致、外部リンクだけ README 手書き */}
+        <RelatedSection
+          related={d.related ?? []}
+          taggedNotes={taggedNotes.data?.files ?? []}
+          name={name}
+        />
 
         {/* ログは最下部。実績の記録であって、いま判断するための情報ではない */}
         {(d.log ?? []).length > 0 && (
@@ -963,37 +938,53 @@ function Sparkline({ series }: { series: ProjectMetric["series"] }) {
   );
 }
 
-// タグ付きノートのリンク一覧。長寿プロジェクトでは 40 件超の「リンクの壁」になるため、
-// 既定は先頭 8 件 + 「すべて表示」で折りたたむ（新しい順が上に来る前提の一覧をそのまま使う）。
-const NOTE_LIST_COLLAPSED = 8;
-function NoteLinkList({ docs }: { docs: Doc[] }) {
-  const [expanded, setExpanded] = useState(false);
-  const visible = expanded ? docs : docs.slice(0, NOTE_LIST_COLLAPSED);
+const KIND_LABEL: Record<RelatedItem["kind"], string> = {
+  docs: "docs", records: "記録", articles: "記事", note: "ノート", project: "project", external: "外部",
+};
+
+// 出どころの違う 3 系統（project 内 md / タグ付きノート / 手書きリンク）を 1 つに束ねる。
+// 種別ラベルを添えることで「なぜここに出ているか」が分かるようにする。
+function RelatedSection({ related, taggedNotes, name }: { related: RelatedItem[]; taggedNotes: Doc[]; name: string }) {
+  const tagged: RelatedItem[] = taggedNotes.map((d) => ({
+    kind: "note",
+    label: d.meta.title || d.path.split("/").pop()!.replace(/\.md$/, ""),
+    target: d.path,
+  }));
+  const seen = new Set(related.map((r) => r.target).filter(Boolean));
+  const items = [...related, ...tagged.filter((t) => !seen.has(t.target))];
+  if (items.length === 0) {
+    return (
+      <Section title="関連" sub="docs・記録・タグ付きノート">
+        <p className="text-xs text-muted-foreground">
+          <code className="px-1 rounded bg-muted">projects/{name}/docs/</code> に md を置くか、ノートの
+          <code className="px-1 rounded bg-muted">tags</code> に <code className="px-1 rounded bg-muted">{name}</code> を足すと、ここに自動で並びます。
+        </p>
+      </Section>
+    );
+  }
   return (
-    <>
+    <Section title="関連" sub="docs・記録・タグ付きノート" hint={`${items.length} 件`}>
       <ul className="ds-stack !gap-1">
-        {visible.map((doc) => (
-          <li key={doc.path} className="text-sm">
-            <Link to={`/notes?path=${encodeURIComponent(doc.path)}`} className="text-brand hover:underline">
-              {doc.meta.title || doc.path.replace(/^notes\//, "").replace(/\.md$/, "")}
-            </Link>
+        {items.map((r, i) => (
+          <li key={i} className="flex items-baseline gap-2 text-sm">
+            <span className="shrink-0 w-[52px] font-mono text-[10px] text-muted-foreground">{KIND_LABEL[r.kind]}</span>
+            {r.target ? (
+              <Link to={`/notes?path=${encodeURIComponent(r.target)}`} className="text-brand hover:underline">{r.label}</Link>
+            ) : r.url ? (
+              <a href={r.url} target="_blank" rel="noreferrer" className="text-brand hover:underline inline-flex items-center gap-1">
+                {r.label} <ExternalLink size={11} />
+              </a>
+            ) : (
+              <span>{r.label}</span>
+            )}
+            {r.desc && <span className="min-w-0 truncate text-muted-foreground text-xs">— {r.desc}</span>}
           </li>
         ))}
       </ul>
-      {docs.length > NOTE_LIST_COLLAPSED && (
-        <button
-          className="mt-2 text-xs text-muted-foreground hover:text-foreground"
-          onClick={() => setExpanded(!expanded)}
-          aria-expanded={expanded}
-        >
-          {expanded ? "折りたたむ" : `すべて表示（${docs.length} 件）`}
-        </button>
-      )}
-    </>
+    </Section>
   );
 }
 
-// README 内の ## 見出し セクションの境界を返す（同レベル以上の見出しで終端）。
 const HEADING_RE = /^(#{1,6})\s+(.+?)\s*$/;
 function sectionBounds(lines: string[], heading: string): { start: number; end: number; level: number } | null {
   let start = -1;
