@@ -4,7 +4,7 @@
 //
 //	projects/<name>/README.md  ## タスク        ← タスク（project 紐付き）
 //	projects/<name>/README.md  ## マイルストーン ← マイルストーン
-//	projects/<name>/README.md  ## いつかやる     ← someday
+//	projects/<name>/README.md  ## いつかやる     ← タスクと同じくバンド駆動（無タグ = いつか）
 //	todo.md                    ## Now           ← project に属さない即席 today
 //
 // タスクは project に住む。時間軸バンド（今日 / 今週 / 今月 / 中期以降）は
@@ -66,13 +66,12 @@ type Task struct {
 // Board はかんばんの 1 画面分。project の未完了タスクを時間軸バンドに振り分ける。
 // Today = @today / @due≤今日 + todo.md ## Now（即席）。
 // Week / Month = @week / @month（または @due≤今週末 / 月末で自動昇格）。
-// Later = バンドタグの無い未完了タスク（中期以降）。
+// Later = バンドタグの無い未完了タスク（いつか）。## タスク と ## いつかやる の両方が対象。
 type Board struct {
 	Today      []Task `json:"today"`
 	Week       []Task `json:"week"`
 	Month      []Task `json:"month"`
 	Later      []Task `json:"later"`
-	Someday    []Task `json:"someday"` // ## いつかやる セクション（バンドと独立）
 	Milestones []Task `json:"milestones"`
 }
 
@@ -272,7 +271,8 @@ func collect(root, today string) (Board, error) {
 		for _, t := range ExtractLines(string(content), rel) {
 			t.Project = p
 			switch t.Section {
-			case "タスク":
+			case "タスク", "いつかやる":
+				// ## いつかやる はバンドタグ無し = いつか（Later）に落ちる。## タスク と同じ扱い。
 				bd := bandOf(t, today, weekEnd, monthEnd)
 				if bd == bandToday {
 					b.Today = append(b.Today, t) // @today / @due≤今日 は今日やるへ（状態を問わず）
@@ -291,8 +291,6 @@ func collect(root, today string) (Board, error) {
 				}
 			case "マイルストーン":
 				b.Milestones = append(b.Milestones, t)
-			case "いつかやる":
-				b.Someday = append(b.Someday, t)
 			}
 			// ## ルーティン の行は `- [毎日]` 等でチェックボックスにマッチせず除外される
 		}

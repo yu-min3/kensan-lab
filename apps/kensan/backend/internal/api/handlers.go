@@ -215,7 +215,6 @@ func (s *Server) handleStats(w http.ResponseWriter, _ *http.Request) {
 			"week":      len(board.Week),
 			"month":     len(board.Month),
 			"later":     len(board.Later),
-			"someday":   len(board.Someday),
 			"milestone": map[string]int{"total": len(board.Milestones), "done": countState(board.Milestones, "done")},
 		},
 	})

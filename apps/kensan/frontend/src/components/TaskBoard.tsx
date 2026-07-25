@@ -34,7 +34,7 @@ const LANES: LaneDef[] = [
   { band: "today", title: "今日", sub: "@today / @due≤今日", collapsible: false },
   { band: "week", title: "今週", sub: "@week / @due≤今週末", collapsible: false },
   { band: "month", title: "今月", sub: "@month / @due≤月末", collapsible: true },
-  { band: "later", title: "中期以降", sub: "着手時期は未定（backlog）", collapsible: true },
+  { band: "later", title: "いつか", sub: "着手時期は未定（backlog・タグ無し）", collapsible: true },
 ];
 
 // lanes は後方互換のため受け取るが、4 バンドは縦積みで描画する（今日を最上部に）。

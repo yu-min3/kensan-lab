@@ -84,17 +84,17 @@ func TestCollect(t *testing.T) {
 	if len(b.Today) != 2 {
 		t.Errorf("today: want 2 (todo.md ## Now), got %d: %+v", len(b.Today), b.Today)
 	}
-	// ストック = project の ## タスク のうち未完了かつ today でないもの
-	// （原稿レビュー依頼 のみ。アブストラクト確定=done / 没ネタ調査=skipped は除外、_archive も除外）
-	if len(b.Later) != 1 {
-		t.Errorf("stock: want 1 (未完了の ## タスク のみ), got %d: %+v", len(b.Later), b.Later)
+	// いつか(Later) = バンドタグ無しの未完了。## タスク の「原稿レビュー依頼」＋
+	// ## いつかやる の「デモ環境の自動化」の 2 件（done/skipped は除外、_archive も除外）
+	if len(b.Later) != 2 {
+		t.Errorf("later: want 2 (## タスク + ## いつかやる の未完了), got %d: %+v", len(b.Later), b.Later)
 	}
-	if len(b.Milestones) != 2 || len(b.Someday) != 1 {
-		t.Errorf("milestones/someday: got %d/%d", len(b.Milestones), len(b.Someday))
+	if len(b.Milestones) != 2 {
+		t.Errorf("milestones: got %d", len(b.Milestones))
 	}
 	for _, task := range b.Later {
 		if task.Project != "demo" {
-			t.Errorf("stock task must carry project, got %+v", task)
+			t.Errorf("later task must carry project, got %+v", task)
 		}
 	}
 }

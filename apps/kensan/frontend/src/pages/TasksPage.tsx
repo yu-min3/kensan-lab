@@ -8,9 +8,9 @@ import { TaskBoard } from "../components/TaskBoard";
 import { Card, CardBody } from "../components/ui/card";
 import { Badge } from "../components/ui/badge";
 
-// タスクページ = 時間軸バンドのかんばん（今日 / 今週 / 今月 / 中期以降）。
+// タスクページ = 時間軸バンドのかんばん（今日 / 今週 / 今月 / いつか）。
 // タスクは project の ## タスク に住み、行内タグ（@today/@week/@month）でバンドが決まる。
-// その下にいつかやる・マイルストーンを折りたたみで補助表示する。
+// その下にマイルストーンを折りたたみで補助表示する。
 export function TasksPage() {
   return (
     <>
@@ -29,15 +29,9 @@ export function TasksPage() {
 
 function Backlog() {
   const board = useQuery({ queryKey: ["board"], queryFn: api.board });
-  const someday = board.data?.someday ?? [];
   const milestones = board.data?.milestones ?? [];
-  if (someday.length === 0 && milestones.length === 0) return null;
-  return (
-    <>
-      <Collapsible title="いつかやる" tasks={someday} />
-      <Collapsible title="マイルストーン" tasks={milestones} />
-    </>
-  );
+  if (milestones.length === 0) return null;
+  return <Collapsible title="マイルストーン" tasks={milestones} />;
 }
 
 function Collapsible({ title, tasks }: { title: string; tasks: Task[] }) {

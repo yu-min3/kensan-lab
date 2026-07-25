@@ -43,7 +43,7 @@ export const BAND_LABELS: { value: Band; label: string }[] = [
   { value: "today", label: "今日" },
   { value: "week", label: "今週" },
   { value: "month", label: "今月" },
-  { value: "later", label: "中期" },
+  { value: "later", label: "いつか" },
 ];
 
 export function TaskDialog({

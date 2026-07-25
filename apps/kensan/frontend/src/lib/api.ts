@@ -41,8 +41,7 @@ export interface Board {
   today: Task[] | null;
   week: Task[] | null;
   month: Task[] | null;
-  later: Task[] | null;
-  someday: Task[] | null;
+  later: Task[] | null; // いつか（バンドタグ無し。## タスク + ## いつかやる）
   milestones: Task[] | null;
 }
 
