@@ -210,8 +210,12 @@ function ProjectDetailView({ name }: { name: string }) {
   const renderMs = (m: Task) => {
     const k = `${m.file}:${m.line}`;
     const done = m.state === "done";
+    // Journey の連番と対応させる（一覧は未完を上に並べ替えるため、番号が無いと
+    // どのステップの話か分からなくなる）。番号は README の並び順。
+    const step = String(milestones.indexOf(m) + 1).padStart(2, "0");
     return (
       <li key={k} className="flex items-center gap-2 text-sm group">
+        <span className="shrink-0 font-mono tnum text-[11px] text-muted-foreground w-5">{step}</span>
         <button onClick={() => toggleMs.mutate(m)} disabled={busy} aria-label="完了切替">
           <StateIcon state={m.state} />
         </button>
@@ -238,7 +242,7 @@ function ProjectDetailView({ name }: { name: string }) {
               setMsText(m.display);
             }}
           >
-            {m.display}
+            {cleanLabel(m.display)}
           </span>
         )}
         <span className="relative shrink-0">
@@ -267,7 +271,7 @@ function ProjectDetailView({ name }: { name: string }) {
             />
           )}
         </span>
-        {done && <Badge variant="success">完了</Badge>}
+        {done && <Badge variant="success">{doneDate(m) ? `完了 ${doneDate(m)!.slice(5)}` : "完了"}</Badge>}
         <button
           className="size-6 grid place-items-center rounded-md text-destructive hover:bg-destructive/10 opacity-0 group-hover:opacity-100 transition-opacity shrink-0"
           disabled={busy}
@@ -345,7 +349,7 @@ function ProjectDetailView({ name }: { name: string }) {
           {doneMs.length > 0 && (
             <>
               <div className="flex items-center gap-2 mt-3 mb-1">
-                <span className="text-[10px] uppercase tracking-[0.12em] text-success">完了 {doneMs.length}</span>
+                <span className="text-[11px] font-semibold tracking-wide text-success">完了 {doneMs.length}</span>
                 <div className="flex-1 h-px bg-border" />
               </div>
               <ul className="ds-stack !gap-1 opacity-65">{doneMs.map(renderMs)}</ul>
@@ -452,7 +456,7 @@ function ProjectMetrics({
   if (error && metrics.length === 0) return <Section title="Metrics"><ErrorState error={error} onRetry={onRetry} /></Section>;
   if (metrics.length === 0) return null;
   return (
-    <Section title="そのほかのメトリクス">
+    <Section eyebrow="Metrics" title="そのほかの指標">
       <div className="grid grid-cols-1 xl:grid-cols-2 gap-3">
         {metrics.map((metric) => <MetricCard key={metric.id} metric={metric} />)}
       </div>
@@ -673,7 +677,7 @@ function HeroFocus({
         </div>
         <p className="text-sm">
           <span className="text-muted-foreground">次は </span>
-          {openMs[0] ? <span className="font-medium">{inlineMd(openMs[0].display)}</span> : <span className="text-success font-medium">すべて完了</span>}
+          {openMs[0] ? <span className="font-medium">{inlineMd(cleanLabel(openMs[0].display))}</span> : <span className="text-success font-medium">すべて完了</span>}
         </p>
         <div>
           <div className="h-1.5 rounded-full bg-muted overflow-hidden">
@@ -712,6 +716,12 @@ function HeroFocus({
 // ---- Pulse ------------------------------------------------------------
 // Hero が「今どうなっているか」の結論なら、Pulse はその根拠。
 // 左に直近の前進（何が終わったか）、右に次の一手（何から手をつけるか）。
+
+// README の `✅ YYYY-MM-DD` は完了メタデータ。ラベルとしては読みづらいので
+// 表示から外し、完了バッジ側で日付として見せる（生テキストは編集用にそのまま）。
+function cleanLabel(text: string): string {
+  return text.replace(/\s*✅\s*\d{4}-\d{2}-\d{2}\s*/g, " ").trim();
+}
 
 function doneDate(t: Task): string | undefined {
   return /✅\s*(\d{4}-\d{2}-\d{2})/.exec(t.text)?.[1];
@@ -817,7 +827,7 @@ function ProjectPulse({
     }
   } else if (milestones.length > 0) {
     current = `${doneMs.length} / ${milestones.length} milestones`;
-    nextPoint = openMs[0] ? inlineMd(openMs[0].display) : "すべて完了";
+    nextPoint = openMs[0] ? inlineMd(cleanLabel(openMs[0].display)) : "すべて完了";
   }
 
   const hint = metric?.delta.days30 !== undefined
@@ -825,7 +835,7 @@ function ProjectPulse({
     : since !== undefined ? `最終前進 ${since === 0 ? "今日" : `${since}日前`}` : undefined;
 
   return (
-    <Section title="脈拍" hint={hint}>
+    <Section eyebrow="Pulse" title="プロジェクトの脈拍" hint={hint}>
       <div className="rounded-lg border border-border bg-card grid grid-cols-1 lg:grid-cols-[0.8fr_1.2fr] overflow-hidden">
         <div className="p-5 ds-stack !gap-2 border-b lg:border-b-0 lg:border-r border-border">
           <p className="h-serif text-lg font-bold flex items-center gap-2">
@@ -838,7 +848,7 @@ function ProjectPulse({
         <div className="grid grid-cols-2">
           <Fact index={0} label="現在値" value={current} />
           <Fact index={1} label="次の到達点" value={nextPoint} />
-          <Fact index={2} label="最近の成果" value={win ? inlineMd(firstSentence(win.text)) : "—"} />
+          <Fact index={2} label="最近の成果" value={win ? inlineMd(cleanLabel(firstSentence(win.text))) : "—"} />
           <Fact
             index={3}
             label="次の一手"
@@ -898,7 +908,7 @@ function milestoneSteps(milestones: Task[]): Step[] {
   return milestones.map((m, i) => {
     const done = m.state === "done";
     const state: Step["state"] = done ? "done" : !nowPlaced ? ((nowPlaced = true), "now") : "todo";
-    return { value: String(i + 1).padStart(2, "0"), label: m.display, state };
+    return { value: String(i + 1).padStart(2, "0"), label: cleanLabel(m.display), state };
   });
 }
 
@@ -913,7 +923,7 @@ function ProjectJourney({ metric, milestones, hint }: { metric?: ProjectMetric; 
   const steps = metric?.checkpoints?.length ? checkpointSteps(metric, format) : milestoneSteps(milestones);
   if (steps.length === 0) return null;
   return (
-    <Section title="到達点の旅" hint={hint}>
+    <Section eyebrow="Journey" title="到達点の旅" hint={hint}>
       <div className="rounded-lg border border-border bg-card p-6 overflow-x-auto">
         <div className="relative grid min-w-[620px]" style={{ gridTemplateColumns: `repeat(${steps.length}, 1fr)` }}>
           {/* 進行線。両端は最初/最後の dot の中心で止める */}
@@ -921,8 +931,11 @@ function ProjectJourney({ metric, milestones, hint }: { metric?: ProjectMetric; 
           {steps.map((s, i) => (
             <div key={i} className="relative text-center px-1">
               <div className={clsx("mx-auto mb-2.5 size-[22px] rounded-full border-2", DOT_CLASS[s.state])} />
-              <div className="font-mono tnum text-xs font-bold">{s.value}</div>
-              <div className={clsx("mt-1 text-[10px] leading-snug line-clamp-2", s.state === "now" ? "text-brand font-bold" : "text-muted-foreground")}>
+              <div className="font-mono tnum text-sm font-bold">{s.value}</div>
+              <div
+                title={s.label}
+                className={clsx("mt-1 text-[11px] leading-snug line-clamp-2", s.state === "now" ? "text-brand font-bold" : "text-foreground/70")}
+              >
                 {s.label}
               </div>
             </div>
@@ -942,7 +955,7 @@ function ProjectHorizons({ openTasks }: { openTasks: Task[] }) {
   ];
   if (groups.every((g) => g.items.length === 0)) return null;
   return (
-    <Section title="時間軸で見る" hint="Journey は表示しない">
+    <Section eyebrow="Horizons" title="時間軸で見る" hint="Journey は出さない">
       <div className="rounded-lg border border-border bg-card grid grid-cols-1 sm:grid-cols-3 overflow-hidden">
         {groups.map((g, i) => (
           <div key={g.title} className={clsx("p-5", i > 0 && "border-t sm:border-t-0 sm:border-l border-border")}>
@@ -1212,13 +1225,18 @@ function MetaEditor({
   );
 }
 
-function Section({ title, hint, children }: { title: string; hint?: string; children: React.ReactNode }) {
+// eyebrow は Project View の block 名（Pulse / Journey ...）。設計上の呼び名を
+// 残しつつ、見出し自体は日本語 + 明朝で読ませる（プロトタイプの .stitle と同じ構成）。
+function Section({ title, eyebrow, hint, children }: { title: string; eyebrow?: string; hint?: string; children: React.ReactNode }) {
   return (
     <div>
-      <h3 className="flex items-baseline gap-2 text-[10px] uppercase tracking-[0.12em] text-muted-foreground pb-2 border-b border-border mb-3">
-        <span>{title}</span>
-        {hint && <span className="ml-auto font-mono tnum normal-case tracking-normal">{hint}</span>}
-      </h3>
+      <div className="flex items-end justify-between gap-3 pb-2 mb-3 border-b border-border">
+        <div className="min-w-0">
+          {eyebrow && <div className="text-[10px] uppercase tracking-[0.14em] text-brand font-bold">{eyebrow}</div>}
+          <h3 className="h-serif text-lg font-bold leading-tight truncate">{title}</h3>
+        </div>
+        {hint && <span className="shrink-0 pb-1 font-mono tnum text-[11px] text-muted-foreground">{hint}</span>}
+      </div>
       {children}
     </div>
   );
