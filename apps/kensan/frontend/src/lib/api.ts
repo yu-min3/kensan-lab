@@ -9,6 +9,7 @@ export interface Meta {
   created?: string;
   updated?: string;
   parseError?: string;
+  extra?: Record<string, unknown>;
 }
 
 export interface Doc {
@@ -16,6 +17,36 @@ export interface Doc {
   size: number;
   mtime: string;
   meta: Meta;
+}
+
+export interface FeedEntry {
+  date: string;
+  title: string;
+  path: string;
+}
+
+export interface FeedContent extends FeedEntry {
+  generatedAt?: string;
+  content: string;
+}
+
+export interface FeedImportState {
+  schemaVersion: number;
+  reportDate: string;
+  status: "success" | "failed";
+  lastAttemptAt: string;
+  lastSuccessAt?: string;
+  sourceFileId?: string;
+  sourceModifiedAt?: string;
+  errorCode: string;
+  errorMessage: string;
+}
+
+export interface LatestFeed {
+  feed: FeedContent | null;
+  state: FeedImportState | null;
+  stateError?: string;
+  stale: boolean;
 }
 
 export interface Task {
@@ -198,6 +229,10 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 }
 
 export const api = {
+  feeds: () => request<{ feeds: FeedEntry[]; total: number }>("/feeds"),
+
+  latestFeed: () => request<LatestFeed>("/feeds/latest"),
+
   board: () => request<Board>("/tasks"),
 
   goals: () => request<Goals>("/goals"),
@@ -237,9 +272,6 @@ export const api = {
 
   projectMetrics: (name: string) =>
     request<{ metrics: ProjectMetric[] }>(`/projects/${encodeURIComponent(name)}/metrics`),
-
-  refreshProjectMetrics: (name: string) =>
-    request<{ metrics: ProjectMetric[] }>(`/projects/${encodeURIComponent(name)}/metrics/refresh`, { method: "POST" }),
 
   // 行の @due(YYYY-MM-DD) を設定（空文字で除去）
   setDue: (t: Task, due: string) =>

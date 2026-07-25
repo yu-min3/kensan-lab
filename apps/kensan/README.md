@@ -70,6 +70,8 @@ go run ./cmd/kensan
 | GET | `/api/v1/tags` | タグ集計 |
 | GET | `/api/v1/reviews` | レビュー成果物一覧（weekly/daily/monthly の HTML） |
 | GET | `/api/v1/reviews/{path...}` | レビュー HTML の配信 |
+| GET | `/api/v1/feeds` | 保存済みPersonal Daily Briefingの一覧 |
+| GET | `/api/v1/feeds/latest` | 最新Briefing本文とimport状態 |
 | GET | `/api/v1/stats` | 統計（type 別件数・タスク数・今月の daily 数） |
 | GET | `/api/v1/search?q=&type=` | 全文検索 |
 | GET | `/healthz` | ヘルスチェック |

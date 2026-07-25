@@ -10,12 +10,32 @@ import (
 	"strings"
 	"time"
 
+	"github.com/yu-min3/kensan-lab/apps/kensan/backend/internal/feeds"
 	"github.com/yu-min3/kensan-lab/apps/kensan/backend/internal/goals"
 	"github.com/yu-min3/kensan-lab/apps/kensan/backend/internal/metrics"
 	"github.com/yu-min3/kensan-lab/apps/kensan/backend/internal/projects"
 	"github.com/yu-min3/kensan-lab/apps/kensan/backend/internal/tasks"
 	"github.com/yu-min3/kensan-lab/apps/kensan/backend/internal/workspace"
 )
+
+// GET /api/v1/feeds — 保存済みBriefingの一覧。
+func (s *Server) handleFeeds(w http.ResponseWriter, _ *http.Request) {
+	entries, err := feeds.List(s.ws)
+	if err != nil {
+		s.log.Warn("feed scan finished with errors", "err", err)
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"feeds": entries, "total": len(entries)})
+}
+
+// GET /api/v1/feeds/latest — 最新Briefing本文と直近のimport状態。
+func (s *Server) handleLatestFeed(w http.ResponseWriter, _ *http.Request) {
+	latest, err := feeds.LoadLatest(s.ws, time.Now())
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	writeJSON(w, http.StatusOK, latest)
+}
 
 // GET /api/v1/files?type=&tag=&status=&q=
 func (s *Server) handleFiles(w http.ResponseWriter, r *http.Request) {
@@ -147,18 +167,6 @@ func (s *Server) handleProjectMetrics(w http.ResponseWriter, r *http.Request) {
 	result, err := metrics.Load(s.ws.Root, r.PathValue("name"), time.Now())
 	if err != nil {
 		writeError(w, http.StatusBadRequest, err.Error())
-		return
-	}
-	writeJSON(w, http.StatusOK, result)
-}
-
-// POST /api/v1/projects/{name}/metrics/refresh — GitHub 等の外部値を取得して履歴化する。
-func (s *Server) handleProjectMetricsRefresh(w http.ResponseWriter, r *http.Request) {
-	result, err := metrics.Refresh(r.Context(), s.ws.Root, r.PathValue("name"), time.Now(), metrics.Env{})
-	if err != nil {
-		s.log.Warn("metric refresh partially failed", "project", r.PathValue("name"), "err", err)
-		// 既存値は利用できるため、部分失敗も view model と共に返す。
-		writeJSON(w, http.StatusBadGateway, map[string]any{"error": err.Error(), "metrics": result.Metrics})
 		return
 	}
 	writeJSON(w, http.StatusOK, result)

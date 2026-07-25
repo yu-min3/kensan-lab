@@ -19,7 +19,7 @@ export function PageHeader({
           {eyebrow}
         </div>
         <h2 className="h-serif text-2xl font-bold mt-1">{title}</h2>
-        <p className="text-[13px] text-muted-foreground mt-1 max-w-2xl">{sub}</p>
+        <p className="text-[13px] text-muted-foreground mt-1 max-w-2xl break-words">{sub}</p>
       </div>
       {actions && <div className="ds-inline shrink-0">{actions}</div>}
     </header>

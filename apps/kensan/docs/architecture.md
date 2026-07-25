@@ -37,3 +37,23 @@ Browser ─▶ Istio Gateway ─▶ kensan Service ─▶ kensan pod
                                                  └─ SPA assets │
                                                     workspace ◀┘ (Longhorn PVC)
 ```
+
+## External data ingestion
+
+kensan does not fetch from Google Drive, GitHub, or an LLM provider. The short-
+lived `apps/feed` batch validates external data and writes it to the shared
+workspace before kensan reads it:
+
+```mermaid
+flowchart LR
+    External["Claude / Drive / GitHub"]
+    Feed["apps/feed<br/>CronJob"]
+    Workspace["workspace files<br/>Single Source of Truth"]
+    App["apps/kensan<br/>API + UI"]
+
+    External --> Feed --> Workspace --> App
+```
+
+This keeps external credentials and failure handling outside the web application
+without introducing a database or a long-running collector service. See
+[Personal Daily Briefing](feed.md) for the complete flow and file contract.

@@ -4,6 +4,7 @@ site_description: File-based knowledge & goal manager running on kensan-lab
 nav:
   - Home: index.md
   - Architecture: architecture.md
+  - Personal Daily Briefing: feed.md
 
 plugins:
   - techdocs-core

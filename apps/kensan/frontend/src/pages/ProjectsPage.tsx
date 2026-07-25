@@ -14,7 +14,6 @@ import {
   Trash2,
   Check,
   X,
-  RefreshCw,
   TrendingUp,
   AlertTriangle,
   Minus,
@@ -181,10 +180,6 @@ function ProjectDetailView({ name }: { name: string }) {
     onSuccess: () => setEditingMeta(false),
     onSettled: invalidate,
   });
-  const refreshMetrics = useMutation({
-    mutationFn: () => api.refreshProjectMetrics(name),
-    onSuccess: (data) => qc.setQueryData(["project-metrics", name], data),
-  });
 
   const [editingMeta, setEditingMeta] = useState(false);
   const [msInput, setMsInput] = useState("");
@@ -338,9 +333,7 @@ function ProjectDetailView({ name }: { name: string }) {
           openMs={openMs}
           openTasks={openTasks}
           metrics={metrics.data?.metrics ?? []}
-          metricsError={metrics.error ?? refreshMetrics.error}
-          refreshing={refreshMetrics.isPending}
-          onRefresh={() => refreshMetrics.mutate()}
+          metricsError={metrics.error}
         />
 
         {/* Journey は checkpoint を持つ指標のときだけ独立セクションにする。
@@ -659,7 +652,7 @@ function Fact({ label, value, index }: { label: string; value: React.ReactNode; 
 }
 
 function ProjectPulse({
-  d, milestones, doneMs, openMs, openTasks, metrics, metricsError, refreshing, onRefresh,
+  d, milestones, doneMs, openMs, openTasks, metrics, metricsError,
 }: {
   d: ProjectDetail;
   milestones: Task[];
@@ -668,8 +661,6 @@ function ProjectPulse({
   openTasks: Task[];
   metrics: ProjectMetric[];
   metricsError: Error | null;
-  refreshing: boolean;
-  onRefresh: () => void;
 }) {
   const state = d.state;
   const metric = metrics[0];
@@ -715,13 +706,7 @@ function ProjectPulse({
           </p>
           <p className="text-sm leading-relaxed text-muted-foreground">{state.sentence}</p>
           {metric && <Sparkline series={metric.series} />}
-          {metric?.stale && (
-            <Button variant="ghost" size="sm" className="self-start !px-1" loading={refreshing} onClick={onRefresh}>
-              <RefreshCw size={13} />
-              外部値を更新
-            </Button>
-          )}
-          {metricsError && <p className="text-[10px] text-destructive">更新に失敗しました。最後の値を表示しています。</p>}
+          {metricsError && <p className="text-[10px] text-destructive">読み込みに失敗しました。</p>}
         </div>
         <div className="grid grid-cols-2">
           <Fact index={0} label="現在値" value={current} />

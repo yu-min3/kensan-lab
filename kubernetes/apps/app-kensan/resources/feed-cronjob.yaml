@@ -1,0 +1,73 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: feed
+  namespace: app-kensan
+spec:
+  schedule: "15 7 * * *"
+  timeZone: Asia/Tokyo
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 5
+  jobTemplate:
+    spec:
+      backoffLimit: 1
+      activeDeadlineSeconds: 900
+      template:
+        metadata:
+          labels:
+            app.kubernetes.io/name: feed
+            app.kubernetes.io/part-of: kensan
+        spec:
+          restartPolicy: Never
+          automountServiceAccountToken: false
+          imagePullSecrets:
+            - name: ghcr-pull-secret
+          securityContext:
+            runAsNonRoot: true
+            seccompProfile:
+              type: RuntimeDefault
+          containers:
+            - name: feed
+              image: ghcr.io/yu-min3/kensan-feed:v0.1.1
+              imagePullPolicy: IfNotPresent
+              args: ["run"]
+              env:
+                - name: KENSAN_DATA_DIR
+                  value: /data
+                - name: FEED_TIMEZONE
+                  value: Asia/Tokyo
+                - name: GOOGLE_APPLICATION_CREDENTIALS
+                  value: /var/run/secrets/feed/credentials.json
+                - name: GOOGLE_DRIVE_OUTPUT_FOLDER_ID
+                  valueFrom:
+                    secretKeyRef:
+                      name: feed-google-drive
+                      key: output-folder-id
+              resources:
+                requests:
+                  cpu: 25m
+                  memory: 32Mi
+                limits:
+                  memory: 128Mi
+              securityContext:
+                allowPrivilegeEscalation: false
+                capabilities:
+                  drop: ["ALL"]
+                readOnlyRootFilesystem: true
+              volumeMounts:
+                - name: workspace
+                  mountPath: /data
+                - name: google-credentials
+                  mountPath: /var/run/secrets/feed
+                  readOnly: true
+          volumes:
+            - name: workspace
+              persistentVolumeClaim:
+                claimName: kensan-workspace
+            - name: google-credentials
+              secret:
+                secretName: feed-google-drive
+                items:
+                  - key: credentials.json
+                    path: credentials.json

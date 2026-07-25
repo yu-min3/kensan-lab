@@ -11,6 +11,7 @@ import {
   Sparkles,
   Menu,
   X,
+  Newspaper,
 } from "lucide-react";
 import clsx from "clsx";
 import { FloatingMemoButton } from "./FloatingMemoButton";
@@ -26,6 +27,7 @@ const nav = [
       { to: "/", label: "ダッシュボード", icon: LayoutDashboard },
       { to: "/tasks", label: "タスク", icon: SquareKanban },
       { to: "/projects", label: "プロジェクト", icon: FolderKanban },
+      { to: "/feed", label: "フィード", icon: Newspaper },
     ],
   },
   {
@@ -138,7 +140,12 @@ export function AppShell({ children }: { children: ReactNode }) {
           <span className="text-sm">Yu</span>
         </footer>
       </aside>
-      <main className="ds-page min-w-0">{children}</main>
+      <main
+        className="ds-page min-w-0 overflow-x-hidden"
+        style={{ width: "calc(100% - 2 * var(--page-pad))" }}
+      >
+        {children}
+      </main>
       <FloatingMemoButton />
     </div>
   );
