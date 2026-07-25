@@ -37,9 +37,33 @@ type Definition struct {
 	Collector CollectorConfig `yaml:"collector"`
 }
 
+// CollectorConfig は collector の指定。`type` だけを共通で解釈し、残りの
+// キーは collector 固有として生のまま持つ。collector を足すときに
+// この struct も metrics.yaml のスキーマも変更しなくて済むようにするため。
 type CollectorConfig struct {
-	Type string `yaml:"type"`
-	Repo string `yaml:"repo,omitempty"`
+	Type string
+	node *yaml.Node
+}
+
+func (c *CollectorConfig) UnmarshalYAML(node *yaml.Node) error {
+	var head struct {
+		Type string `yaml:"type"`
+	}
+	if err := node.Decode(&head); err != nil {
+		return err
+	}
+	c.Type = head.Type
+	c.node = node
+	return nil
+}
+
+// Decode は collector 固有の設定を v へ読み出す。collector 側が自分の
+// struct を定義して呼ぶ。設定ブロックが無い場合は何もしない。
+func (c CollectorConfig) Decode(v any) error {
+	if c.node == nil {
+		return nil
+	}
+	return c.node.Decode(v)
 }
 
 type Observation struct {
@@ -151,9 +175,9 @@ func loadConfig(path string) (Config, error) {
 		if metric.Display != "integer" && metric.Display != "decimal" && metric.Display != "percent" {
 			return Config{}, fmt.Errorf("invalid display for %s: %s", metric.ID, metric.Display)
 		}
-		if metric.Collector.Type == "github-stars" && metric.Collector.Repo == "" {
-			return Config{}, fmt.Errorf("github-stars metric %s requires repo", metric.ID)
-		}
+		// collector 固有の設定検証は collector 自身が行う（Refresh 時にエラーになる）。
+		// 未知の type でも Load は通す — 表示は既存の履歴で成立するため、
+		// 収集できないことと履歴が読めないことを切り分ける。
 	}
 	return config, nil
 }
@@ -241,8 +265,54 @@ func parseTime(value string) (time.Time, error) {
 	return time.Parse("2006-01-02", value)
 }
 
+// Env は collector が使える環境。ゼロ値で既定（実 HTTP クライアント・os.Getenv）に
+// フォールバックするので、呼び出し側は通常 metrics.Env{} を渡すだけでよい。
+type Env struct {
+	HTTP   *http.Client
+	Secret func(name string) string
+}
+
+func (e Env) httpClient() *http.Client {
+	if e.HTTP != nil {
+		return e.HTTP
+	}
+	return &http.Client{Timeout: 5 * time.Second}
+}
+
+func (e Env) secret(name string) string {
+	if e.Secret != nil {
+		return e.Secret(name)
+	}
+	return os.Getenv(name)
+}
+
+// CollectCtx は 1 metric 分の収集コンテキスト。HTTP を前提にしない
+// （ベンチプレス記録のように workspace のファイルを読む collector も同じ形で書ける）。
+type CollectCtx struct {
+	Env
+	Root    string // workspace root
+	Project string
+	Config  CollectorConfig
+}
+
+// Sample は collector が返す 1 観測。Fields は補助情報（best set の rep / 重量など）。
+type Sample struct {
+	Value  float64
+	Fields map[string]any
+	Source string
+}
+
+type Collector func(ctx context.Context, cc CollectCtx) (Sample, error)
+
+var collectors = map[string]Collector{
+	"github-stars": collectGitHubStars,
+}
+
+// Register は collector を追加する。type 名は metrics.yaml の collector.type と対応する。
+func Register(name string, c Collector) { collectors[name] = c }
+
 // Refresh は外部 collector を実行し、成功した observation を追記する。
-func Refresh(ctx context.Context, root, project string, now time.Time, client *http.Client, token string) (Result, error) {
+func Refresh(ctx context.Context, root, project string, now time.Time, env Env) (Result, error) {
 	dir, err := projectDir(root, project)
 	if err != nil {
 		return Result{}, err
@@ -251,20 +321,29 @@ func Refresh(ctx context.Context, root, project string, now time.Time, client *h
 	if err != nil {
 		return Result{}, err
 	}
-	if client == nil {
-		client = &http.Client{Timeout: 5 * time.Second}
-	}
 	var refreshErrs []error
 	for _, metric := range config.Metrics {
-		if metric.Collector.Type != "github-stars" {
+		// collector 未指定は手入力メトリクス。収集対象外として黙って飛ばす。
+		if metric.Collector.Type == "" {
 			continue
 		}
-		value, err := collectGitHubStars(ctx, client, token, metric.Collector.Repo)
+		collect, ok := collectors[metric.Collector.Type]
+		if !ok {
+			refreshErrs = append(refreshErrs, fmt.Errorf("%s: 未知の collector type %q", metric.ID, metric.Collector.Type))
+			continue
+		}
+		sample, err := collect(ctx, CollectCtx{Env: env, Root: root, Project: project, Config: metric.Collector})
 		if err != nil {
 			refreshErrs = append(refreshErrs, fmt.Errorf("%s: %w", metric.ID, err))
 			continue
 		}
-		o := Observation{Metric: metric.ID, At: now.Format(time.RFC3339), Value: value, Source: "github"}
+		o := Observation{
+			Metric: metric.ID,
+			At:     now.Format(time.RFC3339),
+			Value:  sample.Value,
+			Source: sample.Source,
+			Fields: sample.Fields,
+		}
 		if err := appendObservation(filepath.Join(dir, "metrics.ndjson"), o); err != nil {
 			refreshErrs = append(refreshErrs, fmt.Errorf("%s: %w", metric.ID, err))
 		}
@@ -276,32 +355,41 @@ func Refresh(ctx context.Context, root, project string, now time.Time, client *h
 	return result, errors.Join(refreshErrs...)
 }
 
-func collectGitHubStars(ctx context.Context, client *http.Client, token, repo string) (float64, error) {
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, "https://api.github.com/repos/"+repo, nil)
+func collectGitHubStars(ctx context.Context, cc CollectCtx) (Sample, error) {
+	var cfg struct {
+		Repo string `yaml:"repo"`
+	}
+	if err := cc.Config.Decode(&cfg); err != nil {
+		return Sample{}, err
+	}
+	if cfg.Repo == "" {
+		return Sample{}, errors.New("collector github-stars: repo が未設定")
+	}
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, "https://api.github.com/repos/"+cfg.Repo, nil)
 	if err != nil {
-		return 0, err
+		return Sample{}, err
 	}
 	req.Header.Set("Accept", "application/vnd.github+json")
 	req.Header.Set("X-GitHub-Api-Version", "2022-11-28")
-	if token != "" {
+	if token := cc.secret("GITHUB_TOKEN"); token != "" {
 		req.Header.Set("Authorization", "Bearer "+token)
 	}
-	resp, err := client.Do(req)
+	resp, err := cc.httpClient().Do(req)
 	if err != nil {
-		return 0, err
+		return Sample{}, err
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(io.LimitReader(resp.Body, 512))
-		return 0, fmt.Errorf("github returned %s: %s", resp.Status, strings.TrimSpace(string(body)))
+		return Sample{}, fmt.Errorf("github returned %s: %s", resp.Status, strings.TrimSpace(string(body)))
 	}
 	var body struct {
 		Stars float64 `json:"stargazers_count"`
 	}
 	if err := json.NewDecoder(resp.Body).Decode(&body); err != nil {
-		return 0, err
+		return Sample{}, err
 	}
-	return body.Stars, nil
+	return Sample{Value: body.Stars, Source: "github"}, nil
 }
 
 func appendObservation(path string, o Observation) error {

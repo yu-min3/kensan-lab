@@ -154,7 +154,7 @@ func (s *Server) handleProjectMetrics(w http.ResponseWriter, r *http.Request) {
 
 // POST /api/v1/projects/{name}/metrics/refresh — GitHub 等の外部値を取得して履歴化する。
 func (s *Server) handleProjectMetricsRefresh(w http.ResponseWriter, r *http.Request) {
-	result, err := metrics.Refresh(r.Context(), s.ws.Root, r.PathValue("name"), time.Now(), nil, os.Getenv("GITHUB_TOKEN"))
+	result, err := metrics.Refresh(r.Context(), s.ws.Root, r.PathValue("name"), time.Now(), metrics.Env{})
 	if err != nil {
 		s.log.Warn("metric refresh partially failed", "project", r.PathValue("name"), "err", err)
 		// 既存値は利用できるため、部分失敗も view model と共に返す。

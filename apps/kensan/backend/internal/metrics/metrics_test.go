@@ -6,6 +6,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -85,7 +86,8 @@ func TestRefreshGitHubStarsAndDeduplicates(t *testing.T) {
 	client.Transport = rewriteTransport{base: github.URL, next: client.Transport}
 	now := time.Date(2026, 7, 20, 8, 0, 0, 0, time.FixedZone("JST", 9*60*60))
 	for range 2 {
-		result, err := Refresh(context.Background(), root, "demo", now, client, "test-token")
+		env := Env{HTTP: client, Secret: func(string) string { return "test-token" }}
+		result, err := Refresh(context.Background(), root, "demo", now, env)
 		if err != nil || result.Metrics[0].Current == nil || *result.Metrics[0].Current != 7 {
 			t.Fatalf("result=%+v err=%v", result, err)
 		}
@@ -96,6 +98,96 @@ func TestRefreshGitHubStarsAndDeduplicates(t *testing.T) {
 	}
 	if strings.Count(strings.TrimSpace(string(b)), "\n") != 0 {
 		t.Errorf("expected one line: %s", b)
+	}
+}
+
+// HTTP を使わない collector（ベンチプレス記録のようなファイル系）が
+// 同じ registry に乗ること、collector 固有キーが自前で読めることを確認する。
+func TestRegisteredFileCollector(t *testing.T) {
+	root := t.TempDir()
+	dir := filepath.Join(root, "projects", "demo")
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	config := `version: 1
+metrics:
+  - id: best-set
+    label: Best Set
+    unit: kg
+    direction: increase
+    display: decimal
+    collector:
+      type: test-file
+      path: log.txt
+`
+	if err := os.WriteFile(filepath.Join(dir, "metrics.yaml"), []byte(config), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "log.txt"), []byte("42.5"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	Register("test-file", func(_ context.Context, cc CollectCtx) (Sample, error) {
+		var cfg struct {
+			Path string `yaml:"path"`
+		}
+		if err := cc.Config.Decode(&cfg); err != nil {
+			return Sample{}, err
+		}
+		b, err := os.ReadFile(filepath.Join(cc.Root, "projects", cc.Project, cfg.Path))
+		if err != nil {
+			return Sample{}, err
+		}
+		v, err := strconv.ParseFloat(strings.TrimSpace(string(b)), 64)
+		if err != nil {
+			return Sample{}, err
+		}
+		return Sample{Value: v, Fields: map[string]any{"reps": 5}, Source: "log"}, nil
+	})
+	t.Cleanup(func() { delete(collectors, "test-file") })
+
+	result, err := Refresh(context.Background(), root, "demo", time.Now(), Env{})
+	if err != nil {
+		t.Fatalf("refresh: %v", err)
+	}
+	if result.Metrics[0].Current == nil || *result.Metrics[0].Current != 42.5 {
+		t.Fatalf("current: %+v", result.Metrics[0])
+	}
+	b, err := os.ReadFile(filepath.Join(dir, "metrics.ndjson"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(b), `"source":"log"`) || !strings.Contains(string(b), `"reps":5`) {
+		t.Errorf("observation should carry collector source and fields: %s", b)
+	}
+}
+
+// 未知の type は refresh でエラーになるが、既存履歴の表示は壊さない。
+func TestUnknownCollectorTypeErrorsButKeepsView(t *testing.T) {
+	root, dir := fixture(t)
+	config := strings.Replace(
+		`version: 1
+metrics:
+  - id: github-stars
+    label: GitHub Stars
+    unit: stars
+    direction: increase
+    display: integer
+    collector:
+      type: PLACEHOLDER
+`, "PLACEHOLDER", "not-implemented-yet", 1)
+	if err := os.WriteFile(filepath.Join(dir, "metrics.yaml"), []byte(config), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	history := `{"metric":"github-stars","at":"2026-07-10","value":4,"source":"github"}` + "\n"
+	if err := os.WriteFile(filepath.Join(dir, "metrics.ndjson"), []byte(history), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	result, err := Refresh(context.Background(), root, "demo", time.Now(), Env{})
+	if err == nil || !strings.Contains(err.Error(), "not-implemented-yet") {
+		t.Fatalf("expected unknown collector error, got %v", err)
+	}
+	if result.Metrics[0].Current == nil || *result.Metrics[0].Current != 4 {
+		t.Errorf("existing history should still render: %+v", result.Metrics[0])
 	}
 }
 
