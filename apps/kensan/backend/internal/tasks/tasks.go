@@ -7,12 +7,17 @@
 //	projects/<name>/README.md  ## いつかやる     ← someday
 //	todo.md                    ## Now           ← project に属さない即席 today
 //
-// タスクは project に住む。「今日やる / ストック」は場所ではなく行内タグのビュー:
+// タスクは project に住む。時間軸バンド（今日 / 今週 / 今月 / 中期以降）は
+// 場所ではなく行内タグのビュー:
 //
-//	@today          ← 今日やるレーンに浮上
-//	@due(YYYY-MM-DD) ← 期限。今日以前なら今日やるに自動浮上
+//	@today          ← 今日やる
+//	@week           ← 今週やる
+//	@month          ← 今月やる
+//	（バンドタグ無し）← 中期以降（着手時期未定の backlog）
+//	@due(YYYY-MM-DD) ← 期限。今日以前→今日 / 今週末以前→今週 / 月末以前→今月 に自動昇格
+//	                   （手で置いたバンドより早い締切が勝つ）
 //	@ms(slug)       ← project 内マイルストーンへの紐付け（バッジ表示）
-//	@p(N)           ← 優先度（整数・小さいほど上）。ストックの並び順。ドラッグで中間値に書換
+//	@p(N)           ← バンド内の並び順（整数・小さいほど上）。ドラッグで中間値に書換
 //
 // タスクの単位は「行」。ダッシュボードでチェック / @today 切替すると、その行を
 // 持つ project ファイルが書き換わる（ダッシュボード完結 × project 紐付きの両立）。
@@ -32,6 +37,8 @@ var (
 	checkboxRe = regexp.MustCompile(`^\s*- \[([ x-])\] (.+)$`)
 	headingRe  = regexp.MustCompile(`^(#{1,6})\s+(.+?)\s*$`)
 	todayRe    = regexp.MustCompile(`@today\b`)
+	weekRe     = regexp.MustCompile(`@week\b`)
+	monthRe    = regexp.MustCompile(`@month\b`)
 	dueRe      = regexp.MustCompile(`@due\(([^)]+)\)`)
 	msRe       = regexp.MustCompile(`@ms\(([^)]+)\)`)
 	pRe        = regexp.MustCompile(`@p\((\d+)\)`)
@@ -49,18 +56,23 @@ type Task struct {
 	Project   string `json:"project,omitempty"`
 	Section   string `json:"section,omitempty"`
 	Today     bool   `json:"today"`               // @today
+	Week      bool   `json:"week"`                // @week
+	Month     bool   `json:"month"`               // @month
 	Due       string `json:"due,omitempty"`       // @due(YYYY-MM-DD)
 	Milestone string `json:"milestone,omitempty"` // @ms(slug)
 	Priority  int    `json:"priority,omitempty"`  // @p(N)（0 = 未設定）
 }
 
-// Board はかんばんの 1 画面分。
-// Today = @today / @due≤今日 のタスク + todo.md ## Now（即席）。
-// Stock = project の未完了タスクのうち today でないもの。
+// Board はかんばんの 1 画面分。project の未完了タスクを時間軸バンドに振り分ける。
+// Today = @today / @due≤今日 + todo.md ## Now（即席）。
+// Week / Month = @week / @month（または @due≤今週末 / 月末で自動昇格）。
+// Later = バンドタグの無い未完了タスク（中期以降）。
 type Board struct {
 	Today      []Task `json:"today"`
-	Stock      []Task `json:"stock"`
-	Someday    []Task `json:"someday"`
+	Week       []Task `json:"week"`
+	Month      []Task `json:"month"`
+	Later      []Task `json:"later"`
+	Someday    []Task `json:"someday"` // ## いつかやる セクション（バンドと独立）
 	Milestones []Task `json:"milestones"`
 }
 
@@ -68,14 +80,20 @@ type Board struct {
 type inlineTags struct {
 	Display   string
 	Today     bool
+	Week      bool
+	Month     bool
 	Due       string
 	Milestone string
 	Priority  int
 }
 
-// parseInline は行テキストから @today / @due / @ms / @p を抽出し、タグを除いた表示用テキストを返す。
+// parseInline は行テキストから @today / @week / @month / @due / @ms / @p を抽出し、タグを除いた表示用テキストを返す。
 func parseInline(text string) inlineTags {
-	t := inlineTags{Today: todayRe.MatchString(text)}
+	t := inlineTags{
+		Today: todayRe.MatchString(text),
+		Week:  weekRe.MatchString(text),
+		Month: monthRe.MatchString(text),
+	}
 	if m := dueRe.FindStringSubmatch(text); m != nil {
 		t.Due = strings.TrimSpace(m[1])
 	}
@@ -86,6 +104,8 @@ func parseInline(text string) inlineTags {
 		t.Priority, _ = strconv.Atoi(m[1])
 	}
 	d := todayRe.ReplaceAllString(text, "")
+	d = weekRe.ReplaceAllString(d, "")
+	d = monthRe.ReplaceAllString(d, "")
 	d = dueRe.ReplaceAllString(d, "")
 	d = msRe.ReplaceAllString(d, "")
 	d = pRe.ReplaceAllString(d, "")
@@ -117,6 +137,8 @@ func ExtractLines(content string, file string) []Task {
 			Line:      i + 1,
 			Section:   section,
 			Today:     tg.Today,
+			Week:      tg.Week,
+			Month:     tg.Month,
 			Due:       tg.Due,
 			Milestone: tg.Milestone,
 			Priority:  tg.Priority,
@@ -136,9 +158,73 @@ func stateOf(mark string) string {
 	}
 }
 
-// isToday は @today か、@due が today 以前かを判定する。
-func isToday(t Task, today string) bool {
-	return t.Today || (t.Due != "" && t.Due <= today)
+// band は時間軸バンド。値が小さいほど手前（今日 < 今週 < 今月 < 中期）。
+type band int
+
+const (
+	bandToday band = iota
+	bandWeek
+	bandMonth
+	bandLater
+)
+
+// bandOf はタスクの所属バンドを返す。手で置いたバンドタグ（@today/@week/@month）と
+// @due による自動昇格の、早い方（値の小さい方）を採用する。
+func bandOf(t Task, today, weekEnd, monthEnd string) band {
+	manual := bandLater
+	switch {
+	case t.Today:
+		manual = bandToday
+	case t.Week:
+		manual = bandWeek
+	case t.Month:
+		manual = bandMonth
+	}
+	byDue := bandLater
+	if t.Due != "" {
+		switch {
+		case t.Due <= today:
+			byDue = bandToday
+		case t.Due <= weekEnd:
+			byDue = bandWeek
+		case t.Due <= monthEnd:
+			byDue = bandMonth
+		}
+	}
+	if byDue < manual {
+		return byDue
+	}
+	return manual
+}
+
+// horizons は today（YYYY-MM-DD）から今週末（日曜）と月末の日付文字列を返す。
+// 週は月曜始まり・日曜終わり。パース不能なら today をそのまま返す（自動昇格が today 基準に縮退）。
+func horizons(today string) (weekEnd, monthEnd string) {
+	t, err := time.Parse("2006-01-02", today)
+	if err != nil {
+		return today, today
+	}
+	wd := int(t.Weekday()) // Sun=0 .. Sat=6。日曜を週末とみなす
+	weekEnd = t.AddDate(0, 0, (7-wd)%7).Format("2006-01-02")
+	monthEnd = time.Date(t.Year(), t.Month(), 1, 0, 0, 0, 0, t.Location()).AddDate(0, 1, -1).Format("2006-01-02")
+	return weekEnd, monthEnd
+}
+
+// sortByPriority は @p(N) 昇順（小さいほど上）に安定ソートする。未設定(0)は後ろに、元の並び順を保つ。
+func sortByPriority(ts []Task) {
+	sort.SliceStable(ts, func(i, j int) bool {
+		pi, pj := ts[i].Priority, ts[j].Priority
+		switch {
+		case pi == 0 && pj == 0:
+			return false
+		case pi == 0:
+			return false // i 未設定 → 後ろ
+		case pj == 0:
+			return true // j 未設定 → i が前
+		default:
+			return pi < pj
+		}
+	})
 }
 
 // Projects は projects/ 直下のプロジェクト名一覧を返す（_archive・ドット始まりは除外）。
@@ -165,6 +251,7 @@ func Collect(root string) (Board, error) {
 // collect は today（YYYY-MM-DD）を注入できるテスト用の内部実装。
 func collect(root, today string) (Board, error) {
 	b := Board{}
+	weekEnd, monthEnd := horizons(today)
 
 	// todo.md ## Now: project に属さない即席の「今日やる」
 	if content, err := os.ReadFile(filepath.Join(root, "todo.md")); err == nil {
@@ -186,11 +273,21 @@ func collect(root, today string) (Board, error) {
 			t.Project = p
 			switch t.Section {
 			case "タスク":
-				switch {
-				case isToday(t, today):
-					b.Today = append(b.Today, t) // @today / @due≤今日 は今日やるへ
-				case t.State == "todo":
-					b.Stock = append(b.Stock, t) // 未完了かつ today でない = ストック
+				bd := bandOf(t, today, weekEnd, monthEnd)
+				if bd == bandToday {
+					b.Today = append(b.Today, t) // @today / @due≤今日 は今日やるへ（状態を問わず）
+					break
+				}
+				if t.State != "todo" {
+					break // 完了・スキップ済みで today でないタスクは各バンドに出さない
+				}
+				switch bd {
+				case bandWeek:
+					b.Week = append(b.Week, t)
+				case bandMonth:
+					b.Month = append(b.Month, t)
+				default:
+					b.Later = append(b.Later, t)
 				}
 			case "マイルストーン":
 				b.Milestones = append(b.Milestones, t)
@@ -201,19 +298,9 @@ func collect(root, today string) (Board, error) {
 		}
 	}
 
-	// ストックは @p(N) 昇順（小さいほど上）。未設定(0)は後ろに、元の並び順を保つ。
-	sort.SliceStable(b.Stock, func(i, j int) bool {
-		pi, pj := b.Stock[i].Priority, b.Stock[j].Priority
-		switch {
-		case pi == 0 && pj == 0:
-			return false
-		case pi == 0:
-			return false // i 未設定 → 後ろ
-		case pj == 0:
-			return true // j 未設定 → i が前
-		default:
-			return pi < pj
-		}
-	})
+	// 各バンド内は @p(N) 昇順で並べる（Today は todo.md ## Now の並びを尊重して未ソート）。
+	sortByPriority(b.Week)
+	sortByPriority(b.Month)
+	sortByPriority(b.Later)
 	return b, nil
 }

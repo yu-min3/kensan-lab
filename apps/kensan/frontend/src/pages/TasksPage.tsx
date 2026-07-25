@@ -8,8 +8,8 @@ import { TaskBoard } from "../components/TaskBoard";
 import { Card, CardBody } from "../components/ui/card";
 import { Badge } from "../components/ui/badge";
 
-// タスクページ = ダッシュボードと同じ二層かんばん（今日やる ⇄ ストック）。
-// ストックは project の ## タスク を Project→Milestone でまとめたもの。
+// タスクページ = 時間軸バンドのかんばん（今日 / 今週 / 今月 / 中期以降）。
+// タスクは project の ## タスク に住み、行内タグ（@today/@week/@month）でバンドが決まる。
 // その下にいつかやる・マイルストーンを折りたたみで補助表示する。
 export function TasksPage() {
   return (
@@ -17,7 +17,7 @@ export function TasksPage() {
       <PageHeader
         eyebrow="タスク"
         title="かんばん"
-        sub="ストック（project のタスク）から今日へドラッグ = @today タグの付与。行は project ファイルのまま動かない。"
+        sub="レーン間ドラッグ = バンドの張り替え（今日/今週/今月/中期）。行は project ファイルのまま動かない。"
       />
       <div className="ds-section">
         <TaskBoard />

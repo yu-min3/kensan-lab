@@ -26,13 +26,13 @@ func TestTodayToggleAndArchive(t *testing.T) {
 	board, _ := Collect(root)
 	// 「原稿レビュー依頼」は demo の ## タスク にある未完了 = ストック
 	var src Task
-	for _, task := range board.Stock {
+	for _, task := range board.Later {
 		if task.Display == "原稿レビュー依頼" {
 			src = task
 		}
 	}
 	if src.Text == "" {
-		t.Fatalf("fixture stock task not found: %+v", board.Stock)
+		t.Fatalf("fixture stock task not found: %+v", board.Later)
 	}
 
 	// ストック → 今日（@today タグを付与。ファイルは project のまま）
@@ -77,7 +77,7 @@ func TestTodayToggleAndArchive(t *testing.T) {
 func TestSetTodayToggle(t *testing.T) {
 	ws, root := setupBoard(t)
 	board, _ := Collect(root)
-	src := board.Stock[0]
+	src := board.Later[0]
 
 	on, err := SetToday(ws, src.File, src.Line, src.Text, true)
 	if err != nil {
@@ -127,13 +127,13 @@ type: project
 `)
 	ws := workspace.New(root)
 	board, _ := Collect(root)
-	if len(board.Stock) != 3 {
-		t.Fatalf("want 3 stock, got %d", len(board.Stock))
+	if len(board.Later) != 3 {
+		t.Fatalf("want 3 stock, got %d", len(board.Later))
 	}
 
 	// 「う」に @p(10)、「あ」に @p(20) を付ける → う, あ, (い 未設定) の順
 	var a, u Task
-	for _, t2 := range board.Stock {
+	for _, t2 := range board.Later {
 		switch t2.Display {
 		case "あ":
 			a = t2
@@ -148,16 +148,16 @@ type: project
 		t.Fatal(err)
 	}
 	board, _ = Collect(root)
-	order := []string{board.Stock[0].Display, board.Stock[1].Display, board.Stock[2].Display}
+	order := []string{board.Later[0].Display, board.Later[1].Display, board.Later[2].Display}
 	if order[0] != "う" || order[1] != "あ" || order[2] != "い" {
 		t.Errorf("priority sort wrong: %v", order)
 	}
-	if board.Stock[0].Priority != 10 {
-		t.Errorf("priority not parsed: %+v", board.Stock[0])
+	if board.Later[0].Priority != 10 {
+		t.Errorf("priority not parsed: %+v", board.Later[0])
 	}
 
 	// @p を 0 で除去すると未設定に戻る
-	off, err := SetPriority(ws, board.Stock[0].File, board.Stock[0].Line, board.Stock[0].Text, 0)
+	off, err := SetPriority(ws, board.Later[0].File, board.Later[0].Line, board.Later[0].Text, 0)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -169,7 +169,7 @@ type: project
 // 作成: project の ## タスク に追加（タグ付き）
 func TestCreateTask(t *testing.T) {
 	ws, root := setupBoard(t)
-	out, err := CreateTask(ws, "demo", "新規タスク", true, "2026-06-20", "v1")
+	out, err := CreateTask(ws, "demo", "新規タスク", "today", "2026-06-20", "v1")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -181,7 +181,7 @@ func TestCreateTask(t *testing.T) {
 		t.Errorf("line not created:\n%s", content)
 	}
 	// project 空 → todo.md ## Now
-	out2, err := CreateTask(ws, "", "即席タスク", false, "", "")
+	out2, err := CreateTask(ws, "", "即席タスク", "later", "", "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -198,12 +198,12 @@ func TestEditTaskReproject(t *testing.T) {
 	ws := workspace.New(root)
 	board, _ := Collect(root)
 	var src Task
-	for _, x := range board.Stock {
+	for _, x := range board.Later {
 		if x.Display == "移動するタスク" {
 			src = x
 		}
 	}
-	out, err := EditTask(ws, src.File, src.Line, src.Text, "b", "移動するタスク", false, "", "")
+	out, err := EditTask(ws, src.File, src.Line, src.Text, "b", "移動するタスク", "later", "", "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -253,7 +253,7 @@ type: project
 func TestDeleteLine(t *testing.T) {
 	ws, root := setupBoard(t)
 	board, _ := Collect(root)
-	src := board.Stock[0]
+	src := board.Later[0]
 
 	if err := DeleteLine(ws, src.File, src.Line, src.Text); err != nil {
 		t.Fatal(err)

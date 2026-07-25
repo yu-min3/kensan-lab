@@ -100,7 +100,7 @@ func (s *Server) handleTaskMove(w http.ResponseWriter, r *http.Request) {
 }
 
 // POST /api/v1/tasks/today {file, line, text, on}
-// @today タグの付け外し = 今日やる ⇄ ストックの切替。行はその場で書き換わる。
+// @today タグの付け外し（今日バンドへの単純昇格/降格）。バンド張り替えは /tasks/band。
 func (s *Server) handleTaskToday(w http.ResponseWriter, r *http.Request) {
 	var req struct {
 		File string `json:"file"`
@@ -120,8 +120,29 @@ func (s *Server) handleTaskToday(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]any{"task": updated})
 }
 
+// POST /api/v1/tasks/band {file, line, text, band}
+// バンドタグ（@today/@week/@month、later は無タグ）の張り替え = レーン間のドラッグ移動。
+func (s *Server) handleTaskBand(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		File string `json:"file"`
+		Line int    `json:"line"`
+		Text string `json:"text"`
+		Band string `json:"band"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.File == "" || req.Line < 1 {
+		writeError(w, http.StatusBadRequest, "file, line, text, band are required")
+		return
+	}
+	updated, err := tasks.SetBand(s.ws, req.File, req.Line, req.Text, req.Band)
+	if err != nil {
+		writeOpError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"task": updated})
+}
+
 // POST /api/v1/tasks/priority {file, line, text, priority}
-// ストックの 1 タスクに @p(N) を設定（ドラッグ並べ替えの 1 手）。
+// 1 タスクに @p(N) を設定（バンド内ドラッグ並べ替えの 1 手）。
 func (s *Server) handleTaskPriority(w http.ResponseWriter, r *http.Request) {
 	var req struct {
 		File     string `json:"file"`
@@ -142,7 +163,7 @@ func (s *Server) handleTaskPriority(w http.ResponseWriter, r *http.Request) {
 }
 
 // POST /api/v1/tasks/reorder {items:[{file,line,text,priority}]}
-// ストック全体の @p(N) 一括設定（中間値の隙間が尽きたときの再採番フォールバック）。
+// バンド内の @p(N) 一括設定（中間値の隙間が尽きたときの再採番フォールバック）。
 func (s *Server) handleTaskReorder(w http.ResponseWriter, r *http.Request) {
 	var req struct {
 		Items []struct {
@@ -189,12 +210,12 @@ func (s *Server) handleTaskState(w http.ResponseWriter, r *http.Request) {
 // locator（file/line/text）があれば編集（project 変更はファイル間移動）、無ければ作成。
 func (s *Server) handleTaskSave(w http.ResponseWriter, r *http.Request) {
 	var req struct {
-		File      string `json:"file"`  // 編集時の locator（作成時は空）
-		Line      int    `json:"line"`  //
-		Text      string `json:"text"`  // 現在の生テキスト（楽観ロック）
+		File      string `json:"file"` // 編集時の locator（作成時は空）
+		Line      int    `json:"line"` //
+		Text      string `json:"text"` // 現在の生テキスト（楽観ロック）
 		Project   string `json:"project"`
 		Display   string `json:"display"`
-		Today     bool   `json:"today"`
+		Band      string `json:"band"` // today | week | month | later（空/未知は later = 中期）
 		Due       string `json:"due"`
 		Milestone string `json:"milestone"`
 	}
@@ -205,9 +226,9 @@ func (s *Server) handleTaskSave(w http.ResponseWriter, r *http.Request) {
 	var out tasks.Task
 	var err error
 	if req.File != "" && req.Line > 0 {
-		out, err = tasks.EditTask(s.ws, req.File, req.Line, req.Text, req.Project, req.Display, req.Today, req.Due, req.Milestone)
+		out, err = tasks.EditTask(s.ws, req.File, req.Line, req.Text, req.Project, req.Display, req.Band, req.Due, req.Milestone)
 	} else {
-		out, err = tasks.CreateTask(s.ws, req.Project, req.Display, req.Today, req.Due, req.Milestone)
+		out, err = tasks.CreateTask(s.ws, req.Project, req.Display, req.Band, req.Due, req.Milestone)
 	}
 	if err != nil {
 		writeOpError(w, err)

@@ -212,7 +212,9 @@ func (s *Server) handleStats(w http.ResponseWriter, _ *http.Request) {
 		"dailyThisMonth": dailyThisMonth,
 		"tasks": map[string]any{
 			"today":     map[string]int{"total": len(board.Today), "done": countState(board.Today, "done")},
-			"stock":     map[string]int{"total": len(board.Stock), "done": countState(board.Stock, "done")},
+			"week":      len(board.Week),
+			"month":     len(board.Month),
+			"later":     len(board.Later),
 			"someday":   len(board.Someday),
 			"milestone": map[string]int{"total": len(board.Milestones), "done": countState(board.Milestones, "done")},
 		},

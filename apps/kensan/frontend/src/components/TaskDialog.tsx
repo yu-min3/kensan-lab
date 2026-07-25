@@ -1,9 +1,10 @@
 import { useEffect, useState } from "react";
+import clsx from "clsx";
 import { X, Trash2 } from "lucide-react";
-import { type Task, type TaskSaveInput } from "../lib/api";
+import { type Band, type Task, type TaskSaveInput } from "../lib/api";
 import { Button } from "./ui/button";
 
-// タスクの作成・編集 共通ダイアログ。本文・プロジェクト・今日やる・期限・マイルストーンを編集。
+// タスクの作成・編集 共通ダイアログ。本文・プロジェクト・バンド・期限・マイルストーンを編集。
 // project を変えると（編集時）ファイル間移動になる。優先度 @p はドラッグ管理なのでここには出さない。
 
 export interface TaskDraft {
@@ -12,9 +13,17 @@ export interface TaskDraft {
   text?: string;
   project: string;
   display: string;
-  today: boolean;
+  band: Band;
   due: string;
   milestone: string;
+}
+
+// タスクのバンドタグから draft のバンドを導く（today < week < month < later）。
+export function bandOfTask(t: Task): Band {
+  if (t.today) return "today";
+  if (t.week) return "week";
+  if (t.month) return "month";
+  return "later";
 }
 
 export function taskToDraft(t: Task): TaskDraft {
@@ -24,11 +33,18 @@ export function taskToDraft(t: Task): TaskDraft {
     text: t.text,
     project: t.project ?? "",
     display: t.display,
-    today: t.today,
+    band: bandOfTask(t),
     due: t.due ?? "",
     milestone: t.milestone ?? "",
   };
 }
+
+export const BAND_LABELS: { value: Band; label: string }[] = [
+  { value: "today", label: "今日" },
+  { value: "week", label: "今週" },
+  { value: "month", label: "今月" },
+  { value: "later", label: "中期" },
+];
 
 export function TaskDialog({
   mode,
@@ -68,7 +84,7 @@ export function TaskDialog({
       text: d.text,
       project: d.project,
       display: d.display.trim(),
-      today: d.today,
+      band: d.band,
       due: d.due,
       milestone: d.milestone.trim(),
     });
@@ -164,15 +180,24 @@ export function TaskDialog({
               )}
             </Field>
 
-            <label className="flex items-center gap-2 text-sm cursor-pointer">
-              <input
-                type="checkbox"
-                className="size-4 accent-[hsl(var(--brand))]"
-                checked={d.today}
-                onChange={(e) => set("today", e.target.checked)}
-              />
-              今日やる（@today）
-            </label>
+            <Field label="いつやる（バンド）">
+              <div className="inline-flex rounded-md border border-border overflow-hidden">
+                {BAND_LABELS.map((b) => (
+                  <button
+                    key={b.value}
+                    type="button"
+                    className={clsx(
+                      "px-3 h-9 text-sm border-l border-border first:border-l-0 transition-colors",
+                      d.band === b.value ? "bg-brand text-brand-foreground" : "hover:bg-accent/60",
+                    )}
+                    aria-pressed={d.band === b.value}
+                    onClick={() => set("band", b.value)}
+                  >
+                    {b.label}
+                  </button>
+                ))}
+              </div>
+            </Field>
           </div>
 
           {/* フッタ */}

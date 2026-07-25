@@ -8,11 +8,11 @@ test("ダッシュボードが表示され、フィクスチャの North Star �
   await expect(page.getByText("E2E テスト用の North Star")).toBeVisible();
 });
 
-test("かんばんページに遷移でき、ストックのタスクが見える", async ({ page }) => {
+test("かんばんページに遷移でき、今週バンドのタスクが見える", async ({ page }) => {
   await page.goto("/");
   await page.getByRole("link", { name: "タスク" }).click();
   await expect(page).toHaveURL(/\/tasks$/);
-  await expect(page.getByText("ストックにあるサンプルタスク")).toBeVisible();
+  await expect(page.getByText("今週のサンプルタスク")).toBeVisible();
 });
 
 test("日記ページで未作成の日を作成できる", async ({ page }) => {
