@@ -22,7 +22,7 @@ import {
   ChevronDown,
 } from "lucide-react";
 import clsx from "clsx";
-import { api, ApiError, todayISO, type Doc, type ProjectSummary, type ProjectDetail, type ProjectMetric, type Task } from "../lib/api";
+import { api, ApiError, todayISO, type Doc, type ProjectSummary, type ProjectDetail, type MetricBrief, type ProjectMetric, type ProjectState, type Task } from "../lib/api";
 import { PageHeader } from "../components/PageHeader";
 import { MilkdownEditor } from "../components/editors/MilkdownEditor";
 import { useAutosaveFile } from "../hooks/useAutosaveFile";
@@ -123,6 +123,13 @@ export function ProjectsPage() {
   );
 }
 
+// 一覧の主指標チップ。"4 / 100 stars" の形。
+function formatBrief(m: MetricBrief): string {
+  const f = (v: number) => (m.display === "integer" ? Math.round(v).toLocaleString() : v.toFixed(1));
+  if (m.current === undefined) return `— ${m.unit}`;
+  return m.target !== undefined ? `${f(m.current)} / ${f(m.target)} ${m.unit}` : `${f(m.current)} ${m.unit}`;
+}
+
 function ProjectRow({ project, active, onClick }: { project: ProjectSummary; active: boolean; onClick: () => void }) {
   const { milestonesDone: md, milestonesTotal: mt } = project;
   return (
@@ -131,14 +138,20 @@ function ProjectRow({ project, active, onClick }: { project: ProjectSummary; act
       className={clsx("w-full text-left rounded-md px-2 py-2 transition-colors", active ? "bg-accent text-accent-foreground" : "hover:bg-accent/60")}
     >
       <div className="flex items-center gap-2">
-        <StatusBadge status={project.status} />
         <span className="flex-1 truncate text-sm font-medium">{project.name}</span>
+        {/* 状態は詳細と同じ backend 判定。一覧でも「手当てが要るもの」が色で拾える */}
+        <span className={clsx("shrink-0 rounded-full border px-1.5 py-px text-[10px] font-semibold", TONE_CLASS[project.state.tone])}>
+          {project.state.label}
+        </span>
       </div>
       <div className="mt-1.5 flex items-center gap-2">
         <ProgressBar done={md} total={mt} />
         <span className="font-mono tnum text-[10px] text-muted-foreground shrink-0">{md}/{mt}</span>
       </div>
       <div className="mt-1 flex items-center gap-2 text-[10px] text-muted-foreground">
+        {project.metric && (
+          <span className="font-mono tnum text-brand">{formatBrief(project.metric)}</span>
+        )}
         <span>未完 {project.openTasks}</span>
         {project.deadline && <DeadlineText deadline={project.deadline} />}
       </div>
@@ -312,9 +325,7 @@ function ProjectDetailView({ name }: { name: string }) {
             d={d}
             milestones={milestones}
             doneMs={doneMs}
-            openMs={openMs}
             openTasks={openTasks}
-            metrics={metrics.data?.metrics ?? []}
             onEditMeta={() => setEditingMeta(true)}
           />
         )}
@@ -483,67 +494,16 @@ function ProjectMetrics({
 // 「どこへ向かうか（目標）→ 今どこか（現在地・状態）→ いま見るべき数字」を
 // 1 ブロックに固定する。状態は色だけでなく必ずラベルと根拠を併記する。
 
-type HeroTone = "success" | "warn" | "muted";
-// why = Hero バッジ横に出す一行の根拠。sentence = Pulse に出す説明文。
-type HeroState = { label: string; tone: HeroTone; why: string; sentence: string };
-
 const DAY_MS = 86_400_000;
 
+// 日付文字列から今日までの日数（過去は負）。現在地の鮮度と Pulse の経過表示で使う。
 function daysFromToday(iso: string): number {
   const target = new Date(`${iso}T00:00:00`);
   const today = new Date(todayISO() + "T00:00:00");
   return Math.round((target.getTime() - today.getTime()) / DAY_MS);
 }
 
-// README ログの日付・完了マイルストーンの ✅ 日付・メトリクス更新日のうち最も新しいもの。
-function lastActivity(d: ProjectDetail, metrics: ProjectMetric[]): string | undefined {
-  const dates: string[] = [];
-  for (const entry of d.log ?? []) if (entry.date) dates.push(entry.date);
-  for (const m of d.milestones ?? []) {
-    const hit = /✅\s*(\d{4}-\d{2}-\d{2})/.exec(m.text);
-    if (hit) dates.push(hit[1]);
-  }
-  for (const m of metrics) if (m.updatedAt) dates.push(m.updatedAt.slice(0, 10));
-  return dates.sort().at(-1);
-}
-
-// 状態は決定的なルールだけで決める（表示経路に LLM を入れない）。
-function heroState(d: ProjectDetail, openMs: Task[], openTasks: Task[], metrics: ProjectMetric[]): HeroState {
-  const overdue = openTasks.filter((t) => t.due && daysFromToday(t.due) < 0);
-  const toDeadline = d.deadline ? daysFromToday(d.deadline) : undefined;
-  const activity = lastActivity(d, metrics);
-  const sinceActivity = activity ? -daysFromToday(activity) : undefined;
-
-  if (toDeadline !== undefined && toDeadline >= 0 && toDeadline <= 14 && openMs.length > 0) {
-    return {
-      label: "仕上げの時期", tone: "warn",
-      why: `締切まで ${toDeadline} 日・未完マイルストーン ${openMs.length}`,
-      sentence: `締切まで ${toDeadline} 日。未完のマイルストーンが ${openMs.length} 件残っています。`,
-    };
-  }
-  if (overdue.length > 0) {
-    return {
-      label: "要整理", tone: "warn",
-      why: `期限切れタスク ${overdue.length} 件`,
-      sentence: `期限切れのタスクが ${overdue.length} 件。まず滞留を片付けると動きが戻ります。`,
-    };
-  }
-  if (sinceActivity !== undefined && sinceActivity <= 30) {
-    return {
-      label: "前進中", tone: "success",
-      why: `${activity} に前進`,
-      sentence: sinceActivity === 0 ? "今日前進しました。" : `${sinceActivity} 日前に前進しています。`,
-    };
-  }
-  if (sinceActivity !== undefined) {
-    return (d.milestones ?? []).length === 0
-      ? { label: "安定運用", tone: "muted", why: `直近の記録は ${activity}`, sentence: `終点を置かない project です。直近の記録は ${activity}。` }
-      : { label: "再開待ち", tone: "muted", why: `${sinceActivity} 日動きなし`, sentence: `${sinceActivity} 日動きがありません。小さく再開できる一手を選びます。` };
-  }
-  return { label: "観測を開始", tone: "muted", why: "ログもメトリクスもまだありません", sentence: "ログもメトリクスもまだありません。まず記録を 1 つ残すところから。" };
-}
-
-const TONE_CLASS: Record<HeroTone, string> = {
+const TONE_CLASS: Record<ProjectState["tone"], string> = {
   success: "border-success/40 bg-success/10 text-success",
   warn: "border-warning/40 bg-warning/10 text-warning",
   muted: "border-border bg-muted text-muted-foreground",
@@ -574,17 +534,15 @@ function OverviewDisclosure({ overview }: { overview: string }) {
 }
 
 function ProjectHero({
-  d, milestones, doneMs, openMs, openTasks, metrics, onEditMeta,
+  d, milestones, doneMs, openTasks, onEditMeta,
 }: {
   d: ProjectDetail;
   milestones: Task[];
   doneMs: Task[];
-  openMs: Task[];
   openTasks: Task[];
-  metrics: ProjectMetric[];
   onEditMeta: () => void;
 }) {
-  const state = heroState(d, openMs, openTasks, metrics);
+  const state = d.state;
   const staleDays = d.current.date ? -daysFromToday(d.current.date) : undefined;
   return (
     // 1 カラム。かつて右側に置いていた数値カードは、現在値 / 次の到達点を Pulse が、
@@ -704,12 +662,12 @@ const BAND_LABEL: [keyof Pick<Task, "today" | "week" | "month">, string][] = [
   ["today", "今日"], ["week", "今週"], ["month", "今月"],
 ];
 
-const STATE_ICON: Record<HeroTone, typeof TrendingUp> = {
+const STATE_ICON: Record<ProjectState["tone"], typeof TrendingUp> = {
   success: TrendingUp,
   warn: AlertTriangle,
   muted: Minus,
 };
-const STATE_TEXT: Record<HeroTone, string> = {
+const STATE_TEXT: Record<ProjectState["tone"], string> = {
   success: "text-success",
   warn: "text-warning",
   muted: "text-muted-foreground",
@@ -738,12 +696,12 @@ function ProjectPulse({
   refreshing: boolean;
   onRefresh: () => void;
 }) {
-  const state = heroState(d, openMs, openTasks, metrics);
+  const state = d.state;
   const metric = metrics[0];
   const allWins = recentWins(d, 8);
   const win = allWins.find((w) => w.kind !== "log") ?? allWins[0];
   const moves = nextMoves(openTasks, 1);
-  const activity = lastActivity(d, metrics);
+  const activity = state.lastActivity;
   const since = activity ? -daysFromToday(activity) : undefined;
   if (!win && moves.length === 0 && !metric) return null;
 

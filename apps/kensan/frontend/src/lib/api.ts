@@ -66,6 +66,23 @@ export interface TaskSaveInput {
   milestone: string; // "" = なし
 }
 
+// 状態判定は backend（projects/state.go）が唯一の実装。一覧・詳細で同じものを使う。
+export interface ProjectState {
+  label: string;
+  tone: "success" | "warn" | "muted";
+  why: string;
+  sentence: string;
+  lastActivity?: string;
+}
+
+export interface MetricBrief {
+  label: string;
+  unit: string;
+  current?: number;
+  target?: number;
+  display: "integer" | "decimal" | "percent";
+}
+
 export interface ProjectSummary {
   name: string;
   status: string;
@@ -74,6 +91,8 @@ export interface ProjectSummary {
   milestonesDone: number;
   milestonesTotal: number;
   openTasks: number;
+  state: ProjectState;
+  metric?: MetricBrief;
 }
 
 export interface LogEntry {
@@ -96,6 +115,7 @@ export interface ProjectDetail {
   overview: string;
   // ## 現在地（可変。概要とは分離。date が古い = 棚卸しされていないシグナル）
   current: { date?: string; text: string };
+  state: ProjectState;
   goal: string;
   milestones: Task[] | null;
   tasks: Task[] | null;

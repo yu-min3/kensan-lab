@@ -14,6 +14,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/yu-min3/kensan-lab/apps/kensan/backend/internal/metrics"
 	"github.com/yu-min3/kensan-lab/apps/kensan/backend/internal/tasks"
 	"github.com/yu-min3/kensan-lab/apps/kensan/backend/internal/workspace"
 )
@@ -33,6 +34,9 @@ type Summary struct {
 	MilestonesDone  int    `json:"milestonesDone"`
 	MilestonesTotal int    `json:"milestonesTotal"`
 	OpenTasks       int    `json:"openTasks"`
+	// 一覧でも「今どういう状態か」を出すため、詳細と同じ判定を返す（実装は state.go）
+	State  State        `json:"state"`
+	Metric *MetricBrief `json:"metric,omitempty"`
 }
 
 // LogEntry は ## ログ の 1 エントリ（日付 + 本文）。
@@ -65,6 +69,7 @@ type Detail struct {
 	Repo       string       `json:"repo,omitempty"`
 	Overview   string       `json:"overview"`
 	Current    CurrentState `json:"current"`
+	State      State        `json:"state"`
 	Goal       string       `json:"goal"`
 	Milestones []tasks.Task `json:"milestones"`
 	Tasks      []tasks.Task `json:"tasks"`
@@ -84,6 +89,7 @@ func readme(root, name string) (string, error) {
 // Summaries は全アクティブ含む全プロジェクトのサマリを返す。
 // 並び: active 優先 → 締切が近い順（無しは後ろ）→ 名前。
 func Summaries(root string) []Summary {
+	today := time.Now().Truncate(24 * time.Hour)
 	var out []Summary
 	for _, name := range tasks.Projects(root) {
 		content, err := readme(root, name)
@@ -92,19 +98,29 @@ func Summaries(root string) []Summary {
 		}
 		fm := frontmatter(content)
 		s := Summary{Name: name, Status: fm["status"], Deadline: fm["deadline"], Goal: firstLine(section(content, "目標"))}
+		var ms, ts []tasks.Task
 		for _, t := range tasks.ExtractLines(content, "") {
 			switch t.Section {
 			case "マイルストーン":
+				ms = append(ms, t)
 				s.MilestonesTotal++
 				if t.State == "done" {
 					s.MilestonesDone++
 				}
-			case "タスク":
+			case "タスク", "いつかやる":
+				ts = append(ts, t)
 				if t.State == "todo" {
 					s.OpenTasks++
 				}
 			}
 		}
+		// メトリクスは opt-in。無い project では nil のまま（エラーにしない）。
+		var views []metrics.View
+		if r, err := metrics.Load(root, name, time.Now()); err == nil {
+			views = r.Metrics
+		}
+		s.State = ComputeState(s.Deadline, ms, ts, parseLog(section(content, "ログ")), views, today)
+		s.Metric = briefOf(views)
 		out = append(out, s)
 	}
 	sort.SliceStable(out, func(i, j int) bool {
@@ -152,6 +168,11 @@ func Load(root, name string) (Detail, error) {
 			d.Tasks = append(d.Tasks, t)
 		}
 	}
+	var views []metrics.View
+	if r, err := metrics.Load(root, name, time.Now()); err == nil {
+		views = r.Metrics
+	}
+	d.State = ComputeState(d.Deadline, d.Milestones, d.Tasks, d.Log, views, time.Now().Truncate(24*time.Hour))
 	return d, nil
 }
 
