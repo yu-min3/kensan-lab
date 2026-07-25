@@ -6,7 +6,7 @@ import { api, type Task } from "../lib/api";
 import { PageHeader } from "../components/PageHeader";
 import { TaskBoard } from "../components/TaskBoard";
 import { Card, CardBody } from "../components/ui/card";
-import { Badge } from "../components/ui/badge";
+import { ProjectBadge } from "../components/ProjectBadge";
 
 // タスクページ = 時間軸バンドのかんばん（今日 / 今週 / 今月 / いつか）。
 // タスクは project の ## タスク に住み、行内タグ（@today/@week/@month）でバンドが決まる。
@@ -69,7 +69,7 @@ function Collapsible({ title, tasks }: { title: string; tasks: Task[] }) {
               <span className={clsx("flex-1", t.state !== "todo" && "text-muted-foreground line-through")}>
                 {t.display}
               </span>
-              {t.project && <Badge variant="outline">{t.project}</Badge>}
+              {t.project && <ProjectBadge project={t.project} />}
             </div>
           ))}
         </CardBody>
