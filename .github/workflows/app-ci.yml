@@ -1,23 +1,23 @@
 name: App CI
 
-# apps/ に住む app は kensan 1 個の前提で決め打ち（新 app は Backstage template で別 repo に生成される。in-repo app が 2 個目になったら matrix 化する）
-
 on:
   pull_request:
     paths:
       - "apps/kensan/**"
+      - "apps/feed/**"
       - "packages/design-tokens/**"
       - ".github/workflows/app-ci.yml"
   push:
     branches: [main]
     paths:
       - "apps/kensan/**"
+      - "apps/feed/**"
       - "packages/design-tokens/**"
       - ".github/workflows/app-ci.yml"
 
 jobs:
   backend:
-    name: backend (go vet + test)
+    name: kensan backend (go vet + test)
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -28,6 +28,21 @@ jobs:
         with:
           go-version-file: apps/kensan/backend/go.mod
           cache-dependency-path: apps/kensan/backend/go.sum
+      - run: go vet ./...
+      - run: go test ./...
+
+  feed:
+    name: feed (go vet + test)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/feed
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: apps/feed/go.mod
+          cache-dependency-path: apps/feed/go.sum
       - run: go vet ./...
       - run: go test ./...
 
