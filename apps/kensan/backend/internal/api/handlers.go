@@ -10,12 +10,32 @@ import (
 	"strings"
 	"time"
 
+	"github.com/yu-min3/kensan-lab/apps/kensan/backend/internal/feeds"
 	"github.com/yu-min3/kensan-lab/apps/kensan/backend/internal/goals"
 	"github.com/yu-min3/kensan-lab/apps/kensan/backend/internal/metrics"
 	"github.com/yu-min3/kensan-lab/apps/kensan/backend/internal/projects"
 	"github.com/yu-min3/kensan-lab/apps/kensan/backend/internal/tasks"
 	"github.com/yu-min3/kensan-lab/apps/kensan/backend/internal/workspace"
 )
+
+// GET /api/v1/feeds — 保存済みBriefingの一覧。
+func (s *Server) handleFeeds(w http.ResponseWriter, _ *http.Request) {
+	entries, err := feeds.List(s.ws)
+	if err != nil {
+		s.log.Warn("feed scan finished with errors", "err", err)
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"feeds": entries, "total": len(entries)})
+}
+
+// GET /api/v1/feeds/latest — 最新Briefing本文と直近のimport状態。
+func (s *Server) handleLatestFeed(w http.ResponseWriter, _ *http.Request) {
+	latest, err := feeds.LoadLatest(s.ws, time.Now())
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	writeJSON(w, http.StatusOK, latest)
+}
 
 // GET /api/v1/files?type=&tag=&status=&q=
 func (s *Server) handleFiles(w http.ResponseWriter, r *http.Request) {

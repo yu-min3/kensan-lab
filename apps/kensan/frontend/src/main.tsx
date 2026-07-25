@@ -13,6 +13,7 @@ import { ReviewsPage } from "./pages/ReviewsPage";
 import { NotesPage } from "./pages/NotesPage";
 import { LifeGoalsPage } from "./pages/LifeGoalsPage";
 import { NotFoundPage } from "./pages/NotFoundPage";
+import { FeedPage } from "./pages/FeedPage";
 import "./index.css";
 
 const queryClient = new QueryClient({
@@ -31,6 +32,7 @@ createRoot(document.getElementById("root")!).render(
               <Route path="/" element={<Dashboard />} />
               <Route path="/tasks" element={<TasksPage />} />
               <Route path="/projects" element={<ProjectsPage />} />
+              <Route path="/feed" element={<FeedPage />} />
               <Route path="/daily" element={<DailyPage />} />
               <Route path="/memos" element={<MemoPage />} />
               <Route path="/notes" element={<NotesPage />} />

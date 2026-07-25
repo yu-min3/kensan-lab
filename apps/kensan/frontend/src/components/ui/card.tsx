@@ -22,9 +22,9 @@ export function CardHead({
   actions?: ReactNode;
 }) {
   return (
-    <header className="ds-card flex items-start justify-between gap-3 border-b border-border !pb-3">
+    <header className="ds-card min-w-0 flex items-start justify-between gap-3 border-b border-border !pb-3">
       <div className="min-w-0">
-        <h3 className="h-serif text-base font-semibold flex items-center gap-2">
+        <h3 className="h-serif text-base font-semibold flex flex-wrap items-center gap-2 break-words">
           {title}
           {badge}
         </h3>

@@ -10,7 +10,7 @@ export default defineConfig({
       allow: ["../../.."],
     },
     proxy: {
-      "/api": "http://localhost:8080",
+      "/api": process.env.KENSAN_API_PROXY ?? "http://localhost:8080",
     },
   },
 });
