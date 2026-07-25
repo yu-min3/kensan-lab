@@ -28,4 +28,5 @@ other component. It proves the platform end-to-end, not just in manifests.
 | Namespace | `app-kensan` |
 | Data | workspace PVC (Longhorn), synced to a laptop over LAN via Syncthing |
 
-See [Architecture](architecture.md) for how the pieces fit together.
+See [Architecture](architecture.md) for how the pieces fit together, and
+[Personal Daily Briefing](feed.md) for the scheduled Feed ingestion flow.
