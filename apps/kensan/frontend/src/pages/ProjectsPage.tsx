@@ -18,6 +18,8 @@ import {
   TrendingUp,
   AlertTriangle,
   Minus,
+  ChevronRight,
+  ChevronDown,
 } from "lucide-react";
 import clsx from "clsx";
 import { api, ApiError, todayISO, type Doc, type ProjectSummary, type ProjectDetail, type ProjectMetric, type Task } from "../lib/api";
@@ -547,6 +549,30 @@ const TONE_CLASS: Record<HeroTone, string> = {
   muted: "border-border bg-muted text-muted-foreground",
 };
 
+// 概要は「このプロジェクトが何か」の不変説明。毎日読むものではないので既定は畳み、
+// 現在地（可変）を主役にする。conventions 上も概要は描画対象。
+function OverviewDisclosure({ overview }: { overview: string }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <div>
+      <button
+        onClick={() => setOpen((v) => !v)}
+        className="inline-flex items-center gap-1 text-[11px] text-muted-foreground hover:text-foreground"
+      >
+        {open ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
+        概要
+      </button>
+      {open && (
+        <div className="mt-1.5 ds-stack !gap-1.5 border-l border-border pl-3">
+          {overview.split("\n").map((line) => line.trim()).filter(Boolean).map((line, i) => (
+            <p key={i} className="text-sm leading-relaxed text-muted-foreground">{inlineMd(line)}</p>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function ProjectHero({
   d, milestones, doneMs, openMs, openTasks, metrics, onEditMeta,
 }: {
@@ -586,9 +612,11 @@ function ProjectHero({
           </p>
         )}
 
+        {d.overview && <OverviewDisclosure overview={d.overview} />}
+
         {d.current.text && (
-          <div className="rounded-md border border-border bg-accent/30 px-3 py-2">
-            <div className="mb-1 flex items-center gap-2 text-[10px] uppercase tracking-[0.12em] text-muted-foreground">
+          <div className="rounded-md border-l-2 border-brand bg-accent/25 px-4 py-3">
+            <div className="mb-1.5 flex items-center gap-2 text-[10px] uppercase tracking-[0.12em] text-muted-foreground">
               <span>現在地</span>
               {d.current.date && (
                 <span className={clsx("font-mono tnum normal-case tracking-normal", staleDays !== undefined && staleDays > 30 && "text-warning font-semibold")}>
@@ -597,7 +625,12 @@ function ProjectHero({
                 </span>
               )}
             </div>
-            <p className="text-sm leading-relaxed">{inlineMd(d.current.text)}</p>
+            {/* 原文の改行を段落として保つ（1 行に詰め込むと壁のように読みづらい） */}
+            <div className="ds-stack !gap-1.5">
+              {d.current.text.split("\n").map((line) => line.trim()).filter(Boolean).map((line, i) => (
+                <p key={i} className="text-sm leading-relaxed">{inlineMd(line)}</p>
+              ))}
+            </div>
           </div>
         )}
 
