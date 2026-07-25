@@ -278,6 +278,8 @@ function ProjectDetailView({ name }: { name: string }) {
     );
   };
 
+  const status = extractStatus(d.overview);
+
   return (
     <Card>
       <CardBody className="ds-section">
@@ -310,6 +312,14 @@ function ProjectDetailView({ name }: { name: string }) {
                 {d.goal}
               </p>
             )}
+          </div>
+        )}
+
+        {/* 現在地（README ## 概要 の blockquote を「今どのフェーズ・何に注力か」として表示）。
+            目標のすぐ下・指標より前に置き、「どこへ向かうか → 今どこか → 数字」の順で読ませる。 */}
+        {status && (
+          <div className="rounded-md border border-border bg-accent/40 px-3 py-2 text-sm leading-relaxed">
+            {inlineMd(status)}
           </div>
         )}
 
@@ -393,6 +403,26 @@ function ProjectDetailView({ name }: { name: string }) {
         {(d.log ?? []).length > 0 && (
           <Section title="ログ">
             <Timeline entries={d.log ?? []} />
+          </Section>
+        )}
+
+        {/* 関連ドキュメント（README ## 関連ノート・リソース。roadmap 俯瞰などへの導線） */}
+        {(d.notes ?? []).length > 0 && (
+          <Section title="関連ドキュメント">
+            <ul className="ds-stack !gap-1">
+              {(d.notes ?? []).map((n, i) => (
+                <li key={i} className="text-sm">
+                  {n.target ? (
+                    <Link to={`/notes?path=${encodeURIComponent(n.target)}`} className="text-brand hover:underline">
+                      {n.label}
+                    </Link>
+                  ) : (
+                    <span>{n.label}</span>
+                  )}
+                  {n.desc && <span className="text-muted-foreground"> — {n.desc}</span>}
+                </li>
+              ))}
+            </ul>
           </Section>
         )}
 
@@ -818,21 +848,47 @@ function TaskTags({ task }: { task: Task }) {
   );
 }
 
-// 最小限のインライン markdown（**太字** と `コード` のみ）を React ノードへ。
+// 最小限のインライン markdown（**太字** / `コード` / [ラベル](URL)）を React ノードへ。
+// 外部 URL のみアンカー化。相対パス（docs/*.md 等）はラベルのみ表示（プロジェクト画面からは辿らせない。
+// 内部ドキュメントへの導線は「関連ドキュメント」節で target 付きリンクとして出す）。
 function inlineMd(text: string): React.ReactNode[] {
   const out: React.ReactNode[] = [];
-  const re = /\*\*([^*]+)\*\*|`([^`]+)`/g;
+  const re = /\*\*([^*]+)\*\*|`([^`]+)`|\[([^\]]+)\]\(([^)]+)\)/g;
   let last = 0;
   let key = 0;
   let m: RegExpExecArray | null;
   while ((m = re.exec(text))) {
     if (m.index > last) out.push(text.slice(last, m.index));
     if (m[1]) out.push(<strong key={key++}>{m[1]}</strong>);
-    else out.push(<code key={key++} className="px-1 rounded bg-muted text-xs font-mono">{m[2]}</code>);
+    else if (m[2]) out.push(<code key={key++} className="px-1 rounded bg-muted text-xs font-mono">{m[2]}</code>);
+    else {
+      const label = m[3].replace(/[`*]/g, "");
+      const url = m[4];
+      if (/^https?:\/\//.test(url)) {
+        out.push(
+          <a key={key++} href={url} target="_blank" rel="noreferrer" className="text-brand hover:underline">
+            {label}
+          </a>,
+        );
+      } else {
+        out.push(<span key={key++}>{label}</span>);
+      }
+    }
     last = re.lastIndex;
   }
   if (last < text.length) out.push(text.slice(last));
   return out;
+}
+
+// README ## 概要 の blockquote（`> ...`）を「現在地」テキストとして抽出する。
+// 概要末尾に置く運用（conventions.md）。blockquote が無ければ空文字。
+function extractStatus(overview: string): string {
+  return overview
+    .split("\n")
+    .filter((l) => l.trimStart().startsWith(">"))
+    .map((l) => l.replace(/^\s*>\s?/, ""))
+    .join(" ")
+    .trim();
 }
 
 const LOG_LIMIT = 10;
