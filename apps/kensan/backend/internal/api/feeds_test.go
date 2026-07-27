@@ -1,7 +1,9 @@
 package api
 
 import (
+	"bytes"
 	"encoding/json"
+	"net/http"
 	"os"
 	"path/filepath"
 	"testing"
@@ -69,5 +71,32 @@ generated_at: ` + date + `T06:30:00+09:00
 	}
 	if latest.Feed.Date != "2026-07-25" || latest.Feed.Content != "## 要対応\n\nなし\n" || len(latest.State) == 0 {
 		t.Fatalf("unexpected latest: %+v", latest)
+	}
+
+	body := bytes.NewBufferString(`{"key":"https://example.com/thread/1","title":"確認事項","acknowledged":true}`)
+	req, err := http.NewRequest(http.MethodPut, ts.URL+"/api/v1/feeds/acknowledgements", body)
+	if err != nil {
+		t.Fatal(err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("acknowledge: %d", resp.StatusCode)
+	}
+
+	var acknowledged struct {
+		Items []struct {
+			Key string `json:"key"`
+		} `json:"items"`
+	}
+	if code := getJSON(t, ts.URL+"/api/v1/feeds/acknowledgements", &acknowledged); code != http.StatusOK {
+		t.Fatalf("acknowledgements: %d", code)
+	}
+	if len(acknowledged.Items) != 1 || acknowledged.Items[0].Key != "https://example.com/thread/1" {
+		t.Fatalf("unexpected acknowledgements: %+v", acknowledged.Items)
 	}
 }

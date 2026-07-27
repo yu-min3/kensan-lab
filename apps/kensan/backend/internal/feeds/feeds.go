@@ -9,6 +9,7 @@ import (
 	"os"
 	"regexp"
 	"sort"
+	"strings"
 	"time"
 
 	"github.com/yu-min3/kensan-lab/apps/kensan/backend/internal/workspace"
@@ -45,6 +46,96 @@ type Latest struct {
 	State      *ImportState `json:"state"`
 	StateError string       `json:"stateError,omitempty"`
 	Stale      bool         `json:"stale"`
+}
+
+const acknowledgementsPath = "feeds/state/acknowledged.json"
+
+type Acknowledgement struct {
+	Key            string `json:"key"`
+	Title          string `json:"title"`
+	AcknowledgedAt string `json:"acknowledgedAt"`
+}
+
+type acknowledgementState struct {
+	SchemaVersion int                        `json:"schemaVersion"`
+	Items         map[string]Acknowledgement `json:"items"`
+}
+
+func ListAcknowledgements(ws *workspace.Workspace) ([]Acknowledgement, error) {
+	state, err := loadAcknowledgements(ws)
+	if errors.Is(err, os.ErrNotExist) {
+		return []Acknowledgement{}, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	items := make([]Acknowledgement, 0, len(state.Items))
+	for _, item := range state.Items {
+		items = append(items, item)
+	}
+	sort.Slice(items, func(i, j int) bool { return items[i].AcknowledgedAt > items[j].AcknowledgedAt })
+	return items, nil
+}
+
+func SetAcknowledgement(ws *workspace.Workspace, key, title string, acknowledged bool, now time.Time) error {
+	key = strings.TrimSpace(key)
+	title = strings.TrimSpace(title)
+	if key == "" || len(key) > 2048 {
+		return errors.New("acknowledgement key must be between 1 and 2048 bytes")
+	}
+	if len(title) > 300 {
+		return errors.New("acknowledgement title must be at most 300 bytes")
+	}
+	return ws.Mutate(acknowledgementsPath, func(content []byte, exists bool) ([]byte, error) {
+		state := acknowledgementState{SchemaVersion: 1, Items: map[string]Acknowledgement{}}
+		if exists {
+			if err := json.Unmarshal(content, &state); err != nil {
+				return nil, fmt.Errorf("parse feed acknowledgements: %w", err)
+			}
+			if state.SchemaVersion != 1 {
+				return nil, fmt.Errorf("unsupported feed acknowledgement version: %d", state.SchemaVersion)
+			}
+			if state.Items == nil {
+				state.Items = map[string]Acknowledgement{}
+			}
+		}
+		if acknowledged {
+			state.Items[key] = Acknowledgement{
+				Key:            key,
+				Title:          title,
+				AcknowledgedAt: now.Format(time.RFC3339),
+			}
+		} else {
+			delete(state.Items, key)
+		}
+		out, err := json.MarshalIndent(state, "", "  ")
+		if err != nil {
+			return nil, err
+		}
+		return append(out, '\n'), nil
+	})
+}
+
+func loadAcknowledgements(ws *workspace.Workspace) (*acknowledgementState, error) {
+	path, err := ws.Abs(acknowledgementsPath)
+	if err != nil {
+		return nil, err
+	}
+	content, err := os.ReadFile(path)
+	if err != nil {
+		return nil, err
+	}
+	var state acknowledgementState
+	if err := json.Unmarshal(content, &state); err != nil {
+		return nil, fmt.Errorf("parse feed acknowledgements: %w", err)
+	}
+	if state.SchemaVersion != 1 {
+		return nil, fmt.Errorf("unsupported feed acknowledgement version: %d", state.SchemaVersion)
+	}
+	if state.Items == nil {
+		state.Items = map[string]Acknowledgement{}
+	}
+	return &state, nil
 }
 
 func List(ws *workspace.Workspace) ([]Entry, error) {

@@ -1,10 +1,10 @@
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { AlertTriangle, CalendarDays, Newspaper } from "lucide-react";
 import { useSearchParams } from "react-router-dom";
 import clsx from "clsx";
 import { api, type FeedContent } from "../lib/api";
 import { PageHeader } from "../components/PageHeader";
-import { FeedSections } from "../components/FeedSections";
+import { FeedSections, type FeedItem } from "../components/FeedSections";
 import { Badge } from "../components/ui/badge";
 import { Card, CardBody, CardHead } from "../components/ui/card";
 import { Empty, ErrorState, Skeleton, SkeletonRows } from "../components/ui/states";
@@ -28,10 +28,20 @@ function formatDateTime(value?: string): string {
 }
 
 export function FeedPage() {
+  const queryClient = useQueryClient();
   const [params, setParams] = useSearchParams();
   const requestedDate = params.get("date");
   const list = useQuery({ queryKey: ["feeds"], queryFn: api.feeds });
   const latest = useQuery({ queryKey: ["feeds", "latest"], queryFn: api.latestFeed });
+  const acknowledgements = useQuery({
+    queryKey: ["feeds", "acknowledgements"],
+    queryFn: api.feedAcknowledgements,
+  });
+  const acknowledgement = useMutation({
+    mutationFn: ({ item, acknowledged }: { item: FeedItem; acknowledged: boolean }) =>
+      api.setFeedAcknowledgement(item.key, item.title, acknowledged),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["feeds", "acknowledgements"] }),
+  });
 
   const selectedDate = requestedDate ?? latest.data?.feed?.date ?? null;
   const selectedEntry = list.data?.feeds.find((entry) => entry.date === selectedDate);
@@ -163,7 +173,12 @@ export function FeedPage() {
                 }
               />
               <CardBody>
-                <FeedSections content={content.content} />
+                <FeedSections
+                  content={content.content}
+                  acknowledgedKeys={new Set(acknowledgements.data?.items.map((item) => item.key) ?? [])}
+                  pendingKey={acknowledgement.isPending ? acknowledgement.variables?.item.key : undefined}
+                  onAcknowledgement={(item, acknowledged) => acknowledgement.mutate({ item, acknowledged })}
+                />
               </CardBody>
             </>
           )}

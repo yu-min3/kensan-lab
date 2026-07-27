@@ -49,6 +49,12 @@ export interface LatestFeed {
   stale: boolean;
 }
 
+export interface FeedAcknowledgement {
+  key: string;
+  title: string;
+  acknowledgedAt: string;
+}
+
 export interface Task {
   text: string; // 行内タグ込みの生テキスト（state/today/archive の照合に使う）
   display: string; // タグを除いた表示用テキスト
@@ -232,6 +238,15 @@ export const api = {
   feeds: () => request<{ feeds: FeedEntry[]; total: number }>("/feeds"),
 
   latestFeed: () => request<LatestFeed>("/feeds/latest"),
+
+  feedAcknowledgements: () =>
+    request<{ items: FeedAcknowledgement[] }>("/feeds/acknowledgements"),
+
+  setFeedAcknowledgement: (key: string, title: string, acknowledged: boolean) =>
+    request<{ acknowledged: boolean }>("/feeds/acknowledgements", {
+      method: "PUT",
+      body: JSON.stringify({ key, title, acknowledged }),
+    }),
 
   board: () => request<Board>("/tasks"),
 
