@@ -39,7 +39,7 @@ export function FeedPage() {
   });
   const acknowledgement = useMutation({
     mutationFn: ({ item, acknowledged }: { item: FeedItem; acknowledged: boolean }) =>
-      api.setFeedAcknowledgement(item.key, item.title, acknowledged),
+      api.setFeedAcknowledgement(item.key, item.title, item.version, acknowledged),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["feeds", "acknowledgements"] }),
   });
 
@@ -175,7 +175,9 @@ export function FeedPage() {
               <CardBody>
                 <FeedSections
                   content={content.content}
-                  acknowledgedKeys={new Set(acknowledgements.data?.items.map((item) => item.key) ?? [])}
+                  acknowledgedVersions={
+                    new Map(acknowledgements.data?.items.map((item) => [item.key, item.version]) ?? [])
+                  }
                   pendingKey={acknowledgement.isPending ? acknowledgement.variables?.item.key : undefined}
                   onAcknowledgement={(item, acknowledged) => acknowledgement.mutate({ item, acknowledged })}
                 />

@@ -40,7 +40,7 @@ func (s *Server) handleLatestFeed(w http.ResponseWriter, _ *http.Request) {
 
 // GET /api/v1/feeds/acknowledgements — 利用者が確認済みにしたFeed項目。
 func (s *Server) handleFeedAcknowledgements(w http.ResponseWriter, _ *http.Request) {
-	items, err := feeds.ListAcknowledgements(s.ws)
+	items, err := feeds.ListAcknowledgements(s.ws, time.Now())
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, err.Error())
 		return
@@ -53,13 +53,14 @@ func (s *Server) handleFeedAcknowledgementUpdate(w http.ResponseWriter, r *http.
 	var req struct {
 		Key          string `json:"key"`
 		Title        string `json:"title"`
+		Version      string `json:"version"`
 		Acknowledged bool   `json:"acknowledged"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		writeError(w, http.StatusBadRequest, "invalid JSON body")
 		return
 	}
-	if err := feeds.SetAcknowledgement(s.ws, req.Key, req.Title, req.Acknowledged, time.Now()); err != nil {
+	if err := feeds.SetAcknowledgement(s.ws, req.Key, req.Title, req.Version, req.Acknowledged, time.Now()); err != nil {
 		writeError(w, http.StatusBadRequest, err.Error())
 		return
 	}

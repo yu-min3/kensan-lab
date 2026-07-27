@@ -73,7 +73,7 @@ generated_at: ` + date + `T06:30:00+09:00
 		t.Fatalf("unexpected latest: %+v", latest)
 	}
 
-	body := bytes.NewBufferString(`{"key":"https://example.com/thread/1","title":"確認事項","acknowledged":true}`)
+	body := bytes.NewBufferString(`{"key":"https://example.com/thread/1","title":"確認事項","version":"v1","acknowledged":true}`)
 	req, err := http.NewRequest(http.MethodPut, ts.URL+"/api/v1/feeds/acknowledgements", body)
 	if err != nil {
 		t.Fatal(err)

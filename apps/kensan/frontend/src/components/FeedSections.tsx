@@ -15,6 +15,7 @@ export interface FeedItem {
   title: string;
   content: string;
   key: string;
+  version: string;
 }
 
 export function splitFeedSections(markdown: string): FeedSection[] {
@@ -41,13 +42,32 @@ export function splitFeedItems(markdown: string): FeedItem[] {
     const end = matches[index + 1]?.index ?? markdown.length;
     const content = markdown.slice(start, end).trim();
     const source = content.match(/(?:出典|URL):[ \t]*(https?:\/\/[^\s)）]+)/i)?.[1];
+    const updatedAt = content.match(/(?:更新日時|受信日時):[ \t]*(\S+)/)?.[1];
     const title = match[1].trim();
     return {
       title,
       content,
       key: source ?? `title:${title.replace(/[（(].*?[）)]/g, "").trim().toLowerCase()}`,
+      version: updatedAt ?? `content:${stableHash(normalizeForFingerprint(content))}`,
     };
   });
+}
+
+function normalizeForFingerprint(content: string): string {
+  return content
+    .replace(/前回(?:・前々回)?(?:のレポート)?[^。\n]*[。\n]?/g, "")
+    .replace(/締切まで(?:残り)?\d+日/g, "締切まで")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function stableHash(value: string): string {
+  let hash = 2166136261;
+  for (let index = 0; index < value.length; index += 1) {
+    hash ^= value.charCodeAt(index);
+    hash = Math.imul(hash, 16777619);
+  }
+  return (hash >>> 0).toString(16).padStart(8, "0");
 }
 
 function EmptySection({ children }: { children: string }) {
@@ -66,13 +86,13 @@ function SectionBody({ section, empty }: { section?: FeedSection; empty: string 
 function InboxItems({
   section,
   empty,
-  acknowledgedKeys,
+  acknowledgedVersions,
   pendingKey,
   onAcknowledgement,
 }: {
   section?: FeedSection;
   empty: string;
-  acknowledgedKeys: Set<string>;
+  acknowledgedVersions: Map<string, string>;
   pendingKey?: string;
   onAcknowledgement: (item: FeedItem, acknowledged: boolean) => void;
 }) {
@@ -80,8 +100,8 @@ function InboxItems({
   if (!section || !section.content) return <EmptySection>{empty}</EmptySection>;
   const items = splitFeedItems(section.content);
   if (items.length === 0) return <MarkdownView content={section.content} />;
-  const visible = items.filter((item) => !acknowledgedKeys.has(item.key));
-  const acknowledged = items.filter((item) => acknowledgedKeys.has(item.key));
+  const visible = items.filter((item) => acknowledgedVersions.get(item.key) !== item.version);
+  const acknowledged = items.filter((item) => acknowledgedVersions.get(item.key) === item.version);
 
   return (
     <div className="space-y-3">
@@ -142,12 +162,12 @@ function InboxItems({
 
 export function FeedSections({
   content,
-  acknowledgedKeys = new Set<string>(),
+  acknowledgedVersions = new Map<string, string>(),
   pendingKey,
   onAcknowledgement = () => undefined,
 }: {
   content: string;
-  acknowledgedKeys?: Set<string>;
+  acknowledgedVersions?: Map<string, string>;
   pendingKey?: string;
   onAcknowledgement?: (item: FeedItem, acknowledged: boolean) => void;
 }) {
@@ -160,7 +180,7 @@ export function FeedSections({
   const known = new Set(["要対応", "確認", "今日のニュース", "リリース・定点観測"]);
   const others = sections.filter((section) => !known.has(section.title));
   const visibleCount = (section?: FeedSection) =>
-    section ? splitFeedItems(section.content).filter((item) => !acknowledgedKeys.has(item.key)).length : 0;
+    section ? splitFeedItems(section.content).filter((item) => acknowledgedVersions.get(item.key) !== item.version).length : 0;
   const actionCount = visibleCount(action);
   const confirmationCount = visibleCount(confirmation);
 
@@ -193,7 +213,7 @@ export function FeedSections({
               <InboxItems
                 section={action}
                 empty="未確認の要対応はありません。"
-                acknowledgedKeys={acknowledgedKeys}
+                acknowledgedVersions={acknowledgedVersions}
                 pendingKey={pendingKey}
                 onAcknowledgement={onAcknowledgement}
               />
@@ -211,7 +231,7 @@ export function FeedSections({
               <InboxItems
                 section={confirmation}
                 empty="未確認の確認事項はありません。"
-                acknowledgedKeys={acknowledgedKeys}
+                acknowledgedVersions={acknowledgedVersions}
                 pendingKey={pendingKey}
                 onAcknowledgement={onAcknowledgement}
               />

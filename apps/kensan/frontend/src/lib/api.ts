@@ -52,7 +52,9 @@ export interface LatestFeed {
 export interface FeedAcknowledgement {
   key: string;
   title: string;
+  version: string;
   acknowledgedAt: string;
+  expiresAt: string;
 }
 
 export interface Task {
@@ -242,10 +244,10 @@ export const api = {
   feedAcknowledgements: () =>
     request<{ items: FeedAcknowledgement[] }>("/feeds/acknowledgements"),
 
-  setFeedAcknowledgement: (key: string, title: string, acknowledged: boolean) =>
+  setFeedAcknowledgement: (key: string, title: string, version: string, acknowledged: boolean) =>
     request<{ acknowledged: boolean }>("/feeds/acknowledgements", {
       method: "PUT",
-      body: JSON.stringify({ key, title, acknowledged }),
+      body: JSON.stringify({ key, title, version, acknowledged }),
     }),
 
   board: () => request<Board>("/tasks"),
