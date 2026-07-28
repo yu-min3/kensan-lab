@@ -80,13 +80,24 @@ Metricsを再実行しても重複しません。
 workspace/
 ├── feeds/
 │   ├── YYYY/MM/DD.md
-│   └── state/import.json
+│   └── state/
+│       ├── import.json
+│       └── acknowledged.json
 └── projects/<project>/metrics.ndjson
 ```
 
 `feeds/state/import.json`には最新の成功日時、対象日、Drive file ID、content hash、
 直近エラーを保存します。kensanはこのstateを使い、今日のFeedが未取得か、同期が
 失敗しているかを表示します。
+
+`feeds/state/acknowledged.json`には利用者が確認済みにしたInbox項目を保存します。
+出典URLを安定key、項目の`更新日時`をversionとして扱うため、同じメールthreadが
+翌日のレポートへ再掲されても隠れ、新しい返信でversionが進めば再表示されます。
+`更新日時`がない従来レポートは正規化した本文hashをversionとして使います。
+
+確認済みstateは90日で期限切れになり、更新時に自動pruneします。最大2,000件・
+2 MiBに制限し、APIは期限内の項目だけを返します。確認済み一覧から「戻す」ことで
+期限前でも再表示できます。
 
 ## kensanでの表示
 
@@ -100,12 +111,18 @@ workspace/
 Feed本文は外部入力として扱います。Markdown rendererはraw HTMLを解釈せず、
 リンク先のprotocolを`http`と`https`に限定します。
 
+Inboxの各項目には「確認済みにする」操作があります。確認済み項目は件数から除外し、
+折りたたまれた一覧へ移動します。この操作はメールの既読化・archive・返信を行わず、
+workspace内のacknowledgementだけを変更します。
+
 API:
 
 | Method | Path | 説明 |
 |---|---|---|
 | GET | `/api/v1/feeds` | 保存済みFeedの一覧 |
 | GET | `/api/v1/feeds/latest` | 最新Feed本文とimport状態 |
+| GET | `/api/v1/feeds/acknowledgements` | 確認済みInbox項目 |
+| PUT | `/api/v1/feeds/acknowledgements` | 確認済み状態の更新 |
 
 ## Credentialの境界
 
