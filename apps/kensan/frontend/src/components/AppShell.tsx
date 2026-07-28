@@ -68,6 +68,7 @@ export function AppShell({ children }: { children: ReactNode }) {
       {navOpen && <div className="fixed inset-0 bg-black/20 z-40 md:hidden" onClick={close} />}
 
       <aside
+        data-testid="app-sidebar"
         className={clsx(
           "border-r border-border flex-col bg-background",
           // モバイル: 左からのオーバーレイ drawer / md 以上: grid の 1 列目に常設
@@ -140,10 +141,10 @@ export function AppShell({ children }: { children: ReactNode }) {
           <span className="text-sm">Yu</span>
         </footer>
       </aside>
-      <main
-        className="ds-page min-w-0 overflow-x-hidden"
-        style={{ width: "calc(100% - 2 * var(--page-pad))" }}
-      >
+      {/* md 以上では 2 列目に明示配置する。暗黙の auto-placement に任せると、
+          aside が（拡張機能・CSS 事故などで）フローから外れた瞬間に main が
+          200px の 1 列目へ繰り上がり、全ページが判読不能に潰れる。 */}
+      <main className="ds-page min-w-0 overflow-x-hidden md:col-start-2 md:row-start-1">
         {children}
       </main>
       <FloatingMemoButton />
