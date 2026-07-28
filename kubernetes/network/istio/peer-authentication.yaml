@@ -2,11 +2,19 @@
 ## Accepts both mTLS and plaintext connections.
 ## This is the safe first step before migrating to STRICT.
 ##
-## Namespaces with sidecar injection (mTLS active):
-##   app-kensan, backstage, platform-auth-prod
+## Namespaces with sidecar injection (mTLS active) — the `istio-injection: enabled`
+## label on the namespace is the source of truth, grep it before trusting this list:
+##   auth-system, platform-auth-prod, vault, vault-config-operator,
+##   external-secrets, backstage
 ##
-## Namespaces without sidecar (plaintext only):
-##   monitoring, cert-manager, kube-system, argocd
+## Namespaces without sidecar (plaintext only) — includes the app namespaces:
+##   app-kensan, monitoring, cert-manager, kube-system, argocd,
+##   longhorn-system, cloudflare-tunnel
+##
+## NOTE: app-kensan is deliberately listed above as *not* injected. An earlier
+## revision of this comment claimed it was in the mesh; it never carried the
+## label. Gateway -> app traffic is therefore plaintext, protected by the
+## Cilium default-deny NetworkPolicy baseline rather than by mTLS.
 ##
 ## To upgrade to STRICT:
 ##   1. Enable sidecar injection on all namespaces
