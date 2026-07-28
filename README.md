@@ -39,20 +39,28 @@ The platform covers technologies behind 12 out of 16 Golden Kubestronaut certifi
 ## Architecture
 
 <div align="center">
-<img src="docs/assets/request-flow.png" alt="Platform Architecture — Request Flow & Component Interaction" width="800">
+<a href="docs/assets/platform-architecture.png"><img src="docs/assets/platform-architecture.png" alt="kensan-lab platform architecture — request path, shared platform services, guardrails and GitOps" width="100%"></a>
 <br>
-<sub>How traffic flows through the platform and how components interact</sub>
+<sub>Everything inside the cards runs in-cluster — click to enlarge</sub>
 </div>
 
 
-- **Gateway** — Cloudflare Tunnel (internet) and Cilium L2 LB (LAN) route traffic through Istio Gateway using Gateway API
+- **Request path** — two ingress routes converge on one Istio Gateway. From the internet: Cloudflare's edge terminates TLS and Access gates the request, then an in-cluster `cloudflared` connector picks it up over an outbound-only tunnel — no port is ever opened inbound. From the LAN: Cilium announces the LoadBalancer address over L2 and traffic reaches the same Gateway directly
+- **Authentication** — Keycloak is the OIDC identity provider. The Gateway does not proxy auth itself; Envoy makes an `ext_authz` side-call to oauth2-proxy (a standalone deployment in `auth-system`) on every request, so SSO is enforced at the edge before traffic reaches a workload
 - **Applications** — workloads deployed to per-app namespaces (`app-{name}`) via Argo CD, plus the kensan app in a dedicated namespace
 - **Internal Developer Platform** — Backstage provides a service catalog (catalog-info.yaml), TechDocs (MkDocs), and Golden Path scaffolding templates
-- **Observability** — applications emit telemetry to OTel Collector, which fans out to Prometheus (metrics), Loki (logs), and Tempo (traces), all visualized in Grafana. AlertManager sends alerts to Slack
-- **Authentication** — Keycloak is the OIDC identity provider; the Istio Gateway offloads auth to oauth2-proxy (ext_authz), so SSO is enforced at the edge before traffic ever reaches a workload
-- **Secrets** — HashiCorp Vault is the backbone: static secrets in KV v2 (synced into the cluster by External Secrets), dynamic short-lived database credentials, and Transit encryption-as-a-service for PII. Sealed Secrets is used **only** for the few bootstrap credentials that can't depend on Vault yet — e.g. Vault's own auto-unseal key — avoiding a circular dependency
-- **Zero-trust internal network** — Cilium enforces a default-deny NetworkPolicy baseline while Istio provides automatic mTLS for all service-to-service traffic; cert-manager automates TLS and Pod Security Standards harden workloads
+- **Observability** — applications emit telemetry to OTel Collector, which fans out to Prometheus (metrics), Loki (logs), and Tempo (traces), all visualized in Grafana. Alertmanager sends alerts to Slack, and a curated slice of metrics is remote-written to Grafana Cloud so a no-data alert still fires if the whole cluster — monitoring included — goes dark
+- **Secrets** — HashiCorp Vault is the backbone: static secrets in KV v2 (synced into the cluster by External Secrets), dynamic short-lived database credentials, and Transit encryption-as-a-service for PII. The dynamic and Transit rails are deployed and were battle-tested, but currently have no consumers — see the [secrets inventory](./kubernetes/secrets/README.md). Sealed Secrets is used **only** for the few bootstrap credentials that can't depend on Vault yet — e.g. Vault's own auto-unseal key — avoiding a circular dependency
+- **Storage** — Longhorn provides replicated block storage for every stateful workload, with recurring backups shipped off-site to Cloudflare R2
+- **Zero-trust internal network** — Cilium enforces a default-deny NetworkPolicy baseline cluster-wide. Istio mTLS covers the sidecar-injected namespaces (`auth-system`, `platform-auth-prod`, `vault`, `vault-config-operator`, `external-secrets`, `backstage`) and runs in PERMISSIVE mode, so plaintext is still accepted while the remaining namespaces are migrated; cert-manager automates TLS and Pod Security Standards harden workloads
 - **Argo CD** — manages all zones via GitOps. Split into `platform-project` (infrastructure) and `app-project` (applications)
+
+<details>
+<summary><b>Detailed component-interaction diagram</b></summary>
+
+The diagram above is the overview. A denser view — every namespace, IP range, and component-to-component edge — is kept at [`docs/assets/request-flow.png`](docs/assets/request-flow.png) ([source](docs/assets/request-flow.drawio)).
+
+</details>
 
 ## Showcase
 
