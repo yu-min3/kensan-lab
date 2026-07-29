@@ -18,11 +18,10 @@ A bare-metal Kubernetes homelab built with technologies typical of enterprise pl
 ## Architecture
 
 <figure markdown>
-  ![Platform Architecture](assets/platform-architecture.png)
+  ![Platform Architecture](assets/platform-architecture-light.png#only-light)
+  ![Platform Architecture](assets/platform-architecture-dark.png#only-dark)
   <figcaption>Everything inside the cards runs in-cluster — click to enlarge</figcaption>
 </figure>
-
-A denser component-interaction view is kept at [request-flow.png](assets/request-flow.png).
 
 Each domain has an architecture page — design thesis, component map, diagrams, and the rationale behind the choices:
 

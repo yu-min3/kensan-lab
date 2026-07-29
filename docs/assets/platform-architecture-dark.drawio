@@ -188,10 +188,10 @@
         <mxCell id="lg_2" value="&lt;font color=&quot;#F5F2EC&quot;&gt;&lt;font color=&quot;#B689CD&quot;&gt;■&lt;/font&gt;&amp;nbsp; Platform control&lt;/font&gt;" style="text;html=1;align=left;verticalAlign=middle;fontFamily=Inter;fontSize=13;fontColor=#F5F2EC;" vertex="1" parent="lg">
           <mxGeometry x="174" y="18" width="160" height="24" as="geometry" />
         </mxCell>
-        <mxCell id="lg_3" value="&lt;font color=&quot;#F5F2EC&quot;&gt;&lt;font color=&quot;#5B5345&quot;&gt;■&lt;/font&gt;&amp;nbsp; Supporting&lt;/font&gt;" style="text;html=1;align=left;verticalAlign=middle;fontFamily=Inter;fontSize=13;fontColor=#F5F2EC;" vertex="1" parent="lg">
+        <mxCell id="lg_3" value="&lt;font color=&quot;#F5F2EC&quot;&gt;&lt;font color=&quot;#AFA89E&quot;&gt;■&lt;/font&gt;&amp;nbsp; Supporting&lt;/font&gt;" style="text;html=1;align=left;verticalAlign=middle;fontFamily=Inter;fontSize=13;fontColor=#F5F2EC;" vertex="1" parent="lg">
           <mxGeometry x="340" y="18" width="130" height="24" as="geometry" />
         </mxCell>
-        <mxCell id="lg_4" value="&lt;font color=&quot;#F5F2EC&quot;&gt;&lt;font color=&quot;#5B5345&quot;&gt;▢&lt;/font&gt;&amp;nbsp; Outside the cluster&lt;/font&gt;" style="text;html=1;align=left;verticalAlign=middle;fontFamily=Inter;fontSize=13;fontColor=#F5F2EC;" vertex="1" parent="lg">
+        <mxCell id="lg_4" value="&lt;font color=&quot;#F5F2EC&quot;&gt;&lt;font color=&quot;#AFA89E&quot;&gt;▢&lt;/font&gt;&amp;nbsp; Outside the cluster&lt;/font&gt;" style="text;html=1;align=left;verticalAlign=middle;fontFamily=Inter;fontSize=13;fontColor=#F5F2EC;" vertex="1" parent="lg">
           <mxGeometry x="476" y="18" width="180" height="24" as="geometry" />
         </mxCell>
         <mxCell id="lg_5" value="&lt;font color=&quot;#F5F2EC&quot;&gt;&lt;font color=&quot;#F5C77E&quot;&gt;★&lt;/font&gt;&amp;nbsp; Design principle&lt;/font&gt;" style="text;html=1;align=left;verticalAlign=middle;fontFamily=Inter;fontSize=13;fontColor=#F5F2EC;" vertex="1" parent="lg">

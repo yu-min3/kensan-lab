@@ -12,6 +12,18 @@
   --whetstone-font-mono: "JetBrains Mono", "SF Mono", ui-monospace, Menlo, monospace;
   --whetstone-radius: 0.5rem;
   --whetstone-shadow-sm: 0 1px 3px 0 hsl(30 20% 10% / 0.08), 0 1px 2px -1px hsl(30 20% 10% / 0.04);
+
+  /* Mermaid diagrams are dark in both schemes — see the .md-typeset .mermaid
+     block for why they cannot follow the palette. These mirror the slate
+     scheme's values so the diagram panel reads as one surface with them. */
+  --diagram-background: 30 10% 13%;
+  --diagram-surface: 30 10% 15%;
+  --diagram-foreground: 40 27% 94%;
+  --diagram-muted-foreground: 30 8% 72%;
+  --diagram-border: 30 10% 24%;
+  --diagram-accent: 199 89% 60%;
+  --diagram-accent-muted: 199 40% 25%;
+  --diagram-accent-foreground: 30 10% 13%;
 }
 
 [data-md-color-scheme="default"] {
@@ -302,55 +314,55 @@ body {
   box-shadow: none;
 }
 
+/* Mermaid diagrams stay dark in both schemes, framed as a deliberate dark
+   figure in the light scheme.
+   Two hard constraints make per-scheme re-coloring impossible from here:
+   (1) Material renders every diagram into a *closed* shadow root, so no
+       selector in this file reaches the SVG — only inherited properties and
+       custom properties cross the boundary;
+   (2) mermaid v11 emits classDef colors as inline `!important`, which outrank
+       stylesheet `!important` in the cascade even without the shadow root.
+   So the panel is styled from the outside and the palette is handed in through
+   the --md-mermaid-* custom properties, pinned to dark values. Material derives
+   those from --md-code-fg-color et al. at :root, where the substitution has
+   already happened against the active scheme — they have to be re-derived here
+   rather than re-pointed at their sources. */
 .md-typeset .mermaid {
-  background-color: hsl(var(--card));
-  border: 1px solid hsl(var(--border));
+  background-color: hsl(var(--diagram-surface));
+  border: 1px solid hsl(var(--diagram-border));
   border-radius: var(--whetstone-radius);
   padding: 1rem;
-}
 
-.md-typeset .mermaid svg {
-  display: block;
-  margin-inline: auto;
-  max-width: 100%;
-}
+  /* Material's themeCSS reads these two directly for subgraph clusters. */
+  --md-default-fg-color--lighter: hsl(var(--diagram-muted-foreground) / 0.72);
+  --md-default-fg-color--lightest: hsl(var(--diagram-muted-foreground) / 0.42);
 
-.md-typeset .mermaid .edgeLabel,
-.md-typeset .mermaid .edgeLabel p,
-.md-typeset .mermaid .edgeLabel span {
-  color: hsl(var(--foreground)) !important;
-  font-weight: 650 !important;
-  line-height: 1.25 !important;
-  text-shadow:
-    0 1px 0 hsl(var(--card)),
-    0 -1px 0 hsl(var(--card)),
-    1px 0 0 hsl(var(--card)),
-    -1px 0 0 hsl(var(--card));
-}
+  --md-mermaid-edge-color: hsl(var(--diagram-foreground));
+  --md-mermaid-node-bg-color: hsl(var(--diagram-accent-muted));
+  --md-mermaid-node-fg-color: hsl(var(--diagram-accent));
+  --md-mermaid-label-bg-color: hsl(var(--diagram-background));
+  --md-mermaid-label-fg-color: hsl(var(--diagram-foreground));
 
-.md-typeset .mermaid .edgeLabel {
-  transform-box: fill-box;
-  transform-origin: center;
-  translate: 0 -1.4rem;
-}
-
-.md-typeset .mermaid .edgeLabel foreignObject {
-  overflow: visible;
-  transform: translateY(-1.4rem);
-}
-
-.md-typeset .mermaid .edgeLabel,
-.md-typeset .mermaid .edgeLabel .labelBkg,
-.md-typeset .mermaid .edgeLabel rect {
-  background-color: transparent !important;
-  fill: transparent !important;
-  stroke: transparent !important;
-}
-
-.md-typeset .mermaid .edgeLabel .labelBkg,
-.md-typeset .mermaid .edgeLabel rect {
-  rx: 3px;
-  ry: 3px;
+  --md-mermaid-sequence-actor-bg-color: var(--md-mermaid-label-bg-color);
+  --md-mermaid-sequence-actor-fg-color: var(--md-mermaid-label-fg-color);
+  --md-mermaid-sequence-actor-border-color: var(--md-mermaid-node-fg-color);
+  --md-mermaid-sequence-actor-line-color: hsl(var(--diagram-muted-foreground) / 0.72);
+  --md-mermaid-sequence-actorman-bg-color: var(--md-mermaid-label-bg-color);
+  --md-mermaid-sequence-actorman-line-color: var(--md-mermaid-node-fg-color);
+  --md-mermaid-sequence-box-bg-color: var(--md-mermaid-node-bg-color);
+  --md-mermaid-sequence-box-fg-color: var(--md-mermaid-edge-color);
+  --md-mermaid-sequence-label-bg-color: var(--md-mermaid-node-bg-color);
+  --md-mermaid-sequence-label-fg-color: var(--md-mermaid-node-fg-color);
+  --md-mermaid-sequence-loop-bg-color: var(--md-mermaid-node-bg-color);
+  --md-mermaid-sequence-loop-fg-color: var(--md-mermaid-edge-color);
+  --md-mermaid-sequence-loop-border-color: var(--md-mermaid-node-fg-color);
+  --md-mermaid-sequence-message-fg-color: var(--md-mermaid-edge-color);
+  --md-mermaid-sequence-message-line-color: var(--md-mermaid-edge-color);
+  --md-mermaid-sequence-note-bg-color: var(--md-mermaid-label-bg-color);
+  --md-mermaid-sequence-note-fg-color: var(--md-mermaid-edge-color);
+  --md-mermaid-sequence-note-border-color: var(--md-mermaid-label-fg-color);
+  --md-mermaid-sequence-number-bg-color: var(--md-mermaid-node-fg-color);
+  --md-mermaid-sequence-number-fg-color: var(--md-mermaid-sequence-actor-bg-color);
 }
 
 .md-footer {

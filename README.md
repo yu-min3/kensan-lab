@@ -39,7 +39,13 @@ The platform covers technologies behind 12 out of 16 Golden Kubestronaut certifi
 ## Architecture
 
 <div align="center">
-<a href="docs/assets/platform-architecture.png"><img src="docs/assets/platform-architecture.png" alt="kensan-lab platform architecture — request path, shared platform services, guardrails and GitOps" width="100%"></a>
+<a href="docs/assets/platform-architecture-dark.png">
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/assets/platform-architecture-dark.png">
+  <source media="(prefers-color-scheme: light)" srcset="docs/assets/platform-architecture-light.png">
+  <img alt="kensan-lab platform architecture — request path, shared platform services, guardrails and GitOps" src="docs/assets/platform-architecture-dark.png" width="100%">
+</picture>
+</a>
 <br>
 <sub>Everything inside the cards runs in-cluster — click to enlarge</sub>
 </div>
@@ -54,13 +60,6 @@ The platform covers technologies behind 12 out of 16 Golden Kubestronaut certifi
 - **Storage** — Longhorn provides replicated block storage for every stateful workload, with recurring backups shipped off-site to Cloudflare R2
 - **Zero-trust internal network** — Cilium enforces a default-deny NetworkPolicy baseline cluster-wide. Istio mTLS covers the sidecar-injected namespaces (`auth-system`, `platform-auth-prod`, `vault`, `vault-config-operator`, `external-secrets`, `backstage`) and runs in PERMISSIVE mode, so plaintext is still accepted while the remaining namespaces are migrated; cert-manager automates TLS and Pod Security Standards harden workloads
 - **Argo CD** — manages all zones via GitOps. Split into `platform-project` (infrastructure) and `app-project` (applications)
-
-<details>
-<summary><b>Detailed component-interaction diagram</b></summary>
-
-The diagram above is the overview. A denser view — every namespace, IP range, and component-to-component edge — is kept at [`docs/assets/request-flow.png`](docs/assets/request-flow.png) ([source](docs/assets/request-flow.drawio)).
-
-</details>
 
 ## Showcase
 

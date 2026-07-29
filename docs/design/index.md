@@ -143,6 +143,17 @@ Full detail: [`packages/design-tokens/README.md`](https://github.com/yu-min3/ken
 
 To change density for just part of a screen, set `data-density="compact"` on that subtree's parent element.
 
+### 3.7 Diagram colors — one authored file, one generated file
+
+The architecture diagram has its own palette in `tokens.json` (`diagram.dark` / `diagram.light`), because a draw.io file cannot reference CSS variables — it stores literal hexes.
+
+- **`docs/assets/platform-architecture-dark.drawio` is the only file edited by hand.** The light variant and both PNGs are build artifacts of `make diagrams`
+- Every colour in the authored file has to be a `diagram` token. `scripts/diagram-theme.py` is fail-closed: an off-palette hex stops the build instead of shipping a light diagram with a dark box left in it
+- The generator also audits contrast (text 4.5, arrows 3.0) on both files, and CI re-runs `make diagrams-verify`
+- Adding a role means adding it to **both** modes, with a dark hex that no other role uses — the mapping is keyed on the dark value
+
+Mermaid diagrams are a separate case: they keep their palette in `classDef` (which is what GitHub renders) and stay dark in both docs schemes. See the comment above `.md-typeset .mermaid` in `docs/stylesheets/whetstone.css` for why they cannot follow the scheme.
+
 ---
 
 ## 4. Components — use only what's listed

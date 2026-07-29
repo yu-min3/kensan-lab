@@ -1,11 +1,34 @@
 name: Deploy docs site
 
+# The build also runs on pull requests: the site used to be validated only after
+# a merge, and a docs deploy once stayed broken for a week before anyone noticed
+# (#411 → found in #425). Only the deploy job is gated on push to main.
+#
+# The path filters cover the READMEs pulled in with pymdownx.snippets — an
+# architecture page is a one-line transclusion of kubernetes/<domain>/README.md,
+# so a change there changes the site without touching docs/. The two lists are
+# duplicated because GitHub Actions does not resolve YAML anchors; keep them in
+# sync.
 on:
   push:
     branches:
       - main
     paths:
       - "docs/**"
+      - "kubernetes/**/README.md"
+      - "packages/design-tokens/tokens.json"
+      - "scripts/diagram-theme.py"
+      - "Makefile"
+      - "mkdocs.yml"
+      - "requirements-docs.txt"
+      - ".github/workflows/docs.yml"
+  pull_request:
+    paths:
+      - "docs/**"
+      - "kubernetes/**/README.md"
+      - "packages/design-tokens/tokens.json"
+      - "scripts/diagram-theme.py"
+      - "Makefile"
       - "mkdocs.yml"
       - "requirements-docs.txt"
       - ".github/workflows/docs.yml"
@@ -17,7 +40,7 @@ permissions:
   id-token: write
 
 concurrency:
-  group: pages
+  group: pages-${{ github.ref }}
   cancel-in-progress: false
 
 jobs:
@@ -37,15 +60,22 @@ jobs:
       - name: Install dependencies
         run: pip install -r requirements-docs.txt
 
+      # The light architecture diagram is generated from the dark one; this
+      # fails if it was not regenerated, or if the palette lost WCAG AA.
+      - name: Verify generated diagrams
+        run: make diagrams-verify
+
       - name: Build site
-        run: mkdocs build
+        run: mkdocs build --strict
 
       - uses: actions/upload-pages-artifact@v3
+        if: github.event_name != 'pull_request'
         with:
           path: ./site
 
   deploy:
     needs: build
+    if: github.event_name != 'pull_request'
     runs-on: ubuntu-latest
     environment:
       name: github-pages
