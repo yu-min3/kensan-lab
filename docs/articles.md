@@ -4,8 +4,12 @@ Deep-dive write-ups on Zenn and dev.to. These are **point-in-time records** — 
 
 For the current state of the platform, the docs in this site are the source of truth. The articles below capture the *story* — design tradeoffs, what we tried first, what broke, and how it was fixed.
 
-!!! tip "Reading order"
-    If you're new here, start with the [Home](index.md) page for the architecture, then dive into whichever article matches your interest.
+<div class="admonition tip" markdown>
+<p class="admonition-title">Reading order</p>
+
+If you're new here, start with the [Home](index.md) page for the architecture, then dive into whichever article matches your interest.
+
+</div>
 
 ## By topic
 
