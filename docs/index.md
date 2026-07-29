@@ -17,8 +17,8 @@ A bare-metal Kubernetes homelab built with technologies typical of enterprise pl
 
 ## Architecture
 
-<figure markdown>
-  ![Platform Architecture](assets/platform-architecture.png)
+<figure>
+  <img src="assets/platform-architecture.png" alt="Platform Architecture">
   <figcaption>Everything inside the cards runs in-cluster — click to enlarge</figcaption>
 </figure>
 

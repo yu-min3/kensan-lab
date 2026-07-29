@@ -23,8 +23,8 @@ flowchart LR
 | Argo CD `Application` CR | PR against `kensan-lab` → `kubernetes/argocd/applications/apps/<name>/` | PE reviews, then Argo CD |
 | Catalog entry + TechDocs | Backstage (`catalog-info.yaml` auto-registered) | AD |
 
-<figure markdown>
-  ![Backstage entity page for the kensan component — ownership, system, tags, relations, source, and TechDocs](../assets/showcase/backstage-catalog.png){ width="900" }
+<figure>
+  <img src="../assets/showcase/backstage-catalog.png" alt="Backstage entity page for the kensan component — ownership, system, tags, relations, source, and TechDocs" width="900">
   <figcaption>A live catalog entry on this platform: the component is discoverable with ownership, system relations, source, and TechDocs in one place.</figcaption>
 </figure>
 
