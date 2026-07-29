@@ -7,7 +7,7 @@ position of [ADR-008](008-keycloak-db-credentials.md) (static credentials), now 
 static + ESO rather than Sealed Secrets.
 
 > **Note on timing**: Like ADR-013, this is a *retroactive record*. The revert was implemented on
-> 2026-07-02 (commit `cc2f3fe`, "DB dynamic secret の対象を整理"), which removed the VDBE instance
+> 2026-07-02 (commit `cc2f3fe`, "tidy up the DB dynamic secret targets"), which removed the VDBE instance
 > `platform-values/vault-database/keycloak-prod.yaml` along with the unconsumed `backstage` and
 > `kensan-app` instances — but the decision reversing ADR-013 was not written down at the time.
 > Discovered during the 2026-07-11 documentation review.
@@ -42,7 +42,7 @@ Keycloak DB credentials are **Vault static, delivered by ESO**: `keycloak-secret
 
 The general rule extracted from this arc: **Vault dynamic only where a restart / credential reload is
 acceptable.** IdPs, catalog metastores, and long-lived services owning DB schemas stay on Vault
-static (the 据置 list in [`docs/secret-management/index.md`](../secret-management/index.md)).
+static (the "kept as-is" list in [`docs/secret-management/index.md`](../secret-management/index.md)).
 
 ## Consequences
 
