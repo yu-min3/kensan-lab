@@ -15,7 +15,7 @@ If you're new here, start with the [Home](index.md) page for the architecture, t
 
 ### Networking & Ingress
 
-<!-- - [タイトル](URL) — このときの構成: Phase X / YYYY-MM -->
+<!-- - [Title](URL) — platform state at the time: Phase X / YYYY-MM -->
 *Coming soon.*
 
 ### Service Mesh & Auth
