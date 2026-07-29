@@ -5,7 +5,10 @@
 # tokens in packages/design-tokens/tokens.json, so the palette lives in one
 # place and the two files cannot drift apart.
 
-DRAWIO_EXPORT ?= rlespinasse/drawio-export:latest
+# Pinned by digest: the PNGs are committed, so an exporter update would show up
+# as a diff on a file nobody edited. Bump deliberately, and eyeball the diagram
+# after — drawio-exporter 1.4.1.
+DRAWIO_EXPORT ?= rlespinasse/drawio-export@sha256:76c67274d7c7cec45d7e79614e1c1af493d16f079d3db9fe9b32684f4abb67a9
 ASSETS        := docs/assets
 DIAGRAM       := platform-architecture
 THEME         := python3 scripts/diagram-theme.py
