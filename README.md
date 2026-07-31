@@ -30,7 +30,7 @@
 
 A bare-metal Kubernetes homelab built with technologies typical of enterprise platform engineering — Argo CD for GitOps, Istio for service mesh, Backstage for developer self-service, and observability with Prometheus, Grafana, Loki, and Tempo. All running on Raspberry Pis and a mini PC.
 
-> This is a **reference architecture**, not a turnkey solution. A bootstrap automation (Ansible + Makefile) is planned for future release. Published as a learning resource and companion to the author's technical articles. Adapt secrets, domains, and IP ranges for your environment. See [Configuration Guide](./docs/getting-started/configuration.md).
+> This is a **reference architecture**, not a turnkey solution. A bootstrap automation (Ansible + Makefile) is planned for future release. Published as a learning resource and companion to the author's technical articles. Adapt secrets, domains, and IP ranges for your environment. See [Configuration Guide](https://yu-min3.github.io/kensan-lab/getting-started/configuration/).
 
 ## Why This Exists
 
@@ -160,9 +160,9 @@ docs/                             # ADRs, architecture, guides (MkDocs site)
 | ------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **Docs site**       | **[https://yu-min3.github.io/kensan-lab/](https://yu-min3.github.io/kensan-lab/)** — full documentation site |
 | **Showcase**        | [Screenshot gallery](https://yu-min3.github.io/kensan-lab/showcase/) — the running system: Argo CD, Grafana, Backstage, Hubble, kensan, and the physical cluster |
-| **Getting Started** | [Installation](./docs/getting-started/installation.md) / [Configuration](./docs/getting-started/configuration.md) / [Bootstrapping](./docs/bootstrapping/index.md) _(in progress)_ / [Secret Management](./docs/secret-management/index.md) |
+| **Getting Started** | [Installation](https://yu-min3.github.io/kensan-lab/getting-started/installation/) / [Configuration](https://yu-min3.github.io/kensan-lab/getting-started/configuration/) / [Bootstrapping](https://yu-min3.github.io/kensan-lab/bootstrapping/) _(in progress)_ / [Secret Management](https://yu-min3.github.io/kensan-lab/secret-management/) |
 | **Architecture (per domain)** | [Argo CD](./kubernetes/argocd/README.md) / [Network](./kubernetes/network/README.md) / [Auth](./kubernetes/auth/README.md) / [Secrets](./kubernetes/secrets/README.md) / [Storage](./kubernetes/storage/README.md) / [Observability](./kubernetes/observability/README.md) / [Backstage](./kubernetes/backstage/README.md) — design thesis, diagrams, and rationale for each domain |
-| **Concepts & Decisions** | [Namespace Labels](./docs/concepts/namespace-label-design.md) / [Network Policy](./docs/concepts/network-policy-guide.md) / [Policy Enforcement](./docs/concepts/policy-enforcement.md) / [ADRs](./docs/adr/) |
+| **Concepts & Decisions** | [Namespace Labels](https://yu-min3.github.io/kensan-lab/concepts/namespace-label-design/) / [Network Policy](https://yu-min3.github.io/kensan-lab/concepts/network-policy-guide/) / [Policy Enforcement](https://yu-min3.github.io/kensan-lab/concepts/policy-enforcement/) / [ADRs](https://yu-min3.github.io/kensan-lab/adr/) |
 
 ## Application: kensan
 
@@ -171,7 +171,7 @@ A real application runs on this platform as a reference workload:
 - **`apps/kensan`** — a file-based knowledge & goal manager. Markdown files are the single source of truth, served by a single Go service (REST API + bundled SPA, Whetstone design system) shipped as one container image. See [apps/kensan/README.md](./apps/kensan/README.md).
 - **`kubernetes/apps/app-kensan`** — the deploy definition (Argo CD `Application` consuming the `charts/app-base` chart via multi-source, plus raw resources: per-app namespace, workspace PVC, and LAN-only Syncthing sync).
 
-> **Looking for the previous full-stack kensan?** The legacy app (React + Go microservices + Google ADK AI agents + an Iceberg lakehouse with Dagster & Polaris) was retired in July 2026 (PR #394) and removed from the working tree. It is preserved as an implementation reference at the git tag [`kensan-legacy-final`](https://github.com/yu-min3/kensan-lab/tree/kensan-legacy-final/apps/kensan-legacy) — see [ADR-017](./docs/adr/017-kensan-legacy-removal.md).
+> **Looking for the previous full-stack kensan?** The legacy app (React + Go microservices + Google ADK AI agents + an Iceberg lakehouse with Dagster & Polaris) was retired in July 2026 (PR #394) and removed from the working tree. It is preserved as an implementation reference at the git tag [`kensan-legacy-final`](https://github.com/yu-min3/kensan-lab/tree/kensan-legacy-final/apps/kensan-legacy) — see [ADR-017](https://yu-min3.github.io/kensan-lab/adr/017-kensan-legacy-removal/).
 
 ## Acknowledgments
 

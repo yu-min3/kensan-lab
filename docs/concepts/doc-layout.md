@@ -30,6 +30,19 @@ The definitive answer to "where is this information documented." When adding new
 | Cluster topology (nodes, labels, scheduling) | `.claude/rules/kubernetes-cluster.md` | `kubernetes/README.md` |
 | Tech stack | Top `README.md` | `docs/index.md` |
 
+## Rendering target
+
+Every layer above is Markdown, but not every file is read in the same place. **Each file has exactly one rendering target**, and that decides which Markdown you may write in it.
+
+| Files | Read on | May use |
+|---|---|---|
+| `docs/**/*.md` | The docs site only — the top README links to `https://yu-min3.github.io/kensan-lab/…`, never to `./docs/*.md` | Everything MkDocs Material offers: admonitions, content tabs, `attr_list`, `<figure markdown>` |
+| `README.md`, `kubernetes/**/README.md`, `apps/*/README.md` | **Both** github.com and the docs site (the per-domain READMEs are transcluded by `docs/architecture/*.md`) | Only what both engines agree on: CommonMark, plain HTML, tables, Mermaid |
+
+The second row is the constrained one, and it is constrained for a reason: Material's extensions are not errors on GitHub, they are **passed through as literal text**. A page keeps building while displaying its own source. `docs/showcase.md` shipped that way for 17 days before anyone opened it on GitHub (PR #468).
+
+In practice the constraint costs nothing — domain READMEs are written with diagrams, tables, and prose, all of which render identically on both. `scripts/check-github-render.py` enforces the boundary in CI so it never depends on someone remembering.
+
 ## How to decide where something goes
 
 When unsure where a fact belongs, walk through this flow:
