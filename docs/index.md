@@ -12,8 +12,12 @@ A bare-metal Kubernetes homelab built with technologies typical of enterprise pl
 [Get Started](getting-started/installation.md){ .md-button .md-button--primary }
 [See the Showcase](showcase.md){ .md-button }
 
-!!! note "Reference architecture, not a turnkey solution"
-    Bootstrap automation (Ansible + Makefile) is planned. Adapt secrets, domains, and IP ranges to your environment — see the [Configuration Guide](getting-started/configuration.md).
+<div class="admonition note" markdown>
+<p class="admonition-title">Reference architecture, not a turnkey solution</p>
+
+Bootstrap automation (Ansible + Makefile) is planned. Adapt secrets, domains, and IP ranges to your environment — see the [Configuration Guide](getting-started/configuration.md).
+
+</div>
 
 ## Architecture
 

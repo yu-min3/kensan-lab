@@ -89,7 +89,7 @@ K8s → Sealed Secrets → cert-manager → Istio
 ### Cautionary note (from the 2026-06-07 review)
 
 Dynamic migration is **not** mechanically safe for every app: Backstage's attempted cutover failed because it
-connects to 12 databases while VDBE `creationStatements` only GRANTs on `dbName` (see the 据置 section of
+connects to 12 databases while VDBE `creationStatements` only GRANTs on `dbName` (see the "kept as-is" section of
 `docs/secret-management/index.md`, and PR #377 → #379). Check the secret-management inventory before
 migrating any further app.
 

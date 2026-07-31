@@ -114,7 +114,7 @@ Keep gateway-level Authorization at host/IP level (or none). Each service does i
 - SSO experience is fragmented (re-login per service)
 - No fail-secure default-deny at the edge
 - Services without OIDC support (Hubble / Prometheus / Longhorn UI) need ad-hoc protection
-- The "Istio + Keycloak で SSO 完結" homelab differentiator is lost
+- The "SSO handled entirely by Istio + Keycloak" homelab differentiator is lost
 
 ## Decision
 

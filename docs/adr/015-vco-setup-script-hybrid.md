@@ -4,7 +4,7 @@
 
 Accepted
 
-> This is the ADR that `docs/secret-management/index.md` referenced as "ADR-012 (起票予定)" before
+> This is the ADR that `docs/secret-management/index.md` referenced as "ADR-012 (to be filed)" before
 > ADR-012 was taken by the Kyverno policy-enforcement decision. The hybrid itself has been operating
 > since the vault-transit chart work (PR #340); this document records the decision.
 
@@ -77,7 +77,7 @@ exception, constrained as follows:
 
 ## References
 
-- `docs/secret-management/index.md` §例外 — the exception table (SoT for script-managed state)
+- `docs/secret-management/index.md` §Exceptions — the exception table (SoT for script-managed state)
 - `kubernetes/secrets/vault-transit-engine/README.md` — the capability that motivated the hybrid (PR #340/#343)
 - [ADR-012](012-policy-enforcement-kyverno.md) — unrelated; took the number this decision was originally
   penciled in for

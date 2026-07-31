@@ -58,7 +58,7 @@ find kubernetes/ backstage/ apps/ -type f \( -name "*.yaml" -o -name "*.yml" \) 
 | Prometheus HTTPRoute | `kubernetes/observability/prometheus/resources/httproute-prometheus.yaml` | `prometheus.yu-mins.com` |
 | Longhorn HTTPRoute | `kubernetes/storage/longhorn/resources/httproute.yaml` | `longhorn.yu-mins.com` |
 | Backstage HTTPRoute | `kubernetes/backstage/httproute.yaml` | `backstage.yu-mins.com` |
-| oauth2-proxy HTTPRoute | `kubernetes/auth/oauth2-proxy/resources/httproute.yaml` | `{backstage,prometheus,longhorn}.yu-mins.com` の `/oauth2` callback |
+| oauth2-proxy HTTPRoute | `kubernetes/auth/oauth2-proxy/resources/httproute.yaml` | The `/oauth2` callback for `{backstage,prometheus,longhorn}.yu-mins.com` |
 | Keycloak bootstrap | `bootstrap/keycloak/setup.sh` | redirect URIs / hostnames |
 
 ### 2. GitHub Organization

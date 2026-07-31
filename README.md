@@ -20,6 +20,10 @@
 [![App CI](https://github.com/yu-min3/kensan-lab/actions/workflows/app-ci.yml/badge.svg)](https://github.com/yu-min3/kensan-lab/actions/workflows/app-ci.yml)
 [![Docs](https://github.com/yu-min3/kensan-lab/actions/workflows/docs.yml/badge.svg)](https://github.com/yu-min3/kensan-lab/actions/workflows/docs.yml)
 
+### [📖 Documentation site](https://yu-min3.github.io/kensan-lab/) · [🖼️ Showcase](https://yu-min3.github.io/kensan-lab/showcase/) · [🚀 Getting Started](https://yu-min3.github.io/kensan-lab/getting-started/installation/) · [🏛️ Architecture](https://yu-min3.github.io/kensan-lab/architecture/infrastructure/)
+
+<sub>Everything in this README is expanded on the docs site — architecture deep-dives, ADRs, runbooks, and guides.</sub>
+
 </div>
 
 ---
@@ -71,7 +75,7 @@ The platform is a live system, not only a manifest collection:
 <sub>Every component reconciled by Argo CD — 38 Synced / 0 OutOfSync</sub>
 </div>
 
-More running-system views (Grafana cluster health, Hubble network flows, Backstage catalog) in the **[Showcase gallery](./docs/showcase.md)**.
+More running-system views (Grafana cluster health, Hubble network flows, Backstage catalog) in the **[Showcase gallery](https://yu-min3.github.io/kensan-lab/showcase/)**.
 
 <details>
 <summary><b>Internet Exposure</b></summary>
@@ -155,7 +159,7 @@ docs/                             # ADRs, architecture, guides (MkDocs site)
 | Category            | Links                                                                                                                                                                                                       |
 | ------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **Docs site**       | **[https://yu-min3.github.io/kensan-lab/](https://yu-min3.github.io/kensan-lab/)** — full documentation site |
-| **Showcase**        | [Screenshot gallery](./docs/showcase.md) — the running system: Argo CD, Grafana, Backstage, Hubble, kensan, and the physical cluster |
+| **Showcase**        | [Screenshot gallery](https://yu-min3.github.io/kensan-lab/showcase/) — the running system: Argo CD, Grafana, Backstage, Hubble, kensan, and the physical cluster |
 | **Getting Started** | [Installation](./docs/getting-started/installation.md) / [Configuration](./docs/getting-started/configuration.md) / [Bootstrapping](./docs/bootstrapping/index.md) _(in progress)_ / [Secret Management](./docs/secret-management/index.md) |
 | **Architecture (per domain)** | [Argo CD](./kubernetes/argocd/README.md) / [Network](./kubernetes/network/README.md) / [Auth](./kubernetes/auth/README.md) / [Secrets](./kubernetes/secrets/README.md) / [Storage](./kubernetes/storage/README.md) / [Observability](./kubernetes/observability/README.md) / [Backstage](./kubernetes/backstage/README.md) — design thesis, diagrams, and rationale for each domain |
 | **Concepts & Decisions** | [Namespace Labels](./docs/concepts/namespace-label-design.md) / [Network Policy](./docs/concepts/network-policy-guide.md) / [Policy Enforcement](./docs/concepts/policy-enforcement.md) / [ADRs](./docs/adr/) |
