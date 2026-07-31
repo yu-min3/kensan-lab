@@ -5,3 +5,5 @@ mkdocs-llmstxt==0.5.0
 mkdocs-glightbox==0.4.0
 pymdown-extensions==10.21.2
 Pygments==2.20.0
+# scripts/check-github-render.py — CommonMark reference renderer
+markdown-it-py==3.0.0

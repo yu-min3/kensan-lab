@@ -65,6 +65,12 @@ jobs:
       - name: Verify generated diagrams
         run: make diagrams-verify
 
+      # `mkdocs build` is only half the contract: docs/ and the transcluded
+      # READMEs are also read on github.com, where the Material extensions do
+      # not exist and their syntax ships as literal text (PR #468).
+      - name: Verify GitHub rendering
+        run: python scripts/check-github-render.py
+
       - name: Build site
         run: mkdocs build --strict
 

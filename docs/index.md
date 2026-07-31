@@ -9,8 +9,12 @@ hide:
 
 A bare-metal Kubernetes homelab built with technologies typical of enterprise platform engineering — Argo CD for GitOps, Istio for service mesh, Backstage for developer self-service, and observability with Prometheus, Grafana, Loki, and Tempo. All running on Raspberry Pis and a mini PC.
 
-[Get Started](getting-started/installation.md){ .md-button .md-button--primary }
-[See the Showcase](showcase.md){ .md-button }
+<div class="cta-row" markdown>
+
+[Get Started](getting-started/installation.md)
+[See the Showcase](showcase.md)
+
+</div>
 
 <div class="admonition note" markdown>
 <p class="admonition-title">Reference architecture, not a turnkey solution</p>
