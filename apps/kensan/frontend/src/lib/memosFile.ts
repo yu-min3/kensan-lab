@@ -41,8 +41,26 @@ export function parseMemos(content: string): ParsedMemos {
   return { before, blocks: blocksOf(body), after, pinned: blocksOf(sectionBody(content, "Pinned")) };
 }
 
-export function serializeMemos(p: ParsedMemos, blocks: string[]): string {
-  const head = p.before.replace(/\s*$/, "");
+function serializePinned(before: string, pinned: string[]): string {
+  const body = pinned.join("\n\n");
+  const heading = /^## Pinned[^\n]*$/m;
+  const match = before.match(heading);
+
+  if (!match || match.index === undefined) {
+    const head = before.replace(/\s*$/, "");
+    return `${head}${head ? "\n\n" : ""}## Pinned\n\n${body}${body ? "\n" : ""}`;
+  }
+
+  const start = match.index;
+  const restStart = start + match[0].length;
+  const rest = before.slice(restStart);
+  const next = rest.search(/\n## /);
+  const end = next === -1 ? before.length : restStart + next;
+  return `${before.slice(0, start)}## Pinned\n\n${body}${body ? "\n" : ""}${before.slice(end).replace(/^\s+/, "")}`;
+}
+
+export function serializeMemos(p: ParsedMemos, blocks: string[], pinned: string[] = p.pinned): string {
+  const head = serializePinned(p.before, pinned).replace(/\s*$/, "");
   const body = blocks.join("\n\n");
   let out = `${head}\n\n## Scratch\n\n${body}${body ? "\n" : ""}`;
   if (p.after) out += `\n${p.after}\n`;
