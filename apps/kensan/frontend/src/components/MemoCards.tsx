@@ -8,8 +8,8 @@ import { Button } from "./ui/button";
 import { ErrorState, Skeleton, Empty } from "./ui/states";
 import { useToast } from "./ui/toast";
 
-// メモページ用のカード一覧。実体は memos.md の ## Scratch（lib/memosFile）。
-// 素早い追加・編集・削除をフルページで。グローバル FAB と同じデータを共有する。
+// メモページ用のカード一覧。実体は memos.md の ## Pinned / ## Scratch（lib/memosFile）。
+// 素早い追加・ピン留め・編集・削除をフルページで。グローバル FAB と同じデータを共有する。
 export function MemoCards() {
   const qc = useQueryClient();
   const memo = useQuery({ queryKey: ["file", "memos.md"], queryFn: () => api.file("memos.md") });
@@ -19,9 +19,9 @@ export function MemoCards() {
   const [editText, setEditText] = useState("");
 
   const save = useMutation({
-    mutationFn: (blocks: string[]) => {
+    mutationFn: ({ blocks, pinned }: { blocks: string[]; pinned?: string[] }) => {
       const p = parseMemos(memo.data!.content);
-      return api.putFile("memos.md", serializeMemos(p, blocks), memo.data!.doc.mtime);
+      return api.putFile("memos.md", serializeMemos(p, blocks, pinned), memo.data!.doc.mtime);
     },
     onSuccess: () => {
       setQuick("");
@@ -69,12 +69,12 @@ export function MemoCards() {
 
   const add = () => {
     if (!quick.trim()) return;
-    save.mutate([...p.blocks, quick.trim()]);
+    save.mutate({ blocks: [...p.blocks, quick.trim()] });
   };
   const remove = (i: number) => {
     const block = p.blocks[i];
     save.mutate(
-      p.blocks.filter((_, idx) => idx !== i),
+      { blocks: p.blocks.filter((_, idx) => idx !== i) },
       {
         onSuccess: () =>
           toast({
@@ -89,7 +89,21 @@ export function MemoCards() {
   const commitEdit = () => {
     if (editing === null) return;
     const next = p.blocks.map((b, idx) => (idx === editing ? editText.trim() : b)).filter(Boolean);
-    save.mutate(next);
+    save.mutate({ blocks: next });
+  };
+  const pin = (i: number) => {
+    const text = p.blocks[i];
+    save.mutate({
+      blocks: p.blocks.filter((_, idx) => idx !== i),
+      pinned: [...p.pinned, `- ${text}`],
+    });
+  };
+  const unpin = (i: number) => {
+    const text = p.pinned[i].replace(/^-\s+/, "");
+    save.mutate({
+      blocks: [...p.blocks, text],
+      pinned: p.pinned.filter((_, idx) => idx !== i),
+    });
   };
 
   return (
@@ -132,9 +146,20 @@ export function MemoCards() {
       {/* ピン留め */}
       {p.pinned.map((text, i) => (
         <Card key={`pin-${i}`} className="border-brand/30 bg-brand-muted/20">
-          <CardBody className="flex items-start gap-2">
+          <CardBody className="flex items-start gap-2 group">
             <Pin size={14} className="text-brand mt-0.5 shrink-0" />
             <p className="text-sm whitespace-pre-wrap flex-1">{text.replace(/^-\s+/, "")}</p>
+            <Button
+              variant="ghost"
+              size="sm"
+              iconOnly
+              aria-label="ピン留めを外す"
+              title="ピン留めを外す"
+              disabled={save.isPending}
+              onClick={() => unpin(i)}
+            >
+              <Pin size={14} />
+            </Button>
           </CardBody>
         </Card>
       ))}
@@ -173,7 +198,18 @@ export function MemoCards() {
               ) : (
                 <div className="flex items-start gap-2 group">
                   <p className="text-sm whitespace-pre-wrap flex-1 leading-relaxed">{text}</p>
-                  <div className="ds-inline shrink-0 opacity-0 group-hover:opacity-100 transition-opacity duration-fast">
+                  <div className="ds-inline shrink-0">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      iconOnly
+                      aria-label="ピン留めする"
+                      title="ピン留めする"
+                      disabled={save.isPending}
+                      onClick={() => pin(i)}
+                    >
+                      <Pin size={14} />
+                    </Button>
                     <Button
                       variant="ghost"
                       size="sm"

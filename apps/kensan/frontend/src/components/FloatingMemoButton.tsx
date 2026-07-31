@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type KeyboardEvent } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Lightbulb, X, Send, Loader2, Trash2 } from "lucide-react";
+import { Lightbulb, X, Send, Loader2, Trash2, Pin } from "lucide-react";
 import clsx from "clsx";
 import { api, ApiError } from "../lib/api";
 import { parseMemos, serializeMemos } from "../lib/memosFile";
@@ -27,9 +27,9 @@ export function FloatingMemoButton() {
   }, [open]);
 
   const save = useMutation({
-    mutationFn: (blocks: string[]) => {
+    mutationFn: ({ blocks, pinned }: { blocks: string[]; pinned?: string[] }) => {
       const p = parseMemos(memo.data!.content);
-      return api.putFile("memos.md", serializeMemos(p, blocks), memo.data!.doc.mtime);
+      return api.putFile("memos.md", serializeMemos(p, blocks, pinned), memo.data!.doc.mtime);
     },
     onSuccess: () => {
       setContent("");
@@ -44,13 +44,25 @@ export function FloatingMemoButton() {
 
   const addMemo = () => {
     if (!content.trim() || save.isPending) return;
-    save.mutate([...blocks, content.trim()]);
+    save.mutate({ blocks: [...blocks, content.trim()] });
   };
-  const removeMemo = (i: number) => save.mutate(blocks.filter((_, idx) => idx !== i));
+  const removeMemo = (i: number) => save.mutate({ blocks: blocks.filter((_, idx) => idx !== i) });
   const commitEdit = () => {
     if (editingIndex === null) return;
     const next = blocks.map((b, idx) => (idx === editingIndex ? editText.trim() : b)).filter(Boolean);
-    save.mutate(next);
+    save.mutate({ blocks: next });
+  };
+  const pinMemo = (i: number) => {
+    save.mutate({
+      blocks: blocks.filter((_, idx) => idx !== i),
+      pinned: [...pinned, `- ${blocks[i]}`],
+    });
+  };
+  const unpinMemo = (i: number) => {
+    save.mutate({
+      blocks: [...blocks, pinned[i].replace(/^-\s+/, "")],
+      pinned: pinned.filter((_, idx) => idx !== i),
+    });
   };
 
   // Ctrl/Cmd+Enter で保存、Escape で入力クリア → 閉じる
@@ -115,9 +127,18 @@ export function FloatingMemoButton() {
             ) : (
               <div className="divide-y divide-border">
                 {pinned.map((text, i) => (
-                  <div key={`pin-${i}`} className="p-3 flex items-start gap-2 bg-brand-muted/20">
+                  <div key={`pin-${i}`} className="p-3 flex items-start gap-2 bg-brand-muted/20 group">
                     <Lightbulb className="size-3.5 text-brand mt-0.5 shrink-0" />
                     <p className="text-sm whitespace-pre-wrap break-words flex-1">{text.replace(/^-\s+/, "")}</p>
+                    <button
+                      className="size-6 grid place-items-center rounded-md text-muted-foreground hover:bg-accent/60"
+                      disabled={save.isPending}
+                      onClick={() => unpinMemo(i)}
+                      title="ピン留めを外す"
+                      aria-label="ピン留めを外す"
+                    >
+                      <Pin className="size-3.5" />
+                    </button>
                   </div>
                 ))}
                 {blocks.map((text, i) => (
@@ -150,9 +171,17 @@ export function FloatingMemoButton() {
                     )}
                     <div className="flex items-center justify-end mt-1">
                       <button
+                        className="size-6 grid place-items-center rounded-md text-muted-foreground hover:bg-accent/60"
+                        disabled={save.isPending || editingIndex === i}
+                        onClick={() => pinMemo(i)}
+                        title="ピン留めする"
+                        aria-label="ピン留めする"
+                      >
+                        <Pin className="size-3.5" />
+                      </button>
+                      <button
                         className={clsx(
                           "size-6 grid place-items-center rounded-md text-destructive hover:bg-destructive/10",
-                          "opacity-0 group-hover:opacity-100 transition-opacity duration-fast",
                           editingIndex === i && "!opacity-0",
                         )}
                         disabled={save.isPending}

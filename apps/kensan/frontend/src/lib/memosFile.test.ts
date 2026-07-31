@@ -68,4 +68,25 @@ describe("serializeMemos", () => {
     expect(parseMemos(out).blocks).toEqual([]);
     expect(out).toContain("## Scratch");
   });
+
+  it("Pinned と Scratch の間でメモを移動できる", () => {
+    const p = parseMemos(FULL);
+    const pinned = [...p.pinned, "- ブロック1"];
+    const out = serializeMemos(p, p.blocks.slice(1), pinned);
+    const p2 = parseMemos(out);
+    expect(p2.pinned).toEqual(pinned);
+    expect(p2.blocks).toEqual(["ブロック2\n複数行の\nつづき"]);
+
+    const restored = serializeMemos(p2, [...p2.blocks, "ブロック1"], p2.pinned.slice(0, -1));
+    const p3 = parseMemos(restored);
+    expect(p3.pinned).toEqual(["大事なメモ"]);
+    expect(p3.blocks).toEqual(["ブロック2\n複数行の\nつづき", "ブロック1"]);
+  });
+
+  it("Pinned 見出しがないファイルにもピン留めを追加できる", () => {
+    const p = parseMemos("---\ntype: memo\n---\n\n## Scratch\n\nメモ\n");
+    const out = serializeMemos(p, [], ["- メモ"]);
+    expect(parseMemos(out).pinned).toEqual(["- メモ"]);
+    expect(parseMemos(out).blocks).toEqual([]);
+  });
 });
