@@ -53,6 +53,12 @@ shadcn の `components.json` は `"baseColor": "slate"` / `"cssVariables": true`
 3. **Component-scoped** — 特定UI専用のオプトイン値
    `--timeblock-plan-bg` 等。新規追加は最小限に、まずは Semantic で表現できないか検討する。
 
+この三層とは別に、`tokens.json` だけが持つ `diagram` セクションがある。draw.io ファイルは
+CSS 変数を参照できずリテラル hex しか持てないため、アーキテクチャ図用の役割別パレットを
+light / dark 両方でここに置き、`scripts/diagram-theme.py` が dark 図から light 図を生成する
+（`make diagrams`）。役割を足すときは**両モードに追加**し、dark 側の hex を他の役割と重複させ
+ないこと（写像は dark の値をキーにしている）。
+
 ---
 
 ## やってはいけないこと

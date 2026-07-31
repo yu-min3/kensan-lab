@@ -17,6 +17,7 @@ The tunnel is **token / dashboard-managed**: the pod runs `cloudflared tunnel ru
 ## How traffic gets in
 
 ```mermaid
+%%{init: {"flowchart": {"htmlLabels": true}} }%%
 flowchart LR
     Net([Internet]) -->|HTTPS| CF["Cloudflare edge<br/>TLS termination + DDoS"]
     CF --> ACC{"Cloudflare Access<br/>OTP gate"}
@@ -24,9 +25,9 @@ flowchart LR
     CFD --> GW["Istio Gateway<br/>(istio-system svc)"]
     GW --> APP["app"]
 
-    classDef default fill:#FCFAF6,stroke:#D2C9B5,color:#1A1714
-    classDef ext fill:#FBE7D2,stroke:#C97516,color:#1A1714
-    classDef gate fill:#E0F1F8,stroke:#0284C7,color:#1A1714
+    classDef default fill:#26221D,stroke:#4A4232,color:#FCFAF6
+    classDef ext fill:#8A4B12,stroke:#FDBA74,color:#FCFAF6
+    classDef gate fill:#075985,stroke:#38BDF8,color:#FCFAF6
     class Net,CF ext
     class ACC,GW gate
 ```

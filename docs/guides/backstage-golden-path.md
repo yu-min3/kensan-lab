@@ -5,6 +5,7 @@ The end-to-end walkthrough of the platform's fully-automated App Developer (AD) 
 This is the human-facing counterpart to the architecture page ([`kubernetes/backstage/README.md`](https://github.com/yu-min3/kensan-lab/blob/main/kubernetes/backstage/README.md)) and the role model ([PE / AD split](https://github.com/yu-min3/kensan-lab/blob/main/.claude/rules/environment-separation.md)).
 
 ```mermaid
+%%{init: {"flowchart": {"htmlLabels": true}} }%%
 flowchart LR
     AD["App Developer"] -->|one form| BS["Backstage template"]
     BS --> REPO["App repository<br/>code · CI · manifests · TechDocs"]

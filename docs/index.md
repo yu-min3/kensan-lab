@@ -21,12 +21,11 @@ Bootstrap automation (Ansible + Makefile) is planned. Adapt secrets, domains, an
 
 ## Architecture
 
-<figure>
-  <img src="assets/platform-architecture.png" alt="Platform Architecture">
+<figure markdown>
+  ![Platform Architecture](assets/platform-architecture-light.png#only-light)
+  ![Platform Architecture](assets/platform-architecture-dark.png#only-dark)
   <figcaption>Everything inside the cards runs in-cluster — click to enlarge</figcaption>
 </figure>
-
-A denser component-interaction view is kept at [request-flow.png](assets/request-flow.png).
 
 Each domain has an architecture page — design thesis, component map, diagrams, and the rationale behind the choices:
 

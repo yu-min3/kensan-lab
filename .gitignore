@@ -29,3 +29,7 @@ mcp-server-kubernetes/*
 site/
 .cache/
 .venv*/
+
+# Python
+__pycache__/
+*.pyc
