@@ -14,10 +14,16 @@ green the whole time (PR #468).
 
 `mkdocs build --strict` cannot catch this — the site is the half that works.
 
-Scope is every Markdown file *except* the `docs/` tree: `docs/` is the MkDocs
-source and is read on the site only, so Material's extensions are free to be
-used there. Everything else — the top README, the per-directory READMEs, app
-docs — is read on github.com and must stay in the syntax both engines share.
+Scope is the files that are read *both* ways, because only those carry the
+constraint: a page transcluded into the site by `pymdownx.snippets` is also a
+README someone opens on github.com. That set is derived from the `--8<--` lines
+under `docs/`, so adding a tenth architecture page puts its source in scope
+without anyone remembering to update a list here. The top README is included as
+well — it is the repository's front page.
+
+Everything else has a single rendering target and is left alone: `docs/**` is
+site-only (Material's extensions are free to be used there), and a GitHub-only
+README has no reason to reach for site syntax in the first place.
 
 Rather than pattern-match the source (the rules for when a raw-HTML block ends
 are subtle enough that a regex gets both false positives and false negatives),
@@ -76,20 +82,14 @@ LEAKS: list[tuple[str, re.Pattern[str], str]] = [
     ),
 ]
 
-# Per-file exemptions, as (path prefix, leak kind, reason). Empty today: the only
-# entries this ever needed were in `docs/`, which is no longer scanned. Kept
-# because the next deliberate exception should be recorded here with its reason
-# rather than silently dropped from a pattern.
+# Per-file exemptions, as (path prefix, leak kind, reason). Empty today — record
+# the next deliberate exception here with its reason rather than widening a
+# pattern until it stops catching things.
 ALLOW: tuple[tuple[str, str, str], ...] = ()
 
-# `docs/` is the MkDocs source and is read on the site only — the top README
-# links to https://yu-min3.github.io/kensan-lab/… and never to ./docs/*.md, so
-# Material's extensions are free to be used there (docs/concepts/doc-layout.md,
-# "Rendering target"). Only the top-level directory: `apps/kensan/docs/` and the
-# Backstage skeletons are ordinary GitHub-read files.
-SITE_ONLY = "docs"
-
-SKIP_DIRS = {".git", "node_modules", "site", ".venv", ".venv-docs", "temp"}
+# A pymdownx.snippets include: `---8<--- "kubernetes/argocd/README.md"`. Paths
+# resolve from the repository root (`base_path: ["."]` in mkdocs.yml).
+INCLUDE = re.compile(r'^-{2,3}8<-{2,3}\s+"?([^"\s]+)"?\s*$')
 STRIP = re.compile(r"<(pre|code)\b.*?</\1>|<!--.*?-->|<[^>]+>", re.S)
 
 
@@ -119,34 +119,31 @@ def check(path: Path, repo: Path) -> list[str]:
     return findings
 
 
-def markdown_files(roots: list[Path], repo: Path) -> list[Path]:
-    out: list[Path] = []
-    for root in roots:
-        if root.is_file():
-            out.append(root)
-            continue
-        for path in sorted(root.rglob("*.md")):
-            if not SKIP_DIRS.isdisjoint(path.parts):
-                continue
-            if path.is_relative_to(repo / SITE_ONLY):
-                continue
-            out.append(path)
-    return out
+def dual_rendered(repo: Path) -> list[Path]:
+    """The files the docs site transcludes, plus the front page."""
+    found = {repo / "README.md"}
+    for page in (repo / "docs").rglob("*.md"):
+        for line in page.read_text(encoding="utf-8").splitlines():
+            m = INCLUDE.match(line.strip())
+            if m:
+                target = repo / m.group(1)
+                if target.is_file():
+                    found.add(target)
+    return sorted(found)
 
 
 def main(argv: list[str]) -> int:
     repo = Path(__file__).resolve().parent.parent
-    # Everything is GitHub-read except the site source; an explicit path is
-    # always checked, so a docs/ page can still be inspected on demand.
-    roots = [Path(a).resolve() for a in argv] if argv else [repo]
-    files = markdown_files([r for r in roots if r.exists()], repo)
+    # An explicit path is always checked, so any page can be inspected on demand.
+    files = [Path(a).resolve() for a in argv] if argv else dual_rendered(repo)
+    files = [f for f in files if f.is_file()]
     findings = [f for p in files for f in check(p, repo)]
 
     if not findings:
-        print(f"GitHub rendering: {len(files)} files clean")
+        print(f"GitHub rendering: {len(files)} dual-rendered files clean")
         return 0
-    print("These files are read on github.com, where the following will show", file=sys.stderr)
-    print("as literal text instead of rendering:\n", file=sys.stderr)
+    print("These files are rendered by both MkDocs and github.com. GitHub will", file=sys.stderr)
+    print("show the following as literal text instead of rendering it:\n", file=sys.stderr)
     for f in findings:
         print(f, file=sys.stderr)
     print(f"\n{len(findings)} finding(s).", file=sys.stderr)

@@ -1,14 +1,13 @@
 name: Markdown renders on GitHub
 
-# Every Markdown file outside docs/ is read on github.com, where MkDocs Material
-# extensions are not errors — they are passed through as literal text. A page
-# keeps building while displaying its own source, which is how docs/showcase.md
-# shipped broken for 17 days (PR #468).
+# The files the docs site transcludes are also READMEs someone opens on
+# github.com, and MkDocs Material extensions are not errors there — they are
+# passed through as literal text. A page keeps building while displaying its own
+# source, which is how docs/showcase.md shipped broken for 17 days (PR #468).
 #
-# This used to be a step in docs.yml, but that workflow only triggers on docs/
-# and the transcluded READMEs, so a change to apps/**/*.md was never checked.
-# The scopes are unrelated now that docs/ is site-only, so the check has its own
-# trigger: any Markdown, anywhere.
+# The check derives its own scope from the --8<-- lines under docs/, so the
+# trigger is any Markdown: a new transclusion in docs/ can pull a new file into
+# scope, and the scanned files themselves live outside docs/.
 
 on:
   pull_request:
