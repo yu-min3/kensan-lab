@@ -201,7 +201,8 @@ body {
 /* Material's .md-button inherits --md-primary-fg-color, which we point at
    the header's card background (not a real "primary" fill) — override with
    the actual brand/outline pairing from the Button component spec. */
-.md-typeset .md-button {
+.md-typeset .md-button,
+.md-typeset .cta-row a {
   background-color: transparent;
   border: 1px solid hsl(var(--border-strong));
   border-radius: var(--whetstone-radius);
@@ -209,22 +210,42 @@ body {
   font-weight: 600;
 }
 
-.md-typeset .md-button:hover {
+.md-typeset .md-button:hover,
+.md-typeset .cta-row a:hover {
   background-color: hsl(var(--muted));
   border-color: hsl(var(--border-strong));
   color: hsl(var(--foreground));
 }
 
-.md-typeset .md-button--primary {
+.md-typeset .md-button--primary,
+.md-typeset .cta-row a:first-child {
   background-color: hsl(var(--brand));
   border-color: hsl(var(--brand));
   color: hsl(var(--brand-foreground));
 }
 
-.md-typeset .md-button--primary:hover {
+.md-typeset .md-button--primary:hover,
+.md-typeset .cta-row a:first-child:hover {
   background-color: hsl(var(--brand) / 0.88);
   border-color: hsl(var(--brand) / 0.88);
   color: hsl(var(--brand-foreground));
+}
+
+/* Home CTA. Material's `{ .md-button }` attr_list renders as literal text on
+   GitHub (scripts/check-github-render.py), so the buttons are plain Markdown
+   links — which both engines resolve — and the button shape comes from here.
+   First link is the primary action; the row only ever holds the two. */
+.md-typeset .cta-row > p {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin: 0 0 1.2em;
+}
+
+.md-typeset .cta-row a {
+  display: inline-block;
+  padding: 0.625em 2em;
+  transition: background-color 125ms, border-color 125ms, color 125ms;
 }
 
 .md-typeset a:hover {
