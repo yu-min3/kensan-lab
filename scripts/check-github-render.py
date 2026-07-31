@@ -14,6 +14,18 @@ green the whole time (PR #468).
 
 `mkdocs build --strict` cannot catch this — the site is the half that works.
 
+Scope is the files that are read *both* ways, because only those carry the
+constraint: a page transcluded into the site by `pymdownx.snippets` is also a
+README someone opens on github.com. That set is derived from the `--8<--` lines
+under `docs/`, so adding a tenth architecture page puts its source in scope
+without anyone remembering to update a list here.
+
+Everything else has a single rendering target and is left alone. `docs/**` is
+site-only, so Material's extensions are free to be used there. A GitHub-only
+file — the top README, `.claude/rules/`, app docs — has no reason to reach for
+site syntax in the first place, which is why the scope is the overlap and not
+"every Markdown file outside docs/".
+
 Rather than pattern-match the source (the rules for when a raw-HTML block ends
 are subtle enough that a regex gets both false positives and false negatives),
 this renders each file with markdown-it-py in its CommonMark preset — the same
@@ -71,16 +83,14 @@ LEAKS: list[tuple[str, re.Pattern[str], str]] = [
     ),
 ]
 
-# Deliberately docs-site-only. Transclusion shells exist so the reader lands on
-# the transcluded README itself; the site home switches its architecture diagram
-# with Material's `#only-light` / `#only-dark`, which has no GitHub equivalent
-# that also follows the site's own theme toggle (the README uses `<picture>`).
-ALLOW: tuple[tuple[str, str, str], ...] = (
-    ("docs/architecture/", "snippets", "one-line transclusion of kubernetes/<domain>/README.md"),
-    ("docs/index.md", "image", "Material #only-light / #only-dark theme switching"),
-)
+# Per-file exemptions, as (path prefix, leak kind, reason). Empty today — record
+# the next deliberate exception here with its reason rather than widening a
+# pattern until it stops catching things.
+ALLOW: tuple[tuple[str, str, str], ...] = ()
 
-SKIP_DIRS = {".git", "node_modules", "site", ".venv", ".venv-docs", "temp"}
+# A pymdownx.snippets include: `---8<--- "kubernetes/argocd/README.md"`. Paths
+# resolve from the repository root (`base_path: ["."]` in mkdocs.yml).
+INCLUDE = re.compile(r'^-{2,3}8<-{2,3}\s+"?([^"\s]+)"?\s*$')
 STRIP = re.compile(r"<(pre|code)\b.*?</\1>|<!--.*?-->|<[^>]+>", re.S)
 
 
@@ -110,29 +120,31 @@ def check(path: Path, repo: Path) -> list[str]:
     return findings
 
 
-def markdown_files(roots: list[Path]) -> list[Path]:
-    out: list[Path] = []
-    for root in roots:
-        if root.is_file():
-            out.append(root)
-        else:
-            out += [p for p in sorted(root.rglob("*.md")) if SKIP_DIRS.isdisjoint(p.parts)]
-    return out
+def dual_rendered(repo: Path) -> list[Path]:
+    """The files the docs site transcludes — the only ones read both ways."""
+    found: set[Path] = set()
+    for page in (repo / "docs").rglob("*.md"):
+        for line in page.read_text(encoding="utf-8").splitlines():
+            m = INCLUDE.match(line.strip())
+            if m:
+                target = repo / m.group(1)
+                if target.is_file():
+                    found.add(target)
+    return sorted(found)
 
 
 def main(argv: list[str]) -> int:
     repo = Path(__file__).resolve().parent.parent
-    roots = [Path(a).resolve() for a in argv] if argv else [
-        repo / "README.md", repo / "docs", repo / "kubernetes", repo / "apps"
-    ]
-    files = markdown_files([r for r in roots if r.exists()])
+    # An explicit path is always checked, so any page can be inspected on demand.
+    files = [Path(a).resolve() for a in argv] if argv else dual_rendered(repo)
+    files = [f for f in files if f.is_file()]
     findings = [f for p in files for f in check(p, repo)]
 
     if not findings:
-        print(f"GitHub rendering: {len(files)} files clean")
+        print(f"GitHub rendering: {len(files)} dual-rendered files clean")
         return 0
-    print("These files render on github.com as well as the docs site, and GitHub", file=sys.stderr)
-    print("will show the following as literal text:\n", file=sys.stderr)
+    print("These files are rendered by both MkDocs and github.com. GitHub will", file=sys.stderr)
+    print("show the following as literal text instead of rendering it:\n", file=sys.stderr)
     for f in findings:
         print(f, file=sys.stderr)
     print(f"\n{len(findings)} finding(s).", file=sys.stderr)
