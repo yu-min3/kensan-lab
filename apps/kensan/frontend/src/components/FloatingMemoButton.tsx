@@ -131,7 +131,7 @@ export function FloatingMemoButton() {
                     <Lightbulb className="size-3.5 text-brand mt-0.5 shrink-0" />
                     <p className="text-sm whitespace-pre-wrap break-words flex-1">{text.replace(/^-\s+/, "")}</p>
                     <button
-                      className="size-6 grid place-items-center rounded-md text-muted-foreground hover:bg-accent/60 opacity-0 group-hover:opacity-100 transition-opacity duration-fast"
+                      className="size-6 grid place-items-center rounded-md text-muted-foreground hover:bg-accent/60"
                       disabled={save.isPending}
                       onClick={() => unpinMemo(i)}
                       title="ピン留めを外す"
@@ -171,7 +171,7 @@ export function FloatingMemoButton() {
                     )}
                     <div className="flex items-center justify-end mt-1">
                       <button
-                        className="size-6 grid place-items-center rounded-md text-muted-foreground hover:bg-accent/60 opacity-0 group-hover:opacity-100 transition-opacity duration-fast"
+                        className="size-6 grid place-items-center rounded-md text-muted-foreground hover:bg-accent/60"
                         disabled={save.isPending || editingIndex === i}
                         onClick={() => pinMemo(i)}
                         title="ピン留めする"
@@ -182,7 +182,6 @@ export function FloatingMemoButton() {
                       <button
                         className={clsx(
                           "size-6 grid place-items-center rounded-md text-destructive hover:bg-destructive/10",
-                          "opacity-0 group-hover:opacity-100 transition-opacity duration-fast",
                           editingIndex === i && "!opacity-0",
                         )}
                         disabled={save.isPending}

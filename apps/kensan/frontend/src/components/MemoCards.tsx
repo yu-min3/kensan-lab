@@ -153,7 +153,6 @@ export function MemoCards() {
               variant="ghost"
               size="sm"
               iconOnly
-              className="opacity-0 group-hover:opacity-100 transition-opacity duration-fast"
               aria-label="ピン留めを外す"
               title="ピン留めを外す"
               disabled={save.isPending}
@@ -199,7 +198,7 @@ export function MemoCards() {
               ) : (
                 <div className="flex items-start gap-2 group">
                   <p className="text-sm whitespace-pre-wrap flex-1 leading-relaxed">{text}</p>
-                  <div className="ds-inline shrink-0 opacity-0 group-hover:opacity-100 transition-opacity duration-fast">
+                  <div className="ds-inline shrink-0">
                     <Button
                       variant="ghost"
                       size="sm"
