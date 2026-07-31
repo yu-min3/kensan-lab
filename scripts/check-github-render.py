@@ -18,12 +18,13 @@ Scope is the files that are read *both* ways, because only those carry the
 constraint: a page transcluded into the site by `pymdownx.snippets` is also a
 README someone opens on github.com. That set is derived from the `--8<--` lines
 under `docs/`, so adding a tenth architecture page puts its source in scope
-without anyone remembering to update a list here. The top README is included as
-well — it is the repository's front page.
+without anyone remembering to update a list here.
 
-Everything else has a single rendering target and is left alone: `docs/**` is
-site-only (Material's extensions are free to be used there), and a GitHub-only
-README has no reason to reach for site syntax in the first place.
+Everything else has a single rendering target and is left alone. `docs/**` is
+site-only, so Material's extensions are free to be used there. A GitHub-only
+file — the top README, `.claude/rules/`, app docs — has no reason to reach for
+site syntax in the first place, which is why the scope is the overlap and not
+"every Markdown file outside docs/".
 
 Rather than pattern-match the source (the rules for when a raw-HTML block ends
 are subtle enough that a regex gets both false positives and false negatives),
@@ -120,8 +121,8 @@ def check(path: Path, repo: Path) -> list[str]:
 
 
 def dual_rendered(repo: Path) -> list[Path]:
-    """The files the docs site transcludes, plus the front page."""
-    found = {repo / "README.md"}
+    """The files the docs site transcludes — the only ones read both ways."""
+    found: set[Path] = set()
     for page in (repo / "docs").rglob("*.md"):
         for line in page.read_text(encoding="utf-8").splitlines():
             m = INCLUDE.match(line.strip())
