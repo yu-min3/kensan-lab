@@ -14,6 +14,11 @@ green the whole time (PR #468).
 
 `mkdocs build --strict` cannot catch this — the site is the half that works.
 
+Scope is every Markdown file *except* the `docs/` tree: `docs/` is the MkDocs
+source and is read on the site only, so Material's extensions are free to be
+used there. Everything else — the top README, the per-directory READMEs, app
+docs — is read on github.com and must stay in the syntax both engines share.
+
 Rather than pattern-match the source (the rules for when a raw-HTML block ends
 are subtle enough that a regex gets both false positives and false negatives),
 this renders each file with markdown-it-py in its CommonMark preset — the same
@@ -71,14 +76,18 @@ LEAKS: list[tuple[str, re.Pattern[str], str]] = [
     ),
 ]
 
-# Deliberately docs-site-only. Transclusion shells exist so the reader lands on
-# the transcluded README itself; the site home switches its architecture diagram
-# with Material's `#only-light` / `#only-dark`, which has no GitHub equivalent
-# that also follows the site's own theme toggle (the README uses `<picture>`).
-ALLOW: tuple[tuple[str, str, str], ...] = (
-    ("docs/architecture/", "snippets", "one-line transclusion of kubernetes/<domain>/README.md"),
-    ("docs/index.md", "image", "Material #only-light / #only-dark theme switching"),
-)
+# Per-file exemptions, as (path prefix, leak kind, reason). Empty today: the only
+# entries this ever needed were in `docs/`, which is no longer scanned. Kept
+# because the next deliberate exception should be recorded here with its reason
+# rather than silently dropped from a pattern.
+ALLOW: tuple[tuple[str, str, str], ...] = ()
+
+# `docs/` is the MkDocs source and is read on the site only — the top README
+# links to https://yu-min3.github.io/kensan-lab/… and never to ./docs/*.md, so
+# Material's extensions are free to be used there (docs/concepts/doc-layout.md,
+# "Rendering target"). Only the top-level directory: `apps/kensan/docs/` and the
+# Backstage skeletons are ordinary GitHub-read files.
+SITE_ONLY = "docs"
 
 SKIP_DIRS = {".git", "node_modules", "site", ".venv", ".venv-docs", "temp"}
 STRIP = re.compile(r"<(pre|code)\b.*?</\1>|<!--.*?-->|<[^>]+>", re.S)
@@ -110,29 +119,34 @@ def check(path: Path, repo: Path) -> list[str]:
     return findings
 
 
-def markdown_files(roots: list[Path]) -> list[Path]:
+def markdown_files(roots: list[Path], repo: Path) -> list[Path]:
     out: list[Path] = []
     for root in roots:
         if root.is_file():
             out.append(root)
-        else:
-            out += [p for p in sorted(root.rglob("*.md")) if SKIP_DIRS.isdisjoint(p.parts)]
+            continue
+        for path in sorted(root.rglob("*.md")):
+            if not SKIP_DIRS.isdisjoint(path.parts):
+                continue
+            if path.is_relative_to(repo / SITE_ONLY):
+                continue
+            out.append(path)
     return out
 
 
 def main(argv: list[str]) -> int:
     repo = Path(__file__).resolve().parent.parent
-    roots = [Path(a).resolve() for a in argv] if argv else [
-        repo / "README.md", repo / "docs", repo / "kubernetes", repo / "apps"
-    ]
-    files = markdown_files([r for r in roots if r.exists()])
+    # Everything is GitHub-read except the site source; an explicit path is
+    # always checked, so a docs/ page can still be inspected on demand.
+    roots = [Path(a).resolve() for a in argv] if argv else [repo]
+    files = markdown_files([r for r in roots if r.exists()], repo)
     findings = [f for p in files for f in check(p, repo)]
 
     if not findings:
         print(f"GitHub rendering: {len(files)} files clean")
         return 0
-    print("These files render on github.com as well as the docs site, and GitHub", file=sys.stderr)
-    print("will show the following as literal text:\n", file=sys.stderr)
+    print("These files are read on github.com, where the following will show", file=sys.stderr)
+    print("as literal text instead of rendering:\n", file=sys.stderr)
     for f in findings:
         print(f, file=sys.stderr)
     print(f"\n{len(findings)} finding(s).", file=sys.stderr)
