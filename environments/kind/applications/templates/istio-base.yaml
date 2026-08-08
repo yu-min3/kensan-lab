@@ -1,0 +1,30 @@
+## Istio CRDs — same chart, same values as bare metal.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: istio-base
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "-2"
+    kensan-lab.platform/mirrors: kubernetes/argocd/applications/network/istio-base/app.yaml
+spec:
+  project: platform-project
+  sources:
+    - repoURL: https://istio-release.storage.googleapis.com/charts
+      chart: base
+      targetRevision: 1.27.3
+      helm:
+        releaseName: istio-base
+        valueFiles:
+          - $values/kubernetes/network/istio/base/values.yaml
+    - repoURL: {{ .Values.repoURL }}
+      targetRevision: {{ .Values.targetRevision }}
+      ref: values
+  {{- include "explore.destination" (dict "namespace" "istio-system") | nindent 2 }}
+  {{- include "explore.syncPolicy" . | nindent 2 }}
+  ignoreDifferences:
+    - group: admissionregistration.k8s.io
+      kind: ValidatingWebhookConfiguration
+      name: istiod-default-validator
+      jqPathExpressions:
+        - .webhooks

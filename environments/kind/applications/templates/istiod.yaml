@@ -1,0 +1,38 @@
+## Istio control plane. The bare-metal values are layered first (Gateway API
+## support, the oauth2-proxy ext_authz provider registration), then trimmed for
+## a laptop by values/istiod.yaml.
+##
+## The ext_authz provider entry survives on purpose even though explore ships no
+## oauth2-proxy: registering a provider changes nothing until an
+## AuthorizationPolicy binds it, and keeping the values file shared is worth
+## more than removing an inert block.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: istiod
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "-1"
+    kensan-lab.platform/mirrors: kubernetes/argocd/applications/network/istiod/app.yaml
+spec:
+  project: platform-project
+  sources:
+    - repoURL: https://istio-release.storage.googleapis.com/charts
+      chart: istiod
+      targetRevision: 1.27.3
+      helm:
+        releaseName: istiod
+        valueFiles:
+          - $values/kubernetes/network/istio/istiod/values.yaml
+          - $values/environments/kind/values/istiod.yaml
+    - repoURL: {{ .Values.repoURL }}
+      targetRevision: {{ .Values.targetRevision }}
+      ref: values
+  {{- include "explore.destination" (dict "namespace" "istio-system") | nindent 2 }}
+  {{- include "explore.syncPolicy" . | nindent 2 }}
+  ignoreDifferences:
+    - group: admissionregistration.k8s.io
+      kind: ValidatingWebhookConfiguration
+      name: istio-validator-istio-system
+      jqPathExpressions:
+        - .webhooks

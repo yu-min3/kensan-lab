@@ -1,0 +1,24 @@
+## Longhorn under an assumed name.
+##
+## Every PVC in this repository asks for storageClassName: longhorn, including
+## the default in charts/app-base. Running Longhorn itself on a single kind node
+## would be pointless — its whole value is replicas across machines, which
+## cannot exist here — so explore keeps the *name* and swaps the provisioner for
+## the local-path one that kind already ships. Existing PVC definitions then
+## bind unmodified, which is the entire trick.
+##
+## What is lost with the provisioner: replication, snapshots, volume expansion,
+## and any failure story at all. That is on purpose and it is written down in
+## docs/getting-started/try-it-with-kind.md#what-kind-cannot-show.
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: longhorn
+  annotations:
+    argocd.argoproj.io/sync-wave: "-1"
+    ## kind's own `standard` class is demoted by scripts/explore-up.sh before
+    ## this one is applied; two defaults would make every PVC fail to bind.
+    storageclass.kubernetes.io/is-default-class: "true"
+provisioner: rancher.io/local-path
+reclaimPolicy: Delete
+volumeBindingMode: WaitForFirstConsumer

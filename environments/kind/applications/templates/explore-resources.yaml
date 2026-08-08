@@ -1,0 +1,27 @@
+## The substitution layer: everything explore has to provide differently from
+## bare metal lives in environments/kind/resources/ and nowhere else.
+##
+## This is the one Application with no bare-metal counterpart, so it carries no
+## `mirrors` annotation. Keep it that way — every file added here is a file
+## somebody has to reason about twice.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: explore-resources
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "0"
+spec:
+  project: platform-project
+  source:
+    repoURL: {{ .Values.repoURL }}
+    targetRevision: {{ .Values.targetRevision }}
+    path: environments/kind/resources
+    directory:
+      ## `include` is stated even though it matches everything: a directory
+      ## block holding only zero values is dropped from the live object and the
+      ## Application never leaves OutOfSync (PR #382 -> #383).
+      recurse: false
+      include: '*.yaml'
+  {{- include "explore.destination" (dict "namespace" "istio-system") | nindent 2 }}
+  {{- include "explore.syncPolicy" . | nindent 2 }}

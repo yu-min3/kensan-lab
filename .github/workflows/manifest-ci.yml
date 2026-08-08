@@ -5,6 +5,7 @@ on:
     paths:
       - "kubernetes/**"
       - "charts/**"
+      - "environments/**"
       - ".yamllint"
       - "scripts/validate_argocd_apps.py"
       - ".github/workflows/manifest-ci.yml"
@@ -13,6 +14,7 @@ on:
     paths:
       - "kubernetes/**"
       - "charts/**"
+      - "environments/**"
       - ".yamllint"
       - "scripts/validate_argocd_apps.py"
       - ".github/workflows/manifest-ci.yml"
@@ -24,7 +26,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - run: pipx install yamllint
-      - run: yamllint -c .yamllint kubernetes charts
+      - run: yamllint -c .yamllint kubernetes charts environments
 
   kubeconform:
     name: kubeconform (schema validation)
@@ -38,11 +40,13 @@ jobs:
       # K8s manifest ではないため対象外。CR は -ignore-missing-schemas で skip される
       - name: Validate raw manifests
         run: |
-          find kubernetes -name '*.yaml' \
+          find kubernetes environments -name '*.yaml' \
             ! -name 'values.yaml' \
             ! -name 'Chart.yaml' \
             ! -path '*/chart/templates/*' \
             ! -path '*/platform-values/*' \
+            ! -path 'environments/kind/applications/templates/*' \
+            ! -path 'environments/kind/values/*' \
             -print0 | xargs -0 ./kubeconform -ignore-missing-schemas -summary
 
   helm-render:
@@ -53,6 +57,12 @@ jobs:
       # ApplicationSet が inject するのと同等のパラメータを渡して render が壊れていないか確認
       - name: app-base (app-kensan values)
         run: helm template app-kensan charts/app-base -f kubernetes/apps/app-kensan/values.yaml > /dev/null
+      # explore の Application 群と demo app。explore-ci が kind を起こす前に、
+      # render できないだけの壊れ方はここで落とす (数秒 vs 15 分)
+      - name: explore applications (kind root app)
+        run: helm template explore environments/kind/applications > /dev/null
+      - name: app-base (explore demo values)
+        run: helm template app-demo charts/app-base -f environments/kind/values/demo-app.yaml > /dev/null
       # instance 0 件 (glob 空振り) でも fail せず、chart 単体の render を smoke check する
       - name: vault-database-engine (per-instance values)
         run: |

@@ -1,0 +1,17 @@
+## ADR-006 flat app-{name} namespace with the prefixed 3-axis labels, same as
+## kubernetes/apps/app-kensan/resources/namespace.yaml. The environment label is
+## what gateway-explore's listener selects on, so dropping it silently turns the
+## HTTPRoute into NotAllowedByListeners.
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: app-demo
+  annotations:
+    argocd.argoproj.io/sync-wave: "-1" # before the Gateway in this same app
+  labels:
+    pod-security.kubernetes.io/enforce: restricted
+    kensan-lab.platform/environment: production
+    kensan-lab.platform/team: yu
+    kensan-lab.platform/app: demo
+    kensan-lab.platform/tier: application
+    kensan-lab.platform/pss-level: restricted

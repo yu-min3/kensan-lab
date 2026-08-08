@@ -1,0 +1,46 @@
+# app-demo — values for charts/app-base, the same chart the real apps use.
+# Chart config: environments/kind/applications/templates/demo-app.yaml
+#
+# Nothing here is explore-specific machinery: it is an ordinary app-base values
+# file. The three things a fork would have to change are the image, the
+# hostname, and turning the GHCR pull secret off (that one is backed by Vault,
+# which explore does not run until Phase 3).
+
+nameOverride: demo
+
+# podinfo is public and multi-arch, so this resolves on Apple Silicon as well as
+# on an amd64 runner. The real apps are amd64-only and deliberately left out —
+# see docs/getting-started/try-it-with-kind.md#what-kind-cannot-show.
+image:
+  repository: ghcr.io/stefanprodan/podinfo
+  tag: 6.9.2
+
+ports:
+  http: 9898
+
+probes:
+  path: /healthz
+
+# Bare metal pulls from a private GHCR through an ExternalSecret backed by
+# Vault. Explore has no Vault, and the image is public anyway.
+ghcrPullSecret:
+  enabled: false
+
+# stakater/reloader is not part of the explore slice; the annotation alone is
+# inert, but leaving it on would suggest a controller is watching it.
+reloader: false
+
+httproute:
+  enabled: true
+  hostnames:
+    - demo.127-0-0-1.sslip.io
+  gateway:
+    name: gateway-explore
+    namespace: istio-system
+
+resources:
+  requests:
+    cpu: 25m
+    memory: 32Mi
+  limits:
+    memory: 128Mi

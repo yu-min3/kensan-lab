@@ -1,0 +1,15 @@
+# Layered on top of kubernetes/network/istio/cni/values.yaml.
+# Chart config: environments/kind/applications/templates/istio-cni.yaml
+#
+# Bare metal chains istio-cni onto Cilium; kind chains it onto kindnet. The
+# directories are the same (/opt/cni/bin, /etc/cni/net.d) so the shared values
+# carry over unchanged, but `exclusive` is pinned off here rather than relying
+# on the chart default, because taking over as the only CNI plugin on a kind
+# node cuts the node off from its own control plane.
+#
+# This is the first thing to check if pods come up without a sidecar: see
+# docs/getting-started/try-it-with-kind.md#troubleshooting.
+
+cni:
+  chained: true
+  exclusive: false

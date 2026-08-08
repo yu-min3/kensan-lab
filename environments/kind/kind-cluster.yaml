@@ -1,0 +1,35 @@
+## kind cluster for the explore layer (see environments/kind/README.md).
+##
+## Single node on purpose: explore demonstrates *how the platform is composed*,
+## not how it behaves under failure. Replica rebuild, node drain and L2 lease
+## expiry cannot happen here and are deliberately left to the bare-metal cluster
+## (docs/getting-started/try-it-with-kind.md#what-kind-cannot-show).
+apiVersion: kind.x-k8s.io/v1alpha4
+kind: Cluster
+name: kensan-lab-explore
+
+nodes:
+  - role: control-plane
+
+    ## The bare-metal cluster reaches the gateway through a Cilium L2 VIP
+    ## (192.168.0.242). kind nodes live on a Docker bridge with no physical LAN
+    ## to announce into, so the substitute is host:80 -> node:30080, served by
+    ## the pinned NodePort Service in resources/gateway-explore.yaml.
+    extraPortMappings:
+      - containerPort: 30080
+        hostPort: 80
+        protocol: TCP
+      - containerPort: 30443
+        hostPort: 443
+        protocol: TCP
+
+    ## Several platform components carry a `hardware-class` node affinity
+    ## (preferred, not required) that exists because the real cluster mixes
+    ## Raspberry Pi 5 workers with an x86 mini PC. Labelling the single kind
+    ## node satisfies those rules instead of patching them away per component.
+    kubeadmConfigPatches:
+      - |
+        kind: InitConfiguration
+        nodeRegistration:
+          kubeletExtraArgs:
+            node-labels: "hardware-class=high-performance"

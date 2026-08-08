@@ -1,0 +1,26 @@
+## Demo workload — the proof that an app lands on this platform through the same
+## three-source shape as the real ones (charts/app-base + a values file + raw
+## namespace manifests), with no chart change at all.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: app-demo
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "1"
+    kensan-lab.platform/mirrors: kubernetes/argocd/applications/apps/app-konro/app.yaml
+spec:
+  project: app-project
+  sources:
+    - repoURL: {{ .Values.repoURL }}
+      targetRevision: {{ .Values.targetRevision }}
+      path: charts/app-base
+      helm:
+        releaseName: app-demo
+        valueFiles:
+          - $values/environments/kind/values/demo-app.yaml
+    - repoURL: {{ .Values.repoURL }}
+      targetRevision: {{ .Values.targetRevision }}
+      ref: values
+  {{- include "explore.destination" (dict "namespace" "app-demo") | nindent 2 }}
+  {{- include "explore.syncPolicy" . | nindent 2 }}

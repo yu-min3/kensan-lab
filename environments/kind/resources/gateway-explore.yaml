@@ -1,0 +1,77 @@
+## The explore Gateway — the substitute for kubernetes/network/istio/gateway-platform.yaml.
+##
+## What is deliberately different from bare metal, and why:
+##
+##   addresses    Bare metal pins the Cilium L2 VIP 192.168.0.242 so Cloudflare
+##                DNS and CoreDNS can depend on it. kind nodes sit on a Docker
+##                bridge with no physical segment to announce into, so there is
+##                no address to pin and the Service below carries the entrypoint.
+##   hostname     *.127-0-0-1.sslip.io resolves to 127.0.0.1 through public DNS,
+##                which keeps the quickstart from asking anyone to edit
+##                /etc/hosts. Offline fallback is in the docs.
+##   https        Phase 1 is HTTP only. The real listeners terminate TLS with
+##                wildcard certificates issued by cert-manager through a DNS-01
+##                challenge against a domain we own — a fork has neither the
+##                domain nor the credentials. Phase 2 adds a self-signed issuer
+##                and accepts the browser warning rather than pretending.
+##
+## This file is scaffolding. When the domain centralisation lands and the real
+## Gateway becomes site.yaml-driven, delete it and point explore at the shared
+## chart instead — see environments/kind/README.md#planned-removal.
+apiVersion: gateway.networking.k8s.io/v1
+kind: Gateway
+metadata:
+  name: gateway-explore
+  namespace: istio-system
+  annotations:
+    argocd.argoproj.io/sync-wave: "2" # after istiod, same as the bare-metal Gateways
+    ## Istio would otherwise create a LoadBalancer Service that stays Pending
+    ## forever on kind. The entrypoint is the NodePort Service below.
+    networking.istio.io/service-type: ClusterIP
+spec:
+  gatewayClassName: istio
+  listeners:
+    - name: http
+      protocol: HTTP
+      port: 80
+      hostname: "*.127-0-0-1.sslip.io"
+      allowedRoutes:
+        namespaces:
+          ## Bare metal splits this in two: gateway-platform admits the
+          ## `infrastructure` namespaces and gateway-prod the `production` ones,
+          ## because they sit on different hostnames and different auth. Explore
+          ## has one hostname and no auth, so it admits both from one listener.
+          ## The mechanism is unchanged — a namespace without the label still
+          ## gets NotAllowedByListeners, which is the intended failure.
+          from: Selector
+          selector:
+            matchExpressions:
+              - key: kensan-lab.platform/environment
+                operator: In
+                values:
+                  - infrastructure
+                  - production
+---
+## Entrypoint. kind maps host port 80 to node port 30080 (see kind-cluster.yaml),
+## so this Service is what makes http://demo.127-0-0-1.sslip.io work from the
+## browser. The selector is the one Istio puts on generated gateway pods — the
+## bare-metal gateway-platform-svc uses exactly the same one.
+apiVersion: v1
+kind: Service
+metadata:
+  name: gateway-explore-nodeport
+  namespace: istio-system
+  annotations:
+    argocd.argoproj.io/sync-wave: "3" # after the Gateway, so the pods exist
+  labels:
+    gateway: explore
+spec:
+  type: NodePort
+  selector:
+    gateway.networking.k8s.io/gateway-name: gateway-explore
+  ports:
+    - name: http
+      port: 80
+      targetPort: 80
+      nodePort: 30080
+      protocol: TCP

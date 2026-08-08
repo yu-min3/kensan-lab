@@ -1,0 +1,17 @@
+## Gateway API CRDs — identical to bare metal (no site-specific values).
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: gateway-api
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "-5"
+    kensan-lab.platform/mirrors: kubernetes/argocd/applications/network/gateway-api/app.yaml
+spec:
+  project: platform-project
+  source:
+    repoURL: {{ .Values.repoURL }}
+    targetRevision: {{ .Values.targetRevision }}
+    path: kubernetes/network/gateway-api
+  {{- include "explore.destination" (dict "namespace" "kube-system") | nindent 2 }}
+  {{- include "explore.syncPolicy" . | nindent 2 }}

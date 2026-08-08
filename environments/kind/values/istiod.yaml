@@ -1,0 +1,23 @@
+# Layered on top of kubernetes/network/istio/istiod/values.yaml.
+# Chart config: environments/kind/applications/templates/istiod.yaml
+#
+# The bare-metal values leave pilot on the chart default (500m CPU / 2Gi
+# memory requested), which a Raspberry Pi 5 cluster can spread across nodes but
+# a single kind node cannot: Docker Desktop hands out 4GB by default and the
+# pod would sit Pending with no obvious cause. Requests are lowered, never
+# removed — Kyverno's require-requests policy is Audit today and Enforce in
+# ADR-012 Phase 3, and a values file that drops requests would start failing
+# then.
+
+pilot:
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      memory: 1Gi
+
+  # One control plane replica; the chart's autoscaler would otherwise ask for a
+  # second one that has nowhere to go on a single node.
+  autoscaleEnabled: false
+  replicaCount: 1

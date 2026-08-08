@@ -6,6 +6,7 @@ extends: default
 ignore: |
   charts/*/templates/
   kubernetes/secrets/*/chart/templates/
+  environments/kind/applications/templates/
   kubernetes/network/gateway-api/gateway-api-crds.yaml
 
 rules:

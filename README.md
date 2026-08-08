@@ -16,6 +16,7 @@
 [![Cilium](https://img.shields.io/badge/Cilium-v1.18-F8C517?style=flat-square&logo=cilium&logoColor=black)](https://cilium.io/)
 [![License](https://img.shields.io/badge/License-Apache_2.0-blue?style=flat-square)](./LICENSE)
 
+[![Explore CI](https://github.com/yu-min3/kensan-lab/actions/workflows/explore-ci.yml/badge.svg)](https://github.com/yu-min3/kensan-lab/actions/workflows/explore-ci.yml)
 [![Manifest CI](https://github.com/yu-min3/kensan-lab/actions/workflows/manifest-ci.yml/badge.svg)](https://github.com/yu-min3/kensan-lab/actions/workflows/manifest-ci.yml)
 [![App CI](https://github.com/yu-min3/kensan-lab/actions/workflows/app-ci.yml/badge.svg)](https://github.com/yu-min3/kensan-lab/actions/workflows/app-ci.yml)
 [![Docs](https://github.com/yu-min3/kensan-lab/actions/workflows/docs.yml/badge.svg)](https://github.com/yu-min3/kensan-lab/actions/workflows/docs.yml)
@@ -31,6 +32,19 @@
 A bare-metal Kubernetes homelab built with technologies typical of enterprise platform engineering — Argo CD for GitOps, Istio for service mesh, Backstage for developer self-service, and observability with Prometheus, Grafana, Loki, and Tempo. All running on Raspberry Pis and a mini PC.
 
 > This is a **reference architecture**, not a turnkey solution. A bootstrap automation (Ansible + Makefile) is planned for future release. Published as a learning resource and companion to the author's technical articles. Adapt secrets, domains, and IP ranges for your environment. See [Configuration Guide](https://yu-min3.github.io/kensan-lab/getting-started/configuration/).
+
+## Try it in 10 minutes
+
+You cannot borrow the hardware, so there is a second way in. One command stands up a subset of this platform on a kind cluster — the same Argo CD Applications, the same Helm values, the same Kyverno policies:
+
+```bash
+git clone https://github.com/yu-min3/kensan-lab && cd kensan-lab
+make try
+```
+
+Ten minutes later: Argo CD's app-of-apps tree at `http://argocd.127-0-0-1.sslip.io`, a demo app served through a real Istio Gateway at `http://demo.127-0-0-1.sslip.io`, and the production policy set reporting in `kubectl get policyreport -A`. `make explore-down` removes it.
+
+It is a subset with substitutions, not a fork — no Cilium, Vault, Keycloak or Longhorn, and the L2 load balancer and wildcard TLS are stood in for. **[What kind cannot show you, and why](https://yu-min3.github.io/kensan-lab/getting-started/try-it-with-kind/#what-kind-cannot-show)** is the more interesting half of that list. The Explore CI badge above is this cluster coming up from scratch on every pull request.
 
 ## Why This Exists
 
