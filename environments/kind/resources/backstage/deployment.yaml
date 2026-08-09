@@ -46,7 +46,11 @@ spec:
     spec:
       containers:
         - name: backstage
-          image: ghcr.io/yu-min3/backstage:v0.0.12
+          ## Namespaced under the repository because that is the package CI
+          ## can push to — see .github/workflows/backstage-ci.yml. The older
+          ## ghcr.io/yu-min3/backstage belongs to no repository and is what
+          ## bare metal still pulls from.
+          image: ghcr.io/yu-min3/kensan-lab/backstage:v0.0.12
           imagePullPolicy: IfNotPresent
           ## The two configs baked into the image, then the explore overrides.
           ## Order matters: later files win.
