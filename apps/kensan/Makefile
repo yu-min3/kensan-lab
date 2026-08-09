@@ -32,6 +32,6 @@ k8s-build:
 		-t $(IMAGE):$(TAG) \
 		--push ../..
 
-# 入口は make、実ロジックは deploy.sh（分岐/arg/prompt は shell が素直なため）
+# 入口は make、実ロジックは scripts/deploy-app.sh（app 共通。deploy.sh は互換ラッパー）
 deploy:
-	./deploy.sh $(VERSION) $(if $(MERGE),--merge)
+	./deploy.sh $(VERSION) $(if $(MERGE),--merge) $(if $(YES),--yes)
