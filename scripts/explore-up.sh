@@ -140,6 +140,17 @@ helm upgrade --install argocd argo/argo-cd \
 info "applying the AppProjects"
 kubectl apply -f "${REPO_ROOT}/kubernetes/argocd/projects/" >/dev/null
 
+# The AppProjects warn about resources no Application manages. On bare metal
+# that is a real signal. On kind it is 50-odd objects that kind itself created,
+# and the warning badge lands on every application in the tree — the first thing
+# anyone opens. Turned off here rather than in the shared manifest, because the
+# signal is worth keeping where it means something. Nothing syncs the projects
+# in the explore slice, so this is not drift waiting to be reverted.
+for project in platform-project app-project; do
+  kubectl -n argocd patch appproject "$project" --type merge \
+    -p '{"spec":{"orphanedResources":null}}' >/dev/null
+done
+
 # ---------------------------------------------------------------------------
 # Hand over to GitOps
 # ---------------------------------------------------------------------------

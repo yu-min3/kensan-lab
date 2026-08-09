@@ -21,6 +21,20 @@ ports:
 probes:
   path: /healthz
 
+# podinfo's image declares `USER app` — a name, not a number. The chart asks for
+# runAsNonRoot, and the kubelet cannot resolve a username to a UID without the
+# image's /etc/passwd, so it refuses to start the container:
+#
+#   container has runAsNonRoot and image has non-numeric user (app),
+#   cannot verify user is non-root
+#
+# 100:101 is what `app` resolves to inside the image. Stated numerically here
+# rather than relaxing runAsNonRoot in the chart, which every real app depends
+# on. Any image whose USER is a name needs the same two lines.
+securityContext:
+  runAsUser: 100
+  runAsGroup: 101
+
 # Bare metal pulls from a private GHCR through an ExternalSecret backed by
 # Vault. Explore has no Vault, and the image is public anyway.
 ghcrPullSecret:
