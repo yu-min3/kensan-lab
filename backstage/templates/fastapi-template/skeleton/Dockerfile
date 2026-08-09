@@ -6,7 +6,12 @@ FROM docker.io/library/python:3.11-slim AS builder
 # Install uv
 COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
 
-WORKDIR /build
+# The builder works in the same directory the runtime image uses. uv writes an
+# absolute shebang into every console script in the virtualenv, so a venv built
+# under a different prefix and copied to /app leaves those entry points pointing
+# at an interpreter that no longer exists — the container then exits with
+# "exec /app/.venv/bin/opentelemetry-instrument: no such file or directory".
+WORKDIR /app
 
 # Copy dependency files
 COPY pyproject.toml uv.lock ./
@@ -15,7 +20,7 @@ COPY pyproject.toml uv.lock ./
 RUN uv sync --frozen --no-install-project --no-dev
 
 # Install OpenTelemetry auto-instrumentation libraries
-RUN /build/.venv/bin/opentelemetry-bootstrap -a install
+RUN /app/.venv/bin/opentelemetry-bootstrap -a install
 
 # Final stage
 FROM docker.io/library/python:3.11-slim
@@ -26,7 +31,7 @@ WORKDIR /app
 COPY --from=ghcr.io/astral-sh/uv:latest /uv /bin/uv
 
 # Copy virtual environment from builder
-COPY --from=builder /build/.venv /app/.venv
+COPY --from=builder /app/.venv /app/.venv
 
 # Copy application code
 COPY app/ /app/
