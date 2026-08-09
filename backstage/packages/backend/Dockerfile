@@ -66,4 +66,11 @@ COPY --chown=node:node templates ./templates
 COPY --chown=node:node packages/backend/dist/bundle.tar.gz app-config*.yaml ./
 RUN tar xzf bundle.tar.gz && rm bundle.tar.gz
 
+# Links the published package to this repository, which is what lets the
+# repository's GITHUB_TOKEN push to it from Actions. A package created by a
+# manual `docker push` belongs to no repository, and the release job is denied
+# with `permission_denied: write_package` until somebody connects the two by
+# hand — this label makes that connection happen on its own from now on.
+LABEL org.opencontainers.image.source="https://github.com/yu-min3/kensan-lab"
+
 CMD ["node", "packages/backend", "--config", "app-config.yaml", "--config", "app-config.kubernetes.yaml"]
