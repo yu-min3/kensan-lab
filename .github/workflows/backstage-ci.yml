@@ -1,0 +1,145 @@
+## Backstage CI.
+##
+## Until now the developer portal was the one component with no build in CI: the
+## image was produced by hand with `make push`, which meant it could only be cut
+## from a machine that happened to have the right Node and a warm yarn cache,
+## and nothing checked that the source still compiled. That is also why it
+## stayed amd64-only long after the applications went multi-arch — building for
+## a second architecture on a laptop means emulating one of them.
+##
+## Two jobs, deliberately split:
+##   verify   runs on every pull request. Type-check, test, and build the image
+##            for one architecture without pushing. Fast enough to be useful.
+##   release  runs only when asked, and produces the multi-arch image. Cutting a
+##            version is a decision, not a side effect of merging.
+name: Backstage CI
+
+on:
+  pull_request:
+    paths:
+      - "backstage/**"
+      - ".github/workflows/backstage-ci.yml"
+  push:
+    branches: [main]
+    paths:
+      - "backstage/**"
+      - ".github/workflows/backstage-ci.yml"
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Image tag to publish (e.g. v0.0.12)"
+        required: true
+        type: string
+
+concurrency:
+  group: backstage-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  # backstage/package.json declares "node": "20 || 22". Pinning the upper bound
+  # rather than tracking latest: newer Node breaks the native build of
+  # better-sqlite3, which the backend depends on.
+  NODE_VERSION: "22"
+  IMAGE: ghcr.io/${{ github.repository_owner }}/backstage
+
+jobs:
+  verify:
+    name: verify (type-check, test, image builds)
+    if: github.event_name != 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    defaults:
+      run:
+        working-directory: backstage
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      # The repository vendors yarn 4.4.1 under .yarn/releases, so corepack is
+      # what makes `yarn` resolve to that version rather than whatever ships
+      # with Node.
+      - name: Enable corepack
+        run: corepack enable
+
+      - name: Install
+        run: yarn install --immutable
+
+      - run: yarn tsc
+      - run: yarn test
+
+      # Builds for one architecture and stops there. The point is to catch a
+      # broken Dockerfile or a backend bundle that will not assemble, not to
+      # produce an artifact.
+      - name: Build backend bundle
+        run: yarn workspace backend build
+
+      - name: Build image (no push)
+        run: |
+          docker build \
+            --platform linux/amd64 \
+            -f packages/backend/Dockerfile \
+            -t backstage:ci \
+            .
+
+  release:
+    name: release (multi-arch, pushed)
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    permissions:
+      contents: read
+      packages: write
+    defaults:
+      run:
+        working-directory: backstage
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Enable corepack
+        run: corepack enable
+
+      - name: Install
+        run: yarn install --immutable
+
+      - name: Build backend bundle
+        run: yarn workspace backend build
+
+      # arm64 is emulated on an amd64 runner, which is slow but happens here
+      # rather than on somebody's laptop. arm64 matters because the kind explore
+      # cluster runs on whatever architecture the visitor has, and Apple Silicon
+      # cannot run an amd64 node image — `kind load` accepts it and then
+      # silently does not register it.
+      - uses: docker/setup-qemu-action@v3
+      - uses: docker/setup-buildx-action@v3
+
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push
+        uses: docker/build-push-action@v6
+        with:
+          context: backstage
+          file: backstage/packages/backend/Dockerfile
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ${{ env.IMAGE }}:${{ inputs.tag }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Confirm the manifest list
+        run: |
+          docker buildx imagetools inspect "${IMAGE}:${TAG}" \
+            | grep -E 'Platform|Name' || true
+        env:
+          IMAGE: ${{ env.IMAGE }}
+          TAG: ${{ inputs.tag }}

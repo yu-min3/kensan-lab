@@ -24,7 +24,13 @@ FULL_IMAGE := $(REGISTRY)/$(IMAGE_NAME):$(TAG)
 CONTAINER_RUNTIME ?= docker
 
 # Platform for cross-build (e.g., linux/amd64)
+# Single-platform target for `make build`, which loads into the local daemon.
 PLATFORM ?= linux/amd64
+# Multi-platform target for `make push-multiarch`. The apps (kensan, konro) are
+# already built for both; Backstage was the last amd64-only image, which meant
+# it could not run on an Apple Silicon laptop — including the kind explore
+# cluster (environments/kind).
+PLATFORMS ?= linux/amd64,linux/arm64
 
 # Yarn wrapper
 YARN := node .yarn/releases/yarn-4.4.1.cjs
@@ -140,6 +146,20 @@ login:
 push: login build
 	@echo "Pushing image: $(FULL_IMAGE)"
 	$(CONTAINER_RUNTIME) push $(FULL_IMAGE)
+
+# Multi-arch requires buildx: a manifest list cannot be loaded into the local
+# daemon, so this builds and pushes in one step rather than reusing `build`.
+# Slow on a single machine — the foreign architecture is emulated — but it only
+# has to happen when a release is cut.
+.PHONY: push-multiarch
+push-multiarch: build-backend login
+	@echo "Building and pushing $(FULL_IMAGE) for $(PLATFORMS)"
+	$(CONTAINER_RUNTIME) buildx build \
+		--platform $(PLATFORMS) \
+		-f packages/backend/Dockerfile \
+		-t $(FULL_IMAGE) \
+		--push \
+		.
 
 .PHONY: run
 run: build
