@@ -2,15 +2,25 @@
 package api
 
 import (
+	"archive/zip"
+	"bytes"
 	"encoding/json"
 	"errors"
+	"io"
 	"io/fs"
 	"net/http"
 	"os"
 	"path/filepath"
+	"time"
 
 	"github.com/yu-min3/kensan-lab/apps/konro/backend/internal/recipe"
+	"github.com/yu-min3/kensan-lab/apps/konro/backend/internal/rkimport"
 )
+
+// maxImportBytes caps the uploaded export zip. The archive is held in memory
+// (readOnlyRootFilesystem leaves no tmp dir to spill to), so this bound is
+// what keeps the pod inside its memory limit. Current real exports are ~14MB.
+const maxImportBytes = 64 << 20
 
 // New builds the handler. dataDir holds recipe .md files + images/;
 // staticDir (optional) holds the built SPA, served with fallback to
@@ -40,6 +50,37 @@ func New(dataDir, staticDir string) http.Handler {
 		writeJSON(w, rec)
 	})
 
+	// Recipe Keeper 再取込: エクスポート zip をそのまま body で受ける
+	// （multipart にしない — ParseMultipartForm はサイズ超過時にディスクへ
+	// スピルするが、このコンテナに書ける tmp は無い）
+	mux.HandleFunc("POST /api/v1/import", func(w http.ResponseWriter, r *http.Request) {
+		body, err := io.ReadAll(http.MaxBytesReader(w, r.Body, maxImportBytes))
+		if err != nil {
+			http.Error(w, "zip too large (max 64MB)", http.StatusRequestEntityTooLarge)
+			return
+		}
+		zr, err := zip.NewReader(bytes.NewReader(body), int64(len(body)))
+		if err != nil {
+			http.Error(w, "not a zip archive", http.StatusBadRequest)
+			return
+		}
+		res, images, err := rkimport.ParseZipReader(zr)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+		stats, err := rkimport.Materialize(res, images, dataDir, time.Now().Format("2006-01-02"))
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		writeJSON(w, importReport{
+			WriteStats:   stats,
+			Warnings:     res.Warnings,
+			UnknownProps: res.SortedUnknownProps(),
+		})
+	})
+
 	mux.Handle("GET /images/", http.StripPrefix("/images/",
 		http.FileServer(http.Dir(filepath.Join(dataDir, "images")))))
 
@@ -51,6 +92,12 @@ func New(dataDir, staticDir string) http.Handler {
 		mux.Handle("/", spaHandler(staticDir))
 	}
 	return mux
+}
+
+type importReport struct {
+	rkimport.WriteStats
+	Warnings     []string `json:"warnings"`
+	UnknownProps []string `json:"unknownProps"`
 }
 
 func writeJSON(w http.ResponseWriter, v any) {

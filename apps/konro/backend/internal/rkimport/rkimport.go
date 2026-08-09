@@ -57,7 +57,12 @@ func ParseZip(zipPath string) (*Result, map[string][]byte, error) {
 		return nil, nil, fmt.Errorf("open zip: %w", err)
 	}
 	defer zr.Close()
+	return ParseZipReader(&zr.Reader)
+}
 
+// ParseZipReader is ParseZip over an already-opened zip (the upload endpoint
+// receives the archive as a request body, never as a file on disk).
+func ParseZipReader(zr *zip.Reader) (*Result, map[string][]byte, error) {
 	var htmlFile *zip.File
 	entries := map[string]*zip.File{}
 	for _, f := range zr.File {
@@ -67,7 +72,7 @@ func ParseZip(zipPath string) (*Result, map[string][]byte, error) {
 		}
 	}
 	if htmlFile == nil {
-		return nil, nil, fmt.Errorf("recipes.html not found in %s (entries: %d)", zipPath, len(zr.File))
+		return nil, nil, fmt.Errorf("recipes.html not found in zip (entries: %d)", len(zr.File))
 	}
 
 	rc, err := htmlFile.Open()

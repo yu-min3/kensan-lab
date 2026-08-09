@@ -28,6 +28,21 @@ export async function fetchRecipe(file: string): Promise<Recipe> {
   return res.json();
 }
 
+export type ImportReport = {
+  recipes: number;
+  images: number;
+  emptySections: number;
+  warnings: string[] | null;
+  unknownProps: string[] | null;
+};
+
+/** Recipe Keeper のエクスポート zip をそのまま body で送る（multipart ではない） */
+export async function importRecipeZip(file: File): Promise<ImportReport> {
+  const res = await fetch("/api/v1/import", { method: "POST", body: file });
+  if (!res.ok) throw new Error(`${res.status} ${(await res.text()).trim()}`);
+  return res.json();
+}
+
 /** "PT1H20M" → "1時間20分" */
 export function formatDuration(iso?: string): string {
   if (!iso) return "";
