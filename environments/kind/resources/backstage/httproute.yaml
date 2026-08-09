@@ -1,0 +1,32 @@
+## Backstage on the explore hostname — the substitute for
+## kubernetes/backstage/httproute.yaml, which names the real domain.
+##
+## Scaffolding, like the other two routes here: it exists only because a
+## hostname is hardcoded in a raw manifest, and goes away when the domain
+## centralisation lands. See environments/kind/README.md#planned-removal.
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: backstage-route
+  namespace: backstage
+  annotations:
+    argocd.argoproj.io/sync-wave: "4"
+spec:
+  parentRefs:
+    - group: gateway.networking.k8s.io
+      kind: Gateway
+      name: gateway-explore
+      namespace: istio-system
+  hostnames:
+    - "backstage.127-0-0-1.sslip.io"
+  rules:
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /
+      backendRefs:
+        - group: ""
+          kind: Service
+          name: backstage
+          port: 7007
+          weight: 1

@@ -11,9 +11,10 @@ $ git clone https://github.com/yu-min3/kensan-lab && cd kensan-lab
 $ make try
 ```
 
-Nothing else to configure. Around three to seven minutes later you have Argo CD
-reconciling ten Applications, Istio serving a demo app through the Gateway API,
-and the production policy set reporting on everything in the cluster.
+Nothing else to configure. A few minutes later you have Argo CD reconciling
+eleven Applications, Backstage serving the developer portal, Istio routing to
+both through the Gateway API, and the production policy set reporting on
+everything in the cluster.
 
 ```console
 $ make explore-down     # when you are done
@@ -24,7 +25,8 @@ $ make explore-down     # when you are done
 | | |
 |---|---|
 | **Argo CD** | `http://argocd.127-0-0-1.sslip.io` — the app-of-apps tree, one Application per component, the same shape as bare metal |
-| **Istio + Gateway API** | The demo app is reached through a real `Gateway` and `HTTPRoute`, not a port-forward |
+| **Backstage** | `http://backstage.127-0-0-1.sslip.io` — the developer portal, with the golden path template and the service catalog |
+| **Istio + Gateway API** | Both are reached through a real `Gateway` and `HTTPRoute`, not a port-forward |
 | **Kyverno** | All six production `ClusterPolicy` objects, in Audit — verdicts land in `PolicyReport` within a minute |
 | **A demo app** | Deployed by `charts/app-base`, the same chart the real apps use: a values file and no chart changes |
 | **A `longhorn` StorageClass** | Not Longhorn, but named after it, so every PVC in this repository binds unmodified |
@@ -77,8 +79,8 @@ $ echo "127.0.0.1 argocd.127-0-0-1.sslip.io demo.127-0-0-1.sslip.io" | sudo tee 
 
 ## Take it for a walk
 
-Six things worth doing, each about a minute. They are ordered so that every one
-builds on the last, and none of them needs anything installed beyond the
+Seven things worth doing, each about a minute. They are ordered so that every
+one builds on the last, and none of them needs anything installed beyond the
 prerequisites above.
 
 ### 1. Look at the tree
@@ -103,7 +105,36 @@ gateway-api         Synced   Healthy
 ...
 ```
 
-### 2. Break something and watch it heal
+### 2. Open the developer portal
+
+This is the part that makes the repository a platform rather than a cluster.
+
+Open `http://backstage.127-0-0-1.sslip.io`, and sign in as a guest — there is no
+identity provider here, so Backstage's guest provider is what you get.
+
+Two things are worth finding:
+
+- **Create → the FastAPI template.** This is the golden path: the scaffolder a
+  developer uses to start a service that arrives on the platform already wired
+  up, rather than assembling manifests by hand.
+- **Catalog.** The domains, systems and teams the platform knows about.
+
+Both are read from files inside the image. Production also runs a GitHub
+provider that scans the organisation for `catalog-info.yaml` files, and that one
+needs a token from Vault — so it is switched off here, and the catalog is
+whatever the repository ships. Nothing else about the portal changes.
+
+Backstage is also the only workload in this slice that runs an Istio sidecar,
+because its namespace carries `istio-injection: enabled`. `kubectl -n backstage
+get pods` shows two containers rather than one.
+
+**Everything you do here disappears.** Production keeps Backstage's catalog in
+PostgreSQL with credentials from Vault; a throwaway cluster has neither and
+nothing worth persisting, so the explore layer uses the in-memory SQLite the
+repository already uses for local development. Restart the pod and the catalog
+is rebuilt from the same files.
+
+### 3. Break something and watch it heal
 
 This is the part of GitOps that is hard to appreciate from a diagram. Scale the
 demo app by hand:
@@ -118,7 +149,7 @@ noticed that the cluster no longer matched Git and corrected it. `selfHeal: true
 is set on every Application in this repository, which is why a manual `kubectl
 edit` on the real cluster is a temporary opinion rather than a change.
 
-### 3. Follow a request through the Gateway API
+### 4. Follow a request through the Gateway API
 
 The demo app is not port-forwarded. It is reached the way the production apps
 are: a `Gateway` that Istio implements, and an `HTTPRoute` that attaches to it.
@@ -136,7 +167,7 @@ without `kensan-lab.platform/environment` comes back `NotAllowedByListeners`.
 That is a deliberate guardrail — a new application cannot publish itself on the
 platform's hostname by accident.
 
-### 4. Watch the policy engine catch you
+### 5. Watch the policy engine catch you
 
 All six production policies are running, in Audit: they report rather than
 block. Start with what is already there:
@@ -184,7 +215,7 @@ no admission reports, because the etcd write amplification would land on a
 microSD card. kind has neither, so the explore layer shortens the interval to
 one minute — the only Kyverno setting that differs between the two.
 
-### 5. Claim a volume
+### 6. Claim a volume
 
 Every PVC in this repository asks for `storageClassName: longhorn`, including
 the default in `charts/app-base`. There is a StorageClass called `longhorn`
@@ -220,7 +251,7 @@ until a pod actually needs the volume, so the volume lands on the node the pod
 was scheduled to. Give it a consumer and it binds in a few seconds. What you do
 *not* get is replication, snapshots or expansion — see below.
 
-### 6. See how Istio got onto the network
+### 7. See how Istio got onto the network
 
 Istio's CNI plugin does not replace the cluster's networking; it appends itself
 to whatever is already there. On kind that is kindnet:
@@ -275,10 +306,11 @@ LAN. kind's nodes are containers on a Docker bridge; there is no physical
 segment to announce into and no other machine that could ask. The port mapping
 gets traffic to the gateway, but cannot show a VIP failing over between nodes.
 
-**Single sign-on.** Keycloak, oauth2-proxy and the `ext_authz` chain need an
-issuer with a resolvable public hostname and a set of client secrets. The Argo
-CD here uses its local admin account; a dev-mode Vault and a realm import are a
-later phase.
+**Single sign-on.** Keycloak, oauth2-proxy and the `ext_authz` chain guard every
+hostname on the real gateway. Here, Argo CD uses its local admin account and
+Backstage its guest provider — both of which production also has, sitting behind
+the SSO gate rather than instead of it. Bringing the gate itself up is a later
+phase.
 
 **The root of trust for secrets.** This one cannot be solved by more work. The
 sealed secrets in this repository are encrypted to *our* controller's key and
@@ -299,11 +331,12 @@ be drained, and cannot lose an L2 lease. This cluster shows how the platform is
 *composed*; how it *behaves* is told in the [incident
 notes](https://github.com/yu-min3/kensan-lab/tree/main/docs/incidents).
 
-**The service mesh data plane.** Istio is installed and the gateway is one of
-its proxies, but no workload here runs a sidecar — production injects them into
-the platform namespaces (Vault, Keycloak, oauth2-proxy), none of which explore
-runs. Application namespaces have no sidecar on bare metal either, so the demo
-app having a single container is faithful rather than broken.
+**Most of the service mesh data plane.** Backstage runs a sidecar here, so the
+mesh is not purely decorative — but production injects sidecars into several
+platform namespaces (Vault, Keycloak, oauth2-proxy, External Secrets) and
+explore runs none of those. Application namespaces have no sidecar on bare metal
+either, so the demo app having a single container is faithful rather than
+broken. What you cannot see here is traffic between two meshed services.
 
 **Multiple architectures.** kind's nodes are all your host's architecture, so
 the arm64/amd64 split the real cluster schedules around cannot be reproduced.
@@ -330,7 +363,7 @@ $ kubectl -n argocd describe application <name>
 ```
 
 **The demo app returns 404.** The route was rejected by the listener; see
-exercise 3.
+exercise 4.
 
 ```console
 $ kubectl -n app-demo get httproute demo -o jsonpath='{.status.parents}' | jq

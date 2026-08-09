@@ -107,7 +107,25 @@ Two files are scaffolding and should not outlive the domain centralisation:
 |---|---|---|
 | `resources/gateway-explore.yaml` | `kubernetes/network/istio/gateway-platform.yaml` hardcodes the LAN VIP, the real hostnames and the wildcard certificate references | the Gateway is rendered from `site.yaml` and explore can supply its own site values |
 | `resources/httproute-argocd.yaml` | `kubernetes/argocd/resources/httproute.yaml` hardcodes the real hostname | the same |
+| `resources/backstage/httproute.yaml` | `kubernetes/backstage/httproute.yaml` hardcodes the real hostname | the same |
 
 Deleting them is part of the centralisation change, not a follow-up. Leaving
 them behind would mean two substitution layers doing the same job, which is the
 duplication this layout was arranged to avoid.
+
+## The one component that is genuinely copied
+
+`resources/backstage/deployment.yaml` is the largest single divergence in this
+directory, and the only Deployment explore owns rather than follows. The
+bare-metal one reads a PostgreSQL password and a GitHub token from Secrets that
+External Secrets fills from Vault; without Vault those Secrets never exist and
+the pod never starts, so the references had to go.
+
+Everything not forced to differ is copied verbatim — image, port, probes,
+resource requests — and the header of that file lists the three deliberate
+differences. When it drifts from the bare-metal Deployment, that is a bug, not a
+feature: check the two side by side before changing either.
+
+Backstage is also the first workload here that runs an Istio sidecar, because
+the shared namespace carries `istio-injection: enabled`. Nothing else in the
+slice joins the mesh data plane.

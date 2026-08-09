@@ -1,0 +1,72 @@
+## Backstage configuration for the explore cluster.
+##
+## Layered as a third `--config` on top of the two baked into the image, so the
+## catalog locations, the entity rules and the guest auth provider all come from
+## the shared config and only the things that cannot work here are replaced:
+##
+##   database      Production runs PostgreSQL with credentials from Vault. There
+##                 is no Vault here and nothing to persist, so the throwaway
+##                 cluster gets the in-memory SQLite the repository already uses
+##                 for local development. Everything is lost on restart, which
+##                 is the correct behaviour for a cluster that is itself thrown
+##                 away.
+##   URLs          The real host does not resolve here.
+##   integrations  The GitHub token comes from Vault. Emptying the list is what
+##                 stops anything from trying to authenticate with the
+##                 placeholder in the Deployment.
+##   catalog       The organisation scanner is pushed a year into the future
+##                 rather than removed — see below.
+##
+## Everything a visitor came to see — the golden path template, the catalog, the
+## scaffolder — is unaffected: those are read from files inside the image.
+##
+## ── Why the scanner is neutered rather than deleted ──────────────────────────
+##
+## Backstage merges `--config` files key by key, and a later file cannot remove
+## a key an earlier one set. Both of these were tried against a running cluster
+## and neither worked:
+##
+##   catalog.providers: {}            the deep merge keeps `github` underneath
+##   catalog.providers.github: null   likewise; the provider still registers
+##
+## Loading only this file, without the two baked-in ones, does remove it — and
+## breaks the frontend, which validates the config against the schema compiled
+## into the app bundle (`Invalid app bundle schema`).
+##
+## What does work is overriding the schedule, because those are leaf values.
+## The provider registers and then never runs, which for a cluster measured in
+## minutes is indistinguishable from absent — and it leaves the shared config as
+## the single description of what the catalog contains.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: backstage-explore-config
+  namespace: backstage
+data:
+  app-config.explore.yaml: |
+    app:
+      title: kensan-lab Platform Portal
+      baseUrl: http://backstage.127-0-0-1.sslip.io
+
+    backend:
+      baseUrl: http://backstage.127-0-0-1.sslip.io
+      cors:
+        origin: http://backstage.127-0-0-1.sslip.io
+        methods: [GET, HEAD, PATCH, POST, PUT, DELETE]
+        credentials: true
+      database:
+        client: better-sqlite3
+        connection: ':memory:'
+
+    # Replaces the list from the shared config rather than adding to it.
+    integrations:
+      github: []
+
+    catalog:
+      providers:
+        github:
+          kensanLabApps:
+            schedule:
+              initialDelay: { days: 365 }
+              frequency: { days: 365 }
+              timeout: { minutes: 1 }

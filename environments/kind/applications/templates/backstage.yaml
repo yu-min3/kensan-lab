@@ -1,0 +1,40 @@
+## Backstage — the developer portal, and the reason this repository calls itself
+## a platform rather than a cluster.
+##
+## Two sources rather than one: the namespace and the Service are taken from the
+## bare-metal manifests unchanged, and only the pieces that cannot work without
+## Vault (the Deployment's Secret references) are replaced from
+## environments/kind/resources/backstage.
+##
+## Note that the shared namespace carries `istio-injection: enabled`, so this is
+## the first workload in the explore slice that runs a sidecar — the mesh data
+## plane is exercised here and nowhere else.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: backstage
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "1"
+    kensan-lab.platform/mirrors: kubernetes/argocd/applications/backstage/app.yaml
+spec:
+  project: platform-project
+  sources:
+    ## Reused from bare metal: the namespace (with its ADR-006 labels and the
+    ## istio-injection switch) and the Service. The Deployment, the PDB, the
+    ## network policy, the ExternalSecrets and the production HTTPRoute are
+    ## deliberately not included.
+    - repoURL: {{ .Values.repoURL }}
+      targetRevision: {{ .Values.targetRevision }}
+      path: kubernetes/backstage
+      directory:
+        recurse: false
+        include: '{namespace,backstage-service}.yaml'
+    - repoURL: {{ .Values.repoURL }}
+      targetRevision: {{ .Values.targetRevision }}
+      path: environments/kind/resources/backstage
+      directory:
+        recurse: false
+        include: '*.yaml'
+  {{- include "explore.destination" (dict "namespace" "backstage") | nindent 2 }}
+  {{- include "explore.syncPolicy" . | nindent 2 }}
