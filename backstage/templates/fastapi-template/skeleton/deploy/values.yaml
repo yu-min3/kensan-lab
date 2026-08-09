@@ -1,0 +1,49 @@
+# Values for charts/app-base — the chart the platform provides so that an
+# application does not hand-write a Deployment, a Service and an HTTPRoute.
+# https://github.com/yu-min3/kensan-lab/tree/main/charts/app-base
+#
+# The Argo CD Application that consumes this file lives in the platform
+# repository (added by the pull request this template opened). Everything the
+# application itself owns is in this directory.
+
+image:
+  # Pushed by .github/workflows/build-and-push.yaml on every tag.
+  repository: ghcr.io/${{ values.repoOwner }}/${{ values.repoName }}
+  tag: v1.0.0
+
+ports:
+  http: 8000
+
+probes:
+  # app/main.py serves /health; the chart defaults to /healthz.
+  path: /health
+
+# The image declares `USER appuser`, a name rather than a number. The chart
+# asks for runAsNonRoot, and the kubelet cannot resolve a name to a UID without
+# the image's /etc/passwd — it refuses to start the container with
+# "image has non-numeric user". Stating the UID the Dockerfile creates is what
+# makes the two agree.
+securityContext:
+  runAsUser: 1000
+  runAsGroup: 1000
+
+# The image is private, so the pull secret is generated in this namespace from
+# Vault by External Secrets. Set to false while the package is public.
+ghcrPullSecret:
+  enabled: true
+
+otel:
+  enabled: true
+  serviceName: ${{ values.name }}
+
+httproute:
+  enabled: true
+  hostnames:
+    - ${{ values.name }}.app.yu-min3.com
+
+resources:
+  requests:
+    cpu: 100m
+    memory: 128Mi
+  limits:
+    memory: 512Mi
