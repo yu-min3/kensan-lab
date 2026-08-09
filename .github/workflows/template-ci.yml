@@ -100,6 +100,11 @@ jobs:
           # UID or the kubelet refuses to start the container under
           # runAsNonRoot. Cheap to assert, expensive to debug on a cluster.
           grep -q 'runAsUser: 1000' /tmp/rendered.yaml
+          # gateway-prod protects every hostname it serves (ADR-021), so a
+          # service published on it without the /oauth2 route sends people to
+          # Keycloak and then 404s the callback. The failure looks like a broken
+          # login rather than a missing route, so assert the route exists.
+          grep -q 'sample-api-oauth2' /tmp/rendered.yaml
 
       - name: Build the image
         run: docker build -t sample-api:ci /tmp/scaffolded

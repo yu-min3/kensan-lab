@@ -41,6 +41,25 @@ httproute:
   hostnames:
     - ${{ values.name }}.app.yu-min3.com
 
+# gateway-prod protects every hostname it serves (ADR-021 inverted this from
+# opt-in to default), so the service is behind Keycloak whether or not this is
+# set. What it adds is the route that carries /oauth2/* to oauth2-proxy — and
+# without that the login redirect comes back to a 404 and nobody can get in.
+#
+# Two things still have to happen on the platform side before the flow closes;
+# neither can be done from this repository:
+#   1. this namespace listed in the ReferenceGrant `allow-app-oauth2-routes`
+#      (kubernetes/auth/oauth2-proxy/resources/referencegrant-apps.yaml)
+#   2. the hostname added to GATEWAY_PROTECTED_HOSTS in
+#      bootstrap/keycloak/setup.sh, and the script re-run, so that Keycloak
+#      accepts the redirect URI
+#
+# The pull request this template opened against the platform repository is
+# where both belong.
+auth:
+  gatewayOAuth2:
+    enabled: true
+
 resources:
   requests:
     cpu: 100m
