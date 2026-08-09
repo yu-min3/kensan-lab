@@ -42,7 +42,9 @@ git clone https://github.com/yu-min3/kensan-lab && cd kensan-lab
 make try
 ```
 
-Ten minutes later: Argo CD's app-of-apps tree at `http://argocd.127-0-0-1.sslip.io`, a demo app served through a real Istio Gateway at `http://demo.127-0-0-1.sslip.io`, and the production policy set reporting in `kubectl get policyreport -A`. `make explore-down` removes it.
+Three to seven minutes later: Argo CD's app-of-apps tree at `http://argocd.127-0-0-1.sslip.io`, a demo app served through a real Istio Gateway at `http://demo.127-0-0-1.sslip.io`, and the production policy set reporting in `kubectl get policyreport -A`. `make explore-down` removes it.
+
+The quickstart includes a **[six-step walkthrough](https://yu-min3.github.io/kensan-lab/getting-started/try-it-with-kind/#take-it-for-a-walk)** — break a deployment and watch Argo CD heal it, trip a Kyverno policy and read the verdict, claim a PVC on the `longhorn` StorageClass, and see how Istio's CNI plugin chained onto the cluster's own networking.
 
 It is a subset with substitutions, not a fork — no Cilium, Vault, Keycloak or Longhorn, and the L2 load balancer and wildcard TLS are stood in for. **[What kind cannot show you, and why](https://yu-min3.github.io/kensan-lab/getting-started/try-it-with-kind/#what-kind-cannot-show)** is the more interesting half of that list. The Explore CI badge above is this cluster coming up from scratch on every pull request.
 

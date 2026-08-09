@@ -2,174 +2,356 @@
 
 This repository runs a Kubernetes platform on bare metal — three Raspberry Pi 5
 workers and an x86 mini PC in a cupboard. You cannot borrow the cupboard, so
-there is a second way in: one command stands up the same GitOps tree on a kind
-cluster on your laptop, using the same Argo CD Applications, the same Helm
-values, and the same policy set as the real thing.
+there is a second way in: one command stands up a slice of the same GitOps tree
+on a kind cluster on your laptop, using the same Argo CD Applications, the same
+Helm values, and the same Kyverno policies as the real thing.
 
 ```console
 $ git clone https://github.com/yu-min3/kensan-lab && cd kensan-lab
 $ make try
 ```
 
-Roughly ten minutes later you have Argo CD, Istio with Gateway API, Kyverno
-running the production policies, and a demo app reachable in a browser.
+Nothing else to configure. Around three to seven minutes later you have Argo CD
+reconciling ten Applications, Istio serving a demo app through the Gateway API,
+and the production policy set reporting on everything in the cluster.
 
 ```console
-$ make explore-down    # when you are done
+$ make explore-down     # when you are done
 ```
 
 ## What you get
 
 | | |
 |---|---|
-| **Argo CD** | `http://argocd.127-0-0-1.sslip.io` — the app-of-apps tree, one Application per component, exactly as on bare metal |
+| **Argo CD** | `http://argocd.127-0-0-1.sslip.io` — the app-of-apps tree, one Application per component, the same shape as bare metal |
 | **Istio + Gateway API** | The demo app is reached through a real `Gateway` and `HTTPRoute`, not a port-forward |
-| **Kyverno** | The production `ClusterPolicy` set, in Audit mode — `kubectl get policyreport -A` |
-| **A demo app** | Deployed by `charts/app-base`, the same chart the real apps use, with a values file and no chart changes |
+| **Kyverno** | All six production `ClusterPolicy` objects, in Audit — verdicts land in `PolicyReport` within a minute |
+| **A demo app** | Deployed by `charts/app-base`, the same chart the real apps use: a values file and no chart changes |
+| **A `longhorn` StorageClass** | Not Longhorn, but named after it, so every PVC in this repository binds unmodified |
 
 ## Prerequisites
 
-`docker`, `kind`, `kubectl`, `helm`, `curl`, and `make`.
+`docker`, `kind`, `kubectl`, `helm`, `curl` and `make`. `explore-up.sh` checks
+for all of them before it starts, so a missing one costs you a second rather
+than a confusing failure ten minutes in.
+
+**macOS** — Docker Desktop from
+[docker.com](https://www.docker.com/products/docker-desktop/), then:
 
 ```console
-$ brew install kind kubectl helm            # macOS
+$ brew install kind kubectl helm
 ```
 
-Give Docker at least **6 GiB of memory**. Docker Desktop defaults to 4 GiB,
-which is not enough for Istio's control plane and Kyverno's webhook on one node
-— `explore-up.sh` checks this before it starts, so you find out in a second
-rather than in a Pending pod twenty minutes later.
+**Linux** — Docker Engine per the [official
+instructions](https://docs.docker.com/engine/install/), with your user in the
+`docker` group so the script can reach the daemon
+(`sudo usermod -aG docker "$USER" && newgrp docker`), then:
 
-Host ports **80** and **443** must be free; the gateway is published on them so
-that the URLs above work without a proxy.
+```console
+$ [ "$(uname -m)" = aarch64 ] && ARCH=arm64 || ARCH=amd64
 
-`*.127-0-0-1.sslip.io` is public DNS that resolves to `127.0.0.1`, which is what
-keeps this from asking you to edit `/etc/hosts`. If you are offline, add the
-names yourself:
+$ curl -Lo ./kind "https://kind.sigs.k8s.io/dl/latest/kind-linux-${ARCH}"
+$ chmod +x ./kind && sudo mv ./kind /usr/local/bin/kind
+
+$ curl -LO "https://dl.k8s.io/release/$(curl -Ls https://dl.k8s.io/release/stable.txt)/bin/linux/${ARCH}/kubectl"
+$ chmod +x ./kubectl && sudo mv ./kubectl /usr/local/bin/kubectl
+
+$ curl -fsSL https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
+```
+
+**Memory.** Docker needs at least 6 GiB. Docker Desktop hands out 4 GiB by
+default, which is not enough for Istio's control plane and Kyverno's webhook on
+a single node — raise it under Settings → Resources → Memory. On Linux the
+container gets the host's memory, so there is usually nothing to do.
+
+**Ports.** 80 and 443 must be free. The gateway is published on them, so the
+URLs below work in a browser with no proxy and no port-forward.
+
+**DNS.** `*.127-0-0-1.sslip.io` is public DNS that resolves to `127.0.0.1`,
+which is what keeps this from asking you to edit `/etc/hosts`. If you are
+working offline:
 
 ```console
 $ echo "127.0.0.1 argocd.127-0-0-1.sslip.io demo.127-0-0-1.sslip.io" | sudo tee -a /etc/hosts
 ```
 
+## Take it for a walk
+
+Six things worth doing, each about a minute. They are ordered so that every one
+builds on the last, and none of them needs anything installed beyond the
+prerequisites above.
+
+### 1. Look at the tree
+
+Open `http://argocd.127-0-0-1.sslip.io` — the password is printed at the end of
+`make try`, and the user is `admin`.
+
+The `explore-root` Application is an *app-of-apps*: it is an Application whose
+job is to create other Applications. Open it and you will find ten of them,
+each one a component of the platform. This is the same structure the bare-metal
+cluster uses, where the equivalent root manages thirty-eight.
+
+From the terminal:
+
+```console
+$ make explore-status
+APPLICATION         SYNC     HEALTH
+app-demo            Synced   Healthy
+explore-resources   Synced   Healthy
+explore-root        Synced   Healthy
+gateway-api         Synced   Healthy
+...
+```
+
+### 2. Break something and watch it heal
+
+This is the part of GitOps that is hard to appreciate from a diagram. Scale the
+demo app by hand:
+
+```console
+$ kubectl -n app-demo scale deploy demo --replicas=3
+$ kubectl -n app-demo get deploy demo -w
+```
+
+Within about ten seconds it is back to one replica. Nobody ran a script; Argo CD
+noticed that the cluster no longer matched Git and corrected it. `selfHeal: true`
+is set on every Application in this repository, which is why a manual `kubectl
+edit` on the real cluster is a temporary opinion rather than a change.
+
+### 3. Follow a request through the Gateway API
+
+The demo app is not port-forwarded. It is reached the way the production apps
+are: a `Gateway` that Istio implements, and an `HTTPRoute` that attaches to it.
+
+```console
+$ curl -s http://demo.127-0-0-1.sslip.io | head -4
+$ kubectl -n istio-system get gateway gateway-explore
+$ kubectl -n app-demo get httproute demo -o jsonpath='{.status.parents[0].conditions[*].type}'
+Accepted ResolvedRefs
+```
+
+`Accepted` means the gateway agreed to serve this route. It can refuse: gateways
+in this repository admit routes by namespace label, so a route in a namespace
+without `kensan-lab.platform/environment` comes back `NotAllowedByListeners`.
+That is a deliberate guardrail — a new application cannot publish itself on the
+platform's hostname by accident.
+
+### 4. Watch the policy engine catch you
+
+All six production policies are running, in Audit: they report rather than
+block. Start with what is already there:
+
+```console
+$ kubectl -n app-demo get policyreport \
+    -o custom-columns=PASS:.summary.pass,FAIL:.summary.fail
+PASS   FAIL
+5      0
+```
+
+The demo app passes all five policies that apply to application namespaces —
+not because it was written carefully, but because `charts/app-base` sets the
+security context, and the values file supplies resource requests. Compare with
+the cluster's own components:
+
+```console
+$ kubectl -n kube-system get policyreport -o json \
+    | jq -r '.items[].results[] | select(.result=="fail") | .policy' | sort -u
+pss-baseline
+```
+
+kind's control plane uses host namespaces and non-default capabilities, so it
+fails the baseline. The engine is genuinely evaluating, not decorating.
+
+Now break a rule on purpose:
+
+```console
+$ kubectl -n app-demo run oops --image=nginx:latest --restart=Never
+$ sleep 70
+$ kubectl -n app-demo get policyreport -o json \
+    | jq -r '.items[].results[] | select(.result=="fail") | "\(.policy): \(.message)"'
+disallow-latest-tag: validation error: ':latest' tag は禁止です …
+require-requests: validation error: 全 container に resources.requests.cpu / memory が必要です …
+```
+
+Two policies caught it: the image has a mutable tag, and the pod declares no
+resource requests. Nothing was blocked — Audit is the current stage of
+[ADR-012](../adr/012-policy-enforcement-kyverno.md), and promoting these to
+Enforce is a deliberate later step. Clean up with
+`kubectl -n app-demo delete pod oops`.
+
+**Why a minute, and not instantly?** Bare metal scans once an hour and writes
+no admission reports, because the etcd write amplification would land on a
+microSD card. kind has neither, so the explore layer shortens the interval to
+one minute — the only Kyverno setting that differs between the two.
+
+### 5. Claim a volume
+
+Every PVC in this repository asks for `storageClassName: longhorn`, including
+the default in `charts/app-base`. There is a StorageClass called `longhorn`
+here, and it is not Longhorn:
+
+```console
+$ kubectl get storageclass
+NAME                 PROVISIONER             VOLUMEBINDINGMODE
+longhorn (default)   rancher.io/local-path   WaitForFirstConsumer
+standard             rancher.io/local-path   WaitForFirstConsumer
+```
+
+Borrowing the name is the entire trick: manifests written for the real cluster
+bind here without being edited. Try it:
+
+```console
+$ kubectl -n app-demo create -f - <<'EOF'
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata: { name: scratch }
+spec:
+  accessModes: ["ReadWriteOnce"]
+  storageClassName: longhorn
+  resources: { requests: { storage: 1Gi } }
+EOF
+$ kubectl -n app-demo get pvc scratch
+NAME      STATUS    CAPACITY   STORAGECLASS
+scratch   Pending              longhorn
+```
+
+`Pending` is correct, not broken. `WaitForFirstConsumer` holds provisioning
+until a pod actually needs the volume, so the volume lands on the node the pod
+was scheduled to. Give it a consumer and it binds in a few seconds. What you do
+*not* get is replication, snapshots or expansion — see below.
+
+### 6. See how Istio got onto the network
+
+Istio's CNI plugin does not replace the cluster's networking; it appends itself
+to whatever is already there. On kind that is kindnet:
+
+```console
+$ docker exec kensan-lab-explore-control-plane \
+    cat /etc/cni/net.d/10-kindnet.conflist | jq -r '[.plugins[].type] | join(" ")'
+ptp portmap istio-cni
+```
+
+`istio-cni` last, kindnet's own plugins untouched. On bare metal the same
+setting chains it onto Cilium instead. Getting this wrong — taking the chain
+over rather than joining it — cuts a node off from its own control plane, so
+CI asserts this exact output on every pull request.
+
 ## How it is put together
 
-The explore layer is a **subset with substitutions**, not a fork. Every
-component it runs is the same Application file the bare-metal cluster runs,
-pointed at the same chart version and the same values.
+A **subset with substitutions**, not a fork. Every component runs the same
+Application definition, chart version and values file as bare metal; the
+explore layer adds a second Argo CD root beside the production one rather than
+copying the tree.
 
 Two things differ, and both are contained in `environments/kind/`:
 
-- **What is left out.** No Cilium, Vault, Keycloak, Longhorn, cert-manager,
-  Cloudflare Tunnel, or observability stack. Those either need hardware, need
-  credentials you do not have, or would push the ten minutes out to thirty.
-- **What is swapped.** The Cilium L2 load balancer becomes a kind port mapping;
-  Longhorn becomes kind's local-path provisioner wearing the name `longhorn`, so
-  that the repository's PVCs bind unmodified; the wildcard TLS certificate
-  becomes plain HTTP.
+**What is left out.** No Cilium, Vault, Keycloak, Longhorn, cert-manager,
+Cloudflare Tunnel or observability stack. Those need hardware, need credentials
+you do not have, or would turn three minutes into thirty.
 
-The substitutions live in exactly two files, `resources/gateway-explore.yaml`
-and `resources/storageclass-longhorn.yaml`, and both are meant to be deleted
-later — see [the maintenance
-notes](https://github.com/yu-min3/kensan-lab/blob/main/environments/kind/README.md).
+**What is swapped.** Four files. The Cilium L2 load balancer becomes a kind port
+mapping; Longhorn becomes local-path wearing the name `longhorn`; the real
+domain and its wildcard certificate become `*.127-0-0-1.sslip.io` over plain
+HTTP. Two of the four exist only because a hostname is hardcoded in a raw
+manifest, and are scheduled for deletion.
 
 Every pull request that touches `kubernetes/`, `charts/` or `environments/`
 stands this cluster up in CI and fails if the platform stops coming up. That is
-the real reason the layer exists: it makes "still reproducible from scratch" a
-property CI checks rather than a claim in a README.
+the real reason the layer exists: it turns "still reproducible from scratch"
+from a claim in a README into something a build checks.
+
+The maintenance contract — what is safe to change, what is deliberately
+different, and what gets removed later — is in
+[`environments/kind/README.md`](https://github.com/yu-min3/kensan-lab/blob/main/environments/kind/README.md).
 
 ## What kind cannot show
 
-These are not gaps waiting to be filled. Each one is impossible in a way worth
+These are not gaps waiting to be filled. Each is impossible in a way worth
 being precise about, and each is a reason the bare-metal cluster is where the
 interesting parts live.
 
 **The load balancer.** Cilium announces a virtual IP by answering ARP on the
 LAN. kind's nodes are containers on a Docker bridge; there is no physical
-segment to announce into and no other machine that could ask. The substitute is
-a port mapping, which gets traffic to the gateway but cannot show you a VIP
-failing over between nodes.
+segment to announce into and no other machine that could ask. The port mapping
+gets traffic to the gateway, but cannot show a VIP failing over between nodes.
 
 **Single sign-on.** Keycloak, oauth2-proxy and the `ext_authz` chain need an
-issuer with a resolvable public hostname and a set of client secrets. Phase 3
-of [the plan](https://github.com/yu-min3/kensan-lab) brings a dev-mode Vault and
-a realm import to kind; today the Argo CD you get here uses its local admin
-account.
+issuer with a resolvable public hostname and a set of client secrets. The Argo
+CD here uses its local admin account; a dev-mode Vault and a realm import are a
+later phase.
 
 **The root of trust for secrets.** This one cannot be solved by more work. The
 sealed secrets in this repository are encrypted to *our* controller's key and
 are useless to anyone else. Vault's unseal keys and root token come into
-existence during `vault operator init` and are never written down anywhere they
-could be committed. Generating them from Terraform would only move the secret
+existence during `vault operator init` and are never written anywhere they
+could be committed; generating them from Terraform would only move the secret
 into Terraform state. The irreducible part of bootstrapping a platform is that
 somebody has to run a script and keep what it prints.
 
 **Trusted certificates.** The real gateway terminates TLS with a wildcard
 certificate issued through a DNS-01 challenge against a domain we own. A fork
-has neither. Phase 2 will add a self-signed issuer and let the browser warn you,
-because the alternative — `mkcert` rewriting your system trust store — is more
+has neither. A self-signed issuer is a later phase, and the browser warning
+stays — the alternative, `mkcert` rewriting your system trust store, is more
 than a one-command demo should do to your laptop.
 
 **Anything about failure.** One node cannot rebuild a Longhorn replica, cannot
-be drained, and cannot lose an L2 lease. The explore cluster shows you how the
-platform is *composed*. How it *behaves* is the bare-metal cluster's story, and
-it is told in [the incident
+be drained, and cannot lose an L2 lease. This cluster shows how the platform is
+*composed*; how it *behaves* is told in the [incident
 notes](https://github.com/yu-min3/kensan-lab/tree/main/docs/incidents).
+
+**The service mesh data plane.** Istio is installed and the gateway is one of
+its proxies, but no workload here runs a sidecar — production injects them into
+the platform namespaces (Vault, Keycloak, oauth2-proxy), none of which explore
+runs. Application namespaces have no sidecar on bare metal either, so the demo
+app having a single container is faithful rather than broken.
 
 **Multiple architectures.** kind's nodes are all your host's architecture, so
 the arm64/amd64 split the real cluster schedules around cannot be reproduced.
-The applications themselves are built for both, so this is not why they are
-absent — Backstage is the one image that is amd64-only, and on Apple Silicon it
-would emulate, slowly.
+The applications are built for both, so that is not why they are absent — their
+images are private and pulled through Vault-backed credentials.
 
 ## Troubleshooting
 
-**A pod is Pending with insufficient memory.** Docker has less RAM than it
-needs. Raise it to 6 GiB or more and run `make explore-down && make try`.
+**A pod is Pending and the node looks full.** Docker has less memory than it
+needs. Raise it to 6 GiB or more, then `make explore-down && make try`.
 
-**Ports 80 or 443 are in use.** Find the process with
-`sudo lsof -nP -iTCP:80 -sTCP:LISTEN`. A previous explore cluster is the usual
-culprit — `make explore-down` clears it.
-
-**The demo app has one container, not two.** That is correct: no namespace in
-the slice enables sidecar injection, the same as the real cluster's application
-namespaces. The mesh is present — the gateway is an Istio proxy and traffic
-reaches the app through it — but no workload joins the data plane here.
-Injection in production applies to the platform namespaces (Vault, Keycloak,
-oauth2-proxy), none of which explore runs.
-
-**Checking that istio-cni chained correctly.** It appends itself to kindnet's
-config rather than replacing it, which is why `cni.exclusive` is pinned off in
-`environments/kind/values/istio-cni.yaml`. The plugin list should end with
-`istio-cni`:
-
-```console
-$ docker exec kensan-lab-explore-control-plane \
-    sh -c 'cat /etc/cni/net.d/10-kindnet.conflist' | grep '"type"'
-```
+**Ports 80 or 443 are in use.** Find the process with `sudo lsof -nP -iTCP:80
+-sTCP:LISTEN`. A previous explore cluster is the usual culprit — `make
+explore-down` clears it.
 
 **An Application will not go Healthy.** `explore-up.sh` prints which one it is
-waiting for. Then:
+waiting for. Most components pass through `Degraded` on the way up and settle by
+themselves: sync waves order Application *creation*, not readiness, so the
+convergence relies on Argo CD's retry. If one is still stuck after a few
+minutes:
 
 ```console
 $ kubectl -n argocd describe application <name>
 ```
 
-**The demo app returns 404.** The route was rejected by the listener. Gateways
-in this repository admit routes by namespace label, so a namespace without
-`kensan-lab.platform/environment` gets `NotAllowedByListeners`:
+**The demo app returns 404.** The route was rejected by the listener; see
+exercise 3.
 
 ```console
 $ kubectl -n app-demo get httproute demo -o jsonpath='{.status.parents}' | jq
 ```
 
-**Everything is healthy but nothing loads in the browser.** DNS. Check that
-`demo.127-0-0-1.sslip.io` resolves; if not, use the `/etc/hosts` fallback above.
+**Everything is healthy but the browser shows nothing.** DNS. Check that
+`demo.127-0-0-1.sslip.io` resolves, and use the `/etc/hosts` fallback above if
+it does not.
+
+**`make try` fails on a Kubernetes version you did not choose.** The node image
+follows your kind release. If a newer Kubernetes than this repository targets
+breaks a chart, install the kind version pinned in
+`environments/kind/kind-cluster.yaml`.
 
 ## Where to go next
 
 - [Infrastructure overview](../architecture/infrastructure.md) — what the real
-  cluster is made of
+  cluster is made of, and what the eight components you just ran do there
 - [Argo CD architecture](../architecture/argocd.md) — the app-of-apps structure
-  you just watched sync
+  you watched sync, at production scale
 - [ADR-012: policy enforcement with Kyverno](../adr/012-policy-enforcement-kyverno.md)
-  — why those policies are in Audit and what promoting them means
+  — why those policies are in Audit and what promoting them costs
+- [Network architecture](../architecture/network.md) — Cilium, the L2 load
+  balancer, and the Istio setup this cluster only half reproduces
