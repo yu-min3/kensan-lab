@@ -1,0 +1,18 @@
+# ADR-006: one namespace per application, named app-{name}, carrying the
+# prefixed three-axis labels the platform selects on.
+#
+# The environment label is not decoration: gateway-prod admits routes by
+# namespace selector, so an HTTPRoute in a namespace without it comes back
+# NotAllowedByListeners.
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: app-${{ values.name }}
+  labels:
+    kensan-lab.platform/environment: production
+    kensan-lab.platform/team: ${{ values.owner }}
+    kensan-lab.platform/app: ${{ values.name }}
+    kensan-lab.platform/tier: application
+    # Declares which Kyverno pod-security policy applies (ADR-012).
+    kensan-lab.platform/pss-level: restricted
+    pod-security.kubernetes.io/enforce: restricted

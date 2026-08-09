@@ -18,11 +18,17 @@ on:
   pull_request:
     paths:
       - "backstage/**"
+      # Scaffolder templates are data the portal serves, not code it is built
+      # from: changing one cannot break the build, and rebuilding the whole
+      # portal to find that out costs three minutes per edit. Template CI
+      # covers them instead, by scaffolding and running the result.
+      - "!backstage/templates/**"
       - ".github/workflows/backstage-ci.yml"
   push:
     branches: [main]
     paths:
       - "backstage/**"
+      - "!backstage/templates/**"
       - ".github/workflows/backstage-ci.yml"
   workflow_dispatch:
     inputs:

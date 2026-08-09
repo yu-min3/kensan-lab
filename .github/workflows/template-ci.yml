@@ -1,0 +1,132 @@
+## Golden path CI — build what the scaffolder hands a developer, and run it.
+##
+## The template shipped for months with two defects that made it impossible to
+## get a scaffolded service off the ground: the Dockerfile copied a `uv.lock`
+## that was not in the skeleton, and it built the virtualenv under a different
+## prefix than the runtime image, so every console script carried a shebang
+## pointing at an interpreter that did not exist. Neither is visible by reading
+## the files; both appear on the first `docker build`.
+##
+## Nothing had ever built the skeleton. This does, on every change to it.
+name: Template CI
+
+on:
+  pull_request:
+    paths:
+      - "backstage/templates/**"
+      - "charts/app-base/**"
+      - ".github/workflows/template-ci.yml"
+  push:
+    branches: [main]
+    paths:
+      - "backstage/templates/**"
+      - "charts/app-base/**"
+      - ".github/workflows/template-ci.yml"
+
+concurrency:
+  group: template-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  SKELETON: backstage/templates/fastapi-template/skeleton
+
+jobs:
+  scaffold:
+    name: scaffold, build, run
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      # The scaffolder substitutes these; here they are filled in with sample
+      # values so the skeleton can be treated as a real project.
+      #
+      # Done in Python rather than sed on purpose: Backstage's placeholders and
+      # GitHub Actions expressions are the same syntax, so writing the literal
+      # sequence anywhere in a `run:` block makes Actions try to evaluate
+      # `values.name` as one of its own contexts and the workflow stops parsing.
+      # The escaped regex below never contains that sequence.
+      - name: Fill in the template variables
+        run: |
+          cp -r "${SKELETON}" /tmp/scaffolded
+          python3 - <<'PY'
+          import pathlib, re
+          # What the scaffolder would fill in, for a service called sample-api.
+          sample = {
+              "name": "sample-api",
+              "description": "Sample FastAPI service",
+              "repoOwner": "yu-min3",
+              "repoName": "app-sample-api",
+              "owner": "platform-engineering",
+              "system": "developer-portal",
+              "domain": "platform",
+          }
+          pattern = re.compile(r"\$\{\{\s*values\.(\w+)\s*\}\}")
+          root = pathlib.Path("/tmp/scaffolded")
+          missing = set()
+
+          def fill(match):
+              key = match.group(1)
+              if key not in sample:
+                  missing.add(key)
+                  return match.group(0)
+              return sample[key]
+
+          for path in sorted(root.rglob("*")):
+              if not path.is_file():
+                  continue
+              try:
+                  text = path.read_text()
+              except UnicodeDecodeError:
+                  continue
+              filled = pattern.sub(fill, text)
+              if filled != text:
+                  path.write_text(filled)
+
+          # A placeholder this job does not know about means the template grew a
+          # parameter and nothing here exercises it.
+          assert not missing, f"template uses parameters this job does not supply: {sorted(missing)}"
+          PY
+
+      # What a developer gets must render through the platform's chart with no
+      # edits. A values file that has drifted from charts/app-base fails here
+      # rather than on somebody's first deploy.
+      - name: Render through charts/app-base
+        run: |
+          helm template sample-api charts/app-base -f /tmp/scaffolded/deploy/values.yaml > /tmp/rendered.yaml
+          grep -q 'kind: Deployment' /tmp/rendered.yaml
+          grep -q 'kind: HTTPRoute' /tmp/rendered.yaml
+          # The image declares a named USER, so the values must pin the numeric
+          # UID or the kubelet refuses to start the container under
+          # runAsNonRoot. Cheap to assert, expensive to debug on a cluster.
+          grep -q 'runAsUser: 1000' /tmp/rendered.yaml
+          # gateway-prod protects every hostname it serves (ADR-021), so a
+          # service published on it without the /oauth2 route sends people to
+          # Keycloak and then 404s the callback. The failure looks like a broken
+          # login rather than a missing route, so assert the route exists.
+          grep -q 'sample-api-oauth2' /tmp/rendered.yaml
+
+      - name: Build the image
+        run: docker build -t sample-api:ci /tmp/scaffolded
+
+      # Building is not enough: both defects this job exists for produced an
+      # image that built and then exited immediately.
+      - name: Run it and check the endpoints
+        run: |
+          docker run -d --name sample-api -p 8000:8000 sample-api:ci
+          for i in $(seq 1 30); do
+            if curl -fsS -m 2 http://127.0.0.1:8000/health >/dev/null 2>&1; then
+              echo "healthy after ${i}s"
+              break
+            fi
+            sleep 1
+          done
+          curl -fsS -m 5 http://127.0.0.1:8000/health
+          curl -fsS -m 5 -o /dev/null http://127.0.0.1:8000/metrics
+          curl -fsS -m 5 -o /dev/null http://127.0.0.1:8000/
+          # charts/app-base runs it as UID 1000; the image must agree.
+          test "$(docker exec sample-api id -u)" = "1000"
+
+      - name: Container logs
+        if: failure()
+        run: docker logs sample-api 2>&1 | tail -40

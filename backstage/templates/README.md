@@ -17,11 +17,12 @@ Location: `fastapi-template/`
 
 A production-ready FastAPI application template with:
 - **Modern Python tooling**: uv (fast package manager) + ruff (linter/formatter)
-- Kustomize-based deployment (base + dev/prod overlays)
-- Prometheus metrics endpoint
+- **Deployment through `charts/app-base`** — the platform's chart, driven by one
+  values file, rather than hand-written Deployment / Service / HTTPRoute
+- Per-app namespace with the ADR-006 label contract
+- Prometheus metrics endpoint and a ServiceMonitor
 - Health check endpoints
-- Istio integration (HTTPRoute, AuthorizationPolicy)
-- Automatic Argo CD Application CR generation
+- Automatic Argo CD Application generation
 - GitHub Actions CI/CD pipeline (lint, test, build)
 - Backstage TechDocs support
 - Sample tests with pytest
@@ -65,17 +66,15 @@ catalog:
 ### 3. Automatic GitOps Setup
 
 Backstage will automatically:
-- Create a new GitHub repository (`app-<name>`)
-- Generate Kustomize manifests (base + dev/prod overlays)
-- Create Argo CD Application CRs for both environments
-- Commit Application CRs to `kensan-lab` repository
-- Register the app in Backstage catalog
+- Create a new GitHub repository
+- Generate `deploy/values.yaml` for `charts/app-base` and the namespace it needs
+- Open a pull request against `kensan-lab` adding the Argo CD Application
+- Register the app in the Backstage catalog
 
 ### 4. Deploy Your Application
 
-The application will be automatically deployed by Argo CD:
-- **Dev environment**: `app-dev` namespace
-- **Prod environment**: `app-prod` namespace
+Argo CD deploys the application into its own namespace, `app-<name>`, once the
+platform pull request is merged (ADR-006: one namespace per application).
 
 ## Template Structure
 
@@ -85,17 +84,20 @@ fastapi-template/
 ├── catalog-info.yaml          # Backstage catalog entry
 └── skeleton/                  # Template files
     ├── app/                   # Application code
-    ├── base/                  # Kustomize base manifests
-    ├── overlays/              # Environment-specific configs
-    │   ├── dev/
-    │   └── prod/
+    ├── deploy/
+    │   ├── values.yaml        # charts/app-base の values（唯一の設定面）
+    │   └── resources/         # namespace / ServiceMonitor（app が所有）
     ├── docs/                  # TechDocs
-    ├── .backstage/            # Argo CD Application CRs
-    ├── .github/workflows/     # CI/CD pipelines
+    ├── .backstage/            # Argo CD Application（platform へ PR される）
+    ├── .github/workflows/     # CI/CD
     ├── Dockerfile
-    ├── requirements.txt
+    ├── pyproject.toml
     └── catalog-info.yaml
 ```
+
+**手書きの Deployment / Service / HTTPRoute はありません。** それらは
+`charts/app-base` が `deploy/values.yaml` から生成します。アプリが所有するのは
+「自分の namespace」と「自分が何を公開するか」だけです。
 
 ## Development Workflow
 

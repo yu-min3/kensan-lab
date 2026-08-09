@@ -1,0 +1,19 @@
+# Prometheus scrape target. Not part of charts/app-base: what an application
+# exposes and how often it is scraped is the application's decision, so it stays
+# here rather than becoming a chart value.
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: ${{ values.name }}
+  namespace: app-${{ values.name }}
+  labels:
+    app.kubernetes.io/name: ${{ values.name }}
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: ${{ values.name }}
+  endpoints:
+    - port: http
+      path: /metrics
+      interval: 30s
+      scrapeTimeout: 10s

@@ -73,11 +73,17 @@ httproute:
     name: gateway-prod
     namespace: istio-system
 
-# gateway 層 OAuth2（oauth2-proxy ext_authz、Keycloak SSO）。
-# 有効化には PE 側の 3 点セットが必要:
-#   1. AuthorizationPolicy（gateway-prod-oauth2-authz）の hosts に host 追加
-#   2. auth-system の ReferenceGrant に ns 追加
-#   3. bootstrap/keycloak/setup.sh の GATEWAY_PROTECTED_HOSTS に host 追加 + 再実行
+# gateway 層 OAuth2（oauth2-proxy ext_authz、Keycloak SSO）の /oauth2/* ルート。
+#
+# ADR-021 で gateway-prod は opt-in 列挙からデフォルト保護へ反転したので、
+# **これを false にしても host は保護される**。false のとき失われるのは
+# callback を受けるルートだけで、症状は「Keycloak へ飛ぶが 404 で戻れない」
+# になる。gateway-prod に HTTPRoute を生やすなら true が既定と考えてよい。
+#
+# 残る PE 側の 2 点（chart からは自動化できない）:
+#   1. auth-system の ReferenceGrant（allow-app-oauth2-routes）に ns 追加
+#   2. bootstrap/keycloak/setup.sh の GATEWAY_PROTECTED_HOSTS に host 追加 + 再実行
+#      （漏らすと redirect_uri エラー。PR #394 → #396 の教訓）
 auth:
   gatewayOAuth2:
     enabled: false
