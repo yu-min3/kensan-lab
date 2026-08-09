@@ -1,0 +1,6 @@
+# Overridden by explore-root-app.yaml (helm.parameters) so that every child
+# Application follows the same revision as the root. CI passes the pull request
+# SHA here; without it the children would silently sync `main` and the run would
+# prove nothing about the change under review.
+repoURL: https://github.com/yu-min3/kensan-lab
+targetRevision: main

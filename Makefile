@@ -13,11 +13,23 @@ ASSETS        := docs/assets
 DIAGRAM       := platform-architecture
 THEME         := python3 scripts/diagram-theme.py
 
-.PHONY: help diagrams diagrams-verify
+.PHONY: help diagrams diagrams-verify try explore-up explore-down explore-status
 
 help: ## list the available targets
 	@grep -hE '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) \
 		| awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-16s\033[0m %s\n", $$1, $$2}'
+
+try: ## run this platform on your laptop in a kind cluster (needs docker)
+	@scripts/explore-up.sh $(ARGS)
+
+explore-up: try ## alias for `make try`
+
+explore-down: ## delete the kind cluster (add ARGS=--prune-images to reclaim disk)
+	@scripts/explore-down.sh $(ARGS)
+
+explore-status: ## show what the kind cluster is currently running
+	@kubectl --context kind-kensan-lab-explore -n argocd get applications.argoproj.io \
+		-o custom-columns=APPLICATION:.metadata.name,SYNC:.status.sync.status,HEALTH:.status.health.status
 
 diagrams: ## regenerate the light diagram and export both PNGs (needs docker)
 	$(THEME) generate $(ASSETS)/$(DIAGRAM)-dark.drawio $(ASSETS)/$(DIAGRAM)-light.drawio

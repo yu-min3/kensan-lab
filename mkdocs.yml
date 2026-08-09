@@ -153,6 +153,7 @@ nav:
   - Home: index.md
   - Showcase: showcase.md
   - Getting Started:
+      - Try it with kind: getting-started/try-it-with-kind.md
       - Prerequisites: getting-started/installation.md
       - Configuration: getting-started/configuration.md
       - Bootstrapping:

@@ -1,0 +1,46 @@
+## The explore root — the app-of-apps entrypoint for the kind cluster.
+##
+## Deliberately NOT under kubernetes/argocd/applications/: platform-root syncs
+## that directory with recurse: true, so anything left there lands on the real
+## cluster. This separation is a hard requirement, not a preference.
+##
+## repoURL and targetRevision appear twice: once for Argo CD to find this chart,
+## and once as helm parameters so every child Application follows the same
+## revision. scripts/explore-up.sh rewrites both when --repo/--rev are given,
+## which is how CI points a whole cluster at a pull request SHA instead of main.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: explore-root
+  namespace: argocd
+spec:
+  project: platform-project
+
+  source:
+    repoURL: https://github.com/yu-min3/kensan-lab
+    targetRevision: main
+    path: environments/kind/applications
+    helm:
+      releaseName: explore
+      parameters:
+        - name: repoURL
+          value: https://github.com/yu-min3/kensan-lab
+        - name: targetRevision
+          value: main
+
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: argocd
+
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=false
+    retry:
+      limit: 5
+      backoff:
+        duration: 5s
+        factor: 2
+        maxDuration: 3m

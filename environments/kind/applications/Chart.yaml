@@ -1,0 +1,12 @@
+apiVersion: v2
+name: explore-applications
+description: >-
+  Argo CD Application set for the kind explore layer. Rendered by
+  environments/kind/explore-root-app.yaml, which passes repoURL and
+  targetRevision so CI can point a whole cluster at a pull request SHA.
+  Every template mirrors a bare-metal Application and records which one in the
+  `kensan-lab.platform/mirrors` annotation; scripts/validate_argocd_apps.py
+  fails the build when a mirrored chart version drifts.
+type: application
+version: 0.1.0
+appVersion: "0.1.0"

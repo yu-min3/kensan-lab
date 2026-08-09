@@ -1,0 +1,31 @@
+## istio-system namespace only.
+##
+## On bare metal this namespace ships inside the `istio-resources` Application
+## together with the production Gateways, AuthorizationPolicies and
+## RequestAuthentications — all of which hardcode the real domain and the
+## Keycloak issuer, so explore cannot take that Application as a whole.
+## Pointing at the same directory with `include` reuses the namespace manifest
+## (ADR-006 labels and all) without copying it, and leaves the site-specific
+## siblings behind.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: istio-namespace
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "-4"
+    kensan-lab.platform/mirrors: kubernetes/argocd/applications/network/istio-resources/app.yaml
+spec:
+  project: platform-project
+  source:
+    repoURL: {{ .Values.repoURL }}
+    targetRevision: {{ .Values.targetRevision }}
+    path: kubernetes/network/istio
+    directory:
+      ## recurse and include are stated together on purpose: a directory block
+      ## holding only zero values is dropped from the live object and the
+      ## Application never leaves OutOfSync (PR #382 -> #383).
+      recurse: false
+      include: '00-namespace.yaml'
+  {{- include "explore.destination" (dict "namespace" "istio-system") | nindent 2 }}
+  {{- include "explore.syncPolicy" . | nindent 2 }}

@@ -1,0 +1,125 @@
+## Explore CI — stand the platform up on kind and prove it still serves traffic.
+##
+## The point is not to test kind. It is to notice when a change to the real
+## cluster stops being reproducible: a chart bump that needs a node label we
+## only have on bare metal, a manifest that grows a dependency on Cilium, a
+## values file that assumes Vault. Those show up here as a red build on the pull
+## request that caused them, which is the only moment they are cheap to fix.
+##
+## When this job fails, the first question is "is the production change still
+## reproducible?" — not "how do I make explore green again".
+## See environments/kind/README.md#maintenance.
+name: Explore CI
+
+on:
+  pull_request:
+    paths:
+      - "kubernetes/**"
+      - "charts/**"
+      - "environments/**"
+      - "scripts/explore-up.sh"
+      - "scripts/explore-down.sh"
+      - ".github/workflows/explore-ci.yml"
+  push:
+    branches: [main]
+    paths:
+      - "kubernetes/**"
+      - "charts/**"
+      - "environments/**"
+      - "scripts/explore-up.sh"
+      - "scripts/explore-down.sh"
+      - ".github/workflows/explore-ci.yml"
+
+# A second run of the same branch replaces the first: two kind clusters pulling
+# the same images gains nothing and the job is the slowest one in the repo.
+concurrency:
+  group: explore-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  kind:
+    name: kind (10-minute path)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install kind
+        uses: helm/kind-action@v1
+        with:
+          # The cluster is created by explore-up.sh from environments/kind/,
+          # so the action is here only to put the binary on PATH.
+          install_only: true
+
+      # Argo CD pulls manifests over HTTPS from GitHub, so it syncs the pushed
+      # commit rather than the checkout. `main` on a push, the head commit on a
+      # pull request — otherwise a green run would be proving main, not the
+      # change under review.
+      #
+      # Pull requests from forks are not covered: the head commit lives in the
+      # fork and Argo CD would not find it on this repository.
+      - name: Bring up the explore cluster
+        run: |
+          scripts/explore-up.sh \
+            --rev "${{ github.event.pull_request.head.sha || github.sha }}" \
+            --repo "${{ github.server_url }}/${{ github.repository }}"
+
+      # explore-up.sh already asserts every Application is Synced/Healthy and
+      # that the demo app answers 200 through the gateway. What is left is the
+      # substitution layer, which nothing else would notice if it silently
+      # stopped working.
+      - name: Check the storage substitution
+        run: |
+          default_sc="$(kubectl get storageclass \
+            -o jsonpath='{range .items[?(@.metadata.annotations.storageclass\.kubernetes\.io/is-default-class=="true")]}{.metadata.name}{"\n"}{end}')"
+          if [ "$default_sc" != "longhorn" ]; then
+            echo "expected 'longhorn' to be the only default StorageClass, got: ${default_sc:-none}" >&2
+            kubectl get storageclass
+            exit 1
+          fi
+
+      # The values file pins `cni.exclusive: false` so that istio-cni appends
+      # itself to kindnet's config instead of taking the node over. Nothing else
+      # would notice if that stopped working: the DaemonSet stays Healthy, and no
+      # workload in this slice is injected, so the chain is only observable in
+      # the node's own CNI config.
+      - name: Check that istio-cni chained onto kindnet
+        run: |
+          conflist="$(docker exec kensan-lab-explore-control-plane \
+            cat /etc/cni/net.d/10-kindnet.conflist)"
+          types="$(echo "$conflist" | jq -r '[.plugins[].type] | join(" ")')"
+          echo "CNI chain: ${types}"
+          case " ${types} " in
+            *" istio-cni "*) ;;
+            *) echo "istio-cni is not in the CNI chain" >&2; exit 1 ;;
+          esac
+          if [ "$(echo "$conflist" | jq -r '.plugins[0].type')" = "istio-cni" ]; then
+            echo "istio-cni took the chain over instead of appending to it" >&2
+            exit 1
+          fi
+
+      - name: Check that Kyverno is actually evaluating policies
+        run: |
+          # Audit mode means violations never block a sync, so an engine that
+          # quietly stopped reporting would look exactly like a clean cluster.
+          # Requiring at least one PolicyReport distinguishes the two.
+          kubectl get clusterpolicy
+          reports="$(kubectl get policyreport -A --no-headers 2>/dev/null | wc -l)"
+          echo "PolicyReports: ${reports}"
+          [ "$reports" -gt 0 ]
+
+      - name: Collect diagnostics
+        if: failure()
+        run: |
+          kubectl get applications -n argocd -o wide || true
+          kubectl get pods -A -o wide || true
+          kubectl get events -A --sort-by=.lastTimestamp | tail -50 || true
+          kubectl -n istio-system get gateway,httproute,svc || true
+          for app in $(kubectl -n argocd get applications -o name 2>/dev/null); do
+            echo "----- $app"
+            kubectl -n argocd get "$app" -o jsonpath='{.status.conditions}{"\n"}' || true
+          done
+
+      - name: Tear down
+        if: always()
+        run: scripts/explore-down.sh

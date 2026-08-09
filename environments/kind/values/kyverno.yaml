@@ -1,0 +1,18 @@
+# Layered on top of kubernetes/policy/kyverno/values.yaml.
+# Chart config: environments/kind/applications/templates/kyverno.yaml
+#
+# One value, and only because the production setting exists for a reason that
+# does not apply here.
+#
+# Bare metal scans once an hour and writes no admission reports, to spare the
+# microSD card the etcd write amplification would land on. A kind cluster has
+# neither a microSD card nor a Raspberry Pi, and an engine whose verdict takes
+# an hour to appear is one nobody can see working: the quickstart asks people
+# to deploy something non-compliant and watch the report change, which is the
+# whole point of shipping the production policy set rather than describing it.
+#
+# The policies themselves — all six, all in Audit per ADR-012 — are unchanged.
+
+features:
+  backgroundScan:
+    backgroundScanInterval: 1m

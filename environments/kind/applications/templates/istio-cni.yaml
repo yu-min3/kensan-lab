@@ -1,0 +1,26 @@
+## Istio CNI — the bare-metal values chained onto Cilium; here they chain onto
+## kindnet instead, which is why values/istio-cni.yaml is layered on top.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: istio-cni
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "-2"
+    kensan-lab.platform/mirrors: kubernetes/argocd/applications/network/istio-cni/app.yaml
+spec:
+  project: platform-project
+  sources:
+    - repoURL: https://istio-release.storage.googleapis.com/charts
+      chart: cni
+      targetRevision: 1.27.3
+      helm:
+        releaseName: istio-cni
+        valueFiles:
+          - $values/kubernetes/network/istio/cni/values.yaml
+          - $values/environments/kind/values/istio-cni.yaml
+    - repoURL: {{ .Values.repoURL }}
+      targetRevision: {{ .Values.targetRevision }}
+      ref: values
+  {{- include "explore.destination" (dict "namespace" "istio-system") | nindent 2 }}
+  {{- include "explore.syncPolicy" . | nindent 2 }}

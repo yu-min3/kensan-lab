@@ -1,0 +1,21 @@
+# Layered on top of kubernetes/argocd/values.yaml by scripts/explore-up.sh.
+# Argo CD is the one component installed with helm rather than by an
+# Application, because it has to exist before anything can be synced.
+#
+# Only two things are overridden, and both are site identity rather than
+# behaviour: the external URL, and the Keycloak OIDC block. The OIDC config
+# points at a Keycloak realm that does not exist here and dereferences
+# `$argocd-oidc-secret:client-secret`, a Secret that Vault would have populated;
+# left in place, argocd-server logs a resolution error on every start. Blanking
+# it turns SSO off and leaves the local admin account, which is what the
+# quickstart prints.
+#
+# Everything else — server.insecure, the repo-server probe timeouts, the
+# ignoreDifferences customisations — is inherited on purpose. Those are the
+# settings that took a runbook to arrive at, and explore should run the same
+# ones so a fork inherits them too.
+
+configs:
+  cm:
+    url: "http://argocd.127-0-0-1.sslip.io"
+    oidc.config: ""

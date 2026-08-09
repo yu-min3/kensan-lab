@@ -1,0 +1,73 @@
+## Kyverno namespace, engine and policies.
+##
+## Resource sizing is inherited untouched: the production values are already
+## sized for a Raspberry Pi 5 (single replicas, background and cleanup
+## controllers off, 100m/128Mi requests), so a laptop or a 4 vCPU runner is a
+## larger host than the real one. The only override is the report scan interval
+## — see environments/kind/values/kyverno.yaml for why.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: kyverno-namespace
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "-4"
+    kensan-lab.platform/mirrors: kubernetes/argocd/applications/namespaces/kyverno/app.yaml
+spec:
+  project: platform-project
+  source:
+    repoURL: {{ .Values.repoURL }}
+    targetRevision: {{ .Values.targetRevision }}
+    path: kubernetes/policy
+    directory:
+      recurse: false
+      include: 'namespace.yaml'
+  {{- include "explore.destination" (dict "namespace" "kyverno") | nindent 2 }}
+  {{- include "explore.syncPolicy" . | nindent 2 }}
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: kyverno
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "-2"
+    kensan-lab.platform/mirrors: kubernetes/argocd/applications/policy/kyverno/app.yaml
+spec:
+  project: platform-project
+  sources:
+    - repoURL: https://kyverno.github.io/kyverno/
+      chart: kyverno
+      targetRevision: 3.8.1
+      helm:
+        releaseName: kyverno
+        valueFiles:
+          - $values/kubernetes/policy/kyverno/values.yaml
+          - $values/environments/kind/values/kyverno.yaml
+    - repoURL: {{ .Values.repoURL }}
+      targetRevision: {{ .Values.targetRevision }}
+      ref: values
+  {{- include "explore.destination" (dict "namespace" "kyverno") | nindent 2 }}
+  {{- include "explore.syncPolicy" . | nindent 2 }}
+---
+## Policies run in Audit (ADR-012 Phase 3 has not promoted them to Enforce), so
+## nothing here can block a sync. Violations surface as PolicyReports, which is
+## exactly what the demo is meant to show.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: kyverno-policies
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "-1"
+    kensan-lab.platform/mirrors: kubernetes/argocd/applications/policy/kyverno-policies/app.yaml
+spec:
+  project: platform-project
+  source:
+    repoURL: {{ .Values.repoURL }}
+    targetRevision: {{ .Values.targetRevision }}
+    path: kubernetes/policy/kyverno-policies
+    directory:
+      recurse: true
+  {{- include "explore.destination" (dict "namespace" "kyverno") | nindent 2 }}
+  {{- include "explore.syncPolicy" . | nindent 2 }}
