@@ -1,8 +1,10 @@
-## Kyverno namespace, engine and policies — all three identical to bare metal.
+## Kyverno namespace, engine and policies.
 ##
-## No values override: the production values are already sized for a Raspberry
-## Pi 5 (single replicas, background and cleanup controllers off, 100m/128Mi
-## requests), so a laptop or a 4 vCPU runner is a larger host than the real one.
+## Resource sizing is inherited untouched: the production values are already
+## sized for a Raspberry Pi 5 (single replicas, background and cleanup
+## controllers off, 100m/128Mi requests), so a laptop or a 4 vCPU runner is a
+## larger host than the real one. The only override is the report scan interval
+## — see environments/kind/values/kyverno.yaml for why.
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
@@ -41,6 +43,7 @@ spec:
         releaseName: kyverno
         valueFiles:
           - $values/kubernetes/policy/kyverno/values.yaml
+          - $values/environments/kind/values/kyverno.yaml
     - repoURL: {{ .Values.repoURL }}
       targetRevision: {{ .Values.targetRevision }}
       ref: values
