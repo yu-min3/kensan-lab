@@ -13,14 +13,20 @@ on:
   pull_request:
     paths:
       - "**.md"
+      - "mkdocs.yml"
+      - "requirements-lint.txt"
       - "scripts/check-github-render.py"
+      - "tests/test_check_github_render.py"
       - ".github/workflows/markdown-render.yml"
   push:
     branches:
       - main
     paths:
       - "**.md"
+      - "mkdocs.yml"
+      - "requirements-lint.txt"
       - "scripts/check-github-render.py"
+      - "tests/test_check_github_render.py"
       - ".github/workflows/markdown-render.yml"
   workflow_dispatch:
 
@@ -44,3 +50,6 @@ jobs:
 
       - name: Verify GitHub rendering
         run: python scripts/check-github-render.py
+
+      - name: Test GitHub rendering check
+        run: python -m unittest tests/test_check_github_render.py

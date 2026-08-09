@@ -88,9 +88,12 @@ LEAKS: list[tuple[str, re.Pattern[str], str]] = [
 # pattern until it stops catching things.
 ALLOW: tuple[tuple[str, str, str], ...] = ()
 
-# A pymdownx.snippets include: `---8<--- "kubernetes/argocd/README.md"`. Paths
-# resolve from the repository root (`base_path: ["."]` in mkdocs.yml).
-INCLUDE = re.compile(r'^-{2,3}8<-{2,3}\s+"?([^"\s]+)"?\s*$')
+# pymdownx.snippets accepts one-line includes and a block containing multiple
+# paths. One to three dashes are supported by current and legacy syntax.
+SNIPPET_MARKER = r"-{1,3}8<-{1,3}"
+INCLUDE = re.compile(rf'^{SNIPPET_MARKER}\s+(?:"([^"]+)"|(\S+))\s*$')
+INCLUDE_BLOCK = re.compile(rf"^{SNIPPET_MARKER}\s*$")
+SKIP_DIRS = {".git", "node_modules", "site", ".venv", ".venv-docs", "temp"}
 STRIP = re.compile(r"<(pre|code)\b.*?</\1>|<!--.*?-->|<[^>]+>", re.S)
 
 
@@ -120,28 +123,74 @@ def check(path: Path, repo: Path) -> list[str]:
     return findings
 
 
+def resolve_include(repo: Path, spec: str) -> Path | None:
+    """Resolve a snippet path, removing an optional line/section suffix."""
+    candidate = spec.strip().strip('"')
+    while candidate:
+        target = repo / candidate
+        if target.is_file():
+            return target
+        if ":" not in candidate:
+            return None
+        candidate = candidate.rsplit(":", 1)[0]
+    return None
+
+
 def dual_rendered(repo: Path) -> list[Path]:
     """The files the docs site transcludes — the only ones read both ways."""
     found: set[Path] = set()
     for page in (repo / "docs").rglob("*.md"):
+        in_block = False
         for line in page.read_text(encoding="utf-8").splitlines():
-            m = INCLUDE.match(line.strip())
+            stripped = line.strip()
+            if INCLUDE_BLOCK.match(stripped):
+                in_block = not in_block
+                continue
+            if in_block:
+                if not stripped or stripped.startswith(";"):
+                    continue
+                target = resolve_include(repo, stripped)
+                if target:
+                    found.add(target)
+                continue
+            m = INCLUDE.match(stripped)
             if m:
-                target = repo / m.group(1)
-                if target.is_file():
+                target = resolve_include(repo, m.group(1) or m.group(2))
+                if target:
                     found.add(target)
     return sorted(found)
+
+
+def markdown_files(roots: list[Path]) -> list[Path]:
+    """Expand explicit files and directories supplied on the command line."""
+    files: list[Path] = []
+    for root in roots:
+        if not root.exists():
+            raise FileNotFoundError(root)
+        if root.is_file():
+            files.append(root)
+        else:
+            files.extend(
+                path
+                for path in sorted(root.rglob("*.md"))
+                if SKIP_DIRS.isdisjoint(path.parts)
+            )
+    return files
 
 
 def main(argv: list[str]) -> int:
     repo = Path(__file__).resolve().parent.parent
     # An explicit path is always checked, so any page can be inspected on demand.
-    files = [Path(a).resolve() for a in argv] if argv else dual_rendered(repo)
-    files = [f for f in files if f.is_file()]
+    try:
+        files = markdown_files([Path(a).resolve() for a in argv]) if argv else dual_rendered(repo)
+    except FileNotFoundError as error:
+        print(f"Path does not exist: {error}", file=sys.stderr)
+        return 2
     findings = [f for p in files for f in check(p, repo)]
 
     if not findings:
-        print(f"GitHub rendering: {len(files)} dual-rendered files clean")
+        scope = "explicit" if argv else "dual-rendered"
+        print(f"GitHub rendering: {len(files)} {scope} files clean")
         return 0
     print("These files are rendered by both MkDocs and github.com. GitHub will", file=sys.stderr)
     print("show the following as literal text instead of rendering it:\n", file=sys.stderr)
