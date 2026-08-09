@@ -55,14 +55,14 @@ Backstage: `cd backstage && make {install,dev,all TAG=...}`
 | `security-secrets.md` | Vault + ESO, Sealed Secrets, Reloader, cert-manager, GHCR |
 | `environment-separation.md` | PE/AD roles, multi-repo, namespaces (ADR-006) |
 | `design-system.md` | Whetstone UI tokens/components — 全 app の UI を書く前に読む |
-| `collaboration.md` | PR 運用（独断マージ禁止・本文規約）、設計/状況報告は HTML 図示、script 出力 |
+| `collaboration.md` | PR 運用（独断マージ禁止・本文規約・長さの目安。テンプレは `.github/pull_request_template.md`）、設計/状況報告は HTML 図示、script 出力 |
 
 ## Review Guidelines（エージェントレビュー観点）
 
 レビューエージェント（Claude `/code-review`、Codex `codex exec review` — 後者は `AGENTS.md` symlink 経由で本ファイルを読む）は以下の優先度で指摘する:
 
 - **P0 (block)**: 生 secret の commit（`temp/*-raw.yaml`・`.env`・token / credential 平文）/ rendered Helm manifest（`helm template` 出力）の commit / GitOps バイパス（`kubectl apply` 前提の変更）
-- **P1 (warn)**: single-arch image 指定（multi-arch manifest list 必須）/ chart version を Application CR の `targetRevision` 以外で管理 / 新規 PVC で `longhorn` 以外の storageClass 指定（local-path は全廃済み）/ stateful データを持つリソース（PVC・StorageClass・RecurringJob 等、prune でデータ消失・再作成不能になるもの）への `Prune=false` annotation 漏れ
+- **P1 (warn)**: single-arch image 指定（multi-arch manifest list 必須）/ chart version を Application CR の `targetRevision` 以外で管理 / 新規 PVC で `longhorn` 以外の storageClass 指定（local-path は全廃済み）/ stateful データを持つリソース（PVC・StorageClass・RecurringJob 等、prune でデータ消失・再作成不能になるもの）への `Prune=false` annotation 漏れ / 破壊的になりうる変更（Application・ApplicationSet の rename / namespace・PVC・StorageClass / Gateway の host 追加削除）で PR 本文に「壊れうるもの / 戻し方」が書かれていない
 - **P2 (info)**: doc-layout 規約違反 / namespace 命名（`app-{name}`）違反 / HTTPRoute の `parentRefs` と Gateway の不整合
 
 ## Domain & Network
