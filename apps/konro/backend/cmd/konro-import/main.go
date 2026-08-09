@@ -7,8 +7,6 @@ import (
 	"flag"
 	"fmt"
 	"os"
-	"path"
-	"path/filepath"
 	"time"
 
 	"github.com/yu-min3/kensan-lab/apps/konro/backend/internal/rkimport"
@@ -29,34 +27,14 @@ func main() {
 		os.Exit(1)
 	}
 
-	date := time.Now().Format("2006-01-02")
-	taken := map[string]bool{}
-	empty := 0
-	if err := os.MkdirAll(filepath.Join(*outDir, "images"), 0o755); err != nil {
+	stats, err := rkimport.Materialize(res, images, *outDir, time.Now().Format("2006-01-02"))
+	if err != nil {
 		fmt.Fprintln(os.Stderr, "error:", err)
 		os.Exit(1)
 	}
-	for _, r := range res.Recipes {
-		if len(r.Ingredients) == 0 || len(r.Steps) == 0 {
-			empty++
-			res.Warnings = append(res.Warnings, fmt.Sprintf("%s: ingredients=%d steps=%d", r.Title, len(r.Ingredients), len(r.Steps)))
-		}
-		name := rkimport.Filename(r.Title, taken)
-		md := rkimport.Markdown(r, "images", date)
-		if err := os.WriteFile(filepath.Join(*outDir, name), []byte(md), 0o644); err != nil {
-			fmt.Fprintln(os.Stderr, "error:", err)
-			os.Exit(1)
-		}
-	}
-	for ref, data := range images {
-		if err := os.WriteFile(filepath.Join(*outDir, "images", path.Base(ref)), data, 0o644); err != nil {
-			fmt.Fprintln(os.Stderr, "error:", err)
-			os.Exit(1)
-		}
-	}
 
-	fmt.Printf("recipes:  %d written to %s (recipes with empty sections: %d)\n", len(res.Recipes), *outDir, empty)
-	fmt.Printf("images:   %d\n", len(images))
+	fmt.Printf("recipes:  %d written to %s (recipes with empty sections: %d)\n", stats.Recipes, *outDir, stats.EmptySections)
+	fmt.Printf("images:   %d\n", stats.Images)
 	if props := res.SortedUnknownProps(); len(props) > 0 {
 		fmt.Println("unknown itemprops (format drift — inspect these):")
 		for _, p := range props {

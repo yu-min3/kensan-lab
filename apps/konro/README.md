@@ -31,7 +31,19 @@ cd frontend && npm run dev   # localhost:5173
 
 Android 実機評価: 同一 LAN で `http://<MacのIP>:8090`。**Wake Lock は secure context 限定**なので、通し評価は USB + `adb reverse tcp:8090 tcp:8090` → スマホから `http://localhost:8090`。
 
-## konro-import（PoC CLI）
+## レシピ取込
+
+Recipe Keeper のエクスポート zip（`recipes.html` + `images/`）を、`type: recipe` frontmatter 付き md + 画像に変換する。入口は 2 つ:
+
+**UI / API（推奨）** — レシピ一覧ヘッダの「⤵ 取込」から zip をアップロード。実体は `POST /api/v1/import`（zip をそのまま body で送る。multipart ではない — コンテナは readOnlyRootFilesystem で multipart のディスクスピル先が無い）。上限 64MB、結果は JSON レポート（件数・warnings・unknown itemprops）:
+
+```bash
+curl -X POST --data-binary @export.zip http://localhost:8090/api/v1/import
+```
+
+ファイル名はタイトル由来なので、再取込は同名上書きの upsert（Recipe Keeper 側がマスター）。Recipe Keeper で削除した品は konro には残る（消したければファイルを直接消す）。
+
+**CLI（konro-import）** — サーバを経由せずローカル変換したいとき:
 
 ```bash
 cd backend
@@ -39,9 +51,7 @@ go build -o konro-import ./cmd/konro-import
 ./konro-import -zip export.zip -out recipes-out
 ```
 
-Recipe Keeper のエクスポート zip（`recipes.html` + `images/`）を、`type: recipe` frontmatter 付き md + 画像に変換する。
-
-フォーマットは公式仕様が無く、サードパーティインポータ（[Mealie PR #3642](https://github.com/mealie-recipes/mealie/pull/3642)）からの逆算。認識できない `itemprop` はすべて `unknown itemprops` として報告するので、実エクスポートに対する形式検証を兼ねる:
+フォーマットは公式仕様が無く、サードパーティインポータ（[Mealie PR #3642](https://github.com/mealie-recipes/mealie/pull/3642)）からの逆算。認識できない `itemprop` はすべて unknown itemprops として報告するので、実エクスポートに対する形式検証を兼ねる（UI では「⚠ 未知フィールド N 種」表示）:
 
 ```
 recipes:  2 written to recipes-out (recipes with empty sections: 0)

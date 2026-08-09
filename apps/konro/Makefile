@@ -6,13 +6,14 @@ TAG ?= dev
 PLATFORMS ?= linux/amd64,linux/arm64
 WRITE_GHCR_PAT ?= $(GITHUB_GHCR_PAT)
 
-.PHONY: help login test build k8s-build
+.PHONY: help login test build k8s-build deploy
 
 help:
 	@echo "test       - backend go test + frontend tsc/vite build"
 	@echo "build      - ローカル arch の image build（検証用、push なし）"
 	@echo "login      - GHCR login（WRITE_GHCR_PAT / write:packages を使用）"
 	@echo "k8s-build  - multi-arch build + GHCR push（要 make login か docker login）"
+	@echo "deploy     - 1発デプロイ: test→tag bump→build/push→PR（VERSION=v0.2.0 MERGE=1 YES=1）"
 
 login:
 	@echo "$(WRITE_GHCR_PAT)" | $(CONTAINER_RUNTIME) login ghcr.io -u $${GITHUB_USER:-yu-min3} --password-stdin
@@ -29,3 +30,7 @@ k8s-build:
 		--platform=$(PLATFORMS) \
 		-t $(IMAGE):$(TAG) \
 		--push ../..
+
+# 入口は make、実ロジックは scripts/deploy-app.sh（app 共通）
+deploy:
+	../../scripts/deploy-app.sh konro $(VERSION) $(if $(MERGE),--merge) $(if $(YES),--yes)

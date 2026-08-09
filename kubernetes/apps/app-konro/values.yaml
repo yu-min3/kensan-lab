@@ -4,7 +4,7 @@
 nameOverride: konro
 image:
   repository: ghcr.io/yu-min3/konro
-  tag: v0.1.0
+  tag: v0.2.0
 env:
   # レシピ frontmatter の created/updated と将来のインポート endpoint が
   # time.Now() 依存になるため JST を明示（kensan と同じ理由）

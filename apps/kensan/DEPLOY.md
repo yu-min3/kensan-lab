@@ -1,6 +1,6 @@
 # kensan デプロイ
 
-ファイルベース kensan アプリ（`apps/kensan`）の本番反映手順。**GitOps**：すべての変更は Git → ArgoCD sync を通る。`deploy.sh` がこの流れを 1 コマンドに畳む。
+ファイルベース kensan アプリ（`apps/kensan`）の本番反映手順。**GitOps**：すべての変更は Git → ArgoCD sync を通る。`deploy.sh` がこの流れを 1 コマンドに畳む（実体は app 共通の `scripts/deploy-app.sh`。konro など他アプリは各 `apps/<app>/Makefile` の `make deploy` から同じ流れに乗る）。
 
 公開先: `kensan-preview.app.yu-min3.com`（gateway-prod + Keycloak SSO）。image: `ghcr.io/yu-min3/kensan`。CI は無く image build は手動 multi-arch push。
 
