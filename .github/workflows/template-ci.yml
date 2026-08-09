@@ -40,13 +40,53 @@ jobs:
 
       # The scaffolder substitutes these; here they are filled in with sample
       # values so the skeleton can be treated as a real project.
+      #
+      # Done in Python rather than sed on purpose: Backstage's placeholders and
+      # GitHub Actions expressions are the same syntax, so writing the literal
+      # sequence anywhere in a `run:` block makes Actions try to evaluate
+      # `values.name` as one of its own contexts and the workflow stops parsing.
+      # The escaped regex below never contains that sequence.
       - name: Fill in the template variables
         run: |
           cp -r "${SKELETON}" /tmp/scaffolded
-          cd /tmp/scaffolded
-          sed -i 's|\${{ values\.name }}|sample-api|g; s|\${{ values\.description }}|Sample FastAPI service|g' pyproject.toml
-          sed -i 's|\${{ values\.name }}|sample-api|g; s|\${{ values\.repoOwner }}|yu-min3|g; s|\${{ values\.repoName }}|app-sample-api|g; s|\${{ values\.owner }}|platform-engineering|g' \
-            deploy/values.yaml deploy/resources/*.yaml
+          python3 - <<'PY'
+          import pathlib, re
+          # What the scaffolder would fill in, for a service called sample-api.
+          sample = {
+              "name": "sample-api",
+              "description": "Sample FastAPI service",
+              "repoOwner": "yu-min3",
+              "repoName": "app-sample-api",
+              "owner": "platform-engineering",
+              "system": "developer-portal",
+              "domain": "platform",
+          }
+          pattern = re.compile(r"\$\{\{\s*values\.(\w+)\s*\}\}")
+          root = pathlib.Path("/tmp/scaffolded")
+          missing = set()
+
+          def fill(match):
+              key = match.group(1)
+              if key not in sample:
+                  missing.add(key)
+                  return match.group(0)
+              return sample[key]
+
+          for path in sorted(root.rglob("*")):
+              if not path.is_file():
+                  continue
+              try:
+                  text = path.read_text()
+              except UnicodeDecodeError:
+                  continue
+              filled = pattern.sub(fill, text)
+              if filled != text:
+                  path.write_text(filled)
+
+          # A placeholder this job does not know about means the template grew a
+          # parameter and nothing here exercises it.
+          assert not missing, f"template uses parameters this job does not supply: {sorted(missing)}"
+          PY
 
       # What a developer gets must render through the platform's chart with no
       # edits. A values file that has drifted from charts/app-base fails here
