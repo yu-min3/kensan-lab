@@ -40,7 +40,17 @@ env:
   # rather than tracking latest: newer Node breaks the native build of
   # better-sqlite3, which the backend depends on.
   NODE_VERSION: "22"
-  IMAGE: ghcr.io/${{ github.repository_owner }}/backstage
+  # Namespaced under the repository, not just the owner, and that is the point:
+  # GHCR links a package to a repository when Actions creates it, and the
+  # repository's GITHUB_TOKEN can only push to packages it owns. The older
+  # `ghcr.io/<owner>/backstage` was created by a `docker push` from a laptop, so
+  # it belongs to no repository and the release job is denied — with no way to
+  # connect the two after the fact (the package settings picker only offers
+  # repositories for packages Actions already owns).
+  #
+  # The old package is left alone; production still pulls v0.0.11 from it until
+  # somebody chooses to move.
+  IMAGE: ghcr.io/${{ github.repository }}/backstage
 
 jobs:
   verify:
