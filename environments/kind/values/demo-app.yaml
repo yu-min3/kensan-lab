@@ -9,8 +9,10 @@
 nameOverride: demo
 
 # podinfo is public and multi-arch, so this resolves on Apple Silicon as well as
-# on an amd64 runner. The real apps are amd64-only and deliberately left out —
-# see docs/getting-started/try-it-with-kind.md#what-kind-cannot-show.
+# on an amd64 runner. The real applications are multi-arch too, but their
+# images are private and pulled through an ExternalSecret backed by Vault,
+# which explore does not run until Phase 3 — that, not architecture, is why
+# they are absent.
 image:
   repository: ghcr.io/stefanprodan/podinfo
   tag: 6.9.2

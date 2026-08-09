@@ -116,9 +116,10 @@ it is told in [the incident
 notes](https://github.com/yu-min3/kensan-lab/tree/main/docs/incidents).
 
 **Multiple architectures.** kind's nodes are all your host's architecture, so
-the arm64/amd64 split that the real cluster schedules around cannot be
-reproduced. The two apps that are amd64-only are left out for that reason; on
-Apple Silicon they would emulate, slowly.
+the arm64/amd64 split the real cluster schedules around cannot be reproduced.
+The applications themselves are built for both, so this is not why they are
+absent — Backstage is the one image that is amd64-only, and on Apple Silicon it
+would emulate, slowly.
 
 ## Troubleshooting
 
