@@ -9,8 +9,41 @@ description: Agent collaboration rules — PR conventions, design/status reporti
 ## Pull Request Rules
 
 - **PR 作成後に独断でマージしない** — 別エージェントによるレビューがあるため、マージは必ずレビュー完了 + Yu の指示を待つ
-- **PR 本文にアーキテクチャの変更をわかりやすく記載する** — 何がどう変わるか（構成図・データフロー・依存関係の変化など）を、diff を読まなくても把握できるレベルで書く
-- **レビューエージェントに必要な情報を記載する** — 変更の背景・意図、影響範囲、検証方法（確認済みなら結果も）、関連 ADR / issue / PR へのリンクを PR 本文に含める
+- **本文の構成は `.github/pull_request_template.md` に従う**（見出しの意味と必須条件はテンプレート内のコメントが SoT）
+- **日本語で書く** — タイトルは Conventional Commits、本文は日本語
+
+### 本文に何を書くか
+
+読み手は**人間の Yu と レビューエージェントの 2 者**で、どちらも「diff を読まずに判断できるか」を求めている。したがって本文の役割は**要約ではなく判断材料の提供**。
+
+- **変更点を列挙しない。** Files changed に出ているものを散文に直しても情報は増えない
+- **分かれ道があったなら、選んだ理由と却下した案を書く。** これが無いと、レビュアーが同じ検討を最初からやり直す
+- **検証は「やったこと」と「やっていないこと」の両方を書く。** 未検証を書かないと、レビュアーは検証済みだと解釈する
+- **詳細な設計は repo 内の docs に置いてリンクする。** PR 本文に設計文書を丸ごと書くと、マージ後に読まれない場所へ知識が沈む
+
+### 長さ
+
+**目安 2,000 字、上限 4,000 字。** 実績値は 400〜3,300 字（中央値 1,300 字）で、これがこの repo の読める長さ。
+
+長くなる原因はほぼ 2 つで、どちらも本文を削る前に構造で解く:
+
+1. repo 内の docs と重複している → docs へリンクする
+2. 変更点を列挙している → 消す
+
+バグ修正は 背景 / 何がどう変わるか / 確認 の 3 見出しで足りる。原因と修正点だけ書けばよく、diff の再記述は不要。
+
+### 「壊れうるもの / 戻し方」を必ず書く変更
+
+過去に本番を壊した経路。この repo では**削除は明示的な操作ではなく、rename や path 変更の副作用として起きる**ため、レビュー時に個別に確認する:
+
+| 触るもの | 典型的な壊れ方 |
+|---|---|
+| Argo CD の Application / ApplicationSet | rename = 旧 prune + 新 create。destination namespace ごと消える。ApplicationSet の同名 takeover は ownerRef 経由で子ごと cascade prune |
+| namespace / PVC / StorageClass / PV | reclaim policy 次第で物理データが消え、復元手段が無くなる。`Prune=false` は**リソース個別**に付ける必要がある |
+| Gateway / HTTPRoute / AuthorizationPolicy / RequestAuthentication | host の追加漏れが**無認証の素通し**になる。逆に消し忘れると到達不能になる |
+| Keycloak / Vault / Sealed Secrets | 信頼の根。鍵を失うと git 履歴からしか戻せない |
+
+無害なら「prune されるリソースなし」の 1 行でよい。**書かないことと、無害であることは違う。**
 
 ## Design & Status Reporting Rule
 
