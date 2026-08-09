@@ -6,9 +6,27 @@
 ## none of that, and a Deployment whose `secretKeyRef`s point at Secrets that
 ## will never exist does not start at all.
 ##
-## Kept as close to the original as it can be: same image, same port, same
-## probes, same security context. The differences are the absent Secret
-## references and the third `--config`.
+## Everything else is copied from kubernetes/backstage/backstage-deployment.yaml
+## unchanged — same image, port, probes and resource requests — so that a
+## divergence here is always deliberate. Three of them:
+##
+##   command   adds a third --config; the other two are the ones baked into the
+##             image and are still loaded first.
+##   env       GITHUB_TOKEN is a literal placeholder rather than a Secret. The
+##             explore config empties the integrations list, so nothing ever
+##             authenticates with it; it exists only so that config substitution
+##             resolves.
+##   affinity  the bare-metal Deployment requires a node labelled
+##             hardware-class=high-performance. The single kind node carries
+##             that label (kind-cluster.yaml), so the rule is satisfied rather
+##             than removed — but it is left out here because a one-node cluster
+##             makes it meaningless either way.
+##
+## No securityContext, deliberately: the shared namespace enforces PSS baseline
+## rather than restricted, the bare-metal Deployment sets none, and the image
+## declares `USER node` — a name, not a number. Adding `runAsNonRoot` without a
+## numeric `runAsUser` would leave the kubelet unable to verify the user and the
+## container would never start.
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -26,12 +44,9 @@ spec:
       labels:
         app: backstage
     spec:
-      ## The bare-metal Deployment requires a `hardware-class=high-performance`
-      ## node. The single kind node carries that label (kind-cluster.yaml), so
-      ## the rule is satisfied rather than removed.
       containers:
         - name: backstage
-          image: ghcr.io/yu-min3/backstage:v0.0.11
+          image: ghcr.io/yu-min3/backstage:v0.0.12
           imagePullPolicy: IfNotPresent
           ## The two configs baked into the image, then the explore overrides.
           ## Order matters: later files win.
@@ -45,9 +60,6 @@ spec:
             - --config
             - /explore/app-config.explore.yaml
           env:
-            ## Referenced by the baked-in config. Never used: the explore config
-            ## replaces the integrations list, so nothing authenticates to
-            ## GitHub. Present only so that config substitution resolves.
             - name: GITHUB_TOKEN
               value: "unused-in-explore"
           ports:
@@ -57,33 +69,25 @@ spec:
             - name: explore-config
               mountPath: /explore
               readOnly: true
+          resources:
+            requests:
+              memory: "256Mi"
+              cpu: "200m"
+            limits:
+              memory: "1Gi"
+              cpu: "1000m"
           livenessProbe:
             httpGet:
               path: /healthcheck
               port: 7007
             initialDelaySeconds: 60
-            periodSeconds: 30
-            failureThreshold: 6
+            periodSeconds: 10
           readinessProbe:
             httpGet:
               path: /healthcheck
               port: 7007
             initialDelaySeconds: 30
             periodSeconds: 10
-            failureThreshold: 12
-          resources:
-            requests:
-              cpu: 100m
-              memory: 512Mi
-            limits:
-              memory: 1536Mi
-          securityContext:
-            allowPrivilegeEscalation: false
-            capabilities:
-              drop: ["ALL"]
-            runAsNonRoot: true
-            seccompProfile:
-              type: RuntimeDefault
       volumes:
         - name: explore-config
           configMap:
