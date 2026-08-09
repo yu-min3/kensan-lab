@@ -1,0 +1,90 @@
+## Backstage for the explore cluster.
+##
+## This is the one component explore cannot follow from the shared manifests.
+## The bare-metal Deployment wires in PostgreSQL credentials and a GitHub token,
+## both through Secrets that External Secrets fills from Vault; explore runs
+## none of that, and a Deployment whose `secretKeyRef`s point at Secrets that
+## will never exist does not start at all.
+##
+## Kept as close to the original as it can be: same image, same port, same
+## probes, same security context. The differences are the absent Secret
+## references and the third `--config`.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: backstage
+  namespace: backstage
+  annotations:
+    argocd.argoproj.io/sync-wave: "2"
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: backstage
+  template:
+    metadata:
+      labels:
+        app: backstage
+    spec:
+      ## The bare-metal Deployment requires a `hardware-class=high-performance`
+      ## node. The single kind node carries that label (kind-cluster.yaml), so
+      ## the rule is satisfied rather than removed.
+      containers:
+        - name: backstage
+          image: ghcr.io/yu-min3/backstage:v0.0.11
+          imagePullPolicy: IfNotPresent
+          ## The two configs baked into the image, then the explore overrides.
+          ## Order matters: later files win.
+          command:
+            - node
+            - packages/backend
+            - --config
+            - app-config.yaml
+            - --config
+            - app-config.kubernetes.yaml
+            - --config
+            - /explore/app-config.explore.yaml
+          env:
+            ## Referenced by the baked-in config. Never used: the explore config
+            ## replaces the integrations list, so nothing authenticates to
+            ## GitHub. Present only so that config substitution resolves.
+            - name: GITHUB_TOKEN
+              value: "unused-in-explore"
+          ports:
+            - containerPort: 7007
+              name: http
+          volumeMounts:
+            - name: explore-config
+              mountPath: /explore
+              readOnly: true
+          livenessProbe:
+            httpGet:
+              path: /healthcheck
+              port: 7007
+            initialDelaySeconds: 60
+            periodSeconds: 30
+            failureThreshold: 6
+          readinessProbe:
+            httpGet:
+              path: /healthcheck
+              port: 7007
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            failureThreshold: 12
+          resources:
+            requests:
+              cpu: 100m
+              memory: 512Mi
+            limits:
+              memory: 1536Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
+            runAsNonRoot: true
+            seccompProfile:
+              type: RuntimeDefault
+      volumes:
+        - name: explore-config
+          configMap:
+            name: backstage-explore-config

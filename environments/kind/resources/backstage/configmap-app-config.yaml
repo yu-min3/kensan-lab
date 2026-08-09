@@ -1,0 +1,49 @@
+## Backstage configuration for the explore cluster.
+##
+## Layered as a third `--config` on top of the two baked into the image, so the
+## catalog locations, the entity rules and the guest auth provider all come from
+## the shared config and only the things that cannot work here are replaced:
+##
+##   database      Production runs PostgreSQL with credentials from Vault. There
+##                 is no Vault here and nothing to persist, so the throwaway
+##                 cluster gets the in-memory SQLite the repository already uses
+##                 for local development. Everything is lost on restart, which
+##                 is the correct behaviour for a cluster that is itself thrown
+##                 away.
+##   URLs          The real host does not resolve here.
+##   integrations  The GitHub token comes from Vault and is only used by the
+##                 organisation-scanning catalog provider. The catalog itself is
+##                 read from files inside the image (templates/ and catalog/ are
+##                 COPYed by the Dockerfile), so dropping the integration costs
+##                 the entity discovery and nothing else.
+##
+## Everything a visitor came to see — the golden path template, the catalog, the
+## scaffolder — is unaffected.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: backstage-explore-config
+  namespace: backstage
+data:
+  app-config.explore.yaml: |
+    app:
+      title: kensan-lab Platform Portal
+      baseUrl: http://backstage.127-0-0-1.sslip.io
+
+    backend:
+      baseUrl: http://backstage.127-0-0-1.sslip.io
+      cors:
+        origin: http://backstage.127-0-0-1.sslip.io
+        methods: [GET, HEAD, PATCH, POST, PUT, DELETE]
+        credentials: true
+      database:
+        client: better-sqlite3
+        connection: ':memory:'
+
+    # Replaces the list from the shared config rather than adding to it.
+    integrations:
+      github: []
+
+    catalog:
+      # The organisation scanner needs a token; the file locations do not.
+      providers: {}
