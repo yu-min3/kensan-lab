@@ -108,6 +108,10 @@ if [[ "$cluster_exists" == false ]]; then
   kind create cluster --config "${ENV_DIR}/kind-cluster.yaml" --wait 120s
 fi
 
+# kind wrote a context for the new cluster and made it current. Switching
+# explicitly anyway, so that every kubectl below is aimed at the throwaway
+# cluster no matter what the caller had selected — the one thing this script
+# must never do is touch somebody's real cluster.
 kubectl config use-context "kind-${CLUSTER_NAME}" >/dev/null
 
 # kind ships `standard` as the default StorageClass and the explore layer adds
@@ -261,6 +265,9 @@ cat <<EOF
   What this cluster deliberately cannot show you — the L2 load balancer, SSO,
   storage replication, multi-architecture scheduling — and why:
   docs/getting-started/try-it-with-kind.md#what-kind-cannot-show
+
+  Your kubectl now points at this cluster, not whatever it pointed at before.
+  'make explore-down' removes the context along with the cluster.
 
   Tear it down with:  make explore-down
 

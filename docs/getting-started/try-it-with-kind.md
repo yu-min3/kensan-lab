@@ -340,10 +340,10 @@ $ kubectl -n app-demo get httproute demo -o jsonpath='{.status.parents}' | jq
 `demo.127-0-0-1.sslip.io` resolves, and use the `/etc/hosts` fallback above if
 it does not.
 
-**`make try` fails on a Kubernetes version you did not choose.** The node image
-follows your kind release. If a newer Kubernetes than this repository targets
-breaks a chart, install the kind version pinned in
-`environments/kind/kind-cluster.yaml`.
+**kind cannot pull the node image.** `environments/kind/kind-cluster.yaml` pins
+one by digest, so that everybody gets the Kubernetes version the real cluster
+runs rather than whatever their kind release defaults to. A kind old enough not
+to support that image will say so; upgrading kind fixes it.
 
 ## Where to go next
 
