@@ -1,0 +1,22 @@
+# Longhorn StorageClass for reconstructable, high-churn data such as the
+# Prometheus TSDB. Unlike the default `longhorn` class, volumes created from
+# this class do not join the `default` recurring-job group, so daily snapshots
+# and weekly/monthly R2 volume backups are not scheduled automatically.
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  annotations:
+    # Protect the class from accidental deletion if its manifest moves.
+    argocd.argoproj.io/sync-options: Prune=false
+  name: longhorn-no-backup
+provisioner: driver.longhorn.io
+allowVolumeExpansion: true
+reclaimPolicy: Retain
+volumeBindingMode: Immediate
+parameters:
+  dataEngine: "v1"
+  fsType: "ext4"
+  numberOfReplicas: "1"
+  staleReplicaTimeout: "30"
+  dataLocality: "best-effort"
+  unmapMarkSnapChainRemoved: "ignored"
