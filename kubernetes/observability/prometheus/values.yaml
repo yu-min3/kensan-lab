@@ -49,11 +49,14 @@ prometheus:
     storageSpec:
       volumeClaimTemplate:
         spec:
-          storageClassName: longhorn
+          # Prometheus TSDB is intentionally excluded from Longhorn recurring
+          # snapshots/backups. Long-term queryable storage should use Thanos,
+          # not whole-volume backups of a constantly changing TSDB.
+          storageClassName: longhorn-no-backup
           accessModes: ["ReadWriteOnce"]
           resources:
             requests:
-              storage: 10Gi
+              storage: 75Gi
 
     # Enable remote write receiver (OTel Collector → Prometheus)
     enableRemoteWriteReceiver: true
@@ -86,8 +89,11 @@ prometheus:
             action: drop
 
     # Retention settings
-    retention: 7d
-    retentionSize: "9GB"
+    # Keep enough local history for the 6-8 week m4neo C-state experiment.
+    # The size cap wins if reached first and leaves ~20% of the 75Gi PVC free
+    # for WAL/head chunks and compaction overlap.
+    retention: 90d
+    retentionSize: "60GB"
 
     # Service monitor selection
     serviceMonitorSelectorNilUsesHelmValues: false
