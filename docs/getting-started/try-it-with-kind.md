@@ -130,13 +130,21 @@ needs. Raise it to 6 GiB or more and run `make explore-down && make try`.
 `sudo lsof -nP -iTCP:80 -sTCP:LISTEN`. A previous explore cluster is the usual
 culprit — `make explore-down` clears it.
 
-**Application pods start but have no Istio sidecar.** istio-cni chains onto
-kindnet, and `cni.exclusive` is pinned off in
-`environments/kind/values/istio-cni.yaml` for exactly this reason. Check the
-CNI config the node ended up with:
+**The demo app has one container, not two.** That is correct: no namespace in
+the slice enables sidecar injection, the same as the real cluster's application
+namespaces. The mesh is present — the gateway is an Istio proxy and traffic
+reaches the app through it — but no workload joins the data plane here.
+Injection in production applies to the platform namespaces (Vault, Keycloak,
+oauth2-proxy), none of which explore runs.
+
+**Checking that istio-cni chained correctly.** It appends itself to kindnet's
+config rather than replacing it, which is why `cni.exclusive` is pinned off in
+`environments/kind/values/istio-cni.yaml`. The plugin list should end with
+`istio-cni`:
 
 ```console
-$ docker exec kensan-lab-explore-control-plane ls /etc/cni/net.d
+$ docker exec kensan-lab-explore-control-plane \
+    sh -c 'cat /etc/cni/net.d/10-kindnet.conflist' | grep '"type"'
 ```
 
 **An Application will not go Healthy.** `explore-up.sh` prints which one it is

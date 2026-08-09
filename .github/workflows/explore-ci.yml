@@ -78,6 +78,26 @@ jobs:
             exit 1
           fi
 
+      # The values file pins `cni.exclusive: false` so that istio-cni appends
+      # itself to kindnet's config instead of taking the node over. Nothing else
+      # would notice if that stopped working: the DaemonSet stays Healthy, and no
+      # workload in this slice is injected, so the chain is only observable in
+      # the node's own CNI config.
+      - name: Check that istio-cni chained onto kindnet
+        run: |
+          conflist="$(docker exec kensan-lab-explore-control-plane \
+            cat /etc/cni/net.d/10-kindnet.conflist)"
+          types="$(echo "$conflist" | jq -r '[.plugins[].type] | join(" ")')"
+          echo "CNI chain: ${types}"
+          case " ${types} " in
+            *" istio-cni "*) ;;
+            *) echo "istio-cni is not in the CNI chain" >&2; exit 1 ;;
+          esac
+          if [ "$(echo "$conflist" | jq -r '.plugins[0].type')" = "istio-cni" ]; then
+            echo "istio-cni took the chain over instead of appending to it" >&2
+            exit 1
+          fi
+
       - name: Check that Kyverno is actually evaluating policies
         run: |
           # Audit mode means violations never block a sync, so an engine that
