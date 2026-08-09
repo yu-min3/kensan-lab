@@ -37,11 +37,12 @@ Every layer above is Markdown, but not every file is read in the same place. **E
 | Files | Read on | May use |
 |---|---|---|
 | `docs/**/*.md` | The docs site only — the top README links to `https://yu-min3.github.io/kensan-lab/…`, never to `./docs/*.md` | Everything MkDocs Material offers: admonitions, content tabs, `attr_list`, `<figure markdown>` |
-| `README.md`, `kubernetes/**/README.md`, `apps/*/README.md` | **Both** github.com and the docs site (the per-domain READMEs are transcluded by `docs/architecture/*.md`) | Only what both engines agree on: CommonMark, plain HTML, tables, Mermaid |
+| Every file transcluded by `docs/**` — today the nine per-domain `kubernetes/**/README.md` | **Both** github.com and the docs site | Only what both engines agree on: CommonMark, plain HTML, tables, Mermaid |
+| Everything else — the top `README.md`, `apps/**`, `.claude/`, `bootstrap/`, sample data, scaffold templates | github.com only, or not read as prose at all | Whatever renders on GitHub; no site constraint applies |
 
 The second row is the constrained one, and it is constrained for a reason: Material's extensions are not errors on GitHub, they are **passed through as literal text**. A page keeps building while displaying its own source. `docs/showcase.md` shipped that way for 17 days before anyone opened it on GitHub (PR #468).
 
-In practice the constraint costs nothing — domain READMEs are written with diagrams, tables, and prose, all of which render identically on both. `scripts/check-github-render.py` enforces the boundary in CI so it never depends on someone remembering.
+In practice the constraint costs nothing — domain READMEs are written with diagrams, tables, and prose, all of which render identically on both. `scripts/check-github-render.py` enforces it in CI, deriving the file list from the `--8<--` lines under `docs/` so a tenth architecture page is covered without anyone updating a list.
 
 ## How to decide where something goes
 

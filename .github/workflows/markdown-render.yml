@@ -1,0 +1,55 @@
+name: Markdown renders on GitHub
+
+# The files the docs site transcludes are also READMEs someone opens on
+# github.com, and MkDocs Material extensions are not errors there — they are
+# passed through as literal text. A page keeps building while displaying its own
+# source, which is how docs/showcase.md shipped broken for 17 days (PR #468).
+#
+# The check derives its own scope from the --8<-- lines under docs/, so the
+# trigger is any Markdown: a new transclusion in docs/ can pull a new file into
+# scope, and the scanned files themselves live outside docs/.
+
+on:
+  pull_request:
+    paths:
+      - "**.md"
+      - "mkdocs.yml"
+      - "requirements-lint.txt"
+      - "scripts/check-github-render.py"
+      - "tests/test_check_github_render.py"
+      - ".github/workflows/markdown-render.yml"
+  push:
+    branches:
+      - main
+    paths:
+      - "**.md"
+      - "mkdocs.yml"
+      - "requirements-lint.txt"
+      - "scripts/check-github-render.py"
+      - "tests/test_check_github_render.py"
+      - ".github/workflows/markdown-render.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: requirements-lint.txt
+
+      - name: Install dependencies
+        run: pip install -r requirements-lint.txt
+
+      - name: Verify GitHub rendering
+        run: python scripts/check-github-render.py
+
+      - name: Test GitHub rendering check
+        run: python -m unittest tests/test_check_github_render.py

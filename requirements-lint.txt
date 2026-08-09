@@ -1,0 +1,4 @@
+# scripts/check-github-render.py — CommonMark reference renderer.
+# Kept separate from requirements-docs.txt so the Markdown check does not pull
+# in the whole MkDocs stack (it does not build the site).
+markdown-it-py==3.0.0
