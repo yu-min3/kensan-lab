@@ -68,11 +68,18 @@ docker info >/dev/null 2>&1 || fail "the Docker daemon is not running. Start Doc
 # Istio's control plane plus Kyverno's webhook plus Argo CD's five components do
 # not fit in the 4GB Docker Desktop hands out by default. Finding that out as a
 # Pending pod twenty minutes in is the worst version of this failure.
+#
+# Measured in MiB rather than GiB: `docker info` reports what the Linux VM sees,
+# which is a few hundred MiB below what Docker Desktop was told to allocate
+# (kernel reservations). Rounding that down to whole GiB rejects a correctly
+# configured 6 GiB machine, so the floor sits below the nominal setting.
+MIN_MEM_MIB=5600
 mem_bytes="$(docker info --format '{{.MemTotal}}' 2>/dev/null || echo 0)"
-mem_gib=$(( mem_bytes / 1024 / 1024 / 1024 ))
-if [[ "$mem_bytes" -gt 0 && "$mem_gib" -lt 6 ]]; then
-  fail "Docker has ${mem_gib}GiB of memory; this needs at least 6GiB.
-     Docker Desktop: Settings -> Resources -> Memory, then restart Docker."
+mem_mib=$(( mem_bytes / 1024 / 1024 ))
+if [[ "$mem_bytes" -gt 0 && "$mem_mib" -lt "$MIN_MEM_MIB" ]]; then
+  fail "Docker can use ${mem_mib}MiB of memory; this needs the equivalent of 6GiB allocated.
+     Docker Desktop: Settings -> Resources -> Memory, then restart Docker.
+     8GiB is worth setting if you have it — the Phase 1 slice fits in 6, with nothing to spare."
 fi
 
 cluster_exists=false
