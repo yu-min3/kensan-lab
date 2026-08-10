@@ -65,6 +65,21 @@ Backstage: `cd backstage && make {install,dev,all TAG=...}`
 - **P1 (warn)**: single-arch image 指定（multi-arch manifest list 必須）/ chart version を Application CR の `targetRevision` 以外で管理 / 新規 PVC で `longhorn` 以外の storageClass 指定（local-path は全廃済み）/ stateful データを持つリソース（PVC・StorageClass・RecurringJob 等、prune でデータ消失・再作成不能になるもの）への `Prune=false` annotation 漏れ / 破壊的になりうる変更（Application・ApplicationSet の rename / namespace・PVC・StorageClass / Gateway の host 追加削除）で PR 本文に「壊れうるもの / 戻し方」が書かれていない
 - **P2 (info)**: doc-layout 規約違反 / namespace 命名（`app-{name}`）違反 / HTTPRoute の `parentRefs` と Gateway の不整合
 
+### テストが対象より高機能になっていないか（2026-08-10 追加）
+
+**テストが検証対象より都合よく作られていると、欠陥が見えなくなる。** 同じ形で 2 回続けて見逃したので観点として立てる:
+
+| 実例 | どう隠れたか |
+|---|---|
+| `uv.lock` がサービス名に束縛（#482） | CI が lockfile を生成したときと**同じ名前**を使っていた。別名なら `Missing workspace member` で落ちる |
+| `fetch:template` はパスを置換しない（#483） | CI が**パスを rename していた**。実物はしないので、生成物にプレースホルダが残る |
+
+レビュー時に確認する:
+
+- **テストが使う固定値は、対象が生成したものと同じではないか。** 名前・ID・パスを検証対象の生成物から取っていたら、それは自己一致の確認でしかない
+- **テスト側のヘルパが、対象の実装より多くのことをしていないか。** 前処理で整形・補完・rename していたら、実物が同じことをする保証があるか
+- **その assert は、意図的に壊したときに落ちるか。** 落ちることを一度確認していない assert は、通っている理由が不明
+
 ## Domain & Network
 
 - **ドメイン**: `yu-min3.com`（DNS 権威は AWS Route53。Cloudflare は Tunnel での edge 公開のみで DNS 権威ではない）
