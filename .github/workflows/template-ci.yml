@@ -84,13 +84,16 @@ jobs:
               if filled != text:
                   path.write_text(filled)
 
-          # fetch:template substitutes inside paths as well as contents, and the
-          # platform pull request depends on it — the Application lands in a
-          # directory named after the service.
-          for path in sorted(root.rglob("*"), key=lambda p: len(p.parts), reverse=True):
-              filled = pattern.sub(fill, path.name)
-              if filled != path.name:
-                  path.rename(path.with_name(filled))
+          # Deliberately not renaming paths. fetch:template substitutes file
+          # contents only — a directory named after a placeholder arrives with
+          # the placeholder still in it — and a job that renamed them would be
+          # more capable than the thing it is testing. The per-app path comes
+          # from targetPath in template.yaml instead.
+          leftover = sorted(str(p.relative_to(root)) for p in root.rglob("*")
+                            if pattern.search(p.name))
+          assert not leftover, (
+              "these paths rely on placeholder substitution, which fetch:template "
+              f"does not do: {leftover}")
 
           # A placeholder this job does not know about means the template grew a
           # parameter and nothing here exercises it.
@@ -115,13 +118,17 @@ jobs:
           # login rather than a missing route, so assert the route exists.
           grep -q 'widget-service-oauth2' /tmp/rendered.yaml
 
-      # The platform pull request has to carry the ReferenceGrant as well as
-      # the Application: without it the /oauth2 route is RefNotPermitted and the
-      # login redirect dead-ends.
+      # Both files have to reach the platform repository: without the
+      # ReferenceGrant the /oauth2 route is RefNotPermitted and the login
+      # redirect dead-ends. Their destinations come from targetPath, so what is
+      # checked here is that the sources exist and template.yaml still ships
+      # each one.
       - name: Check the platform pull request contents
         run: |
-          test -f "/tmp/scaffolded/.backstage/kubernetes/argocd/applications/apps/app-widget-service/app.yaml"
-          test -f "/tmp/scaffolded/.backstage/kubernetes/auth/oauth2-proxy/resources/referencegrant-app-widget-service.yaml"
+          test -f /tmp/scaffolded/.backstage/argocd-app.yaml
+          test -f /tmp/scaffolded/.backstage/referencegrant.yaml
+          grep -q 'sourcePath: .backstage/argocd-app.yaml' backstage/templates/fastapi-template/template.yaml
+          grep -q 'sourcePath: .backstage/referencegrant.yaml' backstage/templates/fastapi-template/template.yaml
 
       # Named something other than the package name baked into uv.lock. The
       # lockfile records a root package, and `uv sync --frozen` rejects a
