@@ -29,18 +29,18 @@ API docs: <http://localhost:8000/docs> (Swagger) · <http://localhost:8000/redoc
 make help                  # full target list
 make format / lint / test  # code quality
 make build TAG=v1.0        # build image
-make deploy TAG=v1.0       # build + push + bump manifests/deployment.yaml
-make validate              # kubectl apply --dry-run on manifests/
+make deploy TAG=v0.2.0     # build + push + bump deploy/values.yaml
+make validate              # kubectl apply --dry-run on deploy/resources/
 ```
 
 `TAG` is required and must be `vX.Y` (e.g. `v1.0`, `v10.5`). See `make help` for the container runtime switch (`CONTAINER_RUNTIME=podman`) and other knobs.
 
 ## Deployment
 
-GitOps via Argo CD. `make deploy TAG=v1.0` builds, pushes to GHCR, and rewrites the image tag in `manifests/deployment.yaml`. **Commit + push** the manifests change to trigger sync:
+GitOps via Argo CD. `make deploy TAG=v0.2.0` builds, pushes to GHCR, and rewrites the image tag in `deploy/values.yaml`. **Commit + push** that change to trigger sync:
 
 ```bash
-git add manifests/deployment.yaml
+git add deploy/values.yaml
 git commit -m "Deploy v1.0"
 git push
 ```
@@ -52,7 +52,9 @@ Argo CD then syncs the app namespace.
 ```
 .
 ├── app/main.py                     # application source
-├── manifests/                      # Kubernetes manifests (Argo CD directory source)
+├── deploy/
+│   ├── values.yaml              # charts/app-base の values（デプロイ設定はここだけ）
+│   └── resources/              # namespace / ServiceMonitor（このリポジトリが所有）
 │   ├── deployment.yaml
 │   ├── service.yaml
 │   ├── httproute.yaml

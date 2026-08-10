@@ -6,23 +6,17 @@ metadata:
   annotations:
     github.com/project-slug: ${{ values.repoOwner }}/${{ values.repoName }}
     backstage.io/techdocs-ref: dir:.
-    argocd/app-name: app-dev-${{ values.name }},app-prod-${{ values.name }}
+    argocd/app-name: app-${{ values.name }}
   tags:
     - fastapi
     - python
   links:
-    - url: https://${{ values.name }}-dev.app.yu-min3.com/docs
-      title: API Docs (Dev)
-      icon: web
     - url: https://${{ values.name }}.app.yu-min3.com/docs
-      title: API Docs (Prod)
+      title: API Docs
       icon: web
-    - url: https://argocd.platform.yu-min3.com/applications/app-dev-${{ values.name }}
-      title: Argo CD (Dev)
-      icon: dashboard
-    - url: https://argocd.platform.yu-min3.com/applications/app-prod-${{ values.name }}
-      title: Argo CD (Prod)
-      icon: dashboard
+    - url: https://argocd.platform.yu-min3.com/applications/app-${{ values.name }}
+      title: Argo CD
+      icon: kubernetes
 spec:
   type: service
   lifecycle: experimental

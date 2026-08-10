@@ -87,27 +87,27 @@ The FastAPI application automatically generates OpenAPI documentation:
 ### Quick Start with Makefile
 
 ```bash
-make deploy TAG=v1.0.0
+make deploy TAG=v0.2.0
 ```
 
 The Makefile automates:
 - Docker image build
 - Push to GHCR
-- Updating the image tag in `manifests/deployment.yaml`
+- Updating the image tag in `deploy/values.yaml`
 
-Commit and push the change. Argo CD will automatically deploy to the `app-prod` namespace.
+Commit and push the change. Argo CD deploys to the `app-${{ values.name }}` namespace — one namespace per application (ADR-006).
 
 ### Manual Build and Deploy
 
 ```bash
-docker build -t ghcr.io/yu-min3/${{ values.name }}:v1.0.0 .
-docker push ghcr.io/yu-min3/${{ values.name }}:v1.0.0
+docker build -t ghcr.io/${{ values.repoOwner }}/${{ values.repoName }}:v0.2.0 .
+docker push ghcr.io/${{ values.repoOwner }}/${{ values.repoName }}:v0.2.0
 ```
 
-Update the image tag in `manifests/deployment.yaml`:
+Update the image tag in `deploy/values.yaml`:
 
 ```yaml
-image: ghcr.io/yu-min3/${{ values.name }}:v1.0.0  # Update this tag
+  tag: v0.2.0   # deploy/values.yaml
 ```
 
 Commit and push the change. Argo CD will automatically deploy.
@@ -154,14 +154,13 @@ These metrics are automatically scraped by Prometheus via the ServiceMonitor res
 ### Check Application Logs
 
 ```bash
-kubectl logs -n app-dev deployment/${{ values.name }} -f
+kubectl logs -n app-${{ values.name }} deployment/${{ values.name }} -f
 ```
 
 ### Check Argo CD Sync Status
 
 Visit Argo CD UI:
-- Dev: https://argocd.yu-min3.com/applications/app-dev-${{ values.name }}
-- Prod: https://argocd.yu-min3.com/applications/app-prod-${{ values.name }}
+- https://argocd.platform.yu-min3.com/applications/app-${{ values.name }}
 
 ### Test Health Endpoint
 
@@ -176,5 +175,4 @@ Owner: ${{ values.owner }}
 ## Links
 
 - [GitHub Repository](https://github.com/yu-min3/${{ values.name }})
-- [Argo CD Dev](https://argocd.yu-min3.com/applications/app-dev-${{ values.name }})
-- [Argo CD Prod](https://argocd.yu-min3.com/applications/app-prod-${{ values.name }})
+- [Argo CD](https://argocd.platform.yu-min3.com/applications/app-${{ values.name }})

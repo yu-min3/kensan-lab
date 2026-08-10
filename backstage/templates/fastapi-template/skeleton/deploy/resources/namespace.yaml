@@ -8,9 +8,19 @@ apiVersion: v1
 kind: Namespace
 metadata:
   name: app-${{ values.name }}
+  annotations:
+    # The Application syncs with prune: true, and Prune=false on the
+    # Application does not protect its children. Without this, dropping the
+    # app from Git deletes the namespace and cascades through everything in
+    # it — including any PVC.
+    argocd.argoproj.io/sync-options: Prune=false
   labels:
     kensan-lab.platform/environment: production
-    kensan-lab.platform/team: ${{ values.owner }}
+    # OwnerPicker hands back an entity reference — "group:default/platform" —
+    # and a label value cannot contain ':' or '/', so the API server would
+    # reject this namespace. template.yaml derives ownerSlug from it for use
+    # here; the full reference stays in catalog-info.yaml where it belongs.
+    kensan-lab.platform/team: ${{ values.ownerSlug }}
     kensan-lab.platform/app: ${{ values.name }}
     kensan-lab.platform/tier: application
     # Declares which Kyverno pod-security policy applies (ADR-012).

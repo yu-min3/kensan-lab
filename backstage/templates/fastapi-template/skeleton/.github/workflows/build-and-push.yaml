@@ -66,6 +66,12 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      # The platform schedules across arm64 (Raspberry Pi) and amd64 nodes, so
+      # an amd64-only image fails to start wherever it lands on an ARM node.
+      # QEMU is what lets a single amd64 runner produce both.
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
@@ -85,15 +91,18 @@ jobs:
           tags: |
             type=ref,event=branch
             type=ref,event=pr
-            type=semver,pattern={{version}}
-            type=semver,pattern={{major}}.{{minor}}
-            type=raw,value=dev-latest,enable={{is_default_branch}}
-            type=raw,value=prod-{{tag}},enable=${{ startsWith(github.ref, 'refs/tags/v') }}
+            # v-prefixed, because that is what deploy/values.yaml and every
+            # other image in this platform use. Without it a `v0.1.0` git tag
+            # produces an image tagged `0.1.0` and the first sync sits in
+            # ImagePullBackOff looking for one that does not exist.
+            type=semver,pattern=v{{version}}
+            type=semver,pattern=v{{major}}.{{minor}}
 
       - name: Build and push Docker image
         uses: docker/build-push-action@v5
         with:
           context: .
+          platforms: linux/amd64,linux/arm64
           push: ${{ github.event_name != 'pull_request' }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
@@ -105,5 +114,5 @@ jobs:
         run: |
           VERSION=${GITHUB_REF#refs/tags/}
           echo "Image pushed with tag: $VERSION"
-          echo "To deploy: 'make update-image TAG=$VERSION' then commit manifests/deployment.yaml"
+          echo "To deploy: 'make update-image TAG=$VERSION' then commit deploy/values.yaml"
 {% endraw %}

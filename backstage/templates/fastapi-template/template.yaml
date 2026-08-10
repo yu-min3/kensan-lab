@@ -118,6 +118,11 @@ spec:
           name: ${{ parameters.name }}
           description: ${{ parameters.description }}
           owner: ${{ parameters.owner }}
+          # OwnerPicker returns an entity reference such as
+          # "group:default/platform-engineering". Kubernetes label values allow
+          # neither ':' nor '/', so the bare name is derived here for use in the
+          # namespace labels; `owner` keeps the full reference for the catalog.
+          ownerSlug: ${{ parameters.owner | replace("group:default/", "") | replace("user:default/", "") | replace("group:", "") | replace("user:", "") }}
           repoName: ${{ (parameters.repoUrl | parseRepoUrl).repo }}
           repoOwner: ${{ (parameters.repoUrl | parseRepoUrl).owner }}
           # Domain & System values
@@ -138,7 +143,7 @@ spec:
 
     # Step 3a: Create Argo CD Application CRs
     - id: create-argocd-apps
-      name: Create Argo CD Applications (Dev & Prod)
+      name: Open the platform pull request
       action: publish:github:pull-request
       input:
         repoUrl: github.com?repo=kensan-lab&owner=yu-min3
@@ -162,27 +167,39 @@ spec:
           - **Domain**: `${{ parameters.domain }}`
           - **System**: `${{ parameters.system }}`
 
-          **Location**: `kubernetes/argocd/applications/apps/${{ parameters.name }}/argocd-apps.yaml`
+          ## What this changes
 
-          ## 🔐 Repository Authentication
+          | File | Why |
+          |---|---|
+          | `kubernetes/argocd/applications/apps/app-${{ parameters.name }}/app.yaml` | The Application: `charts/app-base` driven by the service's own values file |
+          | `kubernetes/auth/oauth2-proxy/resources/referencegrant-app-${{ parameters.name }}.yaml` | Lets the service's `/oauth2` route reach oauth2-proxy across namespaces |
 
-          ✅ **No manual action required!**
+          ## ⚠️ One thing this PR cannot do
 
-          Argo CD is configured with Credential Templates that automatically authenticate all repositories under `https://github.com/${{ (parameters.repoUrl | parseRepoUrl).owner }}/` prefix.
+          `gateway-prod` protects every hostname it serves, so **Keycloak has to
+          accept the redirect URI before anyone can log in**. That list is a
+          shell array, not a file this template can add to:
 
-          ## ⚠️ Platform Engineer Actions Required
+          ```
+          bootstrap/keycloak/setup.sh → GATEWAY_PROTECTED_HOSTS
+            add: ${{ parameters.name }}.app.yu-min3.com
+          then re-run the script
+          ```
 
-          ### Review & Merge
+          Merging without this leaves the service reachable but impossible to
+          log into — the redirect comes back and Keycloak rejects the URI.
 
-          1. **Review Application CRs**: Verify the Argo CD Application definitions are correct
-          2. **Merge PR**: After review, merge this PR
+          ## Review
 
-          Argo CD will automatically:
-          1. Detect the new Application CRs
-          2. Authenticate to the repository using Credential Templates
-          3. Sync the application to both Dev and Prod environments
+          1. Check the Application's sources and destination namespace
+          2. Add the hostname to `GATEWAY_PROTECTED_HOSTS` and re-run the script
+          3. Merge
+
+          Argo CD picks the Application up on its own once merged. Repository
+          authentication needs no action — Credential Templates already cover
+          `https://github.com/${{ (parameters.repoUrl | parseRepoUrl).owner }}/`.
         sourcePath: .backstage
-        targetPath: kubernetes/argocd/applications/apps/${{ parameters.name }}
+        targetPath: .
 
     # Step 4: Register component in Backstage catalog
     - id: register

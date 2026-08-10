@@ -1,5 +1,12 @@
 [project]
-name = "${{ values.name }}"
+# Deliberately not the service name. uv writes the root package name into
+# uv.lock, and `uv sync --frozen` in the Dockerfile then refuses any project
+# whose name disagrees ("Missing workspace member"). Since the Dockerfile
+# builds with --no-install-project, this package is never installed and the
+# name is internal — so it stays fixed and the lockfile works for every
+# scaffolded service. The service's identity lives in the image name and the
+# Kubernetes resources.
+name = "app"
 version = "1.0.0"
 description = "${{ values.description }}"
 readme = "README.md"
