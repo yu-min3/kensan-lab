@@ -53,10 +53,11 @@ jobs:
           import pathlib, re
           # What the scaffolder would fill in, for a service called sample-api.
           sample = {
-              "name": "sample-api",
+              "name": "widget-service",
               "description": "Sample FastAPI service",
+              "ownerSlug": "platform-engineering",
               "repoOwner": "yu-min3",
-              "repoName": "app-sample-api",
+              "repoName": "app-widget-service",
               "owner": "platform-engineering",
               "system": "developer-portal",
               "domain": "platform",
@@ -83,6 +84,14 @@ jobs:
               if filled != text:
                   path.write_text(filled)
 
+          # fetch:template substitutes inside paths as well as contents, and the
+          # platform pull request depends on it — the Application lands in a
+          # directory named after the service.
+          for path in sorted(root.rglob("*"), key=lambda p: len(p.parts), reverse=True):
+              filled = pattern.sub(fill, path.name)
+              if filled != path.name:
+                  path.rename(path.with_name(filled))
+
           # A placeholder this job does not know about means the template grew a
           # parameter and nothing here exercises it.
           assert not missing, f"template uses parameters this job does not supply: {sorted(missing)}"
@@ -93,7 +102,7 @@ jobs:
       # rather than on somebody's first deploy.
       - name: Render through charts/app-base
         run: |
-          helm template sample-api charts/app-base -f /tmp/scaffolded/deploy/values.yaml > /tmp/rendered.yaml
+          helm template widget-service charts/app-base -f /tmp/scaffolded/deploy/values.yaml > /tmp/rendered.yaml
           grep -q 'kind: Deployment' /tmp/rendered.yaml
           grep -q 'kind: HTTPRoute' /tmp/rendered.yaml
           # The image declares a named USER, so the values must pin the numeric
@@ -104,16 +113,28 @@ jobs:
           # service published on it without the /oauth2 route sends people to
           # Keycloak and then 404s the callback. The failure looks like a broken
           # login rather than a missing route, so assert the route exists.
-          grep -q 'sample-api-oauth2' /tmp/rendered.yaml
+          grep -q 'widget-service-oauth2' /tmp/rendered.yaml
 
+      # The platform pull request has to carry the ReferenceGrant as well as
+      # the Application: without it the /oauth2 route is RefNotPermitted and the
+      # login redirect dead-ends.
+      - name: Check the platform pull request contents
+        run: |
+          test -f "/tmp/scaffolded/.backstage/kubernetes/argocd/applications/apps/app-widget-service/app.yaml"
+          test -f "/tmp/scaffolded/.backstage/kubernetes/auth/oauth2-proxy/resources/referencegrant-app-widget-service.yaml"
+
+      # Named something other than the package name baked into uv.lock. The
+      # lockfile records a root package, and `uv sync --frozen` rejects a
+      # project whose name disagrees — a defect that stayed invisible while
+      # this job used the same name the lockfile was generated with.
       - name: Build the image
-        run: docker build -t sample-api:ci /tmp/scaffolded
+        run: docker build -t widget-service:ci /tmp/scaffolded
 
       # Building is not enough: both defects this job exists for produced an
       # image that built and then exited immediately.
       - name: Run it and check the endpoints
         run: |
-          docker run -d --name sample-api -p 8000:8000 sample-api:ci
+          docker run -d --name widget-service -p 8000:8000 widget-service:ci
           for i in $(seq 1 30); do
             if curl -fsS -m 2 http://127.0.0.1:8000/health >/dev/null 2>&1; then
               echo "healthy after ${i}s"
@@ -125,8 +146,8 @@ jobs:
           curl -fsS -m 5 -o /dev/null http://127.0.0.1:8000/metrics
           curl -fsS -m 5 -o /dev/null http://127.0.0.1:8000/
           # charts/app-base runs it as UID 1000; the image must agree.
-          test "$(docker exec sample-api id -u)" = "1000"
+          test "$(docker exec widget-service id -u)" = "1000"
 
       - name: Container logs
         if: failure()
-        run: docker logs sample-api 2>&1 | tail -40
+        run: docker logs widget-service 2>&1 | tail -40

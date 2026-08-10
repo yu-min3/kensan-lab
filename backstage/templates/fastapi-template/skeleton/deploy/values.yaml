@@ -7,9 +7,11 @@
 # application itself owns is in this directory.
 
 image:
-  # Pushed by .github/workflows/build-and-push.yaml on every tag.
+  # Pushed by .github/workflows/build-and-push.yaml on every tag. The value
+  # here matches the first release the README asks for, so that the initial
+  # sync finds an image instead of sitting in ImagePullBackOff.
   repository: ghcr.io/${{ values.repoOwner }}/${{ values.repoName }}
-  tag: v1.0.0
+  tag: v0.1.0
 
 ports:
   http: 8000

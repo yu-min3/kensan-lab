@@ -25,6 +25,38 @@ wheels = [
 ]
 
 [[package]]
+name = "app"
+version = "1.0.0"
+source = { editable = "." }
+dependencies = [
+    { name = "fastapi" },
+    { name = "opentelemetry-distro" },
+    { name = "opentelemetry-exporter-otlp" },
+    { name = "prometheus-client" },
+    { name = "uvicorn", extra = ["standard"] },
+]
+
+[package.optional-dependencies]
+dev = [
+    { name = "httpx" },
+    { name = "pytest" },
+    { name = "ruff" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "fastapi", specifier = "==0.115.0" },
+    { name = "httpx", marker = "extra == 'dev'", specifier = "==0.27.2" },
+    { name = "opentelemetry-distro", specifier = "==0.49b0" },
+    { name = "opentelemetry-exporter-otlp", specifier = "==1.28.0" },
+    { name = "prometheus-client", specifier = "==0.21.0" },
+    { name = "pytest", marker = "extra == 'dev'", specifier = "==8.3.3" },
+    { name = "ruff", marker = "extra == 'dev'", specifier = "==0.8.0" },
+    { name = "uvicorn", extras = ["standard"], specifier = "==0.32.0" },
+]
+provides-extras = ["dev"]
+
+[[package]]
 name = "certifi"
 version = "2026.7.22"
 source = { registry = "https://pypi.org/simple" }
@@ -738,38 +770,6 @@ wheels = [
     { url = "https://files.pythonhosted.org/packages/1d/5c/4d800fca7854f62ad77f2c0d99b4b585f03e2d87a6ec1ecea85543a14a3c/ruff-0.8.0-py3-none-win_amd64.whl", hash = "sha256:582891c57b96228d146725975fbb942e1f30a0c4ba19722e692ca3eb25cc9b4f", size = 9559876 },
     { url = "https://files.pythonhosted.org/packages/5b/bc/cc8a6a5ca4960b226dc15dd8fb511dd11f2014ff89d325c0b9b9faa9871f/ruff-0.8.0-py3-none-win_arm64.whl", hash = "sha256:ba93e6294e9a737cd726b74b09a6972e36bb511f9a102f1d9a7e1ce94dd206a6", size = 8939733 },
 ]
-
-[[package]]
-name = "sample-api"
-version = "1.0.0"
-source = { editable = "." }
-dependencies = [
-    { name = "fastapi" },
-    { name = "opentelemetry-distro" },
-    { name = "opentelemetry-exporter-otlp" },
-    { name = "prometheus-client" },
-    { name = "uvicorn", extra = ["standard"] },
-]
-
-[package.optional-dependencies]
-dev = [
-    { name = "httpx" },
-    { name = "pytest" },
-    { name = "ruff" },
-]
-
-[package.metadata]
-requires-dist = [
-    { name = "fastapi", specifier = "==0.115.0" },
-    { name = "httpx", marker = "extra == 'dev'", specifier = "==0.27.2" },
-    { name = "opentelemetry-distro", specifier = "==0.49b0" },
-    { name = "opentelemetry-exporter-otlp", specifier = "==1.28.0" },
-    { name = "prometheus-client", specifier = "==0.21.0" },
-    { name = "pytest", marker = "extra == 'dev'", specifier = "==8.3.3" },
-    { name = "ruff", marker = "extra == 'dev'", specifier = "==0.8.0" },
-    { name = "uvicorn", extras = ["standard"], specifier = "==0.32.0" },
-]
-provides-extras = ["dev"]
 
 [[package]]
 name = "sniffio"
