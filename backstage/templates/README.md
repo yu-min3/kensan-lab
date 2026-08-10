@@ -88,7 +88,8 @@ fastapi-template/
     │   ├── values.yaml        # charts/app-base の values（唯一の設定面）
     │   └── resources/         # namespace / ServiceMonitor（app が所有）
     ├── docs/                  # TechDocs
-    ├── .backstage/            # Argo CD Application（platform へ PR される）
+    ├── .backstage/            # platform へ PR される内容
+    │   └── kubernetes/       #   Application + oauth2 の ReferenceGrant
     ├── .github/workflows/     # CI/CD
     ├── Dockerfile
     ├── pyproject.toml

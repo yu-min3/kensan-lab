@@ -62,7 +62,10 @@ jobs:
               "system": "developer-portal",
               "domain": "platform",
           }
-          pattern = re.compile(r"\$\{\{\s*values\.(\w+)\s*\}\}")
+          # Dotted references (values.destination.x) count too — the earlier
+          # pattern matched only single words, so a placeholder the scaffolder
+          # never fills could sit in a shipped file unnoticed.
+          pattern = re.compile(r"\$\{\{\s*values\.([\w.]+)\s*\}\}")
           root = pathlib.Path("/tmp/scaffolded")
           missing = set()
 
@@ -118,22 +121,48 @@ jobs:
           # login rather than a missing route, so assert the route exists.
           grep -q 'widget-service-oauth2' /tmp/rendered.yaml
 
-      # Both files have to reach the platform repository: without the
-      # ReferenceGrant the /oauth2 route is RefNotPermitted and the login
-      # redirect dead-ends. Their destinations come from targetPath, so what is
-      # checked here is that the sources exist and template.yaml still ships
-      # each one.
+      # publish:github:pull-request globs sourcePath as a directory and joins
+      # targetPath as a prefix — neither can name a destination file. So the
+      # per-app paths come from an fs:rename step, and what has to hold is that
+      # the rename targets exist and that sourcePath is a directory. Grepping
+      # template.yaml for its own strings would prove none of that.
       - name: Check the platform pull request contents
         run: |
-          test -f /tmp/scaffolded/.backstage/argocd-app.yaml
-          test -f /tmp/scaffolded/.backstage/referencegrant.yaml
-          grep -q 'sourcePath: .backstage/argocd-app.yaml' backstage/templates/fastapi-template/template.yaml
-          grep -q 'sourcePath: .backstage/referencegrant.yaml' backstage/templates/fastapi-template/template.yaml
+          python3 - <<'PY'
+          import pathlib, re, sys, yaml
 
-      # Named something other than the package name baked into uv.lock. The
-      # lockfile records a root package, and `uv sync --frozen` rejects a
-      # project whose name disagrees — a defect that stayed invisible while
-      # this job used the same name the lockfile was generated with.
+          tpl = yaml.safe_load(open("backstage/templates/fastapi-template/template.yaml"))
+          steps = {s["id"]: s for s in tpl["spec"]["steps"]}
+          root = pathlib.Path("/tmp/scaffolded")
+
+          # 1. sourcePath must be a directory in the scaffolded output, because
+          #    the action globs it with cwd set to that path.
+          src = steps["create-platform-pr"]["input"]["sourcePath"]
+          assert (root / src).is_dir(), f"sourcePath must be a directory, got {src}"
+
+          # 2. Every fs:rename source must exist, or the rename silently leaves
+          #    the placeholder name in the pull request.
+          expr = re.compile(r"\$\{\{.*?\}\}")
+          renamed = []
+          for f in steps["rename-platform-paths"]["input"]["files"]:
+              assert (root / f["from"]).exists(), f"fs:rename source missing: {f['from']}"
+              renamed.append(f["to"])
+
+          # 3. Simulate the rename so the resulting layout can be checked. The
+          #    destinations are expressions; substitute the service name the
+          #    same way the scaffolder would.
+          for f in steps["rename-platform-paths"]["input"]["files"]:
+              (root / f["from"]).rename(root / expr.sub("widget-service", f["to"]))
+
+          want = [
+              ".backstage/kubernetes/argocd/applications/apps/app-widget-service/app.yaml",
+              ".backstage/kubernetes/auth/oauth2-proxy/resources/referencegrant-app-widget-service.yaml",
+          ]
+          for w in want:
+              assert (root / w).is_file(), f"after rename, expected {w}"
+          print("platform pull request would carry:", *want, sep="\n  ")
+          PY
+
       - name: Build the image
         run: docker build -t widget-service:ci /tmp/scaffolded
 

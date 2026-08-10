@@ -61,7 +61,8 @@ Argo CD then syncs the app namespace.
 │   ├── authz-policy.yaml
 │   └── servicemonitor.yaml
 ├── docs/index.md                   # TechDocs source
-├── .backstage/argocd-apps.yaml     # Argo CD Application template
+├── .backstage/                     # プラットフォーム repo へ PR される内容
+│   └── kubernetes/                 #   Application と ReferenceGrant
 ├── Dockerfile
 ├── requirements.txt
 └── catalog-info.yaml               # Backstage catalog entry
@@ -76,7 +77,6 @@ Argo CD then syncs the app namespace.
 
 ## Links
 
-- [Backstage](${{ values.destination.backstageUrl }})
 - [Argo CD](https://argocd.yu-min3.com/applications/app-${{ values.name }})
 - [Live App](https://${{ values.name }}.yu-min3.com)
 
