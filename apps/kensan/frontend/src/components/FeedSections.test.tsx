@@ -37,6 +37,29 @@ describe("splitFeedItems", () => {
     expect(items[1].version).toMatch(/^content:[0-9a-f]{8}$/);
   });
 
+  it("renders 30秒サマリー ahead of the inbox instead of after every zone", () => {
+    const { container } = render(
+      <FeedSections
+        content={
+          "## 30秒サマリー\n\n| 区分 | 件数 |\n|---|---|\n| 要対応 | 0 |\n\n" +
+          "## 要対応\n\nなし。\n\n" +
+          "## 今日のニュース\n\n### 記事\n本文\n\n" +
+          "## 未知の新セクション\n\n本文"
+        }
+      />,
+    );
+    const headings = [...container.querySelectorAll("h3")].map((h) => h.textContent);
+    expect(headings[0]).toBe("30秒サマリー");
+    // 既知zoneに入ったので、未知sectionを流す末尾には出ない
+    expect(headings.indexOf("30秒サマリー")).toBeLessThan(headings.indexOf("Inbox"));
+    expect(headings.at(-1)).toBe("未知の新セクション");
+  });
+
+  it("omits the summary card when the report has no 30秒サマリー", () => {
+    const { container } = render(<FeedSections content={"## 要対応\n\nなし。"} />);
+    expect(container.textContent).not.toContain("30秒サマリー");
+  });
+
   it("hides acknowledged inbox items and excludes them from the badge", () => {
     render(
       <FeedSections
