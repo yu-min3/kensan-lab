@@ -142,7 +142,14 @@ def main() -> int:
         # that is reconciled a screenshot here would show a guest card behind an
         # SSO gate, which describes neither cluster.
         shot(page, "https://grafana.127-0-0-1.sslip.io/dashboards",
-             "grafana-dashboards", settle=3000)
+             "grafana-dashboards", settle=4000)
+        # The dashboard itself, not the list. `kiosk` drops Grafana's chrome so
+        # the picture is the panels rather than a navigation bar, and the fixed
+        # window keeps two runs comparable.
+        shot(page,
+             "https://grafana.127-0-0-1.sslip.io/d/cluster-health/cluster-health"
+             "?orgId=1&from=now-30m&to=now&kiosk",
+             "grafana-cluster-health", settle=9000)
         shot(page, "https://demo.127-0-0-1.sslip.io/docs",
              "demo-app", settle=2500)
 
