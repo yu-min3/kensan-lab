@@ -655,6 +655,24 @@ if [[ "$code" != "200" ]]; then
        scripts/explore-login-check.sh demo.127-0-0-1.sslip.io demo '<password>'"
 fi
 
+# Backstage signs people in itself now, so its round trip is a different shape:
+# no CSRF cookie, no /oauth2/callback, and a handler that answers with a page
+# rather than a status code. Checked separately for that reason — and checked at
+# all because the two failures it catches (a client Keycloak does not know, a
+# discovery document Node will not trust) both look like a healthy pod.
+info "checking that a person can sign in to Backstage"
+result="$("${REPO_ROOT}/scripts/explore-backstage-login-check.sh" \
+  backstage.127-0-0-1.sslip.io demo "${DEMO_USER_PASSWORD}" 2>&1 || true)"
+case "$result" in
+  200*) : ;;
+  *)
+    fail "signing in to Backstage did not complete: ${result}
+     The portal is up and its plugins started, so this is the OIDC round trip:
+       kubectl -n backstage logs deploy/backstage -c backstage | grep -i oidc
+     A self-signed CA that Node was not told about fails here as a certificate
+     error; a missing Keycloak client fails as an unknown client_id." ;;
+esac
+
 # Backstage's probe is a liveness check on the HTTP router, not on the plugins
 # behind it. A backend whose catalog failed to start still serves the frontend
 # shell and still answers /healthcheck with 200, so the pod is Ready, the
