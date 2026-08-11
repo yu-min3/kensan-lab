@@ -102,7 +102,7 @@ Backstage の plugin API は sign-in 後に Backstage 自身が発行した Bear
 | Istio `includeRequestHeadersInCheck` | **cookieでsession検証**。application `Authorization`はoauth2-proxyへ渡さない |
 | Gateway JWT検証 | `X-Auth-Request-Access-Token` をJWKS検証し、既存のgroups許可を維持 |
 | Backstage利用者 | Gatewayのadmin/dev許可に加え、Catalog User resolverでもallowlist |
-| `requestauthentication-strip-jwt.yaml` | **維持**。外部 Keycloak JWT を Backstage token と誤認して 401 にする既知問題を防ぐ |
+| workload `RequestAuthentication` | **削除**。Keycloak tokenはGateway専用headerで検証し、workloadではBackstage tokenをbackendへ渡す |
 | Backstage ExternalSecret | **変更なし**。専用 client secret は不要 |
 | Backstage image | application build 後に新 tag へ更新。`latest` は使わない |
 
@@ -152,7 +152,7 @@ GitOps のため runtime 変更は Git commit と Argo CD sync を経由する�
 - oauth2-proxy outage 時は現在どおり fail closed で 503 になる。
 - Backstage の health probe と内部 plugin-to-plugin 呼び出しが default auth policy 復元後も成功する。
 - frontend の Backstage Bearer token が Gateway で上書きされず、plugin API に到達する。
-- `requestauthentication-strip-jwt.yaml` により直接転送された外部 Keycloak Bearer token 起因の 401 が再発しない。
+- workload sidecarがBackstage tokenを未知のissuerとして拒否しない。
 - restart と oauth2-proxy cookie refresh 後も Backstage session を再確立できる。
 
 ## Observability
@@ -164,7 +164,7 @@ GitOps のため runtime 変更は Git commit と Argo CD sync を経由する�
 | 302 loop / 503 | Gateway → oauth2-proxy | oauth2-proxy log、ext_authz metrics、cookie domain |
 | 403 Gateway | Gateway AuthorizationPolicy | CUSTOM/ALLOW policy、host category |
 | sign-in resolver error | Backstage auth backend | email header の有無、Catalog User email |
-| plugin API 401 | Backstage backend auth | Backstage token、service-to-service auth、JWT strip |
+| plugin API 401 | Backstage backend auth | Backstage token、service-to-service auth、workload JWT policyの有無 |
 
 認証 header の値や token 本文を通常ログへ出さない。診断時も email は最小限にし、access token / cookie / authorization header は記録しない。
 
