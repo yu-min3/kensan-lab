@@ -11,9 +11,10 @@
 # 動作:
 # 1. 対象 host への non-/oauth2 request 着弾
 # 2. Istio が oauth2-proxy.auth-system.svc:4180 を叩く (meshConfig.extensionProviders 経由)
-# 3. cookie 有効 → oauth2-proxy が 200 OK + Authorization: Bearer <id_token> を付与
+# 3. cookie 有効 → oauth2-proxy が 200 OK + identity headers を返す
 #    cookie 無 → oauth2-proxy が 302 で Keycloak へ redirect
-# 4. ALLOW policy の `when claims[groups]` で再度 group 確認
+# 4. ALLOW policy が共通 provider では JWT claim、Backstage 専用 provider では
+#    oauth2-proxy が上書きした groups header を確認
 #
 # 失敗時挙動: oauth2-proxy 側で failOpen: false なので、oauth2-proxy が落ちると
 # 対象 host (の /oauth2/* 以外) は 503 になる。Category 1 (bypass) 側は影響しない。
@@ -34,14 +35,37 @@ spec:
     - to:
         - operation:
             hosts:
-              - backstage.platform.yu-min3.com
               - prometheus.platform.yu-min3.com
               - hubble.platform.yu-min3.com
               - longhorn.platform.yu-min3.com
               # `.yu-mins.com` (Cloudflare Tunnel 経由) も同じく oauth2-proxy ext_authz を強制
-              - backstage.yu-mins.com
               - prometheus.yu-mins.com
               - longhorn.yu-mins.com
+            notPaths:
+              - /oauth2
+              - /oauth2/*
+---
+# Backstage は frontend が発行済み Backstage token を Authorization header で送る。
+# 共通 provider の Keycloak token 転送で上書きしない専用 provider を使用する。
+apiVersion: security.istio.io/v1
+kind: AuthorizationPolicy
+metadata:
+  name: gateway-platform-oauth2-authz-backstage
+  namespace: istio-system
+spec:
+  targetRef:
+    group: gateway.networking.k8s.io
+    kind: Gateway
+    name: gateway-platform
+  action: CUSTOM
+  provider:
+    name: oauth2-proxy-backstage
+  rules:
+    - to:
+        - operation:
+            hosts:
+              - backstage.platform.yu-min3.com
+              - backstage.yu-mins.com
             notPaths:
               - /oauth2
               - /oauth2/*
