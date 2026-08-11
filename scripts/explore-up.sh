@@ -273,24 +273,44 @@ if [[ "$code" != "200" ]]; then
      Troubleshooting: docs/getting-started/try-it-with-kind.md#troubleshooting"
 fi
 
+# And again over TLS. This is a separate assertion because it can fail on its
+# own: the route can be perfect while the certificate is still being issued, in
+# which case Istio serves the listener with no certificate at all.
+info "checking that the gateway serves the same app over TLS"
+code="$(curl -sSk -o /dev/null -w '%{http_code}' --max-time 15 \
+  --resolve "demo.127-0-0-1.sslip.io:443:127.0.0.1" \
+  https://demo.127-0-0-1.sslip.io/ || echo 000)"
+if [[ "$code" != "200" ]]; then
+  fail "the demo app answered HTTP ${code} over TLS, not 200.
+     Plain HTTP works, so the route is fine and the certificate is not:
+       kubectl -n istio-system get certificate explore-wildcard
+       kubectl -n cert-manager get certificate explore-ca
+     Troubleshooting: docs/getting-started/try-it-with-kind.md#troubleshooting"
+fi
+
 admin_password="$(kubectl -n argocd get secret argocd-initial-admin-secret \
   -o jsonpath='{.data.password}' 2>/dev/null | base64 --decode || echo '(already rotated)')"
 
 cat <<EOF
 
-  The platform is up. Three things worth doing, in order:
+  The platform is up. Four things worth doing, in order.
 
-  1. Open the GitOps tree            http://argocd.127-0-0-1.sslip.io
+  Every URL below is https, and your browser will warn about the certificate.
+  cert-manager issued it from a CA this cluster generated a minute ago, and
+  nothing on your machine has a reason to trust that — there is no domain here
+  to prove ownership of. Clicking through is the intended path.
+
+  1. Open the GitOps tree            https://argocd.127-0-0-1.sslip.io
      user 'admin', password '${admin_password}'
      The 'explore-root' application is the app-of-apps: open it and every
      component below it is one Application, exactly as on the real cluster.
 
   2. Open Grafana                    https://grafana.127-0-0-1.sslip.io
      user 'admin', password '${GRAFANA_PASSWORD}'
-     The certificate is self-signed, so the browser will warn — there is no
-     domain here to prove ownership of, and the warning is the honest result.
+     The 'Cluster Health' dashboard is the bare-metal one, unedited. The panels
+     that stay empty are reading a Raspberry Pi's temperature sensor.
 
-  3. Open the demo app               http://demo.127-0-0-1.sslip.io
+  3. Open the demo app               https://demo.127-0-0-1.sslip.io
      It reached the browser through Istio's Gateway API implementation, and it
      was deployed by charts/app-base — the same chart the real apps use, with
      no changes, only a values file.

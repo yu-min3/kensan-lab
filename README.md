@@ -42,11 +42,11 @@ git clone https://github.com/yu-min3/kensan-lab && cd kensan-lab
 make try
 ```
 
-A few minutes later: Argo CD's app-of-apps tree at `http://argocd.127-0-0-1.sslip.io`, the Backstage developer portal at `http://backstage.127-0-0-1.sslip.io`, a demo app served through a real Istio Gateway at `http://demo.127-0-0-1.sslip.io`, and the production policy set reporting in `kubectl get policyreport -A`. `make explore-down` removes it.
+A few minutes later: Argo CD's app-of-apps tree at `https://argocd.127-0-0-1.sslip.io`, the Backstage developer portal at `https://backstage.127-0-0-1.sslip.io`, Grafana drawing the production Cluster Health dashboard at `https://grafana.127-0-0-1.sslip.io`, a demo app served through a real Istio Gateway at `https://demo.127-0-0-1.sslip.io`, and the production policy set reporting in `kubectl get policyreport -A`. `make explore-down` removes it.
 
-The quickstart includes a **[seven-step walkthrough](https://yu-min3.github.io/kensan-lab/getting-started/try-it-with-kind/#take-it-for-a-walk)** — open the developer portal and find the golden path template, break a deployment and watch Argo CD heal it, trip a Kyverno policy and read the verdict, claim a PVC on the `longhorn` StorageClass, and see how Istio's CNI plugin chained onto the cluster's own networking.
+The quickstart includes an **[eight-step walkthrough](https://yu-min3.github.io/kensan-lab/getting-started/try-it-with-kind/#take-it-for-a-walk)** — open the developer portal and find the golden path template, break a deployment and watch Argo CD heal it, read the cluster's own health dashboard, trip a Kyverno policy and read the verdict, claim a PVC on the `longhorn` StorageClass, and see how Istio's CNI plugin chained onto the cluster's own networking.
 
-It is a subset with substitutions, not a fork — no Cilium, Vault, Keycloak or Longhorn, and the L2 load balancer and wildcard TLS are stood in for. **[What kind cannot show you, and why](https://yu-min3.github.io/kensan-lab/getting-started/try-it-with-kind/#what-kind-cannot-show)** is the more interesting half of that list. The Explore CI badge above is this cluster coming up from scratch on every pull request.
+It is a subset with substitutions, not a fork — no Cilium, Vault, Keycloak or Longhorn, and the L2 load balancer is stood in for. TLS is real, but signed by a CA the cluster generates for itself: a fork has no domain to prove ownership of, so the browser warning is the missing proof shown accurately. **[What kind cannot show you, and why](https://yu-min3.github.io/kensan-lab/getting-started/try-it-with-kind/#what-kind-cannot-show)** is the more interesting half of that list. The Explore CI badge above is this cluster coming up from scratch on every pull request.
 
 ## Why This Exists
 
