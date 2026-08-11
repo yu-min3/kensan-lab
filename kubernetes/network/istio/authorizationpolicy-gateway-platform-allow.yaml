@@ -58,12 +58,27 @@ spec:
               - grafana.yu-mins.com
 
     # === Category 2: oauth2-proxy 強制 + admin or dev ===
+    # Backstage は専用 ext_authz provider が上書きした groups header を評価する。
+    # Authorization header は Backstage 自身の token のために保持する。
     - to:
         - operation:
             hosts:
               - backstage.platform.yu-min3.com
-              - prometheus.platform.yu-min3.com
               - backstage.yu-mins.com
+      when:
+        - key: request.headers[x-auth-request-groups]
+          values:
+            - platform-admin
+            - platform-admin,*
+            - '*,platform-admin'
+            - platform-dev
+            - platform-dev,*
+            - '*,platform-dev'
+
+    - to:
+        - operation:
+            hosts:
+              - prometheus.platform.yu-min3.com
               - prometheus.yu-mins.com
       when:
         - key: request.auth.claims[groups]

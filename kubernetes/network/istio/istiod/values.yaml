@@ -53,3 +53,29 @@ meshConfig:
           - content-type
           - set-cookie
           - location
+    # Backstage は sign-in 後の plugin API 呼び出しに、自身が発行した
+    # Authorization: Bearer <Backstage token> を使う。共通 provider は oauth2-proxy
+    # の Keycloak token でこの header を上書きするため、Backstage 専用 provider では
+    # identity header だけを反映し、元の Authorization header を保持する。
+    - name: oauth2-proxy-backstage
+      envoyExtAuthzHttp:
+        service: oauth2-proxy.auth-system.svc.cluster.local
+        port: 4180
+        pathPrefix: /oauth2/auth
+        failOpen: false
+        timeout: 0.2s
+        includeRequestHeadersInCheck:
+          - cookie
+          - authorization
+          - x-forwarded-uri
+          - x-forwarded-host
+          - x-forwarded-proto
+        headersToUpstreamOnAllow:
+          - x-auth-request-user
+          - x-auth-request-email
+          - x-auth-request-groups
+          - x-auth-request-access-token
+        headersToDownstreamOnDeny:
+          - content-type
+          - set-cookie
+          - location

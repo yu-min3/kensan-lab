@@ -90,12 +90,15 @@ oauth2-proxy を Istio ext_authz の `/oauth2/auth` として使う場合、認�
 
 ### Platform manifests
 
-既存の header forwarding は必要条件を満たしているため、原則変更しない。
+Backstage の plugin API は sign-in 後に Backstage 自身が発行した Bearer token を使う。
+共通 ext_authz provider が Keycloak token を `Authorization` に設定すると、この token を
+上書きしてしまうため、Backstage だけ header forwarding を分離する。
 
 | 対象 | 判断 |
 |---|---|
 | oauth2-proxy Keycloak client / Secret | **変更なし**。既存 `istio-gateway-platform` client を共有 |
-| Istio `headersToUpstreamOnAllow` | **変更なし**。user/email/groups をすでに転送 |
+| Istio `headersToUpstreamOnAllow` | **Backstage 専用 provider を追加**。user/email/groups は上書きし、`Authorization` は元の Backstage token を保持 |
+| Gateway group 許可 | **identity header で評価**。専用 ext_authz provider が上書きした `X-Auth-Request-Groups` の admin/dev を許可 |
 | `requestauthentication-strip-jwt.yaml` | **維持**。外部 Keycloak JWT を Backstage token と誤認して 401 にする既知問題を防ぐ |
 | Backstage ExternalSecret | **変更なし**。専用 client secret は不要 |
 | Backstage image | application build 後に新 tag へ更新。`latest` は使わない |
@@ -105,8 +108,8 @@ oauth2-proxy を Istio ext_authz の `/oauth2/auth` として使う場合、認�
 1. Browser が Backstage を開く。
 2. Istio が oauth2-proxy の `/oauth2/auth` へ ext_authz check を行う。
 3. session がなければ oauth2-proxy が Keycloak へ redirect し、認証後に共有 cookie を設定する。
-4. Gateway が Keycloak JWT の `groups` claim を検証し、admin/dev のみ Backstage へ許可する。
-5. oauth2-proxy が identity header を付加し、workload 側 RequestAuthentication が外部 Bearer JWT を剥がす。
+4. 専用 ext_authz provider が oauth2-proxy の identity header を上書きし、Gateway が groups header の admin/dev のみ Backstage へ許可する。
+5. 専用 provider は browser が送る `Authorization` を上書きしない。workload 側 RequestAuthentication は外部 Keycloak Bearer JWT だけを剥がす。
 6. Backstage oauth2Proxy provider が email header を Catalog User に照合し、Backstage token を発行する。
 7. frontend と backend plugin は Backstage token で user identity を共有する。
 
@@ -145,7 +148,8 @@ GitOps のため runtime 変更は Git commit と Argo CD sync を経由する�
 
 - oauth2-proxy outage 時は現在どおり fail closed で 503 になる。
 - Backstage の health probe と内部 plugin-to-plugin 呼び出しが default auth policy 復元後も成功する。
-- `requestauthentication-strip-jwt.yaml` により外部 Keycloak Bearer token 起因の 401 が再発しない。
+- frontend の Backstage Bearer token が Gateway で上書きされず、plugin API に到達する。
+- `requestauthentication-strip-jwt.yaml` により直接転送された外部 Keycloak Bearer token 起因の 401 が再発しない。
 - restart と oauth2-proxy cookie refresh 後も Backstage session を再確立できる。
 
 ## Observability
@@ -155,7 +159,7 @@ GitOps のため runtime 変更は Git commit と Argo CD sync を経由する�
 | 症状 | 境界 | 見るもの |
 |---|---|---|
 | 302 loop / 503 | Gateway → oauth2-proxy | oauth2-proxy log、ext_authz metrics、cookie domain |
-| 403 RBAC | Gateway AuthorizationPolicy | JWT groups claim、host category |
+| 403 RBAC | Gateway AuthorizationPolicy | oauth2-proxy groups header、host category |
 | sign-in resolver error | Backstage auth backend | email header の有無、Catalog User email |
 | plugin API 401 | Backstage backend auth | Backstage token、service-to-service auth、JWT strip |
 
