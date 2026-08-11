@@ -141,7 +141,8 @@ Those are two different mechanisms, and the difference is the interesting part:
 
 | | how it authenticates | why |
 |---|---|---|
-| **demo app, Backstage** | gateway `ext_authz` → oauth2-proxy | neither has auth code of its own; Backstage reads who you are from the headers the proxy sets |
+| **demo app** | gateway `ext_authz` → oauth2-proxy | the demo has no auth code of its own |
+| **Backstage (production)** | app-native OIDC → Keycloak | Backstage resolves the verified email to a Catalog User and issues its own application token |
 | **Argo CD, Grafana** | their own OIDC client | they already have identity, roles and an API; a second gate in front would mean two logins |
 
 Bare metal draws the line in the same place, for the same reason.

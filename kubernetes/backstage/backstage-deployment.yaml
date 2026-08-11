@@ -51,6 +51,21 @@ spec:
             secretKeyRef:
               name: backstage-secret
               key: GITHUB_TOKEN
+        - name: AUTH_OIDC_CLIENT_ID
+          valueFrom:
+            secretKeyRef:
+              name: backstage-secret
+              key: AUTH_OIDC_CLIENT_ID
+        - name: AUTH_OIDC_CLIENT_SECRET
+          valueFrom:
+            secretKeyRef:
+              name: backstage-secret
+              key: AUTH_OIDC_CLIENT_SECRET
+        - name: AUTH_SESSION_SECRET
+          valueFrom:
+            secretKeyRef:
+              name: backstage-secret
+              key: AUTH_SESSION_SECRET
         resources:
           requests:
             memory: "256Mi"

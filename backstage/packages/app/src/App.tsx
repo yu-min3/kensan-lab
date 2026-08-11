@@ -28,7 +28,6 @@ import { Root } from './components/Root';
 import {
   AlertDisplay,
   OAuthRequestDialog,
-  ProxiedSignInPage,
   SignInPage,
 } from '@backstage/core-components';
 import { createApp } from '@backstage/app-defaults';
@@ -38,6 +37,7 @@ import { RequirePermission } from '@backstage/plugin-permission-react';
 import { catalogEntityCreatePermission } from '@backstage/plugin-catalog-common/alpha';
 import { NotificationsPage } from '@backstage/plugin-notifications';
 import { SignalsDisplay } from '@backstage/plugin-signals';
+import { keycloakAuthApiRef } from './apis';
 
 const app = createApp({
   apis,
@@ -63,7 +63,16 @@ const app = createApp({
       ['localhost', '127.0.0.1'].includes(window.location.hostname) ? (
         <SignInPage {...props} auto providers={['guest']} />
       ) : (
-        <ProxiedSignInPage {...props} provider="oauth2Proxy" />
+        <SignInPage
+          {...props}
+          auto
+          provider={{
+            id: 'keycloak-auth-provider',
+            title: 'Keycloak',
+            message: 'Sign in using Keycloak',
+            apiRef: keycloakAuthApiRef,
+          }}
+        />
       ),
   },
 });

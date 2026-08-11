@@ -41,6 +41,7 @@ VAULT_HOSTNAME="vault.platform.yu-min3.com"
 
 BW_CLIENT_ITEM="kensan-lab/keycloak/oidc-client-vault"
 BW_USER_ITEM="kensan-lab/keycloak/user-yu"
+BW_BACKSTAGE_CLIENT_ITEM="kensan-lab/keycloak/oidc-client-backstage"
 
 # === 前提チェック ===
 for cmd in kubectl jq bw openssl; do
@@ -341,6 +342,25 @@ ARGOCD_CLIENT_UUID=$(ensure_oidc_client \
   "$ARGOCD_WEB_ORIGINS" \
   "https://$ARGOCD_HOSTNAME")
 
+# === Backstage OIDC client (Path B — Backstage native OIDC) ===
+BACKSTAGE_HOSTNAME="backstage.platform.yu-min3.com"
+BACKSTAGE_HOSTNAME_TUNNEL="backstage.yu-mins.com"
+BACKSTAGE_REDIRECT_URIS=$(jq -nc \
+  --arg cb "https://$BACKSTAGE_HOSTNAME/api/auth/oidc/handler/frame" \
+  --arg cb_tunnel "https://$BACKSTAGE_HOSTNAME_TUNNEL/api/auth/oidc/handler/frame" \
+  '[$cb, $cb_tunnel]')
+BACKSTAGE_WEB_ORIGINS=$(jq -nc \
+  --arg origin "https://$BACKSTAGE_HOSTNAME" \
+  --arg origin_tunnel "https://$BACKSTAGE_HOSTNAME_TUNNEL" \
+  '[$origin, $origin_tunnel]')
+BACKSTAGE_CLIENT_UUID=$(ensure_oidc_client \
+  "backstage" \
+  "Backstage OIDC" \
+  "Backstage native OIDC (Path B — gateway-platform bypass)" \
+  "$BACKSTAGE_REDIRECT_URIS" \
+  "$BACKSTAGE_WEB_ORIGINS" \
+  "https://$BACKSTAGE_HOSTNAME")
+
 # === Vault client_secret 取得 ===
 echo ""
 echo "==> Fetching Vault client_secret..."
@@ -468,6 +488,25 @@ Created by: bootstrap/keycloak/setup.sh"
 save_bw "kensan-lab/keycloak/oidc-client-argocd" \
   "argocd" "$ARGOCD_CLIENT_SECRET" "$ARGOCD_NOTES"
 
+# === Backstage client_secret 取得 + Bitwarden 保存 ===
+echo ""
+echo "==> Fetching backstage client_secret..."
+BACKSTAGE_CLIENT_SECRET=$(kcadm get "clients/$BACKSTAGE_CLIENT_UUID/client-secret" -r "$REALM" 2>/dev/null \
+  | jq -r '.value')
+if [ -z "$BACKSTAGE_CLIENT_SECRET" ] || [ "$BACKSTAGE_CLIENT_SECRET" = "null" ]; then
+  echo "ERROR: backstage client_secret が取れない"; exit 1
+fi
+echo "    backstage client_secret 取得 OK"
+
+BACKSTAGE_NOTES="Backstage OIDC client (Path B — gateway bypass + Backstage native OIDC).
+Realm: $REALM
+ClientID: backstage
+DiscoveryURL: https://auth.yu-mins.com/realms/$REALM
+Used by: Backstage in backstage namespace (auth.providers.oidc)
+Created by: bootstrap/keycloak/setup.sh"
+save_bw "$BW_BACKSTAGE_CLIENT_ITEM" \
+  "backstage" "$BACKSTAGE_CLIENT_SECRET" "$BACKSTAGE_NOTES"
+
 if [ -n "${USER_PW:-}" ]; then
   USER_NOTES="Keycloak user for kensan realm.
 Realm: $REALM
@@ -577,6 +616,37 @@ vault_populate_argocd_oidc_kv() {
   echo "    populated OK"
 }
 
+# === Vault KV 投入 (Backstage native OIDC 用) ===
+# session-secret は既存値を維持し、Pod再起動やscript再実行でsessionを壊さない。
+BACKSTAGE_OIDC_VAULT_PATH="secret/backstage/oidc"
+
+vault_populate_backstage_oidc_kv() {
+  echo ""
+  echo "==> Populating Vault KV: $BACKSTAGE_OIDC_VAULT_PATH"
+
+  local session_secret=""
+  if vault kv get -format=json "$BACKSTAGE_OIDC_VAULT_PATH" >/dev/null 2>&1; then
+    session_secret=$(vault kv get -format=json "$BACKSTAGE_OIDC_VAULT_PATH" \
+      | jq -r '.data.data["session-secret"] // empty')
+    echo "    既存 KV あり — client credentialsを同期"
+  else
+    echo "    KV path 未存在、新規作成"
+  fi
+
+  if [ -z "$session_secret" ]; then
+    session_secret=$(openssl rand -hex 32)
+    echo "    session-secret: 新規生成"
+  else
+    echo "    session-secret: 既存値を流用"
+  fi
+
+  vault kv put "$BACKSTAGE_OIDC_VAULT_PATH" \
+    client-id=backstage \
+    client-secret="$BACKSTAGE_CLIENT_SECRET" \
+    session-secret="$session_secret" > /dev/null
+  echo "    populated OK"
+}
+
 print_gateway_vault_manual() {
   cat <<MSG
 
@@ -591,6 +661,8 @@ print_gateway_vault_manual() {
     CSEC=\$(bw get item kensan-lab/keycloak/oidc-client-istio-gateway-platform | jq -r .login.password)
     GSEC=\$(bw get item kensan-lab/keycloak/oidc-client-grafana | jq -r .login.password)
     ASEC=\$(bw get item kensan-lab/keycloak/oidc-client-argocd | jq -r .login.password)
+    BSEC=\$(bw get item $BW_BACKSTAGE_CLIENT_ITEM | jq -r .login.password)
+    BSESSION=\$(openssl rand -hex 32)
 
     # 2. Vault に投入 (Gateway oauth2-proxy 用)
     vault kv put $GATEWAY_VAULT_PATH \\
@@ -608,10 +680,17 @@ print_gateway_vault_manual() {
       client-id=argocd \\
       client-secret="\$ASEC"
 
+    # 2'''. Vault に投入 (Backstage native OIDC 用)
+    vault kv put $BACKSTAGE_OIDC_VAULT_PATH \\
+      client-id=backstage \\
+      client-secret="\$BSEC" \\
+      session-secret="\$BSESSION"
+
     # 3. 確認
     vault kv get -format=json $GATEWAY_VAULT_PATH | jq '.data.data | keys'
     vault kv get -format=json $GRAFANA_OIDC_VAULT_PATH | jq '.data.data | keys'
     vault kv get -format=json $ARGOCD_OIDC_VAULT_PATH | jq '.data.data | keys'
+    vault kv get -format=json $BACKSTAGE_OIDC_VAULT_PATH | jq '.data.data | keys'
 MSG
 }
 
@@ -625,6 +704,7 @@ else
   vault_populate_gateway_kv
   vault_populate_grafana_oidc_kv
   vault_populate_argocd_oidc_kv
+  vault_populate_backstage_oidc_kv
 fi
 
 # === 出力 ===

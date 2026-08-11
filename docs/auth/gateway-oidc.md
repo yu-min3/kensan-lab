@@ -8,8 +8,8 @@ For the design rationale and the path-selection discussion, see ADR-005 / ADR-01
 
 | Auth method | Which hosts | Treatment at the gateway |
 |---|---|---|
-| **App-native auth** (the app has its own OIDC or auth) | Vault, ArgoCD, Keycloak, oauth2-proxy itself, **Grafana** | **Bypass** (gateway passes through) |
-| **Gateway-enforced OIDC** (the app has no auth of its own, or trusts proxy headers) | Backstage, Prometheus, Hubble, Longhorn | **CUSTOM (oauth2-proxy ext_authz) + ALLOW (group-claim check)** |
+| **App-native auth** (the app has its own OIDC or auth) | Vault, ArgoCD, Keycloak, **Grafana, Backstage** | **Bypass** (gateway passes through) |
+| **Gateway-enforced OIDC** (the app has no auth of its own, or trusts proxy headers) | Prometheus, Hubble, Longhorn | **CUSTOM (oauth2-proxy ext_authz) + ALLOW (group-claim check)** |
 
 > **Why Grafana bypasses**: Grafana misreads the `Authorization: Bearer ...` header that oauth2-proxy injects as its own API key and returns 403, so the gateway lets it through untouched and Grafana's own Keycloak OIDC (`auth.generic_oauth`) handles authentication. Implemented as Category 1 in `authorizationpolicy-gateway-platform-allow.yaml`.
 
@@ -26,9 +26,9 @@ The deciding axis is only **whether the app has its own auth** — not CLI vs UI
             ┌──────────┴──────────┐
             ▼                     ▼
      [bypass hosts]         [protected hosts]
-     vault / argocd /        backstage / prometheus /
-     auth / oauth2-proxy /   hubble / longhorn
-     grafana                       │
+     vault / argocd /        prometheus / hubble /
+     auth / grafana /        longhorn
+     backstage                      │
             │                     │
             │                     ▼
             │             ext_authz CUSTOM
@@ -60,7 +60,7 @@ Corresponds to the rules in `kubernetes/network/istio/authorizationpolicy-gatewa
 | `vault.platform.yu-min3.com` | 1: bypass | (no claim check) | Vault native OIDC + Vault token |
 | `argocd.platform.yu-min3.com` | 1: bypass | (no claim check) | ArgoCD native OIDC + its own JWT |
 | `grafana.platform.yu-min3.com` | 1: bypass | (no claim check) | Grafana native OIDC (`auth.generic_oauth`). Bypasses to avoid the Bearer-header misread |
-| `backstage.platform.yu-min3.com` | 2: admin + dev | `platform-admin`, `platform-dev` | oauth2-proxy enforced |
+| `backstage.platform.yu-min3.com` | 1: bypass | (no claim check) | Backstage native OIDC + Catalog identity resolver |
 | `prometheus.platform.yu-min3.com` | 2: admin + dev | `platform-admin`, `platform-dev` | oauth2-proxy enforced |
 | `hubble.platform.yu-min3.com` | 3: admin only | `platform-admin` | oauth2-proxy enforced |
 | `longhorn.platform.yu-min3.com` | 3: admin only | `platform-admin` | oauth2-proxy enforced |
@@ -84,7 +84,7 @@ Example: adding `awx.platform.yu-min3.com`, opening it to admin + dev.
 1. Add it to `hosts:` in the Category 2 rule of `authorizationpolicy-gateway-platform-allow.yaml`
 2. Also add it to `hosts:` in `authorizationpolicy-gateway-platform-oauth2.yaml` (bring it under CUSTOM enforcement)
 3. Add an HTTPRoute on the app side (parentRef `gateway-platform`)
-4. Configure the app's auth in **header-trust mode** (trusting oauth2-proxy's `X-Auth-Request-User` etc.). For Backstage, this means the proxy auth provider, etc. (Note: Grafana bypasses instead, due to the Bearer misread — see Case B.)
+4. Configure the app's auth in **header-trust mode** (trusting oauth2-proxy's `X-Auth-Request-User` etc.). Backstage is not an example of this class; it uses native OIDC under Case B.
 
 ### Case B: a new app with its own auth (same class as Vault/ArgoCD)
 

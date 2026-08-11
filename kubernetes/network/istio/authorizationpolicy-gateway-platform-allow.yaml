@@ -54,16 +54,16 @@ spec:
               - vault.platform.yu-min3.com
               - argocd.platform.yu-min3.com
               - grafana.platform.yu-min3.com
+              - backstage.platform.yu-min3.com
               - argocd.yu-mins.com
               - grafana.yu-mins.com
+              - backstage.yu-mins.com
 
     # === Category 2: oauth2-proxy 強制 + admin or dev ===
     - to:
         - operation:
             hosts:
-              - backstage.platform.yu-min3.com
               - prometheus.platform.yu-min3.com
-              - backstage.yu-mins.com
               - prometheus.yu-mins.com
       when:
         - key: request.auth.claims[groups]

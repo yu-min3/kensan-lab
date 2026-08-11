@@ -2,7 +2,7 @@
 
 Authentication and authorization for humans and services — built around one idea: **complete browser authentication once, at the Istio Gateway, so the apps behind it never implement login.**
 
-**Design thesis:** **Keycloak is the single IdP; the Gateway is the single browser chokepoint — for apps that need it.** oauth2-proxy sits on the Gateway as an `ext_authz` check and gives apps with no native auth at all (Backstage, Prometheus, Hubble, Longhorn) OIDC for free. Apps that already have a real auth surface (Vault, Argo CD, Grafana, Keycloak itself) are explicitly **excluded** from that Gateway check and authenticate natively against the same Keycloak realm instead — the Gateway passes their traffic straight through. One identity source, two enforcement tiers.
+**Design thesis:** **Keycloak is the single IdP; the Gateway is the single browser chokepoint — for apps that need it.** oauth2-proxy sits on the Gateway as an `ext_authz` check and gives apps with no native auth (Prometheus, Hubble, Longhorn) OIDC for free. Apps that already have a real auth surface (Vault, Argo CD, Grafana, Backstage, Keycloak itself) are explicitly **excluded** from that Gateway check and authenticate natively against the same Keycloak realm instead — the Gateway passes their traffic straight through. One identity source, two enforcement tiers.
 
 **What you'll find here:** how the SSO flow actually moves between Gateway, oauth2-proxy, and Keycloak; which apps bypass the Gateway check entirely and why; why Gateway-level auth won over per-service OIDC and Istio-native filters; and how LAN and internet traffic get different session friction on the same infrastructure.
 
@@ -57,7 +57,7 @@ yu (local) → vault login -method=oidc role=admin
             └─ opens browser → authenticate at Keycloak → callback returns a Vault token
 ```
 
-Apps that *are* behind the Gateway check (Category 2/3: Backstage, Prometheus, Hubble, Longhorn) instead receive oauth2-proxy's `X-Auth-Request-*` headers and trust those — that's the flow in the diagram above.
+Apps that *are* behind the Gateway check (Category 2/3: Prometheus, Hubble, Longhorn) instead receive oauth2-proxy's `X-Auth-Request-*` headers and trust those — that's the flow in the diagram above.
 
 ## Design rationale
 
