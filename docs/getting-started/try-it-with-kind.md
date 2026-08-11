@@ -12,9 +12,10 @@ $ make try
 ```
 
 Nothing else to configure. A few minutes later you have Argo CD reconciling
-eleven Applications, Backstage serving the developer portal, Istio routing to
-both through the Gateway API, and the production policy set reporting on
-everything in the cluster.
+fifteen Applications, Backstage serving the developer portal, Grafana drawing
+the same cluster-health dashboard the real machines are watched with, Istio
+routing to all three over HTTPS through the Gateway API, and the production
+policy set reporting on everything in the cluster.
 
 ```console
 $ make explore-down     # when you are done
@@ -24,9 +25,11 @@ $ make explore-down     # when you are done
 
 | | |
 |---|---|
-| **Argo CD** | `http://argocd.127-0-0-1.sslip.io` — the app-of-apps tree, one Application per component, the same shape as bare metal |
-| **Backstage** | `http://backstage.127-0-0-1.sslip.io` — the developer portal, with the golden path template and the service catalog |
-| **Istio + Gateway API** | Both are reached through a real `Gateway` and `HTTPRoute`, not a port-forward |
+| **Argo CD** | `https://argocd.127-0-0-1.sslip.io` — the app-of-apps tree, one Application per component, the same shape as bare metal |
+| **Backstage** | `https://backstage.127-0-0-1.sslip.io` — the developer portal, with the golden path template and the service catalog |
+| **Grafana + Prometheus** | `https://grafana.127-0-0-1.sslip.io` — the production Cluster Health dashboard, reading this cluster |
+| **Istio + Gateway API** | All of them are reached through a real `Gateway` and `HTTPRoute`, not a port-forward |
+| **TLS** | cert-manager issues a wildcard certificate from a CA it generates on the spot; your browser will warn, and [that is honest](#4-follow-a-request-through-the-gateway-api) |
 | **Kyverno** | All six production `ClusterPolicy` objects, in Audit — verdicts land in `PolicyReport` within a minute |
 | **A demo app** | Deployed by `charts/app-base`, the same chart the real apps use: a values file and no chart changes |
 | **A `longhorn` StorageClass** | Not Longhorn, but named after it, so every PVC in this repository binds unmodified |
@@ -62,9 +65,11 @@ $ curl -fsSL https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3
 ```
 
 **Memory.** Docker needs at least 6 GiB. Docker Desktop hands out 4 GiB by
-default, which is not enough for Istio's control plane and Kyverno's webhook on
-a single node — raise it under Settings → Resources → Memory. On Linux the
-container gets the host's memory, so there is usually nothing to do.
+default, which is not enough for Istio's control plane, Kyverno's webhook and
+Prometheus on a single node — raise it under Settings → Resources → Memory. A
+settled cluster measures about 4.1 GiB, so 6 GiB is the floor rather than a
+comfortable number. On Linux the container gets the host's memory, so there is
+usually nothing to do.
 
 **Ports.** 80 and 443 must be free. The gateway is published on them, so the
 URLs below work in a browser with no proxy and no port-forward.
@@ -85,11 +90,12 @@ prerequisites above.
 
 ### 1. Look at the tree
 
-Open `http://argocd.127-0-0-1.sslip.io` — the password is printed at the end of
-`make try`, and the user is `admin`.
+Open `https://argocd.127-0-0-1.sslip.io` — the password is printed at the end of
+`make try`, and the user is `admin`. The browser will warn about the
+certificate; step 4 explains why, and clicking through is the intended path.
 
 The `explore-root` Application is an *app-of-apps*: it is an Application whose
-job is to create other Applications. Open it and you will find ten of them,
+job is to create other Applications. Open it and you will find fourteen of them,
 each one a component of the platform. This is the same structure the bare-metal
 cluster uses, where the equivalent root manages thirty-eight.
 
@@ -109,7 +115,7 @@ gateway-api         Synced   Healthy
 
 This is the part that makes the repository a platform rather than a cluster.
 
-Open `http://backstage.127-0-0-1.sslip.io`, and sign in as a guest — there is no
+Open `https://backstage.127-0-0-1.sslip.io`, and sign in as a guest — there is no
 identity provider here, so Backstage's guest provider is what you get.
 
 Two things are worth finding:

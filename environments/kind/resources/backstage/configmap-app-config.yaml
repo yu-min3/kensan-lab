@@ -48,12 +48,15 @@ data:
   app-config.explore.yaml: |
     app:
       title: kensan-lab Platform Portal
-      baseUrl: http://backstage.127-0-0-1.sslip.io
+      baseUrl: https://backstage.127-0-0-1.sslip.io
 
     backend:
-      baseUrl: http://backstage.127-0-0-1.sslip.io
+      ## https, not http: the frontend is served over TLS, and a page loaded
+      ## over https calling an http backend is blocked as mixed content — the
+      ## portal would render and then fail every request it makes.
+      baseUrl: https://backstage.127-0-0-1.sslip.io
       cors:
-        origin: http://backstage.127-0-0-1.sslip.io
+        origin: https://backstage.127-0-0-1.sslip.io
         methods: [GET, HEAD, PATCH, POST, PUT, DELETE]
         credentials: true
       database:
