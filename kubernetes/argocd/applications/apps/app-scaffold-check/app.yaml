@@ -1,0 +1,60 @@
+# Argo CD Application for scaffold-check, opened as a pull request against
+# the platform repository by the scaffolder.
+#
+# Three sources, the same shape every application on this platform uses:
+#   1. the platform's chart, with the values file from this repository
+#   2. this repository again, as a `ref` so that $values resolves
+#   3. this repository's raw manifests (namespace, ServiceMonitor)
+#
+# The application owns its namespace and its deployment values; the platform
+# owns the chart and this Application CR. That split is the point — see
+# docs/architecture/argocd.md.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: app-scaffold-check
+  namespace: argocd
+  annotations:
+    # The namespace and anything stateful in it must survive this Application
+    # being removed from Git. Prune=false has to sit on the resources as well
+    # as here — see the platform's own apps for the pattern.
+    argocd.argoproj.io/sync-options: Prune=false
+spec:
+  project: app-project
+
+  sources:
+    - repoURL: https://github.com/yu-min3/kensan-lab
+      targetRevision: main
+      path: charts/app-base
+      helm:
+        releaseName: scaffold-check
+        valueFiles:
+          - $values/deploy/values.yaml
+    - repoURL: https://github.com/yu-min3/app-scaffold-check
+      targetRevision: main
+      ref: values
+    - repoURL: https://github.com/yu-min3/app-scaffold-check
+      targetRevision: main
+      path: deploy/resources
+      directory:
+        recurse: false
+        include: '*.yaml'
+
+  destination:
+    server: https://kubernetes.default.svc
+    # ADR-006: one namespace per application, created by deploy/resources.
+    namespace: app-scaffold-check
+
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=false
+      - ServerSideApply=true
+    retry:
+      limit: 5
+      backoff:
+        duration: 5s
+        factor: 2
+        maxDuration: 3m

@@ -1,0 +1,24 @@
+# Lets this service's /oauth2 route reach oauth2-proxy across namespaces.
+#
+# charts/app-base generates an HTTPRoute in the app namespace whose backend is
+# the oauth2-proxy Service in auth-system. Gateway API refuses cross-namespace
+# backends unless the target namespace grants it, and the failure is quiet: the
+# route reports RefNotPermitted and the login redirect dead-ends.
+#
+# One grant per app rather than editing a shared list — grants in the same
+# namespace are additive, and a per-app file is something a scaffolder can
+# produce without rewriting somebody else's YAML.
+apiVersion: gateway.networking.k8s.io/v1beta1
+kind: ReferenceGrant
+metadata:
+  name: allow-oauth2-app-scaffold-check
+  namespace: auth-system
+spec:
+  from:
+    - group: gateway.networking.k8s.io
+      kind: HTTPRoute
+      namespace: app-scaffold-check
+  to:
+    - group: ""
+      kind: Service
+      name: oauth2-proxy
