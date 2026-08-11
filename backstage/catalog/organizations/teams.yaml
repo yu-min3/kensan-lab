@@ -29,6 +29,17 @@ spec:
 apiVersion: backstage.io/v1alpha1
 kind: User
 metadata:
+  name: yu
+spec:
+  profile:
+    displayName: Yu Misaki
+    email: ymisaki00@gmail.com
+  memberOf: [platform-engineering]
+
+---
+apiVersion: backstage.io/v1alpha1
+kind: User
+metadata:
   name: demo-platform-admin
 spec:
   profile:

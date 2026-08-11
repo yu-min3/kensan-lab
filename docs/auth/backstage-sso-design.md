@@ -77,14 +77,16 @@ Backstage token / plugin API identity
 
 | 対象 | 変更 |
 |---|---|
-| `packages/backend/package.json` | `@backstage/plugin-auth-backend-module-oauth2-proxy-provider` を同一 Backstage release line で追加し、guest provider dependency を除去 |
-| `packages/backend/src/index.ts` | guest module を oauth2-proxy provider module に置換 |
+| `packages/backend/package.json` | `@backstage/plugin-auth-backend-module-oauth2-proxy-provider` を同一 Backstage release line で追加。guest module は local development 専用として残す |
+| `packages/backend/src/index.ts` | oauth2-proxy provider を登録。Istio ext_authz の `X-Auth-Request-*` を読む profile transform を追加 |
 | `packages/app/src/App.tsx` | `guest` の自動 sign-in を `oauth2Proxy` に置換。Gateway login 済みなら追加 UI なしで Backstage session を確立 |
 | `app-config.kubernetes.yaml` | `auth.providers.oauth2Proxy` と email resolver を設定し、production guest を削除 |
 | `app-config.kubernetes.yaml` | `dangerouslyDisableDefaultAuthPolicy` を削除し、Backstage の既定 plugin auth policy を復元 |
 | `catalog/organizations/teams.yaml` | `user:default/yu` を実 email と `platform-engineering` membership で追加 |
 
-local development は Gateway header が存在しないため、`app-config.yaml` の guest provider を残す。production overlay だけが oauth2Proxy を選ぶ。frontend provider の環境差を config で吸収できない場合は、provider list を `oauth2Proxy` と `guest` の両方にして production config に存在する provider のみ表示されることを実装時に確認する。
+local development は Gateway header が存在しないため、`app-config.development.yaml` だけで guest provider を構成する。production image はこの config を読み込まず、frontend も production host では `ProxiedSignInPage` を使う。したがって guest module のコードが bundle に含まれても production の guest provider endpoint は作られない。
+
+oauth2-proxy を Istio ext_authz の `/oauth2/auth` として使う場合、認証結果は `X-Auth-Request-Email` 等の**レスポンス**headerで返る。Backstage公式providerの既定profile transformはreverse proxy方式の `X-Forwarded-Email` を読むため、kensan-labでは公式authenticatorを再利用しつつ、profile transformだけを `X-Auth-Request-*` 用に差し替える。
 
 ### Platform manifests
 
@@ -181,4 +183,3 @@ GitOps のため runtime 変更は Git commit と Argo CD sync を経由する�
 - [ADR-002: Authentication and Authorization Architecture](../adr/002-authentication-authorization-architecture.md)
 - [ADR-010: oauth2-proxy ext_authz](../adr/010-istio-native-oauth2-absent.md)
 - [Gateway OIDC operation guide](gateway-oidc.md)
-

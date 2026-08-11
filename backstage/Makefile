@@ -90,6 +90,7 @@ dev: build-backend
 	cd packages/backend/dist/packages/backend && \
 		NODE_OPTIONS=--no-node-snapshot node dist/index.cjs.js \
 		--config $(CURDIR)/app-config.yaml \
+		--config $(CURDIR)/app-config.development.yaml \
 		--config $(CURDIR)/app-config.local.yaml
 
 #==============================================================================
