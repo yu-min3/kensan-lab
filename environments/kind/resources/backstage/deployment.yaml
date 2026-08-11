@@ -47,10 +47,10 @@ spec:
       containers:
         - name: backstage
           ## Namespaced under the repository because that is the package CI
-          ## can push to — see .github/workflows/backstage-ci.yml. The older
-          ## ghcr.io/yu-min3/backstage belongs to no repository and is what
-          ## bare metal still pulls from.
-          image: ghcr.io/yu-min3/kensan-lab/backstage:v0.0.12
+          ## can push to — see .github/workflows/backstage-ci.yml. Bare metal
+          ## pins the same tag from the same package now, so explore and
+          ## production run one artifact rather than two that share a number.
+          image: ghcr.io/yu-min3/kensan-lab/backstage:v0.0.14
           imagePullPolicy: IfNotPresent
           ## The two configs baked into the image, then the explore overrides.
           ## Order matters: later files win.
@@ -73,12 +73,40 @@ spec:
                 secretKeyRef:
                   name: backstage-explore-github
                   key: GITHUB_TOKEN
+            ## Backstage signs people in against Keycloak itself. Bare metal
+            ## fills these from Vault; scripts/explore-up.sh generates them and
+            ## registers the matching client on the realm it creates.
+            - name: AUTH_OIDC_CLIENT_ID
+              valueFrom:
+                secretKeyRef:
+                  name: backstage-secret
+                  key: AUTH_OIDC_CLIENT_ID
+            - name: AUTH_OIDC_CLIENT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: backstage-secret
+                  key: AUTH_OIDC_CLIENT_SECRET
+            - name: AUTH_SESSION_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: backstage-secret
+                  key: AUTH_SESSION_SECRET
+            ## Backstage fetches Keycloak's discovery document over HTTPS, and
+            ## that certificate is signed by a CA this cluster invented. Node
+            ## reads extra roots from this variable and nowhere else — without
+            ## it sign-in fails at startup with UNABLE_TO_VERIFY_LEAF_SIGNATURE,
+            ## which reads like a Keycloak fault rather than a trust one.
+            - name: NODE_EXTRA_CA_CERTS
+              value: /etc/ssl/explore/ca.crt
           ports:
             - containerPort: 7007
               name: http
           volumeMounts:
             - name: explore-config
               mountPath: /explore
+              readOnly: true
+            - name: explore-ca
+              mountPath: /etc/ssl/explore
               readOnly: true
           resources:
             requests:
@@ -103,3 +131,11 @@ spec:
         - name: explore-config
           configMap:
             name: backstage-explore-config
+        ## See resources/tls-selfsigned.yaml for why a certificate nobody serves
+        ## is how the CA bundle crosses a namespace.
+        - name: explore-ca
+          secret:
+            secretName: backstage-explore-ca-tls
+            items:
+              - key: ca.crt
+                path: ca.crt

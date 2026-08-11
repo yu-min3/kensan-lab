@@ -222,6 +222,8 @@ DEMO_USER_PASSWORD="${DEMO_PASSWORD:-$(rand)}"
 ARGOCD_CLIENT_SECRET="$(rand)"
 GRAFANA_CLIENT_SECRET="$(rand)"
 OAUTH2_PROXY_CLIENT_SECRET="$(rand)"
+BACKSTAGE_CLIENT_SECRET="$(rand)"
+BACKSTAGE_SESSION_SECRET="$(rand)"
 # oauth2-proxy requires exactly 16, 24 or 32 bytes here and refuses to start
 # otherwise, with a message that does not mention the length.
 OAUTH2_PROXY_COOKIE_SECRET="$(openssl rand -base64 32 | tr -d '\n' | head -c 32)"
@@ -242,6 +244,11 @@ kubectl -n argocd create secret generic argocd-oidc-secret \
   --dry-run=client -o yaml | kubectl apply -f - >/dev/null
 kubectl -n argocd label secret argocd-oidc-secret \
   app.kubernetes.io/part-of=argocd --overwrite >/dev/null
+kubectl -n backstage create secret generic backstage-secret \
+  --from-literal=AUTH_OIDC_CLIENT_ID=backstage \
+  --from-literal=AUTH_OIDC_CLIENT_SECRET="${BACKSTAGE_CLIENT_SECRET}" \
+  --from-literal=AUTH_SESSION_SECRET="${BACKSTAGE_SESSION_SECRET}" \
+  --dry-run=client -o yaml | kubectl apply -f - >/dev/null
 kubectl -n auth-system create secret generic oauth2-proxy-secret \
   --from-literal=client-id=oauth2-proxy \
   --from-literal=client-secret="${OAUTH2_PROXY_CLIENT_SECRET}" \
@@ -440,6 +447,10 @@ else
     "https://argocd.127-0-0-1.sslip.io/applications"
   kc_client grafana "${GRAFANA_CLIENT_SECRET}" \
     "https://grafana.127-0-0-1.sslip.io/login/generic_oauth"
+  ## Backstage's OIDC provider posts back to this exact path. It is not behind
+  ## the gateway's gate — it holds its own client, like Argo CD and Grafana.
+  kc_client backstage "${BACKSTAGE_CLIENT_SECRET}" \
+    "https://backstage.127-0-0-1.sslip.io/api/auth/oidc/handler/frame"
   # One client for every host the proxy guards, and the hosts are listed rather
   # than matched with a wildcard.
   #
@@ -607,7 +618,7 @@ fi
 # page a person sees after clicking. A wildcard host in the client's redirect
 # URIs produces exactly this.
 info "checking that Keycloak accepts the callback the gateway sends people to"
-for host in demo backstage; do
+for host in demo; do
   target="$(curl -sSk -o /dev/null -w '%{redirect_url}' --max-time 15 \
     --resolve "${host}.127-0-0-1.sslip.io:443:127.0.0.1" \
     "https://${host}.127-0-0-1.sslip.io/" || echo '')"
@@ -625,6 +636,22 @@ for host in demo backstage; do
      Keycloak answered, but not with something a person can sign in to:
        kubectl -n platform-auth-prod logs deploy/keycloak -c keycloak | tail -30"
 done
+
+# And the whole login, walked the way a person walks it: redirect to Keycloak,
+# post the form, return through /oauth2/callback, come back holding a session
+# cookie. Every earlier check stops before the callback, and the callback is
+# where two separate faults land — a redirect URI Keycloak will not accept, and
+# a CSRF cookie that never reached the client. Both looked like a working
+# cluster from every other angle.
+info "checking that a person can actually sign in"
+code="$("${REPO_ROOT}/scripts/explore-login-check.sh" \
+  demo.127-0-0-1.sslip.io demo "${DEMO_USER_PASSWORD}" 2>&1 || true)"
+if [[ "$code" != "200" ]]; then
+  fail "signing in to demo.127-0-0-1.sslip.io did not work: ${code}
+     The gate redirects and Keycloak answers, so this is the round trip rather
+     than the setup. Run it by hand to see which step stopped:
+       scripts/explore-login-check.sh demo.127-0-0-1.sslip.io demo '<password>'"
+fi
 
 # Backstage's probe is a liveness check on the HTTP router, not on the plugins
 # behind it. A backend whose catalog failed to start still serves the frontend

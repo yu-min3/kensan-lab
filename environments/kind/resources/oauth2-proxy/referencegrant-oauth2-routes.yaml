@@ -19,9 +19,6 @@ spec:
     - group: gateway.networking.k8s.io
       kind: HTTPRoute
       namespace: app-demo
-    - group: gateway.networking.k8s.io
-      kind: HTTPRoute
-      namespace: backstage
   to:
     - group: ""
       kind: Service
