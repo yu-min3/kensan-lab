@@ -186,6 +186,7 @@ nav:
   - Operations:
       - Secret Management: secret-management/index.md
       - Auth integration:
+          - Backstage SSO design: auth/backstage-sso-design.md
           - ArgoCD ↔ Keycloak (Path B): auth/argocd-keycloak-integration.md
           - Gateway OIDC (Path A): auth/gateway-oidc.md
           - oauth2-proxy: auth/oauth2-proxy.md
