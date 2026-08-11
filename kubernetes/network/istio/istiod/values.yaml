@@ -42,7 +42,8 @@ meshConfig:
         # request 認証判断のために必要なヘッダ
         includeRequestHeadersInCheck:
           - cookie
-          - authorization
+          # Authorization は Backstage 等のapplication tokenに使うため、
+          # oauth2-proxyへ渡さない。browser sessionはcookieで検証する。
           - x-forwarded-uri
           - x-forwarded-host
           - x-forwarded-proto
