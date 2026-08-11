@@ -155,14 +155,33 @@ helm upgrade --install argocd argo/argo-cd \
 # own account cannot be generated. So it is passed in or the feature is absent —
 # the Secret is created either way, holding an empty string, so that the
 # Deployment's reference always resolves.
+#
+# The placeholder is not decoration. Backstage type-checks its config at
+# startup, and `integrations.github[0].token` set to an empty string fails that
+# check — which does not stop the process or fail the probe, it stops the
+# catalog, scaffolder and techdocs plugins from ever initialising. The portal
+# then serves its shell, answers /healthcheck, reports Healthy to Argo CD, and
+# returns 503 for every catalog request. A syntactically valid token that GitHub
+# will reject keeps all three plugins running and moves the failure to where it
+# belongs: the moment somebody presses Create.
 if [[ -n "$GITHUB_TOKEN" ]]; then
   info "wiring the GitHub token into Backstage (scaffolder enabled)"
 else
   info "no GITHUB_TOKEN set — Backstage runs without the scaffolder's publish step"
+  GITHUB_TOKEN="ghp_0000000000000000000000000000000000no-token-was-supplied"
 fi
 kubectl apply -f "${REPO_ROOT}/kubernetes/backstage/namespace.yaml" >/dev/null
 kubectl -n backstage create secret generic backstage-explore-github \
   --from-literal=GITHUB_TOKEN="${GITHUB_TOKEN}" \
+  --dry-run=client -o yaml | kubectl apply -f - >/dev/null
+
+# Grafana reads its admin credentials from a Secret. Bare metal fills that from
+# Vault; here it is generated, printed at the end, and gone when the cluster is.
+kubectl create namespace monitoring --dry-run=client -o yaml | kubectl apply -f - >/dev/null
+GRAFANA_PASSWORD="$(openssl rand -base64 18 | tr -d '/+=' | head -c 20)"
+kubectl -n monitoring create secret generic grafana-explore-admin \
+  --from-literal=admin-user=admin \
+  --from-literal=admin-password="${GRAFANA_PASSWORD}" \
   --dry-run=client -o yaml | kubectl apply -f - >/dev/null
 
 info "applying the AppProjects"
@@ -264,24 +283,70 @@ if [[ "$code" != "200" ]]; then
      Troubleshooting: docs/getting-started/try-it-with-kind.md#troubleshooting"
 fi
 
+# And again over TLS. This is a separate assertion because it can fail on its
+# own: the route can be perfect while the certificate is still being issued, in
+# which case Istio serves the listener with no certificate at all.
+info "checking that the gateway serves the same app over TLS"
+code="$(curl -sSk -o /dev/null -w '%{http_code}' --max-time 15 \
+  --resolve "demo.127-0-0-1.sslip.io:443:127.0.0.1" \
+  https://demo.127-0-0-1.sslip.io/ || echo 000)"
+if [[ "$code" != "200" ]]; then
+  fail "the demo app answered HTTP ${code} over TLS, not 200.
+     Plain HTTP works, so the route is fine and the certificate is not:
+       kubectl -n istio-system get certificate explore-wildcard
+       kubectl -n cert-manager get certificate explore-ca
+     Troubleshooting: docs/getting-started/try-it-with-kind.md#troubleshooting"
+fi
+
+# Backstage's probe is a liveness check on the HTTP router, not on the plugins
+# behind it. A backend whose catalog failed to start still serves the frontend
+# shell and still answers /healthcheck with 200, so the pod is Ready, the
+# Application is Healthy, and the portal is useless. The only way to know is to
+# ask the catalog something.
+info "checking that Backstage's catalog is actually serving"
+for attempt in $(seq 1 30); do
+  code="$(curl -sSk -o /dev/null -w '%{http_code}' --max-time 10 \
+    --resolve "backstage.127-0-0-1.sslip.io:443:127.0.0.1" \
+    "https://backstage.127-0-0-1.sslip.io/api/catalog/entities?limit=1" || echo 000)"
+  [[ "$code" == "200" ]] && break
+  sleep 5
+done
+if [[ "$code" != "200" ]]; then
+  fail "Backstage's catalog answered HTTP ${code}, not 200.
+     The pod is Ready and the frontend loads, so this is a backend plugin that
+     failed to initialise rather than a routing or scheduling problem:
+       kubectl -n backstage logs deploy/backstage -c backstage | grep -i 'during startup'
+     A config value the backend type-checks at boot is the usual cause."
+fi
+
 admin_password="$(kubectl -n argocd get secret argocd-initial-admin-secret \
   -o jsonpath='{.data.password}' 2>/dev/null | base64 --decode || echo '(already rotated)')"
 
 cat <<EOF
 
-  The platform is up. Three things worth doing, in order:
+  The platform is up. Four things worth doing, in order.
 
-  1. Open the GitOps tree            http://argocd.127-0-0-1.sslip.io
+  Every URL below is https, and your browser will warn about the certificate.
+  cert-manager issued it from a CA this cluster generated a minute ago, and
+  nothing on your machine has a reason to trust that — there is no domain here
+  to prove ownership of. Clicking through is the intended path.
+
+  1. Open the GitOps tree            https://argocd.127-0-0-1.sslip.io
      user 'admin', password '${admin_password}'
      The 'explore-root' application is the app-of-apps: open it and every
      component below it is one Application, exactly as on the real cluster.
 
-  2. Open the demo app               http://demo.127-0-0-1.sslip.io
+  2. Open Grafana                    https://grafana.127-0-0-1.sslip.io
+     user 'admin', password '${GRAFANA_PASSWORD}'
+     The 'Cluster Health' dashboard is the bare-metal one, unedited. The panels
+     that stay empty are reading a Raspberry Pi's temperature sensor.
+
+  3. Open the demo app               https://demo.127-0-0-1.sslip.io
      It reached the browser through Istio's Gateway API implementation, and it
      was deployed by charts/app-base — the same chart the real apps use, with
      no changes, only a values file.
 
-  3. See what the policy engine thinks
+  4. See what the policy engine thinks
        kubectl get policyreport -A
      Kyverno is running the production policies in Audit mode, so violations
      are reported rather than blocked (ADR-012).

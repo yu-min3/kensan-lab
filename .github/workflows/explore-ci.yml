@@ -108,6 +108,42 @@ jobs:
           echo "PolicyReports: ${reports}"
           [ "$reports" -gt 0 ]
 
+      - name: Check that Prometheus is scraping and nothing is down
+        run: |
+          # A Prometheus that came up but scrapes nothing looks healthy to Argo
+          # CD, and every dashboard would be empty for a reason no Application
+          # status can show. Assert both halves: targets exist, and none of them
+          # is down — a permanently-failing target is a substitution we got
+          # wrong, not background noise.
+          pod=prometheus-prometheus-kube-prometheus-prometheus-0
+          kubectl -n monitoring wait --for=condition=Ready "pod/${pod}" --timeout=300s
+          q() {
+            kubectl -n monitoring exec "$pod" -c prometheus -- \
+              wget -qO- "localhost:9090/api/v1/query?query=$1"
+          }
+          up="$(q 'count(up)' | jq -r '.data.result[0].value[1] // 0')"
+          down="$(q 'count(up%20%3D%3D%200)' | jq -r '.data.result[0].value[1] // 0')"
+          echo "scrape targets: ${up} up, ${down} down"
+          [ "$up" -ge 5 ] || { echo "too few scrape targets" >&2; exit 1; }
+          [ "$down" -eq 0 ] || {
+            q 'up%20%3D%3D%200' | jq -r '.data.result[].metric.job' >&2
+            echo "the jobs above have no target on kind — drop them in values/prometheus.yaml" >&2
+            exit 1
+          }
+
+      - name: Check that the gateway serves a certificate it issued itself
+        run: |
+          # explore-up.sh already proved TLS answers 200. This proves the
+          # certificate is the one cert-manager minted rather than Istio's
+          # fallback, which would also serve traffic and hide the failure.
+          kubectl -n istio-system get certificate explore-wildcard \
+            -o jsonpath='{.status.conditions[?(@.type=="Ready")].status}' | grep -qx True
+          issuer="$(echo | openssl s_client -connect 127.0.0.1:443 \
+            -servername demo.127-0-0-1.sslip.io 2>/dev/null \
+            | openssl x509 -noout -issuer)"
+          echo "$issuer"
+          echo "$issuer" | grep -q "kensan-lab explore"
+
       - name: Collect diagnostics
         if: failure()
         run: |

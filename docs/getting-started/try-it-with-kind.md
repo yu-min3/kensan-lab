@@ -12,9 +12,10 @@ $ make try
 ```
 
 Nothing else to configure. A few minutes later you have Argo CD reconciling
-eleven Applications, Backstage serving the developer portal, Istio routing to
-both through the Gateway API, and the production policy set reporting on
-everything in the cluster.
+sixteen Applications, Backstage serving the developer portal, Grafana drawing
+the same cluster-health dashboard the real machines are watched with, Istio
+routing to all three over HTTPS through the Gateway API, and the production
+policy set reporting on everything in the cluster.
 
 ```console
 $ make explore-down     # when you are done
@@ -24,9 +25,11 @@ $ make explore-down     # when you are done
 
 | | |
 |---|---|
-| **Argo CD** | `http://argocd.127-0-0-1.sslip.io` — the app-of-apps tree, one Application per component, the same shape as bare metal |
-| **Backstage** | `http://backstage.127-0-0-1.sslip.io` — the developer portal, with the golden path template and the service catalog |
-| **Istio + Gateway API** | Both are reached through a real `Gateway` and `HTTPRoute`, not a port-forward |
+| **Argo CD** | `https://argocd.127-0-0-1.sslip.io` — the app-of-apps tree, one Application per component, the same shape as bare metal |
+| **Backstage** | `https://backstage.127-0-0-1.sslip.io` — the developer portal, with the golden path template and the service catalog |
+| **Grafana + Prometheus** | `https://grafana.127-0-0-1.sslip.io` — the production Cluster Health dashboard, reading this cluster |
+| **Istio + Gateway API** | All of them are reached through a real `Gateway` and `HTTPRoute`, not a port-forward |
+| **TLS** | cert-manager issues a wildcard certificate from a CA it generates on the spot; your browser will warn, and [that is honest](#4-follow-a-request-through-the-gateway-api) |
 | **Kyverno** | All six production `ClusterPolicy` objects, in Audit — verdicts land in `PolicyReport` within a minute |
 | **A demo app** | Deployed by `charts/app-base`, the same chart the real apps use: a values file and no chart changes |
 | **A `longhorn` StorageClass** | Not Longhorn, but named after it, so every PVC in this repository binds unmodified |
@@ -62,9 +65,11 @@ $ curl -fsSL https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3
 ```
 
 **Memory.** Docker needs at least 6 GiB. Docker Desktop hands out 4 GiB by
-default, which is not enough for Istio's control plane and Kyverno's webhook on
-a single node — raise it under Settings → Resources → Memory. On Linux the
-container gets the host's memory, so there is usually nothing to do.
+default, which is not enough for Istio's control plane, Kyverno's webhook and
+Prometheus on a single node — raise it under Settings → Resources → Memory. A
+settled cluster measures about 4.1 GiB, so 6 GiB is the floor rather than a
+comfortable number. On Linux the container gets the host's memory, so there is
+usually nothing to do.
 
 **Ports.** 80 and 443 must be free. The gateway is published on them, so the
 URLs below work in a browser with no proxy and no port-forward.
@@ -79,17 +84,18 @@ $ echo "127.0.0.1 argocd.127-0-0-1.sslip.io demo.127-0-0-1.sslip.io" | sudo tee 
 
 ## Take it for a walk
 
-Seven things worth doing, each about a minute. They are ordered so that every
+Eight things worth doing, each about a minute. They are ordered so that every
 one builds on the last, and none of them needs anything installed beyond the
 prerequisites above.
 
 ### 1. Look at the tree
 
-Open `http://argocd.127-0-0-1.sslip.io` — the password is printed at the end of
-`make try`, and the user is `admin`.
+Open `https://argocd.127-0-0-1.sslip.io` — the password is printed at the end of
+`make try`, and the user is `admin`. The browser will warn about the
+certificate; step 4 explains why, and clicking through is the intended path.
 
 The `explore-root` Application is an *app-of-apps*: it is an Application whose
-job is to create other Applications. Open it and you will find ten of them,
+job is to create other Applications. Open it and you will find fifteen of them,
 each one a component of the platform. This is the same structure the bare-metal
 cluster uses, where the equivalent root manages thirty-eight.
 
@@ -109,7 +115,7 @@ gateway-api         Synced   Healthy
 
 This is the part that makes the repository a platform rather than a cluster.
 
-Open `http://backstage.127-0-0-1.sslip.io`, and sign in as a guest — there is no
+Open `https://backstage.127-0-0-1.sslip.io`, and sign in as a guest — there is no
 identity provider here, so Backstage's guest provider is what you get.
 
 Two things are worth finding:
@@ -132,6 +138,12 @@ rather than pretending:
 ```console
 $ GITHUB_TOKEN=ghp_... make try
 ```
+
+Without one the cluster fills the slot with a placeholder GitHub will reject,
+rather than leaving it empty — an empty value there fails the backend's config
+type check at startup and takes the catalog down with it, while the pod stays
+Ready and Argo CD stays green. `make try` asks the catalog a question before it
+declares success, for exactly that reason.
 
 Without it everything above still works; only the Create button stops at the
 publish step. It is the same shape as bare metal, where the variable is filled
@@ -168,11 +180,34 @@ The demo app is not port-forwarded. It is reached the way the production apps
 are: a `Gateway` that Istio implements, and an `HTTPRoute` that attaches to it.
 
 ```console
-$ curl -s http://demo.127-0-0-1.sslip.io | head -4
+$ curl -sk https://demo.127-0-0-1.sslip.io | head -4
 $ kubectl -n istio-system get gateway gateway-explore
 $ kubectl -n app-demo get httproute demo -o jsonpath='{.status.parents[0].conditions[*].type}'
 Accepted ResolvedRefs
 ```
+
+**About that `-k`.** The gateway has two listeners and every route attaches to
+both, so each hostname answers on 80 and on 443. The certificate on 443 is real
+in every respect except the one a browser cares about: cert-manager generated a
+CA inside this cluster a few minutes ago and signed a wildcard for
+`*.127-0-0-1.sslip.io` with it, and nothing on your machine has any reason to
+trust that CA.
+
+```console
+$ kubectl -n istio-system get certificate explore-wildcard
+NAME               READY   SECRET                 AGE
+explore-wildcard   True    explore-wildcard-tls   4m
+```
+
+This is the whole difference between here and production, and it is not a
+difference in effort. The real gateway's certificate comes from Let's Encrypt
+through a DNS-01 challenge — a proof that we control the domain, carried out
+with API credentials for it. A visitor has neither the domain nor the
+credentials, and no amount of automation makes that transferable: the browser
+warning *is* the missing proof, shown accurately. Making it go away would mean
+writing a CA into your system trust store, which is more than a demo should do
+to your laptop. The CA certificate is sitting in the `cert-manager` namespace if
+you would rather trust it yourself, once, deliberately.
 
 `Accepted` means the gateway agreed to serve this route. It can refuse: gateways
 in this repository admit routes by namespace label, so a route in a namespace
@@ -180,7 +215,34 @@ without `kensan-lab.platform/environment` comes back `NotAllowedByListeners`.
 That is a deliberate guardrail — a new application cannot publish itself on the
 platform's hostname by accident.
 
-### 5. Watch the policy engine catch you
+### 5. Watch the cluster from the dashboard the real one is watched with
+
+Open `https://grafana.127-0-0-1.sslip.io` — user `admin`, password printed at
+the end of `make try` — and find the **Cluster Health** dashboard.
+
+It is the bare-metal dashboard, unmodified, pointed at this cluster. Most of it
+fills in: node readiness, CPU and memory, pod phases, container restarts. Some
+of it does not, and the empty panels are the interesting part — CPU temperature,
+wired and WiFi link state, and the ICMP probes are reading a Raspberry Pi in a
+cupboard through a hardware sensor and a blackbox exporter. A dashboard that
+visibly knows what machine it was written for says more than one edited until
+every panel is green.
+
+Prometheus is the same `kube-prometheus-stack` release and version as
+production, layered with a values file that switches off what a ten-minute
+cluster cannot use: remote write to Grafana Cloud, alerting, persistent storage,
+and the control-plane scrape jobs that kind's static pods do not expose. The
+stack's own dashboards come along too, and those do fill in completely.
+
+```console
+$ kubectl -n monitoring get prometheus,pods
+```
+
+Two of production's dashboards are deliberately absent rather than broken: the
+control-plane one reads etcd and Cilium metrics that do not exist here, and the
+OpenTelemetry one wants a collector this slice does not run.
+
+### 6. Watch the policy engine catch you
 
 All six production policies are running, in Audit: they report rather than
 block. Start with what is already there:
@@ -228,7 +290,7 @@ no admission reports, because the etcd write amplification would land on a
 microSD card. kind has neither, so the explore layer shortens the interval to
 one minute — the only Kyverno setting that differs between the two.
 
-### 6. Claim a volume
+### 7. Claim a volume
 
 Every PVC in this repository asks for `storageClassName: longhorn`, including
 the default in `charts/app-base`. There is a StorageClass called `longhorn`
@@ -264,7 +326,7 @@ until a pod actually needs the volume, so the volume lands on the node the pod
 was scheduled to. Give it a consumer and it binds in a few seconds. What you do
 *not* get is replication, snapshots or expansion — see below.
 
-### 7. See how Istio got onto the network
+### 8. See how Istio got onto the network
 
 Istio's CNI plugin does not replace the cluster's networking; it appends itself
 to whatever is already there. On kind that is kindnet:
@@ -289,16 +351,19 @@ copying the tree.
 
 Two things differ, and both are contained in `environments/kind/`:
 
-**What is left out.** No Cilium, Vault, Keycloak, Longhorn, cert-manager,
-Cloudflare Tunnel or observability stack. Those need hardware, need credentials
-you do not have, or would turn three minutes into thirty.
+**What is left out.** No Cilium, Vault, Keycloak, Longhorn or Cloudflare Tunnel,
+and four of the six observability components — Loki, Tempo, the OTel collector
+and blackbox-exporter. Those need hardware, need credentials you do not have, or
+have nothing to say on a cluster with no traffic and no history.
 
-**What is swapped.** Four files. The Cilium L2 load balancer becomes a kind port
-mapping; Longhorn becomes local-path wearing the name `longhorn`; the real
-domain and its wildcard certificate become `*.127-0-0-1.sslip.io` over plain
-HTTP. Two of the four exist only because a hostname is hardcoded in a raw
-manifest — the price of the real cluster keeping its own domain rather than
-reading one from a config file.
+**What is swapped.** The Cilium L2 load balancer becomes a kind port mapping;
+Longhorn becomes local-path wearing the name `longhorn`; the real domain and its
+Let's Encrypt wildcard become `*.127-0-0-1.sslip.io` signed by a CA the cluster
+generates for itself. Where the swap is a values file it is a handful of lines
+layered over the production one — nineteen for Istio, ten for Prometheus. Where
+it is a whole resource, it is because a hostname is hardcoded in a raw manifest:
+the price of the real cluster keeping its own domain rather than reading one
+from a config file.
 
 Every pull request that touches `kubernetes/`, `charts/` or `environments/`
 stands this cluster up in CI and fails if the platform stops coming up. That is
@@ -334,11 +399,12 @@ could be committed; generating them from Terraform would only move the secret
 into Terraform state. The irreducible part of bootstrapping a platform is that
 somebody has to run a script and keep what it prints.
 
-**Trusted certificates.** The real gateway terminates TLS with a wildcard
-certificate issued through a DNS-01 challenge against a domain we own. A fork
-has neither. A self-signed issuer is a later phase, and the browser warning
-stays — the alternative, `mkcert` rewriting your system trust store, is more
-than a one-command demo should do to your laptop.
+**Trusted certificates.** cert-manager runs here and issues a real wildcard, so
+what is missing is narrower than it looks: not TLS, but the proof of domain
+ownership behind it. The real gateway answers a DNS-01 challenge against a
+domain we own; a visitor owns neither the domain nor the API credentials, so the
+certificate is signed by a CA this cluster invented and the browser warning
+stays. [Step 4](#4-follow-a-request-through-the-gateway-api) has the detail.
 
 **Anything about failure.** One node cannot rebuild a Longhorn replica, cannot
 be drained, and cannot lose an L2 lease. This cluster shows how the platform is

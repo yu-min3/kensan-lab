@@ -1,0 +1,54 @@
+# Layered on top of kubernetes/observability/prometheus/values.yaml.
+# Chart config: environments/kind/applications/templates/observability.yaml
+#
+# kube-prometheus-stack is a bundle, and most of it has nothing to do on a
+# cluster that exists for ten minutes. What is left off is off because it
+# cannot say anything here, not to save resources — though it does that too.
+
+# Grafana ships as a subchart. Bare metal runs it as its own Application so
+# that it can be upgraded independently, and explore follows that.
+grafana:
+  enabled: false
+
+# Alerts need somewhere to go and someone to read them. Neither exists here.
+alertmanager:
+  enabled: false
+
+prometheus:
+  prometheusSpec:
+    # Production ships its metrics on to Grafana Cloud, authenticating with a
+    # Secret that Vault fills. Without that Secret the operator refuses to write
+    # any config at all — not just the remote write — and no Prometheus pod is
+    # ever created. Explore keeps its metrics local.
+    remoteWrite: []
+    # The only entry production has here is a static job pointing at the OTel
+    # collector, which explore does not run — it would sit permanently down and
+    # be the one red target on an otherwise green cluster.
+    additionalScrapeConfigs: []
+    # Nothing to remember: the cluster outlives the retention window by minutes.
+    retention: 2h
+    # Without this the chart asks for a PVC, and a Prometheus that has to wait
+    # for storage is a slow first impression.
+    storageSpec: null
+    resources:
+      requests:
+        cpu: 150m
+        memory: 512Mi
+      limits:
+        memory: 1500Mi
+    # The single node is the whole cluster; scraping every 30s is plenty and
+    # halves the write volume.
+    scrapeInterval: 30s
+    evaluationInterval: 30s
+
+# The control-plane components kind runs are not the ones the chart expects to
+# find (they are static pods without the usual Services), so these scrape jobs
+# would sit permanently down and make the dashboards look broken.
+kubeControllerManager:
+  enabled: false
+kubeScheduler:
+  enabled: false
+kubeEtcd:
+  enabled: false
+kubeProxy:
+  enabled: false

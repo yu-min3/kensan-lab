@@ -1,0 +1,38 @@
+# Layered on top of kubernetes/observability/grafana/values.yaml.
+# Chart config: environments/kind/applications/templates/observability.yaml
+#
+# The shared values already do most of what explore needs — the dashboard and
+# datasource sidecars, the folder layout, anonymous access off. What differs is
+# the identity of the site and the fact that nothing here should persist.
+
+# Bare metal reads these from a Secret that External Secrets fills from Vault.
+# Explore has neither, so scripts/explore-up.sh generates a password and prints
+# it at the end, the same way it does for Argo CD.
+admin:
+  existingSecret: grafana-explore-admin
+  userKey: admin-user
+  passwordKey: admin-password
+
+persistence:
+  enabled: false
+
+resources:
+  requests:
+    cpu: 100m
+    memory: 128Mi
+  limits:
+    memory: 512Mi
+
+grafana.ini:
+  server:
+    root_url: "https://grafana.127-0-0-1.sslip.io"
+  # Keycloak is not part of this slice yet. Until it is, Grafana keeps the
+  # local admin account the block above creates — the same account bare metal
+  # retains as a break-glass. Turning this back on is one block, not a rebuild.
+  auth.generic_oauth:
+    enabled: false
+
+## Same story as remoteWrite: production pulls the OIDC client credentials from
+## a Secret that ExternalSecrets creates. generic_oauth is off above, but the
+## envFrom reference would still hold the container in CreateContainerConfigError.
+envFromSecrets: []

@@ -58,6 +58,13 @@ metadata:
 `scripts/validate_argocd_apps.py` reads that annotation and fails the build when
 the upstream chart name, chart repository or version disagree.
 
+The annotation may also point at an **ApplicationSet**, which is how
+`prometheus` and `grafana` are checked: bare metal generates all six
+observability Applications from one ApplicationSet, whose template says
+`chart: '{{ .chart }}'` and so cannot be compared directly. The validator
+follows the generator to the `config.json` the Application is named after and
+compares against that instead.
+
 `versions.sh` is a knowing exception to the repository rule that chart versions
 live in an Application's `targetRevision`: Argo CD's own chart version is needed
 before Argo CD exists, so `explore-up.sh` has to read it from somewhere else.
@@ -82,8 +89,11 @@ to differ.
    Vault. Making explore green again without answering that question throws away
    the signal.
 4. **The substitutions are supposed to differ from their bare-metal
-   counterparts.** `gateway-explore.yaml` and `storageclass-longhorn.yaml` are
-   not out-of-date copies. Do not sync them up.
+   counterparts.** `gateway-explore.yaml`, `storageclass-longhorn.yaml` and
+   `tls-selfsigned.yaml` are not out-of-date copies. Do not sync them up.
+   `tls-selfsigned.yaml` in particular has no bare-metal counterpart to sync to:
+   production's issuer is a Let's Encrypt `ClusterIssuer` doing a DNS-01
+   challenge, and the two are alternatives rather than versions of each other.
 5. **Nothing explore-related goes in `kubernetes/argocd/applications/`.**
    `platform-root` syncs that directory with `recurse: true`; a file left there
    lands on the real cluster.
@@ -98,13 +108,20 @@ to differ.
 8. **Promoting Kyverno to Enforce (ADR-012 Phase 3) means revisiting
    `values/istiod.yaml`.** The trimmed requests there are sized for Audit mode;
    under Enforce a workload that asks for too little can be rejected outright.
+9. **A dashboard whose metrics do not exist here does not belong here.** Explore
+   ships one of production's three because the other two read etcd, Cilium and
+   an OTel collector that a single kind node has none of. Half-empty panels do
+   not demonstrate observability; they demonstrate a broken cluster, which is
+   the opposite of the point. The same test applies to scrape jobs — a target
+   that can only ever be down is worse than an absent one.
 
 ## Why the substitutions are permanent
 
-Three of the files here exist because a hostname is hardcoded in a raw
-manifest — the Gateway, Argo CD's route and Backstage's route. For a while the
-plan was to centralise those values behind a `site.yaml` and delete these
-copies. **That is no longer planned**, so they stay.
+Five of the files here exist because a hostname is hardcoded in a raw
+manifest — the Gateway, the routes for Argo CD, Backstage and Grafana, and the
+wildcard certificate. For a while the plan was to centralise those values behind
+a `site.yaml` and delete these copies. **That is no longer planned**, so they
+stay.
 
 The reasoning, in short: centralising was justified by making the repository
 easier to fork, and forking is not what this repository is for. The place
@@ -123,9 +140,9 @@ render step at bootstrap, with plain manifests on the other side. That is a
 different kind of repository than a reference architecture, and copying its
 answer here would mean becoming one.
 
-So: expect these three to stay, keep them small, and keep new site-specific
-values out of raw manifests anyway — the rule below still holds, because it is
-what keeps the *count* at three.
+So: expect these five to stay, keep them small, and keep new site-specific
+values out of raw manifests anyway — rule 6 above still holds, because it is
+what keeps the count from growing past the hostnames that genuinely need one.
 
 ## The one component that is genuinely copied
 

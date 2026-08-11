@@ -1,0 +1,56 @@
+## Grafana's datasource and route for the explore cluster.
+##
+## The shared datasource ConfigMap (kubernetes/observability/grafana/resources/
+## datasources.yaml) wires up Tempo and Loki, which explore does not run — the
+## dashboards would render, and every panel would error. This one points at the
+## Prometheus the slice does run.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: grafana-explore-datasource
+  namespace: monitoring
+  annotations:
+    argocd.argoproj.io/sync-wave: "2"
+  labels:
+    ## The sidecar finds datasources by this label, exactly as on bare metal.
+    grafana_datasource: "1"
+data:
+  prometheus-datasource.yaml: |
+    apiVersion: 1
+    datasources:
+      - name: Prometheus
+        type: prometheus
+        access: proxy
+        url: http://prometheus-kube-prometheus-prometheus.monitoring.svc:9090
+        uid: prometheus
+        isDefault: true
+        editable: false
+---
+## Scaffolding, like the other route copies here: the production HTTPRoute names
+## the real hostname. See environments/kind/README.md#why-the-substitutions-are-permanent.
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: grafana-route
+  namespace: monitoring
+  annotations:
+    argocd.argoproj.io/sync-wave: "4"
+spec:
+  parentRefs:
+    - group: gateway.networking.k8s.io
+      kind: Gateway
+      name: gateway-explore
+      namespace: istio-system
+  hostnames:
+    - "grafana.127-0-0-1.sslip.io"
+  rules:
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /
+      backendRefs:
+        - group: ""
+          kind: Service
+          name: grafana
+          port: 80
+          weight: 1
