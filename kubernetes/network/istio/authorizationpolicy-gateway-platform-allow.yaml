@@ -58,19 +58,12 @@ spec:
               - grafana.yu-mins.com
 
     # === Category 2: oauth2-proxy 強制 + admin or dev ===
-    # Backstage は専用 CUSTOM policy で oauth2-proxy session を必須化する。
-    # 許可ユーザーは Backstage の Catalog User resolver で明示的に制限する。
-    # ext_authz response header は同じ Gateway の ALLOW 評価から参照できないため、
-    # ここでは host だけを許可する（CUSTOM と ALLOW は両方成立する必要がある）。
     - to:
         - operation:
             hosts:
               - backstage.platform.yu-min3.com
-              - backstage.yu-mins.com
-    - to:
-        - operation:
-            hosts:
               - prometheus.platform.yu-min3.com
+              - backstage.yu-mins.com
               - prometheus.yu-mins.com
       when:
         - key: request.auth.claims[groups]

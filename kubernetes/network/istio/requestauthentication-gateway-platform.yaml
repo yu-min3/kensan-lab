@@ -1,18 +1,14 @@
-# gateway-platform に到達した HTTP request の Authorization: Bearer JWT を
-# Keycloak realm "kensan" の JWKS で検証する。
+# oauth2-proxy が返す X-Auth-Request-Access-Token を Keycloak JWKS で検証する。
 #
 # 動作:
-# - oauth2-proxy が UI 経路で id_token を Authorization header に詰めて upstream へ
-#   forward する (set_authorization_header = true)。本 RA がそれを検証して
+# - oauth2-proxy が UI 経路で access token をidentity headerとして返す。本 RAが検証して
 #   request.auth.claims を populate → AuthorizationPolicy ALLOW の `when` 句で
 #   groups claim を判定できるようになる。
 # - JWT が無い request (Vault CLI の X-Vault-Token、ArgoCD CLI の独自 JWT 等) は
 #   request.auth.claims が空のまま素通り。bypass host (vault/argocd 等) は
 #   ALLOW policy 側で claim 不要 rule で許可する。
 #
-# forwardOriginalToken: true → upstream (Grafana 等) に Authorization header を
-# そのまま渡す。受け側アプリは header trust モード (Grafana auth.proxy 等) で
-# X-Auth-Request-User と組み合わせて identity を確定できる。
+# Authorization header はJWT抽出元にしない。各appが発行したtokenをそのまま保持する。
 apiVersion: security.istio.io/v1
 kind: RequestAuthentication
 metadata:
@@ -26,7 +22,9 @@ spec:
   jwtRules:
     - issuer: "https://auth.yu-mins.com/realms/kensan"
       jwksUri: "https://auth.yu-mins.com/realms/kensan/protocol/openid-connect/certs"
-      forwardOriginalToken: true
+      fromHeaders:
+        - name: x-auth-request-access-token
+      forwardOriginalToken: false
     # Keycloak admin console (realm master) のトークンも検証可能にする。
     # これが無いと console の admin API call が "Jwt issuer is not configured"
     # で 401 になる (RA は JWT 持ちリクエストの issuer 未登録を reject するため)。
@@ -34,4 +32,6 @@ spec:
     # Category 2/3 host (groups claim 必須) には通らない。
     - issuer: "https://auth.yu-mins.com/realms/master"
       jwksUri: "https://auth.yu-mins.com/realms/master/protocol/openid-connect/certs"
-      forwardOriginalToken: true
+      fromHeaders:
+        - name: x-auth-request-access-token
+      forwardOriginalToken: false
