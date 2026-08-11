@@ -1,5 +1,5 @@
 """
-test
+${{ values.description }}
 
 This FastAPI application is generated from the Backstage template.
 """
@@ -11,8 +11,8 @@ from prometheus_client import CONTENT_TYPE_LATEST, Counter, Histogram, generate_
 from starlette.responses import Response
 
 app = FastAPI(
-    title="test-app-8",
-    description="test",
+    title="${{ values.name }}",
+    description="${{ values.description }}",
     version="1.0.0",
 )
 
@@ -43,7 +43,11 @@ async def add_metrics(request, call_next):
 @app.get("/")
 async def root():
     """Root endpoint."""
-    return {"message": "Welcome to test-app-8", "status": "running", "version": "1.0.0"}
+    return {
+        "message": "Welcome to ${{ values.name }}",
+        "status": "running",
+        "version": "1.0.0",
+    }
 
 
 @app.get("/health")
