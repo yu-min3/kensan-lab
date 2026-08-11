@@ -1,0 +1,33 @@
+## A certificate nobody serves.
+##
+## oauth2-proxy has to talk to Keycloak over the same HTTPS URL the browser
+## uses, and that URL is served by a certificate signed by a CA this cluster
+## generated for itself — which the pod's system trust store has never heard of.
+## The CA bundle has to get into the namespace somehow.
+##
+## cert-manager writes `ca.crt` into the Secret of every certificate it signs,
+## so asking it for a certificate here is the cheapest declarative way to carry
+## the bundle across a namespace boundary. The leaf itself is unused; only
+## `ca.crt` from the resulting Secret is mounted.
+##
+## The tool built for this job is trust-manager, and on a cluster that outlives
+## an afternoon it would be the right answer. It is another component to install
+## and explain, for one file.
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: oauth2-proxy-explore-ca
+  namespace: auth-system
+  annotations:
+    argocd.argoproj.io/sync-wave: "2"
+spec:
+  secretName: oauth2-proxy-explore-ca-tls
+  commonName: oauth2-proxy-ca-bundle-carrier
+  duration: 8760h
+  privateKey:
+    algorithm: ECDSA
+    size: 256
+  issuerRef:
+    name: explore-ca
+    kind: ClusterIssuer
+    group: cert-manager.io

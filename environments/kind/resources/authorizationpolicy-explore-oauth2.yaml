@@ -1,0 +1,47 @@
+## The gate itself: everything reaching the demo app's hostname is sent to
+## oauth2-proxy first, and only a request carrying a valid session gets through.
+## The application never sees an unauthenticated request and contains no
+## authentication code — that is the whole claim, and this file is where it is
+## true.
+##
+## **This is scoped to one host, and bare metal is not.** ADR-021 made
+## `gateway-prod` default-protect: every hostname on it is gated unless
+## explicitly opted out, because the opt-in list fell the dangerous way — a host
+## missing from it was silently public. That reversal is right, and explore
+## cannot copy it, because production splits its hostnames across two gateways
+## and explore has one. Argo CD, Grafana and Backstage all sit on this same
+## gateway and all authenticate themselves; putting them behind a second gate
+## would mean logging in twice and would teach nothing about either mechanism.
+##
+## So: named hosts here, default-protect on bare metal, and the difference is a
+## consequence of there being one gateway rather than a change of mind. Adding a
+## protected host in explore means editing this file; adding one on bare metal
+## does not.
+apiVersion: security.istio.io/v1
+kind: AuthorizationPolicy
+metadata:
+  name: explore-oauth2-authz
+  namespace: istio-system
+  annotations:
+    argocd.argoproj.io/sync-wave: "3"
+spec:
+  targetRef:
+    group: gateway.networking.k8s.io
+    kind: Gateway
+    name: gateway-explore
+  action: CUSTOM
+  provider:
+    ## Declared in kubernetes/network/istio/istiod/values.yaml, which explore
+    ## uses unmodified — the ext_authz wiring is shared, only its scope is not.
+    name: oauth2-proxy
+  rules:
+    - to:
+        - operation:
+            hosts:
+              - demo.127-0-0-1.sslip.io
+            ## The OIDC round trip cannot be gated by the thing it is trying to
+            ## satisfy: ext_authz checks a cookie, and the callback is where the
+            ## cookie is first set. These paths go straight to the proxy.
+            notPaths:
+              - /oauth2
+              - /oauth2/*

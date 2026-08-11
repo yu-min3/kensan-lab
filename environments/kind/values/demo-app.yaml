@@ -54,6 +54,15 @@ httproute:
     name: gateway-explore
     namespace: istio-system
 
+# The point of the whole SSO phase, stated in one flag. podinfo has no
+# authentication code and no idea it is protected: the gateway sends every
+# request for this hostname to oauth2-proxy first, and only a request carrying a
+# valid Keycloak session reaches the pod. This line and a ReferenceGrant are the
+# entire cost to the application.
+auth:
+  gatewayOAuth2:
+    enabled: true
+
 resources:
   requests:
     cpu: 25m

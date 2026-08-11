@@ -1,0 +1,25 @@
+## Lets the demo app's `/oauth2` route reach the proxy in this namespace.
+##
+## The route lives in app-demo rather than here for the same reason it does on
+## bare metal: the gateway admits routes by namespace label, and auth-system
+## carries `environment: infrastructure` while application namespaces carry
+## something else. charts/app-base generates that route whenever
+## `auth.gatewayOAuth2.enabled` is set; this grant is the other half, and
+## forgetting it is the usual way a newly protected app ends up in a redirect
+## loop with no error anywhere.
+apiVersion: gateway.networking.k8s.io/v1beta1
+kind: ReferenceGrant
+metadata:
+  name: allow-app-oauth2-routes
+  namespace: auth-system
+  annotations:
+    argocd.argoproj.io/sync-wave: "2"
+spec:
+  from:
+    - group: gateway.networking.k8s.io
+      kind: HTTPRoute
+      namespace: app-demo
+  to:
+    - group: ""
+      kind: Service
+      name: oauth2-proxy

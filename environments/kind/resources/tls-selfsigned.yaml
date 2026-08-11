@@ -76,3 +76,45 @@ spec:
     name: explore-ca
     kind: ClusterIssuer
     group: cert-manager.io
+---
+## Two more certificates nobody serves, for the same reason as the one in
+## resources/oauth2-proxy/: Argo CD and Grafana both validate tokens against an
+## issuer whose certificate this cluster signed itself, and cert-manager puts
+## `ca.crt` into every Secret it writes. Only that key is ever read.
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: argocd-explore-ca
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "2"
+spec:
+  secretName: argocd-explore-ca-tls
+  commonName: argocd-ca-bundle-carrier
+  duration: 8760h
+  privateKey:
+    algorithm: ECDSA
+    size: 256
+  issuerRef:
+    name: explore-ca
+    kind: ClusterIssuer
+    group: cert-manager.io
+---
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: grafana-explore-ca
+  namespace: monitoring
+  annotations:
+    argocd.argoproj.io/sync-wave: "2"
+spec:
+  secretName: grafana-explore-ca-tls
+  commonName: grafana-ca-bundle-carrier
+  duration: 8760h
+  privateKey:
+    algorithm: ECDSA
+    size: 256
+  issuerRef:
+    name: explore-ca
+    kind: ClusterIssuer
+    group: cert-manager.io
