@@ -70,6 +70,8 @@ def iter_sources(spec: dict):
 # chart 側だけで、git source の revision は explore-root が注入する）
 TEMPLATE_LINE = re.compile(r"^\s*\{\{-?\s")
 TEMPLATE_EXPR = re.compile(r"\{\{.*?\}\}")
+## TEMPLATE_EXPR が潰した跡地。値が実体でなく変数だったことを示す番人。
+TEMPLATED = "templated"
 
 
 def load_docs(path: str) -> list:
@@ -77,18 +79,28 @@ def load_docs(path: str) -> list:
         text = fh.read()
     if "{{" in text:
         kept = [ln for ln in text.splitlines() if not TEMPLATE_LINE.match(ln)]
-        text = TEMPLATE_EXPR.sub("templated", "\n".join(kept))
+        text = TEMPLATE_EXPR.sub(TEMPLATED, "\n".join(kept))
     return list(yaml.safe_load_all(text))
 
 
 def read_app(rel: str) -> dict | None:
-    """本番 app.yaml を 1 つ読む（mirror 先の解決用）。"""
+    """mirror 先を 1 つ読む。
+
+    ApplicationSet も受ける。observability は 1 つの ApplicationSet が
+    config.json から 6 つの Application を生成する形で、explore はそのうち 2 つを
+    素の Application として持つ。chart は template 側に書かれているので、
+    照合には spec.template.spec を見る必要がある。
+    """
     path = os.path.join(ROOT, rel)
     if not os.path.isfile(path):
         return None
     for doc in load_docs(path):
-        if isinstance(doc, dict) and doc.get("kind") == "Application":
+        if not isinstance(doc, dict):
+            continue
+        if doc.get("kind") == "Application":
             return doc
+        if doc.get("kind") == "ApplicationSet":
+            return {"spec": doc.get("spec", {}).get("template", {}).get("spec", {})}
     return None
 
 
@@ -99,6 +111,33 @@ def chart_identity(spec: dict) -> dict:
         for src in iter_sources(spec)
         if src.get("chart")
     }
+
+
+def chart_identity_from_generator(rel: str, name: str) -> dict:
+    """ApplicationSet の chart 情報を generator の config.json から解決する。
+
+    template 側は `{{ .chart }}` のような変数なので直接は比べられない。実体は
+    generator が読む config.json にあり、そこには chart / chartRepo /
+    chartVersion が入っている。explore の Application 名（prometheus 等）と
+    config.json の name を突き合わせる。
+    """
+    import json
+    path = os.path.join(ROOT, rel)
+    if not os.path.isfile(path):
+        return {}
+    for doc in load_docs(path):
+        if not isinstance(doc, dict) or doc.get("kind") != "ApplicationSet":
+            continue
+        for gen in doc.get("spec", {}).get("generators") or []:
+            for item in (gen.get("git") or {}).get("files") or []:
+                for cfg in glob.glob(os.path.join(ROOT, item.get("path", "")), recursive=True):
+                    try:
+                        d = json.load(open(cfg))
+                    except (OSError, ValueError):
+                        continue
+                    if d.get("name") == name and d.get("chart"):
+                        return {d["chart"]: (d.get("chartRepo"), str(d.get("chartVersion")))}
+    return {}
 
 
 def check_mirror(rel: str, doc: dict) -> None:
@@ -112,6 +151,11 @@ def check_mirror(rel: str, doc: dict) -> None:
 
     here = chart_identity(doc.get("spec", {}))
     there = chart_identity(mirrored.get("spec", {}))
+    if here and TEMPLATED in there:
+        # mirror 先が ApplicationSet の場合、template 側の chart は `{{ .chart }}`
+        # のような変数（load_docs が TEMPLATED に潰す）なので比較できない。実体は
+        # generator が読む config.json 側にある。
+        there = chart_identity_from_generator(target, doc["metadata"]["name"])
     for chart, identity in here.items():
         if chart not in there:
             errors.append(f"{rel}: chart '{chart}' が mirror 元 {target} に存在しない")

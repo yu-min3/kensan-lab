@@ -165,6 +165,15 @@ kubectl -n backstage create secret generic backstage-explore-github \
   --from-literal=GITHUB_TOKEN="${GITHUB_TOKEN}" \
   --dry-run=client -o yaml | kubectl apply -f - >/dev/null
 
+# Grafana reads its admin credentials from a Secret. Bare metal fills that from
+# Vault; here it is generated, printed at the end, and gone when the cluster is.
+kubectl create namespace monitoring --dry-run=client -o yaml | kubectl apply -f - >/dev/null
+GRAFANA_PASSWORD="$(openssl rand -base64 18 | tr -d '/+=' | head -c 20)"
+kubectl -n monitoring create secret generic grafana-explore-admin \
+  --from-literal=admin-user=admin \
+  --from-literal=admin-password="${GRAFANA_PASSWORD}" \
+  --dry-run=client -o yaml | kubectl apply -f - >/dev/null
+
 info "applying the AppProjects"
 kubectl apply -f "${REPO_ROOT}/kubernetes/argocd/projects/" >/dev/null
 
@@ -276,12 +285,17 @@ cat <<EOF
      The 'explore-root' application is the app-of-apps: open it and every
      component below it is one Application, exactly as on the real cluster.
 
-  2. Open the demo app               http://demo.127-0-0-1.sslip.io
+  2. Open Grafana                    https://grafana.127-0-0-1.sslip.io
+     user 'admin', password '${GRAFANA_PASSWORD}'
+     The certificate is self-signed, so the browser will warn — there is no
+     domain here to prove ownership of, and the warning is the honest result.
+
+  3. Open the demo app               http://demo.127-0-0-1.sslip.io
      It reached the browser through Istio's Gateway API implementation, and it
      was deployed by charts/app-base — the same chart the real apps use, with
      no changes, only a values file.
 
-  3. See what the policy engine thinks
+  4. See what the policy engine thinks
        kubectl get policyreport -A
      Kyverno is running the production policies in Audit mode, so violations
      are reported rather than blocked (ADR-012).

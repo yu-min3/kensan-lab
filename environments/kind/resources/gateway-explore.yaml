@@ -51,6 +51,36 @@ spec:
                 values:
                   - infrastructure
                   - production
+
+    ## Same shape as the production gateway: one wildcard certificate covering
+    ## every host. The certificate is self-signed (resources/tls-selfsigned.yaml)
+    ## because a visitor has no domain to prove ownership of, so browsers warn —
+    ## that is expected and explained in the docs rather than worked around.
+    ##
+    ## HTTP is kept alongside rather than redirected: without a trusted
+    ## certificate, forcing HTTPS would turn every first visit into a warning
+    ## page. Anything that needs a secure context (OIDC cookies) uses the HTTPS
+    ## listener; plain browsing works either way.
+    - name: https
+      protocol: HTTPS
+      port: 443
+      hostname: "*.127-0-0-1.sslip.io"
+      allowedRoutes:
+        namespaces:
+          from: Selector
+          selector:
+            matchExpressions:
+              - key: kensan-lab.platform/environment
+                operator: In
+                values:
+                  - infrastructure
+                  - production
+      tls:
+        mode: Terminate
+        certificateRefs:
+          - group: ""
+            kind: Secret
+            name: explore-wildcard-tls
 ---
 ## Entrypoint. kind maps host port 80 to node port 30080 (see kind-cluster.yaml),
 ## so this Service is what makes http://demo.127-0-0-1.sslip.io work from the
@@ -74,4 +104,9 @@ spec:
       port: 80
       targetPort: 80
       nodePort: 30080
+      protocol: TCP
+    - name: https
+      port: 443
+      targetPort: 443
+      nodePort: 30443
       protocol: TCP

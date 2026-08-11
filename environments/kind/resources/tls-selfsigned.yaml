@@ -1,0 +1,78 @@
+## TLS for a cluster with no domain.
+##
+## Production terminates TLS with wildcard certificates that cert-manager gets
+## from Let's Encrypt through a DNS-01 challenge — proof that we own the domain.
+## A visitor owns neither the domain nor the API credentials, and no amount of
+## work makes that transferable.
+##
+## Self-signing needs neither: nothing verifies ownership, so a certificate for
+## *.127-0-0-1.sslip.io can simply be issued. The cost is a browser warning,
+## which stays. Suppressing it would mean writing into the visitor's system
+## trust store, and a demo does not get to do that.
+##
+## Two issuers rather than one: the first is bootstrapping-only — it signs the
+## CA certificate — and the second is what actually issues leaf certificates.
+## The extra hop is what lets a person trust one certificate (the CA) instead of
+## one per hostname, if they choose to.
+apiVersion: cert-manager.io/v1
+kind: ClusterIssuer
+metadata:
+  name: explore-selfsigned-bootstrap
+  annotations:
+    argocd.argoproj.io/sync-wave: "1"
+spec:
+  selfSigned: {}
+---
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: explore-ca
+  namespace: cert-manager
+  annotations:
+    argocd.argoproj.io/sync-wave: "1"
+spec:
+  isCA: true
+  commonName: kensan-lab explore
+  secretName: explore-ca-tls
+  duration: 8760h    # a year; the cluster will not outlive an afternoon
+  privateKey:
+    algorithm: ECDSA
+    size: 256
+  issuerRef:
+    name: explore-selfsigned-bootstrap
+    kind: ClusterIssuer
+    group: cert-manager.io
+---
+apiVersion: cert-manager.io/v1
+kind: ClusterIssuer
+metadata:
+  name: explore-ca
+  annotations:
+    argocd.argoproj.io/sync-wave: "1"
+spec:
+  ca:
+    secretName: explore-ca-tls
+---
+## The wildcard the gateway serves. Mirrors the shape of the production
+## certificate — one cert covering every host on the gateway — so that adding a
+## hostname needs no certificate work here either.
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: explore-wildcard
+  namespace: istio-system
+  annotations:
+    argocd.argoproj.io/sync-wave: "1"
+spec:
+  secretName: explore-wildcard-tls
+  duration: 8760h
+  dnsNames:
+    - "*.127-0-0-1.sslip.io"
+    - "127-0-0-1.sslip.io"
+  privateKey:
+    algorithm: ECDSA
+    size: 256
+  issuerRef:
+    name: explore-ca
+    kind: ClusterIssuer
+    group: cert-manager.io

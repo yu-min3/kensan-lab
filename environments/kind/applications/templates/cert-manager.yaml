@@ -1,0 +1,47 @@
+## cert-manager — same chart and values as bare metal.
+##
+## What differs is what issues the certificates, and that lives in
+## environments/kind/resources: production uses Let's Encrypt through a DNS-01
+## challenge against a domain we own, which a visitor has neither the domain nor
+## the credentials for. Explore self-signs instead, which needs no domain at all
+## because nothing verifies ownership — the browser warns, and the docs explain
+## why rather than hiding it.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: cert-manager
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "0"
+    kensan-lab.platform/mirrors: kubernetes/argocd/applications/secrets/cert-manager/app.yaml
+spec:
+  project: platform-project
+  sources:
+    - repoURL: https://charts.jetstack.io
+      chart: cert-manager
+      targetRevision: v1.19.1
+      helm:
+        releaseName: cert-manager
+        valueFiles:
+          - $values/kubernetes/secrets/cert-manager/values.yaml
+    - repoURL: {{ .Values.repoURL }}
+      targetRevision: {{ .Values.targetRevision }}
+      ref: values
+  {{- include "explore.destination" (dict "namespace" "cert-manager") | nindent 2 }}
+
+  ## Not the shared syncPolicy: cert-manager creates its own namespace on bare
+  ## metal too (CreateNamespace=true), and there is no separate namespace app
+  ## for it to follow.
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true
+    retry:
+      limit: 5
+      backoff:
+        duration: 5s
+        factor: 2
+        maxDuration: 3m

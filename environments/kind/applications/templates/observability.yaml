@@ -1,0 +1,107 @@
+## Prometheus and Grafana — the two of the six observability components that
+## can say something on a single node.
+##
+## Bare metal drives all six from one ApplicationSet with a git file generator
+## globbing kubernetes/observability/*/config.json. Explore names two of them
+## explicitly instead: the glob would pull in Loki, Tempo, the OTel collector
+## and blackbox-exporter, which together ask for 600m and 1.5Gi and have nothing
+## to show without workloads emitting to them.
+##
+## The chart versions still come from those same config.json files — see
+## versions in kubernetes/observability/{prometheus,grafana}/config.json — so a
+## bump on bare metal is a bump here, and the drift guard checks it.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: prometheus
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "1"
+    kensan-lab.platform/mirrors: kubernetes/argocd/applications/observability/applicationset.yaml
+spec:
+  project: platform-project
+  sources:
+    - repoURL: https://prometheus-community.github.io/helm-charts
+      chart: kube-prometheus-stack
+      targetRevision: 79.5.0
+      helm:
+        releaseName: prometheus
+        valueFiles:
+          - $values/kubernetes/observability/prometheus/values.yaml
+          - $values/environments/kind/values/prometheus.yaml
+    - repoURL: {{ .Values.repoURL }}
+      targetRevision: {{ .Values.targetRevision }}
+      ref: values
+  {{- include "explore.destination" (dict "namespace" "monitoring") | nindent 2 }}
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      ## The chart ships very large CRDs; server-side apply is what keeps them
+      ## under the annotation size limit, same as bare metal.
+      - CreateNamespace=true
+      - ServerSideApply=true
+    retry:
+      limit: 5
+      backoff:
+        duration: 5s
+        factor: 2
+        maxDuration: 3m
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: grafana
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "2"
+    kensan-lab.platform/mirrors: kubernetes/argocd/applications/observability/applicationset.yaml
+spec:
+  project: platform-project
+  sources:
+    - repoURL: https://grafana-community.github.io/helm-charts
+      chart: grafana
+      targetRevision: 11.3.5
+      helm:
+        releaseName: grafana
+        valueFiles:
+          - $values/kubernetes/observability/grafana/values.yaml
+          - $values/environments/kind/values/grafana.yaml
+    - repoURL: {{ .Values.repoURL }}
+      targetRevision: {{ .Values.targetRevision }}
+      ref: values
+    ## Dashboards travel from bare metal unchanged — they are the reason to run
+    ## Grafana here at all. The datasource does not: the shared one points at
+    ## Tempo and Loki, which explore does not run.
+    - repoURL: {{ .Values.repoURL }}
+      targetRevision: {{ .Values.targetRevision }}
+      path: kubernetes/observability/grafana/resources
+      directory:
+        recurse: false
+        include: '{dashboards,cluster-health-dashboard,controlplane-dashboard}.yaml'
+  {{- include "explore.destination" (dict "namespace" "monitoring") | nindent 2 }}
+  {{- include "explore.syncPolicy" . | nindent 2 }}
+---
+## The monitoring namespace, taken from bare metal unchanged — same ADR-006
+## labels, same file. Prometheus creates it if this has not run yet
+## (CreateNamespace=true), and this brings the labels afterwards.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: monitoring-namespace
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "0"
+    kensan-lab.platform/mirrors: kubernetes/argocd/applications/namespaces/monitoring/app.yaml
+spec:
+  project: platform-project
+  source:
+    repoURL: {{ .Values.repoURL }}
+    targetRevision: {{ .Values.targetRevision }}
+    path: kubernetes/observability
+    directory:
+      recurse: false
+      include: 'namespace.yaml'
+  {{- include "explore.destination" (dict "namespace" "monitoring") | nindent 2 }}
+  {{- include "explore.syncPolicy" . | nindent 2 }}
