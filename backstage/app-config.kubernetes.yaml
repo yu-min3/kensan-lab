@@ -10,8 +10,6 @@ backend:
   listen:
     port: 7007
     host: 0.0.0.0
-  auth:
-    dangerouslyDisableDefaultAuthPolicy: true
   cors:
     origin: https://backstage.platform.yu-min3.com
     methods: [GET, HEAD, PATCH, POST, PUT, DELETE]
@@ -70,8 +68,10 @@ catalog:
 
 auth:
   providers:
-    guest:
-      dangerouslyAllowOutsideDevelopment: true
+    oauth2Proxy:
+      signIn:
+        resolvers:
+          - resolver: emailMatchingUserEntityProfileEmail
 
 techdocs:
   builder: 'local'
