@@ -18,7 +18,7 @@ usage() {
 usage: scripts/explore-down.sh [--prune-images]
 
   --prune-images   also remove the container images this cluster pulled
-                   (istio, kyverno, argo-cd, podinfo). Images shared with your
+                   (istio, kyverno, argo-cd, keycloak). Images shared with your
                    other clusters are removed too — Docker cannot tell them
                    apart. Left off by default.
 EOF
@@ -53,7 +53,8 @@ if [[ "$PRUNE_IMAGES" == true ]]; then
     'ghcr.io/kyverno/' \
     'quay.io/argoproj/' \
     'ghcr.io/dexidp/' \
-    'ghcr.io/stefanprodan/podinfo' \
+    'ghcr.io/yu-min3/kensan-lab/explore-demo' \
+    'quay.io/keycloak/' \
     'kindest/node'
   do
     ids="$(docker images --filter "reference=${pattern}*" -q | sort -u)"

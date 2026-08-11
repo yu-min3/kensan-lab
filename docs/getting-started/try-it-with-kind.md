@@ -33,7 +33,7 @@ $ make explore-down     # when you are done
 | **Istio + Gateway API** | All of them are reached through a real `Gateway` and `HTTPRoute`, not a port-forward |
 | **TLS** | cert-manager issues a wildcard certificate from a CA it generates on the spot; your browser will warn, and [that is honest](#5-follow-a-request-through-the-gateway-api) |
 | **Kyverno** | All six production `ClusterPolicy` objects, in Audit — verdicts land in `PolicyReport` within a minute |
-| **A demo app** | Deployed by `charts/app-base`, the same chart the real apps use: a values file and no chart changes |
+| **A demo app** | The golden path's own output — the template's skeleton, built and deployed by `charts/app-base` exactly as a scaffolded service would be |
 | **A `longhorn` StorageClass** | Not Longhorn, but named after it, so every PVC in this repository binds unmodified |
 
 ## Prerequisites
@@ -118,8 +118,8 @@ gateway-api         Synced   Healthy
 `make try` prints one account — user `demo` — and it is the only one you need.
 
 Open `https://demo.127-0-0-1.sslip.io`. You do not land on the demo app; you
-land on Keycloak. **The application has no authentication code in it.** podinfo
-is an off-the-shelf image that does not know what a session is. The gateway
+land on Keycloak. **The application has no authentication code in it.** It is a
+FastAPI service with four endpoints and no idea what a session is. The gateway
 asked oauth2-proxy about your request before the pod ever saw it, oauth2-proxy
 found no cookie, and sent you to the identity provider. One line of values
 turned that on:
@@ -130,7 +130,7 @@ auth:
     enabled: true
 ```
 
-Sign in, and you arrive at podinfo. Now open
+Sign in, and you arrive at the app. Now open
 `https://argocd.127-0-0-1.sslip.io` and press **Log in via Keycloak** — it does
 not ask again. Same at `https://grafana.127-0-0-1.sslip.io` with **Sign in with
 Keycloak**, and you arrive as an *Admin* rather than a Viewer, because `demo` is
@@ -173,7 +173,10 @@ Two things are worth finding:
 
 - **Create → the FastAPI template.** This is the golden path: the scaffolder a
   developer uses to start a service that arrives on the platform already wired
-  up, rather than assembling manifests by hand.
+  up, rather than assembling manifests by hand. **The app running at
+  `demo.127-0-0-1.sslip.io` is what it produces** — the same skeleton, rendered
+  the same way, built by the same Dockerfile. The demo is not a mock-up of the
+  golden path; it is the golden path's output, already deployed.
 - **Catalog.** The domains, systems and teams the platform knows about.
 
 Both are read from files inside the image. Production also runs a GitHub

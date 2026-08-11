@@ -637,7 +637,7 @@ cat <<EOF
        user 'demo', password '${DEMO_USER_PASSWORD}'
 
   1. Open the demo app               https://demo.127-0-0-1.sslip.io
-     You will land on Keycloak first. podinfo has no authentication code and
+     You will land on Keycloak first. The app has no authentication code and
      does not know it is protected — the gateway asked oauth2-proxy about your
      request before the pod ever saw it. One line of values turned that on.
 

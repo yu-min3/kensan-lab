@@ -8,34 +8,45 @@
 
 nameOverride: demo
 
-# podinfo is public and multi-arch, so this resolves on Apple Silicon as well as
-# on an amd64 runner. The real applications are multi-arch too, but their
-# images are private and pulled through an ExternalSecret backed by Vault,
-# which explore does not run until Phase 3 — that, not architecture, is why
-# they are absent.
+# The output of the golden path, not a stand-in for it.
+#
+# This image is the template's own skeleton, rendered the way the scaffolder
+# renders it and pushed by .github/workflows/template-ci.yml. The app a visitor
+# reaches at demo.127-0-0-1.sslip.io is therefore the thing they would get by
+# pressing Create in the portal: same FastAPI service, same Dockerfile, same
+# /health and /metrics, deployed by the same chart. Nothing about the demo is
+# arranged for the demo.
+#
+# Public and multi-arch, so it resolves on Apple Silicon as well as on an amd64
+# runner. The real applications are multi-arch too; theirs are private and
+# pulled through an ExternalSecret backed by Vault, which is why they are absent
+# — architecture is not the reason.
 image:
-  repository: ghcr.io/stefanprodan/podinfo
-  tag: 6.9.2
+  repository: ghcr.io/yu-min3/kensan-lab/explore-demo
+  tag: v0.1.0
 
 ports:
-  http: 9898
+  http: 8000
 
 probes:
-  path: /healthz
+  # app/main.py serves /health; the chart defaults to /healthz.
+  path: /health
 
-# podinfo's image declares `USER app` — a name, not a number. The chart asks for
-# runAsNonRoot, and the kubelet cannot resolve a username to a UID without the
-# image's /etc/passwd, so it refuses to start the container:
+# Not an explore-specific workaround — these are the two lines the template's
+# own deploy/values.yaml ships, and for the same reason. The skeleton's
+# Dockerfile ends with `USER appuser`, a name rather than a number, and the
+# chart asks for runAsNonRoot; the kubelet cannot resolve a username to a UID
+# without reading the image's /etc/passwd, so it refuses to start the container:
 #
-#   container has runAsNonRoot and image has non-numeric user (app),
+#   container has runAsNonRoot and image has non-numeric user (appuser),
 #   cannot verify user is non-root
 #
-# 100:101 is what `app` resolves to inside the image. Stated numerically here
-# rather than relaxing runAsNonRoot in the chart, which every real app depends
-# on. Any image whose USER is a name needs the same two lines.
+# Stating the UID numerically is what the template tells a developer to do, so
+# explore does the same. A `USER 1000:1000` in the skeleton's Dockerfile would
+# remove the need for both copies.
 securityContext:
-  runAsUser: 100
-  runAsGroup: 101
+  runAsUser: 1000
+  runAsGroup: 1000
 
 # Bare metal pulls from a private GHCR through an ExternalSecret backed by
 # Vault. Explore has no Vault, and the image is public anyway.
@@ -54,11 +65,12 @@ httproute:
     name: gateway-explore
     namespace: istio-system
 
-# The point of the whole SSO phase, stated in one flag. podinfo has no
+# The point of the whole SSO phase, stated in one flag. The application has no
 # authentication code and no idea it is protected: the gateway sends every
 # request for this hostname to oauth2-proxy first, and only a request carrying a
 # valid Keycloak session reaches the pod. This line and a ReferenceGrant are the
-# entire cost to the application.
+# entire cost — and since this app is the golden path's own output, that is the
+# cost to every service scaffolded from it.
 auth:
   gatewayOAuth2:
     enabled: true
