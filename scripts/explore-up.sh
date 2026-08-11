@@ -202,46 +202,6 @@ helm upgrade --install argocd argo/argo-cd \
   --values "${ENV_DIR}/values/argocd.yaml" \
   --wait --timeout 10m >/dev/null
 
-# The scaffolder needs a token to reach GitHub, and there is nowhere for one to
-# come from: Vault is not part of this slice, and a credential for the visitor's
-# own account cannot be generated. So it is passed in or the feature is absent —
-# the Secret is created either way, holding an empty string, so that the
-# Deployment's reference always resolves.
-#
-# The placeholder is not decoration. Backstage type-checks its config at
-# startup, and `integrations.github[0].token` set to an empty string fails that
-# check — which does not stop the process or fail the probe, it stops the
-# catalog, scaffolder and techdocs plugins from ever initialising. The portal
-# then serves its shell, answers /healthcheck, reports Healthy to Argo CD, and
-# returns 503 for every catalog request. A syntactically valid token that GitHub
-# will reject keeps all three plugins running and moves the failure to where it
-# belongs: the moment somebody presses Create.
-if [[ -n "$GITHUB_TOKEN" ]]; then
-  info "wiring the GitHub token into Backstage (scaffolder enabled)"
-else
-  info "no GITHUB_TOKEN set — Backstage runs without the scaffolder's publish step"
-  GITHUB_TOKEN="ghp_0000000000000000000000000000000000no-token-was-supplied"
-fi
-kubectl apply -f "${REPO_ROOT}/kubernetes/backstage/namespace.yaml" >/dev/null
-kubectl -n backstage create secret generic backstage-explore-github \
-  --from-literal=GITHUB_TOKEN="${GITHUB_TOKEN}" \
-  --dry-run=client -o yaml | kubectl apply -f - >/dev/null
-
-# Grafana reads its admin credentials from a Secret. Bare metal fills that from
-# Vault; here it is generated, printed at the end, and gone when the cluster is.
-kubectl create namespace monitoring --dry-run=client -o yaml | kubectl apply -f - >/dev/null
-GRAFANA_PASSWORD="$(openssl rand -base64 18 | tr -d '/+=' | head -c 20)"
-kubectl -n monitoring create secret generic grafana-explore-admin \
-  --from-literal=admin-user=admin \
-  --from-literal=admin-password="${GRAFANA_PASSWORD}" \
-  --dry-run=client -o yaml | kubectl apply -f - >/dev/null
-# Grafana reads the OIDC client through envFrom, so the key names are the
-# environment variable names its config interpolates.
-kubectl -n monitoring create secret generic grafana-oidc-explore \
-  --from-literal=GF_AUTH_GENERIC_OAUTH_CLIENT_ID=grafana \
-  --from-literal=GF_AUTH_GENERIC_OAUTH_CLIENT_SECRET="${GRAFANA_CLIENT_SECRET}" \
-  --dry-run=client -o yaml | kubectl apply -f - >/dev/null
-
 # ---------------------------------------------------------------------------
 # Single sign-on credentials
 # ---------------------------------------------------------------------------
@@ -286,6 +246,46 @@ kubectl -n auth-system create secret generic oauth2-proxy-secret \
   --from-literal=client-id=oauth2-proxy \
   --from-literal=client-secret="${OAUTH2_PROXY_CLIENT_SECRET}" \
   --from-literal=cookie-secret="${OAUTH2_PROXY_COOKIE_SECRET}" \
+  --dry-run=client -o yaml | kubectl apply -f - >/dev/null
+
+# The scaffolder needs a token to reach GitHub, and there is nowhere for one to
+# come from: Vault is not part of this slice, and a credential for the visitor's
+# own account cannot be generated. So it is passed in or the feature is absent —
+# the Secret is created either way, holding an empty string, so that the
+# Deployment's reference always resolves.
+#
+# The placeholder is not decoration. Backstage type-checks its config at
+# startup, and `integrations.github[0].token` set to an empty string fails that
+# check — which does not stop the process or fail the probe, it stops the
+# catalog, scaffolder and techdocs plugins from ever initialising. The portal
+# then serves its shell, answers /healthcheck, reports Healthy to Argo CD, and
+# returns 503 for every catalog request. A syntactically valid token that GitHub
+# will reject keeps all three plugins running and moves the failure to where it
+# belongs: the moment somebody presses Create.
+if [[ -n "$GITHUB_TOKEN" ]]; then
+  info "wiring the GitHub token into Backstage (scaffolder enabled)"
+else
+  info "no GITHUB_TOKEN set — Backstage runs without the scaffolder's publish step"
+  GITHUB_TOKEN="ghp_0000000000000000000000000000000000no-token-was-supplied"
+fi
+kubectl apply -f "${REPO_ROOT}/kubernetes/backstage/namespace.yaml" >/dev/null
+kubectl -n backstage create secret generic backstage-explore-github \
+  --from-literal=GITHUB_TOKEN="${GITHUB_TOKEN}" \
+  --dry-run=client -o yaml | kubectl apply -f - >/dev/null
+
+# Grafana reads its admin credentials from a Secret. Bare metal fills that from
+# Vault; here it is generated, printed at the end, and gone when the cluster is.
+kubectl create namespace monitoring --dry-run=client -o yaml | kubectl apply -f - >/dev/null
+GRAFANA_PASSWORD="$(openssl rand -base64 18 | tr -d '/+=' | head -c 20)"
+kubectl -n monitoring create secret generic grafana-explore-admin \
+  --from-literal=admin-user=admin \
+  --from-literal=admin-password="${GRAFANA_PASSWORD}" \
+  --dry-run=client -o yaml | kubectl apply -f - >/dev/null
+# Grafana reads the OIDC client through envFrom, so the key names are the
+# environment variable names its config interpolates.
+kubectl -n monitoring create secret generic grafana-oidc-explore \
+  --from-literal=GF_AUTH_GENERIC_OAUTH_CLIENT_ID=grafana \
+  --from-literal=GF_AUTH_GENERIC_OAUTH_CLIENT_SECRET="${GRAFANA_CLIENT_SECRET}" \
   --dry-run=client -o yaml | kubectl apply -f - >/dev/null
 
 info "applying the AppProjects"

@@ -22,6 +22,20 @@ Argo CD is installed by `scripts/explore-up.sh` with Helm, because nothing can
 sync it before it exists. Everything after that arrives through
 `explore-root-app.yaml` and behaves like the real cluster.
 
+The script does three other things Argo CD cannot, all for the same reason —
+they have to happen either before there is a cluster to sync into, or after
+something Argo CD created is already running:
+
+| | why it is not an Application |
+|---|---|
+| **generates every SSO credential** | a client secret committed to a public repository is a working credential against every cluster started from it |
+| **creates the Keycloak realm with `kcadm`** | Keycloak does not substitute environment variables during realm import — verified: `${VAR}` in a client secret is stored as those six characters — so a realm file in git would have to carry real secrets |
+| **rewrites CoreDNS** | the issuer hostname has to resolve to the gateway from inside a pod and to `127.0.0.1` from the browser; that is one name with two answers |
+
+Bare metal solves the first two the same way, with `bootstrap/keycloak/setup.sh`
+run once by hand. Explore runs its own smaller version automatically because
+there is nobody to run it and nothing worth keeping if it goes wrong.
+
 ## Why an Application per component instead of a patch
 
 The original design was to reference the bare-metal `app.yaml` files from a
@@ -108,7 +122,11 @@ to differ.
 8. **Promoting Kyverno to Enforce (ADR-012 Phase 3) means revisiting
    `values/istiod.yaml`.** The trimmed requests there are sized for Audit mode;
    under Enforce a workload that asks for too little can be rejected outright.
-9. **A dashboard whose metrics do not exist here does not belong here.** Explore
+9. **Do not edit `scripts/explore-up.sh` while it is running.** bash reads a
+   script incrementally, so an edit mid-run shifts the offset it is reading from
+   and produces a syntax error on a line that is perfectly valid. It looks like
+   a bug in the script and is not.
+10. **A dashboard whose metrics do not exist here does not belong here.** Explore
    ships one of production's three because the other two read etcd, Cilium and
    an OTel collector that a single kind node has none of. Half-empty panels do
    not demonstrate observability; they demonstrate a broken cluster, which is
@@ -117,9 +135,10 @@ to differ.
 
 ## Why the substitutions are permanent
 
-Five of the files here exist because a hostname is hardcoded in a raw
-manifest — the Gateway, the routes for Argo CD, Backstage and Grafana, and the
-wildcard certificate. For a while the plan was to centralise those values behind
+Eight of the files here exist because a hostname is hardcoded in a raw
+manifest — the Gateway, the routes for Argo CD, Backstage, Grafana and Keycloak,
+the wildcard certificate, Keycloak's env config, and the authorization policy
+naming the protected host. For a while the plan was to centralise those values behind
 a `site.yaml` and delete these copies. **That is no longer planned**, so they
 stay.
 
@@ -140,7 +159,7 @@ render step at bootstrap, with plain manifests on the other side. That is a
 different kind of repository than a reference architecture, and copying its
 answer here would mean becoming one.
 
-So: expect these five to stay, keep them small, and keep new site-specific
+So: expect these eight to stay, keep them small, and keep new site-specific
 values out of raw manifests anyway — rule 6 above still holds, because it is
 what keeps the count from growing past the hostnames that genuinely need one.
 
