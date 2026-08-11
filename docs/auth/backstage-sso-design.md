@@ -98,7 +98,7 @@ Backstage の plugin API は sign-in 後に Backstage 自身が発行した Bear
 |---|---|
 | oauth2-proxy Keycloak client / Secret | **変更なし**。既存 `istio-gateway-platform` client を共有 |
 | Istio `headersToUpstreamOnAllow` | **Backstage 専用 provider を追加**。user/email/groups は上書きし、`Authorization` は元の Backstage token を保持 |
-| Gateway group 許可 | **identity header で評価**。専用 ext_authz provider が上書きした `X-Auth-Request-Groups` の admin/dev を許可 |
+| Gateway / app 許可 | Gateway はoauth2-proxy sessionを必須化。利用者のallowlistは Catalog User resolverで評価 |
 | `requestauthentication-strip-jwt.yaml` | **維持**。外部 Keycloak JWT を Backstage token と誤認して 401 にする既知問題を防ぐ |
 | Backstage ExternalSecret | **変更なし**。専用 client secret は不要 |
 | Backstage image | application build 後に新 tag へ更新。`latest` は使わない |
@@ -108,7 +108,7 @@ Backstage の plugin API は sign-in 後に Backstage 自身が発行した Bear
 1. Browser が Backstage を開く。
 2. Istio が oauth2-proxy の `/oauth2/auth` へ ext_authz check を行う。
 3. session がなければ oauth2-proxy が Keycloak へ redirect し、認証後に共有 cookie を設定する。
-4. 専用 ext_authz provider が oauth2-proxy の identity header を上書きし、Gateway が groups header の admin/dev のみ Backstage へ許可する。
+4. 専用 ext_authz provider がoauth2-proxy sessionを検証し、identity headerを上書きする。
 5. 専用 provider は browser が送る `Authorization` を上書きしない。workload 側 RequestAuthentication は外部 Keycloak Bearer JWT だけを剥がす。
 6. Backstage oauth2Proxy provider が email header を Catalog User に照合し、Backstage token を発行する。
 7. frontend と backend plugin は Backstage token で user identity を共有する。
@@ -137,7 +137,7 @@ GitOps のため runtime 変更は Git commit と Argo CD sync を経由する�
 ### セキュリティ
 
 - 未認証 browser は Keycloak へ redirect される。
-- `platform-admin` / `platform-dev` 以外は Gateway で拒否される。
+- Catalog Userに登録されていないemailはBackstage sign-in resolverで拒否される。
 - production の guest endpoint で sign-in できない。
 - email header がない、または Catalog に一致しない場合は sign-in が fail closed になる。
 - 外部から `X-Auth-Request-Email` を偽装しても Gateway / oauth2-proxy が上書きまたは拒否し、別 user になれない。
@@ -159,7 +159,7 @@ GitOps のため runtime 変更は Git commit と Argo CD sync を経由する�
 | 症状 | 境界 | 見るもの |
 |---|---|---|
 | 302 loop / 503 | Gateway → oauth2-proxy | oauth2-proxy log、ext_authz metrics、cookie domain |
-| 403 RBAC | Gateway AuthorizationPolicy | oauth2-proxy groups header、host category |
+| 403 Gateway | Gateway AuthorizationPolicy | CUSTOM/ALLOW policy、host category |
 | sign-in resolver error | Backstage auth backend | email header の有無、Catalog User email |
 | plugin API 401 | Backstage backend auth | Backstage token、service-to-service auth、JWT strip |
 
