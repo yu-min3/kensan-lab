@@ -74,12 +74,18 @@ spec:
     ## Dashboards travel from bare metal unchanged — they are the reason to run
     ## Grafana here at all. The datasource does not: the shared one points at
     ## Tempo and Loki, which explore does not run.
+    ##
+    ## Two of the three come across. The control-plane dashboard does not: five
+    ## of its nine panels read etcd metrics (kind's etcd serves them on
+    ## localhost, behind client certs) or Cilium's operator (explore runs
+    ## kindnet), and neither gap closes on a single node. A dashboard that is
+    ## half empty teaches the wrong thing about the cluster it is pointed at.
     - repoURL: {{ .Values.repoURL }}
       targetRevision: {{ .Values.targetRevision }}
       path: kubernetes/observability/grafana/resources
       directory:
         recurse: false
-        include: '{dashboards,cluster-health-dashboard,controlplane-dashboard}.yaml'
+        include: '{dashboards,cluster-health-dashboard}.yaml'
   {{- include "explore.destination" (dict "namespace" "monitoring") | nindent 2 }}
   {{- include "explore.syncPolicy" . | nindent 2 }}
 ---
