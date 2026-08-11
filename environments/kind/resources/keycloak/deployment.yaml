@@ -9,10 +9,13 @@
 ##
 ## Three deliberate differences from kubernetes/auth/keycloak/, and no others:
 ##
-##   args      `start-dev` with `--import-realm` rather than `start`. Dev mode
-##             also relaxes the hostname checks, which matters because the
-##             issuer here has to be reachable under the same name from both a
-##             browser (via 127.0.0.1) and from inside a pod (via CoreDNS).
+##   args      `start-dev` rather than `start`. Dev mode relaxes the hostname
+##             checks, which matters because the issuer here has to be reachable
+##             under the same name from both a browser (via 127.0.0.1) and from
+##             inside a pod (via CoreDNS). The realm arrives afterwards, from
+##             scripts/explore-up.sh via kcadm — not from an imported file,
+##             because Keycloak stores `${VAR}` in a realm file literally and a
+##             committed realm would have to carry real secrets.
 ##   database  H2 in memory instead of PostgreSQL. Restart the pod and every
 ##             login, session and realm edit is gone; the realm itself comes
 ##             back from the ConfigMap.
@@ -47,7 +50,6 @@ spec:
           image: quay.io/keycloak/keycloak:23.0
           args:
             - start-dev
-            - --import-realm
           envFrom:
             - configMapRef:
                 name: keycloak-env-config
@@ -82,11 +84,3 @@ spec:
               cpu: "200m"
             limits:
               memory: "1200Mi"
-          volumeMounts:
-            - name: realm
-              mountPath: /opt/keycloak/data/import
-              readOnly: true
-      volumes:
-        - name: realm
-          configMap:
-            name: keycloak-explore-realm
