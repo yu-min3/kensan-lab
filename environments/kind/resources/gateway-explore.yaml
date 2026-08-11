@@ -15,9 +15,9 @@
 ##                domain nor the credentials. Phase 2 adds a self-signed issuer
 ##                and accepts the browser warning rather than pretending.
 ##
-## This file is scaffolding. When the domain centralisation lands and the real
-## Gateway becomes site.yaml-driven, delete it and point explore at the shared
-## chart instead — see environments/kind/README.md#planned-removal.
+## This file is permanent. Centralising the real Gateway's site values behind a
+## config file was considered and dropped — see
+## environments/kind/README.md#why-the-substitutions-are-permanent.
 apiVersion: gateway.networking.k8s.io/v1
 kind: Gateway
 metadata:

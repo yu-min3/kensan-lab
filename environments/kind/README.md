@@ -88,9 +88,9 @@ to differ.
    `platform-root` syncs that directory with `recurse: true`; a file left there
    lands on the real cluster.
 6. **Do not hardcode a new site-specific value into a raw manifest.** Domains,
-   IPs and issuer URLs are the reason two of the files in `resources/` exist at
-   all. Once the domain centralisation lands they come from `site.yaml`. This is
-   the single rule that decides whether this layer ages well.
+   IPs and issuer URLs are the reason three of the files here exist at all, and
+   nothing is coming to remove them. Every new one is permanent, so this is the
+   single rule that decides whether this layer ages well.
 7. **If CI time becomes a problem, shrink the slice rather than moving the job
    to nightly.** A slow signal on every pull request is worth more than a fast
    one nobody reads, and "while we are here, let us also run X in explore" is
@@ -99,19 +99,33 @@ to differ.
    `values/istiod.yaml`.** The trimmed requests there are sized for Audit mode;
    under Enforce a workload that asks for too little can be rejected outright.
 
-## Planned removal
+## Why the substitutions are permanent
 
-Two files are scaffolding and should not outlive the domain centralisation:
+Three of the files here exist because a hostname is hardcoded in a raw
+manifest — the Gateway, Argo CD's route and Backstage's route. For a while the
+plan was to centralise those values behind a `site.yaml` and delete these
+copies. **That is no longer planned**, so they stay.
 
-| File | Exists because | Goes away when |
-|---|---|---|
-| `resources/gateway-explore.yaml` | `kubernetes/network/istio/gateway-platform.yaml` hardcodes the LAN VIP, the real hostnames and the wildcard certificate references | the Gateway is rendered from `site.yaml` and explore can supply its own site values |
-| `resources/httproute-argocd.yaml` | `kubernetes/argocd/resources/httproute.yaml` hardcodes the real hostname | the same |
-| `resources/backstage/httproute.yaml` | `kubernetes/backstage/httproute.yaml` hardcodes the real hostname | the same |
+The reasoning, in short: centralising was justified by making the repository
+easier to fork, and forking is not what this repository is for. The place
+somebody tries the platform is here, on kind, where no domain is needed at all
+(`*.127-0-0-1.sslip.io` resolves for everyone). The bare-metal side stays the
+author's own configuration. Rewriting the Gateway, the routes, the
+AuthorizationPolicies and the certificates to be site-driven would have meant a
+broad refactor of the production network and auth layers — where a missed host
+means an unauthenticated route and a rejected one means an unreachable service
+— in exchange for deleting three files from a throwaway cluster.
 
-Deleting them is part of the centralisation change, not a follow-up. Leaving
-them behind would mean two substitution layers doing the same job, which is the
-duplication this layout was arranged to avoid.
+Repositories that do solve this, like
+[onedr0p/cluster-template](https://github.com/onedr0p/cluster-template), are
+templates you generate a repository *from*: a single `cluster.toml` and a
+render step at bootstrap, with plain manifests on the other side. That is a
+different kind of repository than a reference architecture, and copying its
+answer here would mean becoming one.
+
+So: expect these three to stay, keep them small, and keep new site-specific
+values out of raw manifests anyway — the rule below still holds, because it is
+what keeps the *count* at three.
 
 ## The one component that is genuinely copied
 

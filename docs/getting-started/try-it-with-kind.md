@@ -297,7 +297,8 @@ you do not have, or would turn three minutes into thirty.
 mapping; Longhorn becomes local-path wearing the name `longhorn`; the real
 domain and its wildcard certificate become `*.127-0-0-1.sslip.io` over plain
 HTTP. Two of the four exist only because a hostname is hardcoded in a raw
-manifest, and are scheduled for deletion.
+manifest — the price of the real cluster keeping its own domain rather than
+reading one from a config file.
 
 Every pull request that touches `kubernetes/`, `charts/` or `environments/`
 stands this cluster up in CI and fails if the platform stops coming up. That is
