@@ -332,44 +332,6 @@ printf '%s' "$root_app" | kubectl apply -f - >/dev/null
 # ---------------------------------------------------------------------------
 # Wait
 # ---------------------------------------------------------------------------
-
-# `argocd app wait` would be nicer, but it means installing the CLI, and
-# `kubectl wait` cannot read Argo CD's health status. Polling the two status
-# fields is the honest version and it prints what is still moving.
-info "waiting for every Application to go Synced/Healthy (up to ${WAIT_TIMEOUT}s)"
-deadline=$(( $(date +%s) + WAIT_TIMEOUT ))
-last_report=""
-while :; do
-  status="$(kubectl -n argocd get applications.argoproj.io \
-    -o jsonpath='{range .items[*]}{.metadata.name}{" "}{.status.sync.status}{" "}{.status.health.status}{"\n"}{end}' \
-    2>/dev/null || true)"
-
-  pending="$(printf '%s\n' "$status" | awk 'NF && !($2 == "Synced" && $3 == "Healthy") {print "     " $1 " (" $2 "/" $3 ")"}')"
-
-  if [[ -n "$status" && -z "$pending" ]]; then
-    info "all $(printf '%s\n' "$status" | grep -c . ) Applications are Synced/Healthy"
-    break
-  fi
-
-  if [[ "$pending" != "$last_report" ]]; then
-    printf '  still working:\n%s\n' "$pending"
-    last_report="$pending"
-  fi
-
-  if [[ $(date +%s) -ge $deadline ]]; then
-    printf '\n' >&2
-    fail "timed out. What is still not healthy:
-${pending}
-
-     Look at it with:
-       kubectl -n argocd get applications
-       kubectl -n argocd describe application <name>
-     Troubleshooting: docs/getting-started/try-it-with-kind.md#troubleshooting"
-  fi
-  sleep 10
-done
-
-# ---------------------------------------------------------------------------
 # Keycloak realm
 # ---------------------------------------------------------------------------
 #
@@ -384,8 +346,18 @@ done
 # carry real client secrets and a real user password, in a repository anyone can
 # read, for a cluster that publishes ports 80 and 443.
 
-info "creating the Keycloak realm"
-kubectl -n platform-auth-prod rollout status deployment/keycloak --timeout=300s >/dev/null
+# This runs *before* the wait for every Application, and it has to.
+# oauth2-proxy fetches the realm's discovery document at startup and exits if it
+# is not there, so it crash-loops until this code has run — and if this code
+# waited for every Application to be healthy first, it would be waiting for
+# oauth2-proxy, which is waiting for it. The realm is the thing that breaks the
+# circle, so it is created as soon as Keycloak can answer.
+info "waiting for Keycloak, then creating its realm"
+for _ in $(seq 1 60); do
+  kubectl -n platform-auth-prod get deployment keycloak >/dev/null 2>&1 && break
+  sleep 10
+done
+kubectl -n platform-auth-prod rollout status deployment/keycloak --timeout=600s >/dev/null
 
 kcadm() {
   kubectl -n platform-auth-prod exec -i deployment/keycloak -c keycloak -- \
@@ -483,6 +455,44 @@ else
   kcadm update "users/${user_id}/groups/${group_id}" -r kensan \
     -s realm=kensan -s userId="${user_id}" -s groupId="${group_id}" -n >/dev/null
 fi
+
+# ---------------------------------------------------------------------------
+
+# `argocd app wait` would be nicer, but it means installing the CLI, and
+# `kubectl wait` cannot read Argo CD's health status. Polling the two status
+# fields is the honest version and it prints what is still moving.
+info "waiting for every Application to go Synced/Healthy (up to ${WAIT_TIMEOUT}s)"
+deadline=$(( $(date +%s) + WAIT_TIMEOUT ))
+last_report=""
+while :; do
+  status="$(kubectl -n argocd get applications.argoproj.io \
+    -o jsonpath='{range .items[*]}{.metadata.name}{" "}{.status.sync.status}{" "}{.status.health.status}{"\n"}{end}' \
+    2>/dev/null || true)"
+
+  pending="$(printf '%s\n' "$status" | awk 'NF && !($2 == "Synced" && $3 == "Healthy") {print "     " $1 " (" $2 "/" $3 ")"}')"
+
+  if [[ -n "$status" && -z "$pending" ]]; then
+    info "all $(printf '%s\n' "$status" | grep -c . ) Applications are Synced/Healthy"
+    break
+  fi
+
+  if [[ "$pending" != "$last_report" ]]; then
+    printf '  still working:\n%s\n' "$pending"
+    last_report="$pending"
+  fi
+
+  if [[ $(date +%s) -ge $deadline ]]; then
+    printf '\n' >&2
+    fail "timed out. What is still not healthy:
+${pending}
+
+     Look at it with:
+       kubectl -n argocd get applications
+       kubectl -n argocd describe application <name>
+     Troubleshooting: docs/getting-started/try-it-with-kind.md#troubleshooting"
+  fi
+  sleep 10
+done
 
 # Argo CD started before cert-manager had signed anything, so its CA mount
 # resolved to nothing. Now that the Secret exists, the pod has to be replaced to
