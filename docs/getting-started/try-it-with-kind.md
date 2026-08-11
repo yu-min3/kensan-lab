@@ -12,7 +12,7 @@ $ make try
 ```
 
 Nothing else to configure. A few minutes later you have Argo CD reconciling
-fifteen Applications, Backstage serving the developer portal, Grafana drawing
+sixteen Applications, Backstage serving the developer portal, Grafana drawing
 the same cluster-health dashboard the real machines are watched with, Istio
 routing to all three over HTTPS through the Gateway API, and the production
 policy set reporting on everything in the cluster.
@@ -95,7 +95,7 @@ Open `https://argocd.127-0-0-1.sslip.io` — the password is printed at the end 
 certificate; step 4 explains why, and clicking through is the intended path.
 
 The `explore-root` Application is an *app-of-apps*: it is an Application whose
-job is to create other Applications. Open it and you will find fourteen of them,
+job is to create other Applications. Open it and you will find fifteen of them,
 each one a component of the platform. This is the same structure the bare-metal
 cluster uses, where the equivalent root manages thirty-eight.
 
@@ -138,6 +138,12 @@ rather than pretending:
 ```console
 $ GITHUB_TOKEN=ghp_... make try
 ```
+
+Without one the cluster fills the slot with a placeholder GitHub will reject,
+rather than leaving it empty — an empty value there fails the backend's config
+type check at startup and takes the catalog down with it, while the pod stays
+Ready and Argo CD stays green. `make try` asks the catalog a question before it
+declares success, for exactly that reason.
 
 Without it everything above still works; only the Create button stops at the
 publish step. It is the same shape as bare metal, where the variable is filled

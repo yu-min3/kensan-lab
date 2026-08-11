@@ -155,10 +155,20 @@ helm upgrade --install argocd argo/argo-cd \
 # own account cannot be generated. So it is passed in or the feature is absent —
 # the Secret is created either way, holding an empty string, so that the
 # Deployment's reference always resolves.
+#
+# The placeholder is not decoration. Backstage type-checks its config at
+# startup, and `integrations.github[0].token` set to an empty string fails that
+# check — which does not stop the process or fail the probe, it stops the
+# catalog, scaffolder and techdocs plugins from ever initialising. The portal
+# then serves its shell, answers /healthcheck, reports Healthy to Argo CD, and
+# returns 503 for every catalog request. A syntactically valid token that GitHub
+# will reject keeps all three plugins running and moves the failure to where it
+# belongs: the moment somebody presses Create.
 if [[ -n "$GITHUB_TOKEN" ]]; then
   info "wiring the GitHub token into Backstage (scaffolder enabled)"
 else
   info "no GITHUB_TOKEN set — Backstage runs without the scaffolder's publish step"
+  GITHUB_TOKEN="ghp_0000000000000000000000000000000000no-token-was-supplied"
 fi
 kubectl apply -f "${REPO_ROOT}/kubernetes/backstage/namespace.yaml" >/dev/null
 kubectl -n backstage create secret generic backstage-explore-github \
@@ -286,6 +296,27 @@ if [[ "$code" != "200" ]]; then
        kubectl -n istio-system get certificate explore-wildcard
        kubectl -n cert-manager get certificate explore-ca
      Troubleshooting: docs/getting-started/try-it-with-kind.md#troubleshooting"
+fi
+
+# Backstage's probe is a liveness check on the HTTP router, not on the plugins
+# behind it. A backend whose catalog failed to start still serves the frontend
+# shell and still answers /healthcheck with 200, so the pod is Ready, the
+# Application is Healthy, and the portal is useless. The only way to know is to
+# ask the catalog something.
+info "checking that Backstage's catalog is actually serving"
+for attempt in $(seq 1 30); do
+  code="$(curl -sSk -o /dev/null -w '%{http_code}' --max-time 10 \
+    --resolve "backstage.127-0-0-1.sslip.io:443:127.0.0.1" \
+    "https://backstage.127-0-0-1.sslip.io/api/catalog/entities?limit=1" || echo 000)"
+  [[ "$code" == "200" ]] && break
+  sleep 5
+done
+if [[ "$code" != "200" ]]; then
+  fail "Backstage's catalog answered HTTP ${code}, not 200.
+     The pod is Ready and the frontend loads, so this is a backend plugin that
+     failed to initialise rather than a routing or scheduling problem:
+       kubectl -n backstage logs deploy/backstage -c backstage | grep -i 'during startup'
+     A config value the backend type-checks at boot is the usual cause."
 fi
 
 admin_password="$(kubectl -n argocd get secret argocd-initial-admin-secret \

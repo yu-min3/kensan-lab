@@ -12,10 +12,13 @@
 ##                 away.
 ##   URLs          The real host does not resolve here.
 ##   integrations  Left as the shared config has it. GITHUB_TOKEN comes from a
-##                 Secret that scripts/explore-up.sh fills only if the person
-##                 running `make try` passed one — empty otherwise, which the
-##                 scaffolder reports as "no token available" at the moment it
-##                 would publish, and nothing else notices.
+##                 Secret that scripts/explore-up.sh fills with the token the
+##                 person running `make try` passed, or with a placeholder that
+##                 GitHub will reject. Not with an empty string: the backend
+##                 type-checks this key at startup and an empty one stops the
+##                 catalog, scaffolder and techdocs plugins from initialising —
+##                 without stopping the process or failing the probe. See the
+##                 comment on the Secret in explore-up.sh.
 ##   catalog       The organisation scanner is pushed a year into the future
 ##                 rather than removed — see below.
 ##
