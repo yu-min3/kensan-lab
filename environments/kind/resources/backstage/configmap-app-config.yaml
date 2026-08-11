@@ -11,9 +11,11 @@
 ##                 is the correct behaviour for a cluster that is itself thrown
 ##                 away.
 ##   URLs          The real host does not resolve here.
-##   integrations  The GitHub token comes from Vault. Emptying the list is what
-##                 stops anything from trying to authenticate with the
-##                 placeholder in the Deployment.
+##   integrations  Left as the shared config has it. GITHUB_TOKEN comes from a
+##                 Secret that scripts/explore-up.sh fills only if the person
+##                 running `make try` passed one — empty otherwise, which the
+##                 scaffolder reports as "no token available" at the moment it
+##                 would publish, and nothing else notices.
 ##   catalog       The organisation scanner is pushed a year into the future
 ##                 rather than removed — see below.
 ##
@@ -58,9 +60,6 @@ data:
         client: better-sqlite3
         connection: ':memory:'
 
-    # Replaces the list from the shared config rather than adding to it.
-    integrations:
-      github: []
 
     catalog:
       providers:

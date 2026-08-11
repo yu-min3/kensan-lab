@@ -64,8 +64,15 @@ spec:
             - --config
             - /explore/app-config.explore.yaml
           env:
+            ## Created by scripts/explore-up.sh, empty unless the person
+            ## running `make try` supplied one. Bare metal reads the same
+            ## variable from a Secret that External Secrets fills from Vault;
+            ## the shape is identical, only the source differs.
             - name: GITHUB_TOKEN
-              value: "unused-in-explore"
+              valueFrom:
+                secretKeyRef:
+                  name: backstage-explore-github
+                  key: GITHUB_TOKEN
           ports:
             - containerPort: 7007
               name: http

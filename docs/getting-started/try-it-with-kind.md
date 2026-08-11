@@ -124,6 +124,19 @@ provider that scans the organisation for `catalog-info.yaml` files, and that one
 needs a token from Vault — so it is switched off here, and the catalog is
 whatever the repository ships. Nothing else about the portal changes.
 
+**Pressing Create needs a credential only you can supply.** The scaffolder
+creates a repository and opens a pull request, and no platform can hand a
+visitor a GitHub token for their own account — so the explore layer asks for one
+rather than pretending:
+
+```console
+$ GITHUB_TOKEN=ghp_... make try
+```
+
+Without it everything above still works; only the Create button stops at the
+publish step. It is the same shape as bare metal, where the variable is filled
+from Vault instead.
+
 Backstage is also the only workload in this slice that runs an Istio sidecar,
 because its namespace carries `istio-injection: enabled`. `kubectl -n backstage
 get pods` shows two containers rather than one.
