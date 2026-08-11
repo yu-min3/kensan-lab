@@ -31,3 +31,8 @@ grafana.ini:
   # retains as a break-glass. Turning this back on is one block, not a rebuild.
   auth.generic_oauth:
     enabled: false
+
+## Same story as remoteWrite: production pulls the OIDC client credentials from
+## a Secret that ExternalSecrets creates. generic_oauth is off above, but the
+## envFrom reference would still hold the container in CreateContainerConfigError.
+envFromSecrets: []
