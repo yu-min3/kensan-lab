@@ -16,9 +16,9 @@
 ##             scripts/explore-up.sh via kcadm — not from an imported file,
 ##             because Keycloak stores `${VAR}` in a realm file literally and a
 ##             committed realm would have to carry real secrets.
-##   database  H2 in memory instead of PostgreSQL. Restart the pod and every
-##             login, session and realm edit is gone; the realm itself comes
-##             back from the ConfigMap.
+##   database  H2 in memory instead of PostgreSQL. Restart the pod and the realm
+##             is gone with it, along with every session — `make try` is what
+##             creates it, so a restart means running that again.
 ##   affinity  No `hardware-class` node affinity — there is one node.
 ##
 ## Everything else — image, probes, ports, the shape of the env config — is the
