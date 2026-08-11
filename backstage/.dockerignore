@@ -27,6 +27,9 @@ docs
 
 # Build artifacts
 dist
+# The runtime image is assembled from the backend bundle built immediately
+# before `docker build`; excluding it lets BuildKit reuse a stale COPY layer.
+!packages/backend/dist/**
 coverage
 .turbo
 
