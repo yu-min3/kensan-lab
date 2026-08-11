@@ -1,8 +1,9 @@
 ## Backstage configuration for the explore cluster.
 ##
 ## Layered as a third `--config` on top of the two baked into the image, so the
-## catalog locations, the entity rules and the guest auth provider all come from
-## the shared config and only the things that cannot work here are replaced:
+## catalog locations, the entity rules and the oauth2Proxy auth provider all
+## come from the shared config and only the things that cannot work here are
+## replaced:
 ##
 ##   database      Production runs PostgreSQL with credentials from Vault. There
 ##                 is no Vault here and nothing to persist, so the throwaway
@@ -24,6 +25,16 @@
 ##
 ## Everything a visitor came to see — the golden path template, the catalog, the
 ## scaffolder — is unaffected: those are read from files inside the image.
+##
+## **Auth is not overridden here, and cannot be.** The frontend chooses its
+## sign-in page by hostname — localhost and 127.0.0.1 get the guest provider,
+## every other host gets `ProxiedSignInPage` and expects to sit behind
+## oauth2-proxy — and that choice is compiled into the bundle. Explore is served
+## at backstage.127-0-0-1.sslip.io, so it takes the second path: the host is
+## listed in resources/authorizationpolicy-explore-oauth2.yaml and the OIDC
+## round trip has its own route in this directory. The sign-in resolver matches
+## on email, which is why the demo account scripts/explore-up.sh creates carries
+## the address of a User the catalog already ships.
 ##
 ## ── Why the scanner is neutered rather than deleted ──────────────────────────
 ##

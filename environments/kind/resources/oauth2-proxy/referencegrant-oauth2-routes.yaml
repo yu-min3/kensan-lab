@@ -1,4 +1,4 @@
-## Lets the demo app's `/oauth2` route reach the proxy in this namespace.
+## Lets the `/oauth2` routes in other namespaces reach the proxy in this one.
 ##
 ## The route lives in app-demo rather than here for the same reason it does on
 ## bare metal: the gateway admits routes by namespace label, and auth-system
@@ -19,6 +19,9 @@ spec:
     - group: gateway.networking.k8s.io
       kind: HTTPRoute
       namespace: app-demo
+    - group: gateway.networking.k8s.io
+      kind: HTTPRoute
+      namespace: backstage
   to:
     - group: ""
       kind: Service

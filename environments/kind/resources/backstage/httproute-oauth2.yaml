@@ -1,0 +1,36 @@
+## The OIDC round trip for Backstage.
+##
+## charts/app-base generates this automatically for applications that set
+## `auth.gatewayOAuth2.enabled`. Backstage is not deployed by that chart — it
+## has its own manifests on both sides — so the route is written out here.
+##
+## It has to live in this namespace rather than in auth-system: the gateway
+## admits routes by namespace label, and auth-system carries a different one.
+## The other half is the ReferenceGrant in
+## environments/kind/resources/oauth2-proxy/.
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: backstage-oauth2
+  namespace: backstage
+  annotations:
+    argocd.argoproj.io/sync-wave: "1"
+spec:
+  parentRefs:
+    - group: gateway.networking.k8s.io
+      kind: Gateway
+      name: gateway-explore
+      namespace: istio-system
+  hostnames:
+    - "backstage.127-0-0-1.sslip.io"
+  rules:
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /oauth2
+      backendRefs:
+        - group: ""
+          kind: Service
+          name: oauth2-proxy
+          namespace: auth-system
+          port: 4180

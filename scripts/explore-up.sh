@@ -465,11 +465,17 @@ else
   # One user, in the admin group, with a password printed at the end. There is
   # no identity provider behind this one and no directory to import — a person
   # trying the platform needs exactly one account that works.
+  #
+  # The email is not an address at this hostname, and that is deliberate:
+  # Backstage's oauth2Proxy sign-in uses the emailMatchingUserEntityProfileEmail
+  # resolver, so it has to equal the email of a User already in the catalog or
+  # the login succeeds at Keycloak and then fails at the portal. This is the
+  # demo account backstage/catalog/organizations/teams.yaml ships.
   user_id="$(kcadm create users -r kensan \
     -s username=demo \
     -s enabled=true \
     -s emailVerified=true \
-    -s email=demo@127-0-0-1.sslip.io \
+    -s email=demo-admin@example.com \
     -s firstName=Demo -s lastName=User \
     -i)"
   kcadm set-password -r kensan --userid "${user_id}" \
