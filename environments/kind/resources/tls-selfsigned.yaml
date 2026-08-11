@@ -76,3 +76,83 @@ spec:
     name: explore-ca
     kind: ClusterIssuer
     group: cert-manager.io
+---
+## Three certificates nobody serves.
+##
+## Argo CD, Grafana and oauth2-proxy all talk to Keycloak over the same HTTPS
+## URL a browser uses, and that URL is served by a certificate signed by a CA
+## this cluster generated for itself — which their trust stores have never heard
+## of. The bundle has to reach each namespace somehow.
+##
+## cert-manager writes `ca.crt` into the Secret of every certificate it signs,
+## so asking it for a certificate is the cheapest declarative way to carry the
+## bundle across a namespace boundary. The leaves are never served; only
+## `ca.crt` is ever read.
+##
+## They live here, in explore-resources, rather than beside the component that
+## mounts them. Sync waves order Applications against each other, not resources
+## inside one: a chart's own manifests carry no wave annotation, so they are
+## wave 0 and would be created before an annotated Certificate in the same
+## Application — leaving the pod waiting on a Secret that had not been issued
+## yet. explore-resources is wave 0 as a whole, so everything here exists before
+## any component that needs it.
+##
+## The tool built for this job is trust-manager, and on a cluster that outlives
+## an afternoon it would be the right answer. It is another component to install
+## and explain, for three small files.
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: argocd-explore-ca
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "2"
+spec:
+  secretName: argocd-explore-ca-tls
+  commonName: argocd-ca-bundle-carrier
+  duration: 8760h
+  privateKey:
+    algorithm: ECDSA
+    size: 256
+  issuerRef:
+    name: explore-ca
+    kind: ClusterIssuer
+    group: cert-manager.io
+---
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: grafana-explore-ca
+  namespace: monitoring
+  annotations:
+    argocd.argoproj.io/sync-wave: "2"
+spec:
+  secretName: grafana-explore-ca-tls
+  commonName: grafana-ca-bundle-carrier
+  duration: 8760h
+  privateKey:
+    algorithm: ECDSA
+    size: 256
+  issuerRef:
+    name: explore-ca
+    kind: ClusterIssuer
+    group: cert-manager.io
+---
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: oauth2-proxy-explore-ca
+  namespace: auth-system
+  annotations:
+    argocd.argoproj.io/sync-wave: "2"
+spec:
+  secretName: oauth2-proxy-explore-ca-tls
+  commonName: oauth2-proxy-ca-bundle-carrier
+  duration: 8760h
+  privateKey:
+    algorithm: ECDSA
+    size: 256
+  issuerRef:
+    name: explore-ca
+    kind: ClusterIssuer
+    group: cert-manager.io

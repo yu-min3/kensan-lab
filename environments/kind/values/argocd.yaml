@@ -2,20 +2,67 @@
 # Argo CD is the one component installed with helm rather than by an
 # Application, because it has to exist before anything can be synced.
 #
-# Only two things are overridden, and both are site identity rather than
-# behaviour: the external URL, and the Keycloak OIDC block. The OIDC config
-# points at a Keycloak realm that does not exist here and dereferences
-# `$argocd-oidc-secret:client-secret`, a Secret that Vault would have populated;
-# left in place, argocd-server logs a resolution error on every start. Blanking
-# it turns SSO off and leaves the local admin account, which is what the
-# quickstart prints.
+# That ordering is why this file is more involved than the other values files.
+# Argo CD comes up before Keycloak exists, before cert-manager has signed
+# anything, and before the realm has a client for it — so everything below is
+# written to tolerate all three being absent, and scripts/explore-up.sh restarts
+# argocd-server once the bootstrap has filled them in.
 #
-# Everything else — server.insecure, the repo-server probe timeouts, the
-# ignoreDifferences customisations — is inherited on purpose. Those are the
-# settings that took a runbook to arrive at, and explore should run the same
-# ones so a fork inherits them too.
+# Everything not related to that — server.insecure, the repo-server probe
+# timeouts, the ignoreDifferences customisations — is inherited on purpose.
+# Those are the settings that took a runbook to arrive at, and explore should
+# run the same ones so a fork inherits them too.
 
 configs:
   cm:
-    url: "http://argocd.127-0-0-1.sslip.io"
-    oidc.config: ""
+    url: "https://argocd.127-0-0-1.sslip.io"
+
+    # Same shape as the bare-metal block, with this cluster's issuer. The
+    # clientSecret is dereferenced from a Secret that does not exist until the
+    # bootstrap creates it; until then argocd-server logs a resolution failure
+    # and the login page offers only the local admin account.
+    oidc.config: |
+      name: Keycloak
+      issuer: https://auth.127-0-0-1.sslip.io/realms/kensan
+      clientID: argocd
+      clientSecret: $argocd-oidc-secret:client-secret
+      requestedScopes:
+        - openid
+        - profile
+        - email
+      requestedIDTokenClaims:
+        groups:
+          essential: true
+
+  # Anyone who gets through Keycloak on this cluster is the person who started
+  # it, so they get the same rights the printed admin password gives. Bare metal
+  # maps the platform-admin group to admin and everyone else to read-only,
+  # because there is more than one person and the cluster outlives the session.
+  rbac:
+    policy.default: role:admin
+
+server:
+  # The issuer's certificate is signed by a CA this cluster generated, which the
+  # container's trust store has never heard of. Argo CD is Go, so pointing
+  # SSL_CERT_DIR at a directory holding the bundle is enough — no rebuild, no
+  # insecure skip.
+  env:
+    - name: SSL_CERT_DIR
+      value: /etc/ssl/certs:/etc/ssl/explore
+  volumes:
+    - name: explore-ca
+      secret:
+        # cert-manager writes this after Argo CD is already running, so the
+        # mount has to tolerate it being absent — without `optional`,
+        # argocd-server would wait for a Secret that only exists because
+        # argocd-server is running. The bootstrap restarts the pod once it is
+        # there.
+        secretName: argocd-explore-ca-tls
+        optional: true
+        items:
+          - key: ca.crt
+            path: explore-ca.crt
+  volumeMounts:
+    - name: explore-ca
+      mountPath: /etc/ssl/explore
+      readOnly: true

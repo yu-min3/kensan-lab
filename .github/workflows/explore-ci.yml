@@ -59,6 +59,11 @@ jobs:
       # Pull requests from forks are not covered: the head commit lives in the
       # fork and Argo CD would not find it on this repository.
       - name: Bring up the explore cluster
+        env:
+          # Fixed rather than generated, so the SSO check below can log in
+          # without scraping the script's output. Nothing outside this runner
+          # can reach the cluster, and it is destroyed at the end of the job.
+          DEMO_PASSWORD: ci-demo-password
         run: |
           scripts/explore-up.sh \
             --rev "${{ github.event.pull_request.head.sha || github.sha }}" \
@@ -143,6 +148,42 @@ jobs:
             | openssl x509 -noout -issuer)"
           echo "$issuer"
           echo "$issuer" | grep -q "kensan-lab explore"
+
+      - name: Check that single sign-on actually completes
+        run: |
+          # explore-up.sh already proved an unauthenticated request is redirected
+          # to Keycloak. That is only half the claim: a gate nobody can get
+          # through would pass that check too. This walks the whole flow —
+          # password grant against the realm, then the token through the gate —
+          # so a broken client secret, a wrong issuer or a missing group mapper
+          # fails here rather than in somebody's browser.
+          realm=https://auth.127-0-0-1.sslip.io/realms/kensan
+          secret="$(kubectl -n auth-system get secret oauth2-proxy-secret \
+            -o go-template='{{index .data "client-secret" | base64decode}}')"
+          token="$(curl -sk --resolve auth.127-0-0-1.sslip.io:443:127.0.0.1 \
+            -d grant_type=password -d client_id=oauth2-proxy \
+            -d "client_secret=${secret}" \
+            -d username=demo -d password=ci-demo-password \
+            "${realm}/protocol/openid-connect/token" | jq -r '.access_token // empty')"
+          [ -n "$token" ] || { echo "the realm refused to issue a token" >&2; exit 1; }
+
+          # The groups claim is what Grafana maps to a role. Absent, every user
+          # silently lands as a Viewer and nobody notices until they cannot edit.
+          #
+          # Decoded in Python because a JWT payload is base64url *without*
+          # padding, and `base64 -d` rejects that rather than assuming it.
+          claims="$(echo "$token" | cut -d. -f2 | python3 -c '
+          import base64, sys
+          p = sys.stdin.read().strip()
+          sys.stdout.write(base64.urlsafe_b64decode(p + "=" * (-len(p) % 4)).decode())')"
+          echo "$claims" | jq -e '.groups | index("platform-admin")' >/dev/null \
+            || { echo "the token carries no platform-admin group: $claims" >&2; exit 1; }
+
+          code="$(curl -sk -o /dev/null -w '%{http_code}' \
+            --resolve demo.127-0-0-1.sslip.io:443:127.0.0.1 \
+            -H "Authorization: Bearer ${token}" https://demo.127-0-0-1.sslip.io/)"
+          echo "authenticated request: ${code}"
+          [ "$code" = "200" ] || { echo "a valid token did not get through the gate" >&2; exit 1; }
 
       - name: Collect diagnostics
         if: failure()

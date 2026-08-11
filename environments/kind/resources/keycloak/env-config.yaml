@@ -1,0 +1,38 @@
+## Keycloak's environment, differing from kubernetes/auth/keycloak/ in the two
+## things that cannot be shared: where the database is, and what this host is
+## called.
+##
+## KC_HOSTNAME is the single most important value in this file. Whatever it says
+## becomes the `iss` claim in every token Keycloak signs, and three different
+## parties have to agree on it:
+##
+##   the browser        reaches it at 127.0.0.1 via sslip.io, through the gateway
+##   Argo CD / Grafana  reach it from a pod, where 127.0.0.1 is the pod
+##                      itself — so CoreDNS is taught to send this one name to
+##                      the gateway's ClusterIP instead (scripts/explore-up.sh)
+##   the token          carries it verbatim, and a client that resolved a
+##                      different URL rejects it as issued by someone else
+##
+## That is why the name is a real hostname rather than a Service DNS name: a
+## Service name would be unreachable from the browser, and 127.0.0.1 would be
+## unreachable from the pods. One name, two routes to it.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: keycloak-env-config
+  namespace: platform-auth-prod
+  annotations:
+    argocd.argoproj.io/sync-wave: "0"
+data:
+  KC_HOSTNAME: auth.127-0-0-1.sslip.io
+  KC_HOSTNAME_ADMIN: auth.127-0-0-1.sslip.io
+  KC_HOSTNAME_STRICT: "false"
+  KC_HOSTNAME_STRICT_HTTPS: "false"
+  KC_HTTP_ENABLED: "true"
+  ## The gateway terminates TLS and forwards plain HTTP, exactly as on bare
+  ## metal. Without `edge` Keycloak would build redirect URLs with http:// and
+  ## the login round trip would drop out of TLS halfway through.
+  KC_PROXY: "edge"
+  KC_HEALTH_ENABLED: "true"
+  KC_METRICS_ENABLED: "true"
+  KEYCLOAK_ADMIN: admin

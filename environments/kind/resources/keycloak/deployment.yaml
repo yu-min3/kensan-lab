@@ -1,0 +1,86 @@
+## Keycloak, without the database.
+##
+## Bare metal runs `start` against a PostgreSQL StatefulSet whose credentials
+## come from Vault through External Secrets. Explore has neither, and a realm
+## worth keeping does not exist here — the whole cluster is thrown away — so
+## this runs `start-dev`, which uses the in-memory H2 database Keycloak ships
+## for exactly this case. That removes a StatefulSet, a PVC, an ExternalSecret
+## and about 300Mi.
+##
+## Three deliberate differences from kubernetes/auth/keycloak/, and no others:
+##
+##   args      `start-dev` rather than `start`. Dev mode relaxes the hostname
+##             checks, which matters because the issuer here has to be reachable
+##             under the same name from both a browser (via 127.0.0.1) and from
+##             inside a pod (via CoreDNS). The realm arrives afterwards, from
+##             scripts/explore-up.sh via kcadm — not from an imported file,
+##             because Keycloak stores `${VAR}` in a realm file literally and a
+##             committed realm would have to carry real secrets.
+##   database  H2 in memory instead of PostgreSQL. Restart the pod and the realm
+##             is gone with it, along with every session — `make try` is what
+##             creates it, so a restart means running that again.
+##   affinity  No `hardware-class` node affinity — there is one node.
+##
+## Everything else — image, probes, ports, the shape of the env config — is the
+## bare-metal Deployment. When it drifts from that, it is a bug.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: keycloak
+  namespace: platform-auth-prod
+  annotations:
+    argocd.argoproj.io/sync-wave: "1"
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: keycloak
+  template:
+    metadata:
+      labels:
+        app: keycloak
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: keycloak
+          image: quay.io/keycloak/keycloak:23.0
+          args:
+            - start-dev
+          envFrom:
+            - configMapRef:
+                name: keycloak-env-config
+            - secretRef:
+                name: keycloak-explore-admin
+          ports:
+            - name: http
+              containerPort: 8080
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
+          readinessProbe:
+            httpGet:
+              path: /health/ready
+              port: 8080
+            initialDelaySeconds: 30
+            periodSeconds: 5
+            failureThreshold: 60
+          livenessProbe:
+            httpGet:
+              path: /health/live
+              port: 8080
+              ## start-dev does not serve health on the management port the way
+              ## `start` does, so both probes stay on 8080 as bare metal has
+              ## them.
+            initialDelaySeconds: 90
+            periodSeconds: 10
+          resources:
+            requests:
+              memory: "640Mi"
+              cpu: "200m"
+            limits:
+              memory: "1200Mi"

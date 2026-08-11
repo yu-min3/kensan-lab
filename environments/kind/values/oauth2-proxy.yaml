@@ -1,0 +1,107 @@
+# Layered on top of kubernetes/auth/oauth2-proxy/values.yaml.
+# Chart config: environments/kind/applications/templates/auth.yaml
+#
+# `configFile` is a single string, so this replaces the bare-metal one wholesale
+# rather than merging into it. Keep the two side by side when changing either:
+# every line below that is not a hostname or a CA path is copied verbatim from
+# bare metal, including the comments that explain why it is what it is.
+
+config:
+  existingSecret: oauth2-proxy-secret
+
+  requiredSecretKeys:
+    - client-id
+    - client-secret
+    - cookie-secret
+
+  configFile: |-
+    provider                       = "keycloak-oidc"
+    oidc_issuer_url                = "https://auth.127-0-0-1.sslip.io/realms/kensan"
+    insecure_oidc_allow_unverified_email = false
+
+    # The issuer is served by a certificate signed by a CA this cluster made up
+    # a few minutes ago, so the system trust store has never heard of it. This
+    # is the file that closes that gap — it comes from a cert-manager
+    # Certificate in this namespace whose only job is to deliver ca.crt.
+    provider_ca_files              = ["/etc/ssl/explore/ca.crt"]
+
+    email_domains                  = ["*"]
+
+    cookie_domains                 = [".127-0-0-1.sslip.io"]
+    cookie_samesite                = "lax"
+    cookie_secure                  = true
+    cookie_httponly                = true
+    cookie_expire                  = "720h"
+    # Must stay shorter than Keycloak's Access Token Lifespan (realm default
+    # 5m). Longer, and the proxy forwards an expired id_token as a Bearer for
+    # the rest of the window and every request comes back 401 — the exact bug
+    # that made the kensan app fail every few minutes on bare metal.
+    cookie_refresh                 = "4m"
+
+    whitelist_domains              = [".127-0-0-1.sslip.io"]
+
+    proxy_prefix                   = "/oauth2"
+
+    # `groups` is a claim name in Keycloak, not a scope. Asking for it as a
+    # scope is rejected.
+    scope                          = "openid email profile"
+
+    pass_access_token              = true
+    pass_authorization_header      = true
+    set_authorization_header       = true
+    set_xauthrequest               = true
+
+    reverse_proxy                  = true
+    real_client_ip_header          = "X-Forwarded-For"
+
+    # Istio's ext_authz reads only HTTP 200 as "allow", so the proxy has to
+    # answer 200 itself rather than proxying to anything.
+    upstreams                      = ["static://200"]
+
+    skip_provider_button           = true
+    skip_jwt_bearer_tokens         = true
+    extra_jwt_issuers              = ["https://auth.127-0-0-1.sslip.io/realms/kensan=istio-gateway-explore"]
+
+    ping_path                      = "/ping"
+    metrics_address                = "0.0.0.0:44180"
+
+# The CA the line above points at. cert-manager puts ca.crt into the Secret of
+# every certificate it signs, so a certificate this namespace does not otherwise
+# need is the cheapest way to get the bundle here declaratively.
+extraVolumes:
+  - name: explore-ca
+    secret:
+      secretName: oauth2-proxy-explore-ca-tls
+      items:
+        - key: ca.crt
+          path: ca.crt
+extraVolumeMounts:
+  - name: explore-ca
+    mountPath: /etc/ssl/explore
+    readOnly: true
+
+# Bare metal pins this to amd64 because the mini PC is the only node that
+# should carry the auth path. kind's node is whatever the host is, and on Apple
+# Silicon that selector leaves every replica Pending with no other symptom — the
+# Application simply never goes Healthy.
+#
+# `null`, not `{}`: Helm skips empty maps when coalescing values files, so an
+# empty map leaves the bare-metal selector exactly where it was. Verified by
+# rendering both — `{}` keeps `kubernetes.io/arch: amd64`, `null` removes the
+# key. The same is not true of lists, which are replaced wholesale.
+nodeSelector: null
+
+# Two replicas and a PodDisruptionBudget are what keeps a node drain from taking
+# authentication down with it. One node cannot be drained, so the second replica
+# only competes for the same memory, and minAvailable: 1 against a single
+# replica would block the eviction it exists to permit.
+replicaCount: 1
+podDisruptionBudget:
+  enabled: false
+
+resources:
+  requests:
+    cpu: 25m
+    memory: 32Mi
+  limits:
+    memory: 128Mi

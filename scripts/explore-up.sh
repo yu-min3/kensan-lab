@@ -12,6 +12,11 @@ ENV_DIR="${REPO_ROOT}/environments/kind"
 # shellcheck source=../environments/kind/versions.sh
 source "${ENV_DIR}/versions.sh"
 
+# Working files, and where every generated credential lives for the length of
+# this script. Removed on exit however it exits.
+TMP_DIR="$(mktemp -d)"
+trap 'rm -rf "${TMP_DIR}"' EXIT
+
 CLUSTER_NAME="kensan-lab-explore"
 REPO_URL="https://github.com/yu-min3/kensan-lab"
 REVISION="main"
@@ -25,6 +30,10 @@ WAIT_TIMEOUT=900
 # thing the explore layer asks you to bring. Without it everything still runs
 # and the golden path template is visible; only pressing Create stops short.
 GITHUB_TOKEN="${GITHUB_TOKEN:-}"
+# Optional. The demo account's password is generated and printed unless one is
+# supplied, which is what CI does so that it can drive a login without scraping
+# this script's output.
+DEMO_PASSWORD="${DEMO_PASSWORD:-}"
 
 usage() {
   cat <<'EOF'
@@ -37,6 +46,10 @@ usage: scripts/explore-up.sh [--repo URL] [--rev REVISION] [--timeout SECONDS]
 Set GITHUB_TOKEN in the environment to let Backstage's scaffolder create
 repositories and open pull requests. Everything works without it except the
 Create button.
+
+Set DEMO_PASSWORD to choose the demo account's password instead of having one
+generated. Useful for scripting against the cluster; the generated one is
+printed either way.
 
 CI passes --rev "$GITHUB_SHA" so the cluster proves the pull request rather
 than main. A fork passes --repo its own URL.
@@ -82,13 +95,14 @@ docker info >/dev/null 2>&1 || fail "the Docker daemon is not running. Start Doc
 # which is a few hundred MiB below what Docker Desktop was told to allocate
 # (kernel reservations). Rounding that down to whole GiB rejects a correctly
 # configured 6 GiB machine, so the floor sits below the nominal setting.
-MIN_MEM_MIB=5600
+MIN_MEM_MIB=7400
 mem_bytes="$(docker info --format '{{.MemTotal}}' 2>/dev/null || echo 0)"
 mem_mib=$(( mem_bytes / 1024 / 1024 ))
 if [[ "$mem_bytes" -gt 0 && "$mem_mib" -lt "$MIN_MEM_MIB" ]]; then
-  fail "Docker can use ${mem_mib}MiB of memory; this needs the equivalent of 6GiB allocated.
+  fail "Docker can use ${mem_mib}MiB of memory; this needs the equivalent of 8GiB allocated.
      Docker Desktop: Settings -> Resources -> Memory, then restart Docker.
-     8GiB is worth setting if you have it — the Phase 1 slice fits in 6, with nothing to spare."
+     Keycloak is what moved this from 6GiB to 8: an identity provider is a JVM,
+     and the single sign-on it enables is worth more than the two gigabytes."
 fi
 
 cluster_exists=false
@@ -132,6 +146,44 @@ kubectl patch storageclass standard \
   -p '{"metadata":{"annotations":{"storageclass.kubernetes.io/is-default-class":"false"}}}' \
   >/dev/null
 
+# The one name that has to mean two different things.
+#
+# Keycloak signs every token with an `iss` claim of
+# https://auth.127-0-0-1.sslip.io/realms/kensan, and whoever validates that
+# token has to fetch the issuer's keys from that exact URL — a different URL for
+# the same issuer is a different issuer. From a browser the name resolves to
+# 127.0.0.1 and the kind port mapping carries it to the gateway. From inside a
+# pod, 127.0.0.1 is the pod itself, and the fetch would hit the pod's own
+# loopback and fail.
+#
+# So CoreDNS is taught to answer this one name with the gateway's address.
+# Nothing else changes: sslip.io still resolves normally for every other host,
+# and the rewrite is invisible to the browser, which never asks CoreDNS.
+#
+# On bare metal the same split exists and is solved the same way — CoreDNS
+# hosts entries for auth.yu-mins.com — because a LAN client and a pod also
+# reach the gateway by different routes.
+info "teaching CoreDNS to resolve the issuer to the gateway"
+kubectl -n kube-system get configmap coredns -o jsonpath='{.data.Corefile}' \
+  > "${TMP_DIR}/Corefile"
+if ! grep -q "auth.127-0-0-1.sslip.io" "${TMP_DIR}/Corefile"; then
+  # Ahead of `kubernetes`, so the rewritten name is resolved as the cluster
+  # service it now names rather than being forwarded upstream.
+  awk '
+    /^    kubernetes cluster.local/ && !done {
+      print "    rewrite name auth.127-0-0-1.sslip.io gateway-explore-istio.istio-system.svc.cluster.local"
+      done = 1
+    }
+    { print }
+  ' "${TMP_DIR}/Corefile" > "${TMP_DIR}/Corefile.new"
+  kubectl -n kube-system create configmap coredns \
+    --from-file=Corefile="${TMP_DIR}/Corefile.new" \
+    --dry-run=client -o yaml | kubectl apply -f - >/dev/null
+  # CoreDNS reloads on its own within ~30s (the `reload` plugin), but a restart
+  # makes the change take effect before anything asks.
+  kubectl -n kube-system rollout restart deployment/coredns >/dev/null
+fi
+
 # ---------------------------------------------------------------------------
 # Argo CD
 # ---------------------------------------------------------------------------
@@ -149,6 +201,52 @@ helm upgrade --install argocd argo/argo-cd \
   --values "${REPO_ROOT}/kubernetes/argocd/values.yaml" \
   --values "${ENV_DIR}/values/argocd.yaml" \
   --wait --timeout 10m >/dev/null
+
+# ---------------------------------------------------------------------------
+# Single sign-on credentials
+# ---------------------------------------------------------------------------
+#
+# Every secret below is generated here, now, and never written to the
+# repository. That is not squeamishness: a kind cluster publishes ports 80 and
+# 443 on the host, so a client secret committed to a public repository would be
+# a working credential against every cluster anybody ever started from it.
+#
+# They are created *before* Keycloak exists, and Keycloak is then told to use
+# them, rather than the other way round. The reverse order deadlocks: the
+# oauth2-proxy pod will not start without its Secret, so it never becomes
+# healthy, so the bootstrap that would have created the Secret never runs.
+rand() { openssl rand -base64 24 | tr -d '/+=' | head -c 24; }
+
+KEYCLOAK_ADMIN_PASSWORD="$(rand)"
+DEMO_USER_PASSWORD="${DEMO_PASSWORD:-$(rand)}"
+ARGOCD_CLIENT_SECRET="$(rand)"
+GRAFANA_CLIENT_SECRET="$(rand)"
+OAUTH2_PROXY_CLIENT_SECRET="$(rand)"
+# oauth2-proxy requires exactly 16, 24 or 32 bytes here and refuses to start
+# otherwise, with a message that does not mention the length.
+OAUTH2_PROXY_COOKIE_SECRET="$(openssl rand -base64 32 | tr -d '\n' | head -c 32)"
+
+info "generating the SSO credentials (they live as long as the cluster does)"
+kubectl create namespace platform-auth-prod --dry-run=client -o yaml \
+  | kubectl apply -f - >/dev/null
+kubectl create namespace auth-system --dry-run=client -o yaml \
+  | kubectl apply -f - >/dev/null
+kubectl -n platform-auth-prod create secret generic keycloak-explore-admin \
+  --from-literal=KEYCLOAK_ADMIN_PASSWORD="${KEYCLOAK_ADMIN_PASSWORD}" \
+  --dry-run=client -o yaml | kubectl apply -f - >/dev/null
+# The `app.kubernetes.io/part-of: argocd` label is not decoration: Argo CD only
+# dereferences `$name:key` against Secrets carrying it, and without the label
+# the OIDC config silently keeps the literal string as the client secret.
+kubectl -n argocd create secret generic argocd-oidc-secret \
+  --from-literal=client-secret="${ARGOCD_CLIENT_SECRET}" \
+  --dry-run=client -o yaml | kubectl apply -f - >/dev/null
+kubectl -n argocd label secret argocd-oidc-secret \
+  app.kubernetes.io/part-of=argocd --overwrite >/dev/null
+kubectl -n auth-system create secret generic oauth2-proxy-secret \
+  --from-literal=client-id=oauth2-proxy \
+  --from-literal=client-secret="${OAUTH2_PROXY_CLIENT_SECRET}" \
+  --from-literal=cookie-secret="${OAUTH2_PROXY_COOKIE_SECRET}" \
+  --dry-run=client -o yaml | kubectl apply -f - >/dev/null
 
 # The scaffolder needs a token to reach GitHub, and there is nowhere for one to
 # come from: Vault is not part of this slice, and a credential for the visitor's
@@ -182,6 +280,12 @@ GRAFANA_PASSWORD="$(openssl rand -base64 18 | tr -d '/+=' | head -c 20)"
 kubectl -n monitoring create secret generic grafana-explore-admin \
   --from-literal=admin-user=admin \
   --from-literal=admin-password="${GRAFANA_PASSWORD}" \
+  --dry-run=client -o yaml | kubectl apply -f - >/dev/null
+# Grafana reads the OIDC client through envFrom, so the key names are the
+# environment variable names its config interpolates.
+kubectl -n monitoring create secret generic grafana-oidc-explore \
+  --from-literal=GF_AUTH_GENERIC_OAUTH_CLIENT_ID=grafana \
+  --from-literal=GF_AUTH_GENERIC_OAUTH_CLIENT_SECRET="${GRAFANA_CLIENT_SECRET}" \
   --dry-run=client -o yaml | kubectl apply -f - >/dev/null
 
 info "applying the AppProjects"
@@ -228,6 +332,160 @@ printf '%s' "$root_app" | kubectl apply -f - >/dev/null
 # ---------------------------------------------------------------------------
 # Wait
 # ---------------------------------------------------------------------------
+# Keycloak realm
+# ---------------------------------------------------------------------------
+#
+# Bare metal runs bootstrap/keycloak/setup.sh once by hand after the platform is
+# up, using kcadm against the running pod. This is the same thing at a smaller
+# scale, run automatically because there is nobody to run it and nothing worth
+# keeping if it goes wrong.
+#
+# It cannot be a realm file in git. Keycloak does not substitute environment
+# variables during realm import — verified: a `${VAR}` in a client secret is
+# stored as the literal six characters — so a committed realm would have to
+# carry real client secrets and a real user password, in a repository anyone can
+# read, for a cluster that publishes ports 80 and 443.
+
+# This runs *before* the wait for every Application, and it has to.
+# oauth2-proxy fetches the realm's discovery document at startup and exits if it
+# is not there, so it crash-loops until this code has run — and if this code
+# waited for every Application to be healthy first, it would be waiting for
+# oauth2-proxy, which is waiting for it. The realm is the thing that breaks the
+# circle, so it is created as soon as Keycloak can answer.
+info "waiting for Keycloak, then creating its realm"
+for _ in $(seq 1 60); do
+  kubectl -n platform-auth-prod get deployment keycloak >/dev/null 2>&1 && break
+  sleep 10
+done
+kubectl -n platform-auth-prod rollout status deployment/keycloak --timeout=600s >/dev/null
+
+kcadm() {
+  kubectl -n platform-auth-prod exec -i deployment/keycloak -c keycloak -- \
+    /opt/keycloak/bin/kcadm.sh "$@"
+}
+
+# kcadm keeps its session in ~/.keycloak inside the pod, so this login covers
+# every call below.
+kcadm config credentials \
+  --server http://localhost:8080 \
+  --realm master \
+  --user admin \
+  --password "${KEYCLOAK_ADMIN_PASSWORD}" >/dev/null
+
+if kcadm get realms/kensan >/dev/null 2>&1; then
+  info "the 'kensan' realm already exists — leaving it alone"
+else
+  kcadm create realms \
+    -s realm=kensan \
+    -s enabled=true \
+    -s displayName="kensan-lab (explore)" \
+    -s sslRequired=none \
+    >/dev/null
+
+  # The same two groups bare metal has. Grafana maps them to Admin and Editor
+  # (see values/grafana.yaml); nothing else reads them yet, and they are here so
+  # that the claim exists to be read.
+  # The admin group's id is captured at creation. Looking it up afterwards with
+  # `-q search=` matches by prefix and returns every hit, so the answer would
+  # depend on the order Keycloak happens to list them in.
+  admin_group_id="$(kcadm create groups -r kensan -s name=platform-admin -i)"
+  kcadm create groups -r kensan -s name=platform-dev >/dev/null
+
+  # Without this, `groups` never appears in any token, and every consumer that
+  # maps groups to roles sees a user with no groups at all. It is a client
+  # scope rather than a per-client mapper so that all three clients get it.
+  scope_id="$(kcadm create client-scopes -r kensan \
+    -s name=groups -s protocol=openid-connect \
+    -s 'attributes."include.in.token.scope"=true' \
+    -i)"
+  kcadm create "client-scopes/${scope_id}/protocol-mappers/models" -r kensan \
+    -s name=groups \
+    -s protocol=openid-connect \
+    -s protocolMapper=oidc-group-membership-mapper \
+    -s 'config."claim.name"=groups' \
+    -s 'config."full.path"=false' \
+    -s 'config."id.token.claim"=true' \
+    -s 'config."access.token.claim"=true' \
+    -s 'config."userinfo.token.claim"=true' \
+    >/dev/null
+
+  # Each client is created with the secret this script generated earlier and
+  # already wrote into Kubernetes, rather than letting Keycloak generate one and
+  # copying it back. The pods that need these secrets start before this code
+  # runs; going the other way would mean they start without one.
+  kc_client() {
+    local client_id="$1" secret="$2"; shift 2
+    local id
+    id="$(kcadm create clients -r kensan \
+      -s "clientId=${client_id}" \
+      -s enabled=true \
+      -s protocol=openid-connect \
+      -s publicClient=false \
+      -s standardFlowEnabled=true \
+      -s "secret=${secret}" \
+      -s "redirectUris=[$(printf '"%s",' "$@" | sed 's/,$//')]" \
+      -i)"
+    # The groups scope has to be attached through its own sub-resource. Setting
+    # `defaultClientScopes` on the client itself is accepted and then ignored —
+    # the client comes back with the built-in scopes and no groups, so every
+    # token is missing the claim that decides what the user may do. Verified:
+    # the update returns success and `get clients/<id>/default-client-scopes`
+    # shows no groups.
+    kcadm update "clients/${id}/default-client-scopes/${scope_id}" -r kensan \
+      >/dev/null
+  }
+
+  kc_client argocd "${ARGOCD_CLIENT_SECRET}" \
+    "https://argocd.127-0-0-1.sslip.io/auth/callback" \
+    "https://argocd.127-0-0-1.sslip.io/applications"
+  kc_client grafana "${GRAFANA_CLIENT_SECRET}" \
+    "https://grafana.127-0-0-1.sslip.io/login/generic_oauth"
+  # One client for every host the proxy guards. oauth2-proxy builds its callback
+  # from the Host header, so the wildcard is what lets a second protected
+  # hostname work without touching Keycloak.
+  kc_client oauth2-proxy "${OAUTH2_PROXY_CLIENT_SECRET}" \
+    "https://*.127-0-0-1.sslip.io/oauth2/callback"
+
+  # `skip_jwt_bearer_tokens` lets a command-line client present a token it
+  # already holds instead of walking the browser flow, but only for tokens whose
+  # audience matches what oauth2-proxy was told to expect. Keycloak does not put
+  # that audience in by default, so it takes a mapper. Bare metal has the same
+  # one under a different name; without it the feature is configured and inert.
+  o2p_id="$(kcadm get clients -r kensan -q clientId=oauth2-proxy \
+    --fields id --format csv --noquotes | head -1)"
+  kcadm create "clients/${o2p_id}/protocol-mappers/models" -r kensan \
+    -s name=istio-gateway-audience \
+    -s protocol=openid-connect \
+    -s protocolMapper=oidc-audience-mapper \
+    -s 'config."included.custom.audience"=istio-gateway-explore' \
+    -s 'config."access.token.claim"=true' \
+    -s 'config."id.token.claim"=false' \
+    >/dev/null
+
+  # One user, in the admin group, with a password printed at the end. There is
+  # no identity provider behind this one and no directory to import — a person
+  # trying the platform needs exactly one account that works.
+  #
+  # The email is not an address at this hostname, and that is deliberate:
+  # Backstage's oauth2Proxy sign-in uses the emailMatchingUserEntityProfileEmail
+  # resolver, so it has to equal the email of a User already in the catalog or
+  # the login succeeds at Keycloak and then fails at the portal. This is the
+  # demo account backstage/catalog/organizations/teams.yaml ships.
+  user_id="$(kcadm create users -r kensan \
+    -s username=demo \
+    -s enabled=true \
+    -s emailVerified=true \
+    -s email=demo-admin@example.com \
+    -s firstName=Demo -s lastName=User \
+    -i)"
+  kcadm set-password -r kensan --userid "${user_id}" \
+    --new-password "${DEMO_USER_PASSWORD}" >/dev/null
+  kcadm update "users/${user_id}/groups/${admin_group_id}" -r kensan \
+    -s realm=kensan -s userId="${user_id}" -s groupId="${admin_group_id}" \
+    -n >/dev/null
+fi
+
+# ---------------------------------------------------------------------------
 
 # `argocd app wait` would be nicer, but it means installing the CLI, and
 # `kubectl wait` cannot read Argo CD's health status. Polling the two status
@@ -265,6 +523,13 @@ ${pending}
   sleep 10
 done
 
+# Argo CD started before cert-manager had signed anything, so its CA mount
+# resolved to nothing. Now that the Secret exists, the pod has to be replaced to
+# see it — until then every OIDC login fails on an unknown authority.
+info "restarting argocd-server so it picks up the CA and the OIDC client"
+kubectl -n argocd rollout restart deployment/argocd-server >/dev/null
+kubectl -n argocd rollout status deployment/argocd-server --timeout=300s >/dev/null
+
 # ---------------------------------------------------------------------------
 # Smoke test
 # ---------------------------------------------------------------------------
@@ -272,51 +537,87 @@ done
 # Sent with an explicit Host header rather than the sslip.io name, so this works
 # with no DNS at all. The browser instructions below do need DNS; the offline
 # fallback is in the docs.
-info "checking that the gateway actually serves the demo app"
-code="$(curl -sS -o /dev/null -w '%{http_code}' --max-time 15 \
-  -H 'Host: demo.127-0-0-1.sslip.io' http://127.0.0.1/ || echo 000)"
-if [[ "$code" != "200" ]]; then
-  fail "the demo app answered HTTP ${code} through the gateway, not 200.
-     Every Application is healthy, so this is routing rather than workloads:
-       kubectl -n istio-system get gateway gateway-explore -o yaml
-       kubectl -n app-demo get httproute demo -o yaml
-     Troubleshooting: docs/getting-started/try-it-with-kind.md#troubleshooting"
-fi
+# The demo app is behind the gateway's ext_authz gate, so a request with no
+# session must come back as a redirect to Keycloak — not a 200. A 200 here would
+# mean the application is being served to anyone who asks, which is the failure
+# this whole phase exists to prevent, and it is the failure that looks like
+# success in a browser.
+info "checking that the gateway sends an unauthenticated request to Keycloak"
+location="$(curl -sS -o /dev/null -w '%{redirect_url}' --max-time 15 \
+  -H 'Host: demo.127-0-0-1.sslip.io' http://127.0.0.1/ || echo '')"
+case "$location" in
+  *auth.127-0-0-1.sslip.io*) : ;;
+  '')
+    fail "the demo app served a response instead of redirecting to Keycloak.
+     The route works, so this is the authorization policy or oauth2-proxy:
+       kubectl -n istio-system get authorizationpolicy explore-oauth2-authz -o yaml
+       kubectl -n auth-system logs deploy/oauth2-proxy --tail=50
+     Troubleshooting: docs/getting-started/try-it-with-kind.md#troubleshooting" ;;
+  *)
+    fail "the demo app redirected somewhere other than Keycloak: ${location}" ;;
+esac
 
 # And again over TLS. This is a separate assertion because it can fail on its
 # own: the route can be perfect while the certificate is still being issued, in
 # which case Istio serves the listener with no certificate at all.
-info "checking that the gateway serves the same app over TLS"
+# Same request over TLS. A separate assertion because it fails on its own: the
+# route can be perfect while the certificate is still being issued, in which
+# case Istio serves the listener with no certificate at all.
+info "checking that the gateway answers the same host over TLS"
 code="$(curl -sSk -o /dev/null -w '%{http_code}' --max-time 15 \
   --resolve "demo.127-0-0-1.sslip.io:443:127.0.0.1" \
   https://demo.127-0-0-1.sslip.io/ || echo 000)"
-if [[ "$code" != "200" ]]; then
-  fail "the demo app answered HTTP ${code} over TLS, not 200.
-     Plain HTTP works, so the route is fine and the certificate is not:
+if [[ "$code" != "302" ]]; then
+  fail "the demo app answered HTTP ${code} over TLS, not the expected redirect.
+     Plain HTTP redirects correctly, so the route and the gate are fine and the
+     certificate is not:
        kubectl -n istio-system get certificate explore-wildcard
        kubectl -n cert-manager get certificate explore-ca
      Troubleshooting: docs/getting-started/try-it-with-kind.md#troubleshooting"
 fi
 
+# Keycloak has to answer as itself, at the name it puts in its own tokens. If
+# the discovery document names a different issuer, every login fails later with
+# a message about the issuer not matching, far from the cause.
+info "checking that Keycloak's discovery document names the right issuer"
+issuer="$(curl -sSk --max-time 15 \
+  --resolve "auth.127-0-0-1.sslip.io:443:127.0.0.1" \
+  "https://auth.127-0-0-1.sslip.io/realms/kensan/.well-known/openid-configuration" \
+  | sed -n 's/.*"issuer":"\([^"]*\)".*/\1/p')"
+if [[ "$issuer" != "https://auth.127-0-0-1.sslip.io/realms/kensan" ]]; then
+  fail "Keycloak reports its issuer as '${issuer}'.
+     Every token it signs will carry that, and no client is configured for it:
+       kubectl -n platform-auth-prod get configmap keycloak-env-config -o yaml"
+fi
+
 # Backstage's probe is a liveness check on the HTTP router, not on the plugins
 # behind it. A backend whose catalog failed to start still serves the frontend
 # shell and still answers /healthcheck with 200, so the pod is Ready, the
-# Application is Healthy, and the portal is useless. The only way to know is to
-# ask the catalog something.
-info "checking that Backstage's catalog is actually serving"
-for attempt in $(seq 1 30); do
-  code="$(curl -sSk -o /dev/null -w '%{http_code}' --max-time 10 \
-    --resolve "backstage.127-0-0-1.sslip.io:443:127.0.0.1" \
-    "https://backstage.127-0-0-1.sslip.io/api/catalog/entities?limit=1" || echo 000)"
-  [[ "$code" == "200" ]] && break
+# Application is Healthy, and the portal is useless.
+#
+# Asked from the pod's own log rather than over HTTP, because the portal now
+# sits behind the SSO gate: an unauthenticated request never reaches the
+# backend, so a 302 says nothing about whether the plugins came up. The backend
+# announces both outcomes, and one line distinguishes them.
+info "checking that Backstage's plugins all initialised"
+plugins=""
+for attempt in $(seq 1 60); do
+  logs="$(kubectl -n backstage logs deploy/backstage -c backstage 2>/dev/null || true)"
+  if grep -q "threw an error during startup" <<<"$logs"; then
+    fail "a Backstage plugin failed to start. The pod stays Ready and the portal
+     serves its shell either way, so nothing else would have noticed:
+$(grep -o "Plugin '[a-z]*' threw an error during startup[^\"]*" <<<"$logs" | sort -u | head -3 | sed 's/^/       /')
+     A config value the backend type-checks at boot is the usual cause."
+  fi
+  plugins="$(grep -o "Plugin initialization complete[^\"]*" <<<"$logs" | tail -1)"
+  [[ -n "$plugins" ]] && break
   sleep 5
 done
-if [[ "$code" != "200" ]]; then
-  fail "Backstage's catalog answered HTTP ${code}, not 200.
-     The pod is Ready and the frontend loads, so this is a backend plugin that
-     failed to initialise rather than a routing or scheduling problem:
-       kubectl -n backstage logs deploy/backstage -c backstage | grep -i 'during startup'
-     A config value the backend type-checks at boot is the usual cause."
+if [[ -z "$plugins" ]]; then
+  fail "Backstage never reported its plugins as initialised.
+     Neither a success nor a failure line appeared, so it is still starting or
+     stuck before the plugins run:
+       kubectl -n backstage logs deploy/backstage -c backstage | tail -30"
 fi
 
 admin_password="$(kubectl -n argocd get secret argocd-initial-admin-secret \
@@ -331,20 +632,31 @@ cat <<EOF
   nothing on your machine has a reason to trust that — there is no domain here
   to prove ownership of. Clicking through is the intended path.
 
-  1. Open the GitOps tree            https://argocd.127-0-0-1.sslip.io
-     user 'admin', password '${admin_password}'
+  Single sign-on works here. One account reaches all of it:
+
+       user 'demo', password '${DEMO_USER_PASSWORD}'
+
+  1. Open the demo app               https://demo.127-0-0-1.sslip.io
+     You will land on Keycloak first. podinfo has no authentication code and
+     does not know it is protected — the gateway asked oauth2-proxy about your
+     request before the pod ever saw it. One line of values turned that on.
+
+  2. Open the GitOps tree            https://argocd.127-0-0-1.sslip.io
+     'Log in via Keycloak' — you are already signed in, so it will not ask
+     again. Or use the local admin account: password '${admin_password}'.
      The 'explore-root' application is the app-of-apps: open it and every
      component below it is one Application, exactly as on the real cluster.
 
-  2. Open Grafana                    https://grafana.127-0-0-1.sslip.io
-     user 'admin', password '${GRAFANA_PASSWORD}'
+  3. Open Grafana                    https://grafana.127-0-0-1.sslip.io
+     'Sign in with Keycloak', again without being asked. You arrive as an Admin
+     because the 'demo' user is in the platform-admin group and Grafana maps
+     that group to that role. The break-glass local account is still there:
+     user 'admin', password '${GRAFANA_PASSWORD}'.
      The 'Cluster Health' dashboard is the bare-metal one, unedited. The panels
      that stay empty are reading a Raspberry Pi's temperature sensor.
 
-  3. Open the demo app               https://demo.127-0-0-1.sslip.io
-     It reached the browser through Istio's Gateway API implementation, and it
-     was deployed by charts/app-base — the same chart the real apps use, with
-     no changes, only a values file.
+  Keycloak itself is at https://auth.127-0-0-1.sslip.io — user 'admin',
+  password '${KEYCLOAK_ADMIN_PASSWORD}'.
 
   4. See what the policy engine thinks
        kubectl get policyreport -A

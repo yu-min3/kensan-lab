@@ -12,10 +12,11 @@ $ make try
 ```
 
 Nothing else to configure. A few minutes later you have Argo CD reconciling
-sixteen Applications, Backstage serving the developer portal, Grafana drawing
-the same cluster-health dashboard the real machines are watched with, Istio
-routing to all three over HTTPS through the Gateway API, and the production
-policy set reporting on everything in the cluster.
+eighteen Applications, Backstage serving the developer portal, Grafana drawing
+the same cluster-health dashboard the real machines are watched with, Keycloak
+issuing one identity that signs you in to all of them, Istio routing over HTTPS
+through the Gateway API, and the production policy set reporting on everything
+in the cluster.
 
 ```console
 $ make explore-down     # when you are done
@@ -28,8 +29,9 @@ $ make explore-down     # when you are done
 | **Argo CD** | `https://argocd.127-0-0-1.sslip.io` — the app-of-apps tree, one Application per component, the same shape as bare metal |
 | **Backstage** | `https://backstage.127-0-0-1.sslip.io` — the developer portal, with the golden path template and the service catalog |
 | **Grafana + Prometheus** | `https://grafana.127-0-0-1.sslip.io` — the production Cluster Health dashboard, reading this cluster |
+| **Single sign-on** | Keycloak at `https://auth.127-0-0-1.sslip.io`, with one `demo` account that reaches Argo CD, Grafana and the demo app |
 | **Istio + Gateway API** | All of them are reached through a real `Gateway` and `HTTPRoute`, not a port-forward |
-| **TLS** | cert-manager issues a wildcard certificate from a CA it generates on the spot; your browser will warn, and [that is honest](#4-follow-a-request-through-the-gateway-api) |
+| **TLS** | cert-manager issues a wildcard certificate from a CA it generates on the spot; your browser will warn, and [that is honest](#5-follow-a-request-through-the-gateway-api) |
 | **Kyverno** | All six production `ClusterPolicy` objects, in Audit — verdicts land in `PolicyReport` within a minute |
 | **A demo app** | Deployed by `charts/app-base`, the same chart the real apps use: a values file and no chart changes |
 | **A `longhorn` StorageClass** | Not Longhorn, but named after it, so every PVC in this repository binds unmodified |
@@ -64,12 +66,12 @@ $ chmod +x ./kubectl && sudo mv ./kubectl /usr/local/bin/kubectl
 $ curl -fsSL https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
 ```
 
-**Memory.** Docker needs at least 6 GiB. Docker Desktop hands out 4 GiB by
-default, which is not enough for Istio's control plane, Kyverno's webhook and
-Prometheus on a single node — raise it under Settings → Resources → Memory. A
-settled cluster measures about 4.1 GiB, so 6 GiB is the floor rather than a
-comfortable number. On Linux the container gets the host's memory, so there is
-usually nothing to do.
+**Memory.** Docker needs at least 8 GiB. Docker Desktop hands out 4 GiB by
+default, which is not close — raise it under Settings → Resources → Memory.
+Istio's control plane, Kyverno's webhook and Prometheus account for most of it;
+Keycloak is what moved the floor from 6 GiB to 8, because an identity provider
+is a JVM. On Linux the container gets the host's memory, so there is usually
+nothing to do.
 
 **Ports.** 80 and 443 must be free. The gateway is published on them, so the
 URLs below work in a browser with no proxy and no port-forward.
@@ -84,7 +86,7 @@ $ echo "127.0.0.1 argocd.127-0-0-1.sslip.io demo.127-0-0-1.sslip.io" | sudo tee 
 
 ## Take it for a walk
 
-Eight things worth doing, each about a minute. They are ordered so that every
+Nine things worth doing, each about a minute. They are ordered so that every
 one builds on the last, and none of them needs anything installed beyond the
 prerequisites above.
 
@@ -92,11 +94,11 @@ prerequisites above.
 
 Open `https://argocd.127-0-0-1.sslip.io` — the password is printed at the end of
 `make try`, and the user is `admin`. The browser will warn about the
-certificate; step 4 explains why, and clicking through is the intended path.
+certificate; step 5 explains why, and clicking through is the intended path.
 
 The `explore-root` Application is an *app-of-apps*: it is an Application whose
-job is to create other Applications. Open it and you will find fifteen of them,
-each one a component of the platform. This is the same structure the bare-metal
+job is to create other Applications. Open it and you will find seventeen of
+them, each one a component of the platform. This is the same structure the bare-metal
 cluster uses, where the equivalent root manages thirty-eight.
 
 From the terminal:
@@ -111,12 +113,61 @@ gateway-api         Synced   Healthy
 ...
 ```
 
-### 2. Open the developer portal
+### 2. Sign in once, and be signed in everywhere
+
+`make try` prints one account — user `demo` — and it is the only one you need.
+
+Open `https://demo.127-0-0-1.sslip.io`. You do not land on the demo app; you
+land on Keycloak. **The application has no authentication code in it.** podinfo
+is an off-the-shelf image that does not know what a session is. The gateway
+asked oauth2-proxy about your request before the pod ever saw it, oauth2-proxy
+found no cookie, and sent you to the identity provider. One line of values
+turned that on:
+
+```yaml
+auth:
+  gatewayOAuth2:
+    enabled: true
+```
+
+Sign in, and you arrive at podinfo. Now open
+`https://argocd.127-0-0-1.sslip.io` and press **Log in via Keycloak** — it does
+not ask again. Same at `https://grafana.127-0-0-1.sslip.io` with **Sign in with
+Keycloak**, and you arrive as an *Admin* rather than a Viewer, because `demo` is
+in the `platform-admin` group and Grafana is configured to map that group to
+that role.
+
+Those are two different mechanisms, and the difference is the interesting part:
+
+| | how it authenticates | why |
+|---|---|---|
+| **demo app, Backstage** | gateway `ext_authz` → oauth2-proxy | neither has auth code of its own; Backstage reads who you are from the headers the proxy sets |
+| **Argo CD, Grafana** | their own OIDC client | they already have identity, roles and an API; a second gate in front would mean two logins |
+
+Bare metal draws the line in the same place, for the same reason.
+
+The realm is not in this repository. Keycloak does not substitute environment
+variables when importing a realm file — a `${VAR}` in a client secret is stored
+as those six characters — so a committed realm would have to carry real client
+secrets and a real password, for a cluster that publishes ports 80 and 443 on
+whatever machine runs it. Instead `make try` creates the realm with `kcadm`
+against the running pod, generating every secret as it goes, which is what
+bare metal's own bootstrap script does.
+
+### 3. Open the developer portal
 
 This is the part that makes the repository a platform rather than a cluster.
 
-Open `https://backstage.127-0-0-1.sslip.io`, and sign in as a guest — there is no
-identity provider here, so Backstage's guest provider is what you get.
+Open `https://backstage.127-0-0-1.sslip.io`. You are sent to Keycloak first,
+the same as the demo app — the portal sits behind the gateway's gate rather
+than authenticating on its own. Sign in as `demo` and you arrive as a named
+user, not a guest: the portal knows who you are because the proxy told it.
+
+That is not a choice this layer makes. The frontend picks its sign-in page by
+hostname — `localhost` and `127.0.0.1` get the guest provider, every other host
+expects to be behind oauth2-proxy — and that decision is compiled into the
+bundle. Explore is served at a real hostname, so it takes the second path, and
+the SSO from step 2 is what makes it work.
 
 Two things are worth finding:
 
@@ -159,7 +210,7 @@ nothing worth persisting, so the explore layer uses the in-memory SQLite the
 repository already uses for local development. Restart the pod and the catalog
 is rebuilt from the same files.
 
-### 3. Break something and watch it heal
+### 4. Break something and watch it heal
 
 This is the part of GitOps that is hard to appreciate from a diagram. Scale the
 demo app by hand:
@@ -174,7 +225,7 @@ noticed that the cluster no longer matched Git and corrected it. `selfHeal: true
 is set on every Application in this repository, which is why a manual `kubectl
 edit` on the real cluster is a temporary opinion rather than a change.
 
-### 4. Follow a request through the Gateway API
+### 5. Follow a request through the Gateway API
 
 The demo app is not port-forwarded. It is reached the way the production apps
 are: a `Gateway` that Istio implements, and an `HTTPRoute` that attaches to it.
@@ -215,7 +266,7 @@ without `kensan-lab.platform/environment` comes back `NotAllowedByListeners`.
 That is a deliberate guardrail — a new application cannot publish itself on the
 platform's hostname by accident.
 
-### 5. Watch the cluster from the dashboard the real one is watched with
+### 6. Watch the cluster from the dashboard the real one is watched with
 
 Open `https://grafana.127-0-0-1.sslip.io` — user `admin`, password printed at
 the end of `make try` — and find the **Cluster Health** dashboard.
@@ -242,7 +293,7 @@ Two of production's dashboards are deliberately absent rather than broken: the
 control-plane one reads etcd and Cilium metrics that do not exist here, and the
 OpenTelemetry one wants a collector this slice does not run.
 
-### 6. Watch the policy engine catch you
+### 7. Watch the policy engine catch you
 
 All six production policies are running, in Audit: they report rather than
 block. Start with what is already there:
@@ -290,7 +341,7 @@ no admission reports, because the etcd write amplification would land on a
 microSD card. kind has neither, so the explore layer shortens the interval to
 one minute — the only Kyverno setting that differs between the two.
 
-### 7. Claim a volume
+### 8. Claim a volume
 
 Every PVC in this repository asks for `storageClassName: longhorn`, including
 the default in `charts/app-base`. There is a StorageClass called `longhorn`
@@ -326,7 +377,7 @@ until a pod actually needs the volume, so the volume lands on the node the pod
 was scheduled to. Give it a consumer and it binds in a few seconds. What you do
 *not* get is replication, snapshots or expansion — see below.
 
-### 8. See how Istio got onto the network
+### 9. See how Istio got onto the network
 
 Istio's CNI plugin does not replace the cluster's networking; it appends itself
 to whatever is already there. On kind that is kindnet:
@@ -385,11 +436,13 @@ LAN. kind's nodes are containers on a Docker bridge; there is no physical
 segment to announce into and no other machine that could ask. The port mapping
 gets traffic to the gateway, but cannot show a VIP failing over between nodes.
 
-**Single sign-on.** Keycloak, oauth2-proxy and the `ext_authz` chain guard every
-hostname on the real gateway. Here, Argo CD uses its local admin account and
-Backstage its guest provider — both of which production also has, sitting behind
-the SSO gate rather than instead of it. Bringing the gate itself up is a later
-phase.
+**Group-based authorization.** Single sign-on works here — Keycloak issues the
+identity and the gateway enforces it — but the layer above it does not. On bare
+metal an `ALLOW` policy re-checks the `groups` claim at the gateway after
+`ext_authz` has let the request through, which needs istiod to fetch Keycloak's
+signing keys over TLS. istiod would have to be given this cluster's invented CA
+at install time, before cert-manager has created it. So explore proves *who you
+are*, and bare metal also decides *what that entitles you to*.
 
 **The root of trust for secrets.** This one cannot be solved by more work. The
 sealed secrets in this repository are encrypted to *our* controller's key and
@@ -404,7 +457,7 @@ what is missing is narrower than it looks: not TLS, but the proof of domain
 ownership behind it. The real gateway answers a DNS-01 challenge against a
 domain we own; a visitor owns neither the domain nor the API credentials, so the
 certificate is signed by a CA this cluster invented and the browser warning
-stays. [Step 4](#4-follow-a-request-through-the-gateway-api) has the detail.
+stays. [Step 5](#5-follow-a-request-through-the-gateway-api) has the detail.
 
 **Anything about failure.** One node cannot rebuild a Longhorn replica, cannot
 be drained, and cannot lose an L2 lease. This cluster shows how the platform is

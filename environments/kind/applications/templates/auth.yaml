@@ -1,0 +1,84 @@
+## Single sign-on: Keycloak issues the identity, oauth2-proxy turns it into a
+## gateway-level gate, and the two of them are what makes the demo app's
+## "authentication with no application code" claim true rather than a slogan.
+##
+## Bare metal gets its realm from a bootstrap script run once by hand, its
+## database from a PostgreSQL StatefulSet, and every credential from Vault.
+## Explore has none of those, so the realm is created by scripts/explore-up.sh
+## after this Application is healthy — same tool (kcadm against the running
+## pod), same order, different scope.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: keycloak
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "2"
+    kensan-lab.platform/mirrors: kubernetes/argocd/applications/auth/keycloak/app.yaml
+spec:
+  project: platform-project
+  sources:
+    ## The namespace and the Service come from bare metal unmodified. The
+    ## Deployment, the env config and the route do not — those are the three
+    ## files in environments/kind/resources/keycloak, and each says in its
+    ## header what it changed and why.
+    - repoURL: {{ .Values.repoURL }}
+      targetRevision: {{ .Values.targetRevision }}
+      path: kubernetes/auth/keycloak
+      directory:
+        recurse: false
+        include: '{namespace,keycloak-service}.yaml'
+    - repoURL: {{ .Values.repoURL }}
+      targetRevision: {{ .Values.targetRevision }}
+      path: environments/kind/resources/keycloak
+      directory:
+        recurse: false
+        include: '*.yaml'
+  {{- include "explore.destination" (dict "namespace" "platform-auth-prod") | nindent 2 }}
+  {{- include "explore.syncPolicy" . | nindent 2 }}
+---
+## oauth2-proxy — the same chart, version and values file as bare metal, with a
+## values file on top that changes the issuer, the cookie domain and the CA it
+## trusts. Nothing about the ext_authz mechanism itself differs.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: oauth2-proxy
+  namespace: argocd
+  annotations:
+    ## Wave 3, not 6: bare metal waits for Vault and External Secrets to fill
+    ## the Secret this reads. Here scripts/explore-up.sh writes that Secret
+    ## after Keycloak is up, so the only thing to wait for is Keycloak itself.
+    argocd.argoproj.io/sync-wave: "3"
+    kensan-lab.platform/mirrors: kubernetes/argocd/applications/auth/oauth2-proxy/app.yaml
+spec:
+  project: platform-project
+  sources:
+    - repoURL: https://oauth2-proxy.github.io/manifests
+      chart: oauth2-proxy
+      targetRevision: 10.4.3
+      helm:
+        releaseName: oauth2-proxy
+        valueFiles:
+          - $values/kubernetes/auth/oauth2-proxy/values.yaml
+          - $values/environments/kind/values/oauth2-proxy.yaml
+    - repoURL: {{ .Values.repoURL }}
+      targetRevision: {{ .Values.targetRevision }}
+      ref: values
+    ## Only the namespace travels from bare metal. The route and the reference
+    ## grant name production's hosts and app namespaces; the ExternalSecret
+    ## needs a Vault that is not here.
+    - repoURL: {{ .Values.repoURL }}
+      targetRevision: {{ .Values.targetRevision }}
+      path: kubernetes/auth/oauth2-proxy/resources
+      directory:
+        recurse: false
+        include: 'namespace.yaml'
+    - repoURL: {{ .Values.repoURL }}
+      targetRevision: {{ .Values.targetRevision }}
+      path: environments/kind/resources/oauth2-proxy
+      directory:
+        recurse: false
+        include: '*.yaml'
+  {{- include "explore.destination" (dict "namespace" "auth-system") | nindent 2 }}
+  {{- include "explore.syncPolicy" . | nindent 2 }}

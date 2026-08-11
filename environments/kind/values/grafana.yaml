@@ -7,7 +7,9 @@
 
 # Bare metal reads these from a Secret that External Secrets fills from Vault.
 # Explore has neither, so scripts/explore-up.sh generates a password and prints
-# it at the end, the same way it does for Argo CD.
+# it at the end, the same way it does for Argo CD. It stays useful after SSO is
+# working: it is the break-glass account for when Keycloak is the thing that
+# broke.
 admin:
   existingSecret: grafana-explore-admin
   userKey: admin-user
@@ -23,16 +25,52 @@ resources:
   limits:
     memory: 512Mi
 
+# Bare metal fills this from Vault through External Secrets. Here
+# scripts/explore-up.sh writes it after creating the Keycloak client, which is
+# after Grafana has already started — so Grafana is restarted once at the end of
+# the bootstrap.
+envFromSecrets:
+  - name: grafana-oidc-explore
+
 grafana.ini:
   server:
     root_url: "https://grafana.127-0-0-1.sslip.io"
-  # Keycloak is not part of this slice yet. Until it is, Grafana keeps the
-  # local admin account the block above creates — the same account bare metal
-  # retains as a break-glass. Turning this back on is one block, not a rebuild.
-  auth.generic_oauth:
-    enabled: false
 
-## Same story as remoteWrite: production pulls the OIDC client credentials from
-## a Secret that ExternalSecrets creates. generic_oauth is off above, but the
-## envFrom reference would still hold the container in CreateContainerConfigError.
-envFromSecrets: []
+  # The bare-metal block with this cluster's issuer substituted, and two things
+  # taken out:
+  #
+  #   auto_login          off, so the local admin account above stays reachable
+  #                       without editing config. On bare metal SSO is the only
+  #                       way in and auto_login saves a click; here the first
+  #                       thing a visitor should be able to do is compare the
+  #                       two doors.
+  #   role_attribute_strict  off, so a login that carries no groups claim still
+  #                       gets Viewer instead of being refused. The realm this
+  #                       bootstrap creates does map groups, but a visitor who
+  #                       edits the realm should get a demotion, not a lockout.
+  auth.generic_oauth:
+    enabled: true
+    name: Keycloak
+    allow_sign_up: true
+    auto_login: false
+    client_id: "$__env{GF_AUTH_GENERIC_OAUTH_CLIENT_ID}"
+    client_secret: "$__env{GF_AUTH_GENERIC_OAUTH_CLIENT_SECRET}"
+    scopes: "openid email profile"
+    auth_url: "https://auth.127-0-0-1.sslip.io/realms/kensan/protocol/openid-connect/auth"
+    token_url: "https://auth.127-0-0-1.sslip.io/realms/kensan/protocol/openid-connect/token"
+    api_url: "https://auth.127-0-0-1.sslip.io/realms/kensan/protocol/openid-connect/userinfo"
+    use_pkce: true
+    use_refresh_token: true
+    # The CA this cluster signed the issuer's certificate with. Grafana reads
+    # the file directly rather than through the system store.
+    tls_client_ca: /etc/ssl/explore/ca.crt
+    role_attribute_path: "contains(groups[*], 'platform-admin') && 'Admin' || contains(groups[*], 'platform-dev') && 'Editor' || 'Viewer'"
+    role_attribute_strict: false
+
+# Carries the CA above into the pod. See resources/tls-selfsigned.yaml for why a
+# certificate nobody serves is the way this bundle crosses a namespace.
+extraSecretMounts:
+  - name: explore-ca
+    secretName: grafana-explore-ca-tls
+    mountPath: /etc/ssl/explore
+    readOnly: true
