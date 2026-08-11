@@ -10,6 +10,11 @@ global:
     enabled: false
 
 pilot:
+  # meshConfig.extensionProviders is loaded by the istiod process. Bump this
+  # annotation when adding a provider so Argo CD rolls the long-lived pod and
+  # Gateway config does not fall back to "bad CUSTOM action" deny rules.
+  podAnnotations:
+    kensan-lab.platform/auth-config-revision: "2026-08-11-backstage-sso"
   cni:
     enabled: true
   env:
