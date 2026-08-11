@@ -233,6 +233,9 @@ kubectl create namespace platform-auth-prod --dry-run=client -o yaml \
   | kubectl apply -f - >/dev/null
 kubectl create namespace auth-system --dry-run=client -o yaml \
   | kubectl apply -f - >/dev/null
+## The real namespace, with its ADR-006 labels, arrives with the Application a
+## few minutes from now; this is only so the Secret below has somewhere to land.
+kubectl apply -f "${REPO_ROOT}/kubernetes/backstage/namespace.yaml" >/dev/null
 kubectl -n platform-auth-prod create secret generic keycloak-explore-admin \
   --from-literal=KEYCLOAK_ADMIN_PASSWORD="${KEYCLOAK_ADMIN_PASSWORD}" \
   --dry-run=client -o yaml | kubectl apply -f - >/dev/null
@@ -275,7 +278,6 @@ else
   info "no GITHUB_TOKEN set — Backstage runs without the scaffolder's publish step"
   GITHUB_TOKEN="ghp_0000000000000000000000000000000000no-token-was-supplied"
 fi
-kubectl apply -f "${REPO_ROOT}/kubernetes/backstage/namespace.yaml" >/dev/null
 kubectl -n backstage create secret generic backstage-explore-github \
   --from-literal=GITHUB_TOKEN="${GITHUB_TOKEN}" \
   --dry-run=client -o yaml | kubectl apply -f - >/dev/null
