@@ -48,9 +48,11 @@ meshConfig:
           - x-forwarded-host
           - x-forwarded-proto
         # 認可後 (200) に upstream pod へ追加するidentity header。
-        # Authorizationは含めない。oauth2-proxyのKeycloak tokenで、appが送った
-        # application tokenを上書きしないため。
+        # Authorization のKeycloak tokenは gateway-prod のRequestAuthenticationが
+        # groups claimを検証するために必要。native auth app（Backstage / Argo CD /
+        # Grafana）はCUSTOM policy対象外なのでapplication tokenを上書きしない。
         headersToUpstreamOnAllow:
+          - authorization
           - x-auth-request-user
           - x-auth-request-email
           - x-auth-request-groups
