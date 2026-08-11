@@ -75,17 +75,23 @@ spec:
     ## Grafana here at all. The datasource does not: the shared one points at
     ## Tempo and Loki, which explore does not run.
     ##
-    ## Two of the three come across. The control-plane dashboard does not: five
-    ## of its nine panels read etcd metrics (kind's etcd serves them on
-    ## localhost, behind client certs) or Cilium's operator (explore runs
-    ## kindnet), and neither gap closes on a single node. A dashboard that is
-    ## half empty teaches the wrong thing about the cluster it is pointed at.
+    ## One of the three comes across. A dashboard that is half empty teaches the
+    ## wrong thing about the cluster it is pointed at, and two of them would be:
+    ## five of the control-plane dashboard's nine panels read etcd (kind serves
+    ## those on localhost behind client certs) or Cilium's operator (explore
+    ## runs kindnet), and all ten of the OpenTelemetry APM panels want a
+    ## collector explore does not run. Neither gap closes on a single node.
+    ##
+    ## Cluster Health does come across, and most of it fills: the panels that
+    ## stay empty there — CPU temperature, wired/WiFi carrier, blackbox probes —
+    ## are reading a physical machine, and being visibly bare-metal-shaped is
+    ## the point rather than a defect.
     - repoURL: {{ .Values.repoURL }}
       targetRevision: {{ .Values.targetRevision }}
       path: kubernetes/observability/grafana/resources
       directory:
         recurse: false
-        include: '{dashboards,cluster-health-dashboard}.yaml'
+        include: 'cluster-health-dashboard.yaml'
   {{- include "explore.destination" (dict "namespace" "monitoring") | nindent 2 }}
   {{- include "explore.syncPolicy" . | nindent 2 }}
 ---
