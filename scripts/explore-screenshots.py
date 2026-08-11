@@ -131,8 +131,6 @@ def main() -> int:
         # containers whose text a locator does not always see, and a screenshot
         # only needs the page to have settled. A blank result is obvious in
         # review, which a false-negative selector wait is not.
-        shot(page, "https://argocd.127-0-0-1.sslip.io/applications",
-             "argocd-applications", settle=6000)
         shot(page, "https://argocd.127-0-0-1.sslip.io/applications/argocd/explore-root",
              "argocd-tree", settle=7000)
         # Backstage is missing on purpose. The image explore pins
@@ -141,17 +139,14 @@ def main() -> int:
         # v0.0.12, and only the second has the single sign-on frontend. Until
         # that is reconciled a screenshot here would show a guest card behind an
         # SSO gate, which describes neither cluster.
-        shot(page, "https://grafana.127-0-0-1.sslip.io/dashboards",
-             "grafana-dashboards", settle=4000)
-        # The dashboard itself, not the list. `kiosk` drops Grafana's chrome so
+        # The dashboard itself rather than the list of them. `kiosk` drops Grafana's chrome so
         # the picture is the panels rather than a navigation bar, and the fixed
         # window keeps two runs comparable.
         shot(page,
              "https://grafana.127-0-0-1.sslip.io/d/cluster-health/cluster-health"
              "?orgId=1&from=now-30m&to=now&kiosk",
              "grafana-cluster-health", settle=9000)
-        shot(page, "https://demo.127-0-0-1.sslip.io/docs",
-             "demo-app", settle=2500)
+
 
         context.close()
         browser.close()
