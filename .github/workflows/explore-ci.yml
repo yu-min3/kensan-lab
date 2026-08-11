@@ -169,7 +169,13 @@ jobs:
 
           # The groups claim is what Grafana maps to a role. Absent, every user
           # silently lands as a Viewer and nobody notices until they cannot edit.
-          claims="$(echo "$token" | cut -d. -f2 | tr '_-' '/+' | base64 -d 2>/dev/null || true)"
+          #
+          # Decoded in Python because a JWT payload is base64url *without*
+          # padding, and `base64 -d` rejects that rather than assuming it.
+          claims="$(echo "$token" | cut -d. -f2 | python3 -c '
+          import base64, sys
+          p = sys.stdin.read().strip()
+          sys.stdout.write(base64.urlsafe_b64decode(p + "=" * (-len(p) % 4)).decode())')"
           echo "$claims" | jq -e '.groups | index("platform-admin")' >/dev/null \
             || { echo "the token carries no platform-admin group: $claims" >&2; exit 1; }
 
