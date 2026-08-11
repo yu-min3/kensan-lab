@@ -14,7 +14,6 @@ The Internal Developer Platform (IDP) surface — service catalog, TechDocs, and
 | `postgresql-statefulset.yaml` + `postgresql-initdb-configmap.yaml` | Postgres 16 backing store — 12 plugin DBs pre-created for DR determinism (`pluginDivisionMode: database`) |
 | `*-external-secret.yaml` / `ghcr-pull-secret.yaml` | Static creds via ESO — GitHub token, Postgres cred, GHCR pull token |
 | `httproute.yaml` | Attaches to `gateway-platform` (`backstage.platform.yu-min3.com`) |
-| `requestauthentication-strip-jwt.yaml` | Strips a directly forwarded Keycloak JWT while preserving Backstage-issued tokens (see rationale) |
 | `namespace.yaml` / `network-policy.yaml` / `pdb.yaml` | `backstage` ns — PSA baseline, Istio injection, default-deny + explicit allows |
 
 Source code lives at [`backstage/`](https://github.com/yu-min3/kensan-lab/tree/main/backstage) (integrated in this repo, not a separate one); scaffolding templates at [`backstage/templates/`](https://github.com/yu-min3/kensan-lab/tree/main/backstage/templates).
@@ -52,7 +51,7 @@ Step-by-step walkthrough: [Golden Path guide](https://github.com/yu-min3/kensan-
 **Three principles thread the whole design:**
 
 1. **Registration is a PR, not an API call.** The scaffolder does not push into `kensan-lab` directly — it opens a pull request adding the Application CR. The platform keeps its review gate even on the fully-automated path, and a bad template run is a closed PR, not a live deployment.
-2. **Gateway SSO establishes identity; Backstage allowlists users and issues its own application token.** Istio enforces the oauth2-proxy session and validates the Keycloak access token from `X-Auth-Request-Access-Token`, then Backstage maps the trusted email header to an explicitly registered Catalog User. Unregistered identities fail closed. The shared ext_authz provider does not replace `Authorization`, because replacing it with the Keycloak token would erase the Backstage token and make every plugin API return 401.
+2. **Gateway SSO establishes identity; Backstage allowlists users and issues its own application token.** Istio enforces the oauth2-proxy session and validates the Keycloak access token from `X-Auth-Request-Access-Token`, then Backstage maps the trusted email header to an explicitly registered Catalog User. Unregistered identities fail closed. The shared ext_authz provider does not replace `Authorization`, because replacing it with the Keycloak token would erase the Backstage token and make every plugin API return 401. No workload `RequestAuthentication` is attached to Backstage: it would reject Backstage's own JWT before the backend can verify it.
 3. **Deploy definition next to every other component, source next to no other.** Manifests moved from `backstage/manifests/` to `kubernetes/backstage/` so that `kubernetes/` is the single answer to "what runs on the cluster" and manifest CI covers it ([ADR-018](https://github.com/yu-min3/kensan-lab/blob/main/docs/adr/018-backstage-manifests-placement.md)). The app source stays at top-level `backstage/` — it's a workload we build, not platform config.
 
 Concrete choices:
