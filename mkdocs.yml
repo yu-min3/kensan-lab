@@ -205,6 +205,7 @@ nav:
       - Guides:
           - Backstage Golden Path: guides/backstage-golden-path.md
           - OTel integration & troubleshooting: guides/observability-integration.md
+          - Spec-driven development: guides/sdd-workflow.md
           - Raspberry Pi WiFi stabilization: guides/wifi-stabilization.md
   - Architecture Decisions:
       - Overview: adr/index.md
