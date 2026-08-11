@@ -1,9 +1,9 @@
 ## Argo CD's own UI, routed through the platform's own gateway — the substitute
 ## for kubernetes/argocd/resources/httproute.yaml, which names the real domain.
 ##
-## This file exists purely because a hostname is hardcoded in a raw manifest.
-## Once the domain centralisation lands and that route reads site.yaml, this
-## copy goes away — see environments/kind/README.md#planned-removal.
+## This file exists purely because a hostname is hardcoded in a raw manifest,
+## and it stays that way — see
+## environments/kind/README.md#why-the-substitutions-are-permanent.
 apiVersion: gateway.networking.k8s.io/v1
 kind: HTTPRoute
 metadata:

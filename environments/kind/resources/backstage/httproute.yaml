@@ -1,9 +1,9 @@
 ## Backstage on the explore hostname — the substitute for
 ## kubernetes/backstage/httproute.yaml, which names the real domain.
 ##
-## Scaffolding, like the other two routes here: it exists only because a
-## hostname is hardcoded in a raw manifest, and goes away when the domain
-## centralisation lands. See environments/kind/README.md#planned-removal.
+## One of the three permanent substitutions: it exists only because a hostname
+## is hardcoded in a raw manifest. See
+## environments/kind/README.md#why-the-substitutions-are-permanent.
 apiVersion: gateway.networking.k8s.io/v1
 kind: HTTPRoute
 metadata:
