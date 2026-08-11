@@ -20,6 +20,11 @@ REVISION="main"
 # explored — there is no local-path mode, and pretending otherwise would only
 # fail later and less clearly.
 WAIT_TIMEOUT=900
+# Optional. Backstage's scaffolder publishes to GitHub, and no platform can
+# hand a visitor a credential for somebody else's account — so this is the one
+# thing the explore layer asks you to bring. Without it everything still runs
+# and the golden path template is visible; only pressing Create stops short.
+GITHUB_TOKEN="${GITHUB_TOKEN:-}"
 
 usage() {
   cat <<'EOF'
@@ -28,6 +33,10 @@ usage: scripts/explore-up.sh [--repo URL] [--rev REVISION] [--timeout SECONDS]
   --repo URL       Git repository Argo CD syncs from (default: upstream)
   --rev REVISION   Branch, tag or SHA to sync (default: main)
   --timeout SEC    How long to wait for every Application to go healthy
+
+Set GITHUB_TOKEN in the environment to let Backstage's scaffolder create
+repositories and open pull requests. Everything works without it except the
+Create button.
 
 CI passes --rev "$GITHUB_SHA" so the cluster proves the pull request rather
 than main. A fork passes --repo its own URL.
@@ -140,6 +149,21 @@ helm upgrade --install argocd argo/argo-cd \
   --values "${REPO_ROOT}/kubernetes/argocd/values.yaml" \
   --values "${ENV_DIR}/values/argocd.yaml" \
   --wait --timeout 10m >/dev/null
+
+# The scaffolder needs a token to reach GitHub, and there is nowhere for one to
+# come from: Vault is not part of this slice, and a credential for the visitor's
+# own account cannot be generated. So it is passed in or the feature is absent —
+# the Secret is created either way, holding an empty string, so that the
+# Deployment's reference always resolves.
+if [[ -n "$GITHUB_TOKEN" ]]; then
+  info "wiring the GitHub token into Backstage (scaffolder enabled)"
+else
+  info "no GITHUB_TOKEN set — Backstage runs without the scaffolder's publish step"
+fi
+kubectl apply -f "${REPO_ROOT}/kubernetes/backstage/namespace.yaml" >/dev/null
+kubectl -n backstage create secret generic backstage-explore-github \
+  --from-literal=GITHUB_TOKEN="${GITHUB_TOKEN}" \
+  --dry-run=client -o yaml | kubectl apply -f - >/dev/null
 
 info "applying the AppProjects"
 kubectl apply -f "${REPO_ROOT}/kubernetes/argocd/projects/" >/dev/null
