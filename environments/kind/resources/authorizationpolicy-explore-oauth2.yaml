@@ -34,6 +34,12 @@ spec:
     ## Declared in kubernetes/network/istio/istiod/values.yaml, which explore
     ## uses unmodified — the ext_authz wiring is shared, only its scope is not.
     name: oauth2-proxy
+  ## Adding a host here is half the job: the same hostname has to be a
+  ## registered redirect URI on the oauth2-proxy client, which
+  ## scripts/explore-up.sh writes. Keycloak cannot wildcard a host, so the two
+  ## lists are enumerated and have to agree — a host present here but missing
+  ## there gets as far as the login page and then "Invalid parameter:
+  ## redirect_uri".
   rules:
     - to:
         - operation:

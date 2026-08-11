@@ -440,11 +440,21 @@ else
     "https://argocd.127-0-0-1.sslip.io/applications"
   kc_client grafana "${GRAFANA_CLIENT_SECRET}" \
     "https://grafana.127-0-0-1.sslip.io/login/generic_oauth"
-  # One client for every host the proxy guards. oauth2-proxy builds its callback
-  # from the Host header, so the wildcard is what lets a second protected
-  # hostname work without touching Keycloak.
+  # One client for every host the proxy guards, and the hosts are listed rather
+  # than matched with a wildcard.
+  #
+  # `https://*.127-0-0-1.sslip.io/oauth2/callback` looks like it should work and
+  # does not: Keycloak's wildcard matches inside the path, never inside the
+  # host. A browser sent to the authorization endpoint comes back with
+  # "Invalid parameter: redirect_uri" and nothing in the cluster logs an error,
+  # because Keycloak considers refusing an unregistered callback to be its job
+  # rather than a fault.
+  #
+  # Adding a protected host therefore means editing two files: this list, and
+  # the hosts in resources/authorizationpolicy-explore-oauth2.yaml.
   kc_client oauth2-proxy "${OAUTH2_PROXY_CLIENT_SECRET}" \
-    "https://*.127-0-0-1.sslip.io/oauth2/callback"
+    "https://demo.127-0-0-1.sslip.io/oauth2/callback" \
+    "https://backstage.127-0-0-1.sslip.io/oauth2/callback"
 
   # `skip_jwt_bearer_tokens` lets a command-line client present a token it
   # already holds instead of walking the browser flow, but only for tokens whose
@@ -589,6 +599,32 @@ if [[ "$issuer" != "https://auth.127-0-0-1.sslip.io/realms/kensan" ]]; then
      Every token it signs will carry that, and no client is configured for it:
        kubectl -n platform-auth-prod get configmap keycloak-env-config -o yaml"
 fi
+
+# The redirect the browser is about to follow has to be one Keycloak will
+# accept. This is checked by following it, because the failure is invisible from
+# every other angle: the gate redirects correctly, Keycloak answers, the token
+# endpoint works for a direct grant, and the only sign of trouble is an error
+# page a person sees after clicking. A wildcard host in the client's redirect
+# URIs produces exactly this.
+info "checking that Keycloak accepts the callback the gateway sends people to"
+for host in demo backstage; do
+  target="$(curl -sSk -o /dev/null -w '%{redirect_url}' --max-time 15 \
+    --resolve "${host}.127-0-0-1.sslip.io:443:127.0.0.1" \
+    "https://${host}.127-0-0-1.sslip.io/" || echo '')"
+  body="$(curl -sSk --max-time 15 \
+    --resolve "auth.127-0-0-1.sslip.io:443:127.0.0.1" "${target}" || echo '')"
+  if grep -qi "Invalid parameter: redirect_uri" <<<"$body"; then
+    fail "Keycloak refuses the callback for ${host}.127-0-0-1.sslip.io.
+     The host is guarded by the gateway but is not a registered redirect URI on
+     the oauth2-proxy client. Keycloak cannot wildcard a host, so both lists
+     have to name it:
+       scripts/explore-up.sh                (kc_client oauth2-proxy ...)
+       environments/kind/resources/authorizationpolicy-explore-oauth2.yaml"
+  fi
+  grep -qi "kc-login\|<form" <<<"$body" || fail "the login page for ${host} did not render a form.
+     Keycloak answered, but not with something a person can sign in to:
+       kubectl -n platform-auth-prod logs deploy/keycloak -c keycloak | tail -30"
+done
 
 # Backstage's probe is a liveness check on the HTTP router, not on the plugins
 # behind it. A backend whose catalog failed to start still serves the frontend

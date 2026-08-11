@@ -101,6 +101,8 @@ job is to create other Applications. Open it and you will find seventeen of
 them, each one a component of the platform. This is the same structure the bare-metal
 cluster uses, where the equivalent root manages thirty-eight.
 
+![Argo CD showing explore-root and the Applications it created](assets/argocd-tree.png)
+
 From the terminal:
 
 ```console
@@ -116,6 +118,8 @@ gateway-api         Synced   Healthy
 ### 2. Sign in once, and be signed in everywhere
 
 `make try` prints one account — user `demo` — and it is the only one you need.
+
+![The Keycloak sign-in page for the kensan-lab (explore) realm](assets/keycloak-login.png)
 
 Open `https://demo.127-0-0-1.sslip.io`. You do not land on the demo app; you
 land on Keycloak. **The application has no authentication code in it.** It is a
@@ -275,13 +279,17 @@ platform's hostname by accident.
 Open `https://grafana.127-0-0-1.sslip.io` — user `admin`, password printed at
 the end of `make try` — and find the **Cluster Health** dashboard.
 
-It is the bare-metal dashboard, unmodified, pointed at this cluster. Most of it
-fills in: node readiness, CPU and memory, pod phases, container restarts. Some
-of it does not, and the empty panels are the interesting part — CPU temperature,
-wired and WiFi link state, and the ICMP probes are reading a Raspberry Pi in a
-cupboard through a hardware sensor and a blackbox exporter. A dashboard that
-visibly knows what machine it was written for says more than one edited until
-every panel is green.
+It is the bare-metal dashboard, unmodified, pointed at this cluster.
+
+![The Cluster Health dashboard: node and resource panels filled in, the CPU
+temperature and WiFi panels showing no data](assets/grafana-cluster-health.png)
+
+Most of it fills in: node readiness, uptime, CPU and memory. Some of it does
+not, and **the empty panels are the interesting part**. `CPU 温度` reads a
+hardware sensor, `WiFi リンク` reads a wireless interface, and the ICMP probes
+ping a router — none of which a container on a Docker bridge has. A dashboard
+that visibly knows what machine it was written for says more than one edited
+until every panel is green.
 
 Prometheus is the same `kube-prometheus-stack` release and version as
 production, layered with a values file that switches off what a ten-minute
