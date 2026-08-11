@@ -32,6 +32,22 @@ probes:
   # app/main.py serves /health; the chart defaults to /healthz.
   path: /health
 
+# Not an explore-specific workaround — these are the two lines the template's
+# own deploy/values.yaml ships, and for the same reason. The skeleton's
+# Dockerfile ends with `USER appuser`, a name rather than a number, and the
+# chart asks for runAsNonRoot; the kubelet cannot resolve a username to a UID
+# without reading the image's /etc/passwd, so it refuses to start the container:
+#
+#   container has runAsNonRoot and image has non-numeric user (appuser),
+#   cannot verify user is non-root
+#
+# Stating the UID numerically is what the template tells a developer to do, so
+# explore does the same. A `USER 1000:1000` in the skeleton's Dockerfile would
+# remove the need for both copies.
+securityContext:
+  runAsUser: 1000
+  runAsGroup: 1000
+
 # Bare metal pulls from a private GHCR through an ExternalSecret backed by
 # Vault. Explore has no Vault, and the image is public anyway.
 ghcrPullSecret:
