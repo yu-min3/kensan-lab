@@ -99,6 +99,7 @@ Backstage の plugin API は sign-in 後に Backstage 自身が発行した Bear
 |---|---|
 | oauth2-proxy Keycloak client / Secret | **変更なし**。既存 `istio-gateway-platform` client を共有 |
 | Istio `headersToUpstreamOnAllow` | **identity headerのみ転送**。`Authorization`は元のapplication tokenを保持 |
+| Istio `includeRequestHeadersInCheck` | **cookieでsession検証**。application `Authorization`はoauth2-proxyへ渡さない |
 | Gateway JWT検証 | `X-Auth-Request-Access-Token` をJWKS検証し、既存のgroups許可を維持 |
 | Backstage利用者 | Gatewayのadmin/dev許可に加え、Catalog User resolverでもallowlist |
 | `requestauthentication-strip-jwt.yaml` | **維持**。外部 Keycloak JWT を Backstage token と誤認して 401 にする既知問題を防ぐ |
