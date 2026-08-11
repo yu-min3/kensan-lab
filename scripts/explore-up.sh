@@ -385,9 +385,11 @@ else
   # The same two groups bare metal has. Grafana maps them to Admin and Editor
   # (see values/grafana.yaml); nothing else reads them yet, and they are here so
   # that the claim exists to be read.
-  for group in platform-admin platform-dev; do
-    kcadm create groups -r kensan -s "name=${group}" >/dev/null
-  done
+  # The admin group's id is captured at creation. Looking it up afterwards with
+  # `-q search=` matches by prefix and returns every hit, so the answer would
+  # depend on the order Keycloak happens to list them in.
+  admin_group_id="$(kcadm create groups -r kensan -s name=platform-admin -i)"
+  kcadm create groups -r kensan -s name=platform-dev >/dev/null
 
   # Without this, `groups` never appears in any token, and every consumer that
   # maps groups to roles sees a user with no groups at all. It is a client
@@ -423,8 +425,13 @@ else
       -s "secret=${secret}" \
       -s "redirectUris=[$(printf '"%s",' "$@" | sed 's/,$//')]" \
       -i)"
-    kcadm update "clients/${id}" -r kensan \
-      -s 'defaultClientScopes=["web-origins","acr","profile","roles","email","groups"]' \
+    # The groups scope has to be attached through its own sub-resource. Setting
+    # `defaultClientScopes` on the client itself is accepted and then ignored —
+    # the client comes back with the built-in scopes and no groups, so every
+    # token is missing the claim that decides what the user may do. Verified:
+    # the update returns success and `get clients/<id>/default-client-scopes`
+    # shows no groups.
+    kcadm update "clients/${id}/default-client-scopes/${scope_id}" -r kensan \
       >/dev/null
   }
 
@@ -439,6 +446,22 @@ else
   kc_client oauth2-proxy "${OAUTH2_PROXY_CLIENT_SECRET}" \
     "https://*.127-0-0-1.sslip.io/oauth2/callback"
 
+  # `skip_jwt_bearer_tokens` lets a command-line client present a token it
+  # already holds instead of walking the browser flow, but only for tokens whose
+  # audience matches what oauth2-proxy was told to expect. Keycloak does not put
+  # that audience in by default, so it takes a mapper. Bare metal has the same
+  # one under a different name; without it the feature is configured and inert.
+  o2p_id="$(kcadm get clients -r kensan -q clientId=oauth2-proxy \
+    --fields id --format csv --noquotes | head -1)"
+  kcadm create "clients/${o2p_id}/protocol-mappers/models" -r kensan \
+    -s name=istio-gateway-audience \
+    -s protocol=openid-connect \
+    -s protocolMapper=oidc-audience-mapper \
+    -s 'config."included.custom.audience"=istio-gateway-explore' \
+    -s 'config."access.token.claim"=true' \
+    -s 'config."id.token.claim"=false' \
+    >/dev/null
+
   # One user, in the admin group, with a password printed at the end. There is
   # no identity provider behind this one and no directory to import — a person
   # trying the platform needs exactly one account that works.
@@ -451,9 +474,9 @@ else
     -i)"
   kcadm set-password -r kensan --userid "${user_id}" \
     --new-password "${DEMO_USER_PASSWORD}" >/dev/null
-  group_id="$(kcadm get groups -r kensan -q search=platform-admin --fields id --format csv --noquotes | head -1)"
-  kcadm update "users/${user_id}/groups/${group_id}" -r kensan \
-    -s realm=kensan -s userId="${user_id}" -s groupId="${group_id}" -n >/dev/null
+  kcadm update "users/${user_id}/groups/${admin_group_id}" -r kensan \
+    -s realm=kensan -s userId="${user_id}" -s groupId="${admin_group_id}" \
+    -n >/dev/null
 fi
 
 # ---------------------------------------------------------------------------
