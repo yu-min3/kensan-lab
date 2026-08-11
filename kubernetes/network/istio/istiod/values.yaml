@@ -46,40 +46,15 @@ meshConfig:
           - x-forwarded-uri
           - x-forwarded-host
           - x-forwarded-proto
-        # 認可後 (200) に upstream pod へ追加するヘッダ。アプリ側 fine 認可で使う。
+        # 認可後 (200) に upstream pod へ追加するidentity header。
+        # Authorizationは含めない。oauth2-proxyのKeycloak tokenで、Backstageや
+        # native auth appが送ったapplication tokenを上書きしないため。
         headersToUpstreamOnAllow:
-          - authorization                # Bearer JWT (forwardOriginalToken と併用)
           - x-auth-request-user
           - x-auth-request-email
           - x-auth-request-groups
           - x-auth-request-access-token
         # 拒否時 (302/401) に browser へ流すヘッダ。OIDC redirect 成立に必須。
-        headersToDownstreamOnDeny:
-          - content-type
-          - set-cookie
-          - location
-    # Backstage は sign-in 後の plugin API 呼び出しに、自身が発行した
-    # Authorization: Bearer <Backstage token> を使う。共通 provider は oauth2-proxy
-    # の Keycloak token でこの header を上書きするため、Backstage 専用 provider では
-    # identity header だけを反映し、元の Authorization header を保持する。
-    - name: oauth2-proxy-backstage
-      envoyExtAuthzHttp:
-        service: oauth2-proxy.auth-system.svc.cluster.local
-        port: 4180
-        pathPrefix: /oauth2/auth
-        failOpen: false
-        timeout: 0.2s
-        includeRequestHeadersInCheck:
-          - cookie
-          - authorization
-          - x-forwarded-uri
-          - x-forwarded-host
-          - x-forwarded-proto
-        headersToUpstreamOnAllow:
-          - x-auth-request-user
-          - x-auth-request-email
-          - x-auth-request-groups
-          - x-auth-request-access-token
         headersToDownstreamOnDeny:
           - content-type
           - set-cookie

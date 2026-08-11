@@ -92,13 +92,15 @@ oauth2-proxy を Istio ext_authz の `/oauth2/auth` として使う場合、認�
 
 Backstage の plugin API は sign-in 後に Backstage 自身が発行した Bearer token を使う。
 共通 ext_authz provider が Keycloak token を `Authorization` に設定すると、この token を
-上書きしてしまうため、Backstage だけ header forwarding を分離する。
+上書きしてしまう。そのためKeycloak tokenは専用headerでGateway検証し、`Authorization`は
+全hostで元のapplication tokenを保持する。
 
 | 対象 | 判断 |
 |---|---|
 | oauth2-proxy Keycloak client / Secret | **変更なし**。既存 `istio-gateway-platform` client を共有 |
-| Istio `headersToUpstreamOnAllow` | **Backstage 専用 provider を追加**。user/email/groups は上書きし、`Authorization` は元の Backstage token を保持 |
-| Gateway / app 許可 | Gateway はoauth2-proxy sessionを必須化。利用者のallowlistは Catalog User resolverで評価 |
+| Istio `headersToUpstreamOnAllow` | **identity headerのみ転送**。`Authorization`は元のapplication tokenを保持 |
+| Gateway JWT検証 | `X-Auth-Request-Access-Token` をJWKS検証し、既存のgroups許可を維持 |
+| Backstage利用者 | Gatewayのadmin/dev許可に加え、Catalog User resolverでもallowlist |
 | `requestauthentication-strip-jwt.yaml` | **維持**。外部 Keycloak JWT を Backstage token と誤認して 401 にする既知問題を防ぐ |
 | Backstage ExternalSecret | **変更なし**。専用 client secret は不要 |
 | Backstage image | application build 後に新 tag へ更新。`latest` は使わない |
@@ -108,8 +110,8 @@ Backstage の plugin API は sign-in 後に Backstage 自身が発行した Bear
 1. Browser が Backstage を開く。
 2. Istio が oauth2-proxy の `/oauth2/auth` へ ext_authz check を行う。
 3. session がなければ oauth2-proxy が Keycloak へ redirect し、認証後に共有 cookie を設定する。
-4. 専用 ext_authz provider がoauth2-proxy sessionを検証し、identity headerを上書きする。
-5. 専用 provider は browser が送る `Authorization` を上書きしない。workload 側 RequestAuthentication は外部 Keycloak Bearer JWT だけを剥がす。
+4. 共通 ext_authz providerがsessionを検証し、identity headerを上書きする。
+5. Gatewayがaccess-token headerのgroupsを検証し、browserの`Authorization`は上書きしない。
 6. Backstage oauth2Proxy provider が email header を Catalog User に照合し、Backstage token を発行する。
 7. frontend と backend plugin は Backstage token で user identity を共有する。
 
