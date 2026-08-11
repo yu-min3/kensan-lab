@@ -30,6 +30,10 @@ WAIT_TIMEOUT=900
 # thing the explore layer asks you to bring. Without it everything still runs
 # and the golden path template is visible; only pressing Create stops short.
 GITHUB_TOKEN="${GITHUB_TOKEN:-}"
+# Optional. The demo account's password is generated and printed unless one is
+# supplied, which is what CI does so that it can drive a login without scraping
+# this script's output.
+DEMO_PASSWORD="${DEMO_PASSWORD:-}"
 
 usage() {
   cat <<'EOF'
@@ -42,6 +46,10 @@ usage: scripts/explore-up.sh [--repo URL] [--rev REVISION] [--timeout SECONDS]
 Set GITHUB_TOKEN in the environment to let Backstage's scaffolder create
 repositories and open pull requests. Everything works without it except the
 Create button.
+
+Set DEMO_PASSWORD to choose the demo account's password instead of having one
+generated. Useful for scripting against the cluster; the generated one is
+printed either way.
 
 CI passes --rev "$GITHUB_SHA" so the cluster proves the pull request rather
 than main. A fork passes --repo its own URL.
@@ -250,7 +258,7 @@ kubectl -n monitoring create secret generic grafana-oidc-explore \
 rand() { openssl rand -base64 24 | tr -d '/+=' | head -c 24; }
 
 KEYCLOAK_ADMIN_PASSWORD="$(rand)"
-DEMO_USER_PASSWORD="$(rand)"
+DEMO_USER_PASSWORD="${DEMO_PASSWORD:-$(rand)}"
 ARGOCD_CLIENT_SECRET="$(rand)"
 GRAFANA_CLIENT_SECRET="$(rand)"
 OAUTH2_PROXY_CLIENT_SECRET="$(rand)"
