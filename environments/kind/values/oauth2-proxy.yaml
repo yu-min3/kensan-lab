@@ -84,7 +84,12 @@ extraVolumeMounts:
 # should carry the auth path. kind's node is whatever the host is, and on Apple
 # Silicon that selector leaves every replica Pending with no other symptom — the
 # Application simply never goes Healthy.
-nodeSelector: {}
+#
+# `null`, not `{}`: Helm skips empty maps when coalescing values files, so an
+# empty map leaves the bare-metal selector exactly where it was. Verified by
+# rendering both — `{}` keeps `kubernetes.io/arch: amd64`, `null` removes the
+# key. The same is not true of lists, which are replaced wholesale.
+nodeSelector: null
 
 # Two replicas and a PodDisruptionBudget are what keeps a node drain from taking
 # authentication down with it. One node cannot be drained, so the second replica
