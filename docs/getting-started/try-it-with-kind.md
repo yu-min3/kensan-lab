@@ -113,12 +113,61 @@ gateway-api         Synced   Healthy
 ...
 ```
 
-### 2. Open the developer portal
+### 2. Sign in once, and be signed in everywhere
+
+`make try` prints one account — user `demo` — and it is the only one you need.
+
+Open `https://demo.127-0-0-1.sslip.io`. You do not land on the demo app; you
+land on Keycloak. **The application has no authentication code in it.** podinfo
+is an off-the-shelf image that does not know what a session is. The gateway
+asked oauth2-proxy about your request before the pod ever saw it, oauth2-proxy
+found no cookie, and sent you to the identity provider. One line of values
+turned that on:
+
+```yaml
+auth:
+  gatewayOAuth2:
+    enabled: true
+```
+
+Sign in, and you arrive at podinfo. Now open
+`https://argocd.127-0-0-1.sslip.io` and press **Log in via Keycloak** — it does
+not ask again. Same at `https://grafana.127-0-0-1.sslip.io` with **Sign in with
+Keycloak**, and you arrive as an *Admin* rather than a Viewer, because `demo` is
+in the `platform-admin` group and Grafana is configured to map that group to
+that role.
+
+Those are two different mechanisms, and the difference is the interesting part:
+
+| | how it authenticates | why |
+|---|---|---|
+| **demo app, Backstage** | gateway `ext_authz` → oauth2-proxy | neither has auth code of its own; Backstage reads who you are from the headers the proxy sets |
+| **Argo CD, Grafana** | their own OIDC client | they already have identity, roles and an API; a second gate in front would mean two logins |
+
+Bare metal draws the line in the same place, for the same reason.
+
+The realm is not in this repository. Keycloak does not substitute environment
+variables when importing a realm file — a `${VAR}` in a client secret is stored
+as those six characters — so a committed realm would have to carry real client
+secrets and a real password, for a cluster that publishes ports 80 and 443 on
+whatever machine runs it. Instead `make try` creates the realm with `kcadm`
+against the running pod, generating every secret as it goes, which is what
+bare metal's own bootstrap script does.
+
+### 3. Open the developer portal
 
 This is the part that makes the repository a platform rather than a cluster.
 
-Open `https://backstage.127-0-0-1.sslip.io`, and sign in as a guest — there is no
-identity provider here, so Backstage's guest provider is what you get.
+Open `https://backstage.127-0-0-1.sslip.io`. You are sent to Keycloak first,
+the same as the demo app — the portal sits behind the gateway's gate rather
+than authenticating on its own. Sign in as `demo` and you arrive as a named
+user, not a guest: the portal knows who you are because the proxy told it.
+
+That is not a choice this layer makes. The frontend picks its sign-in page by
+hostname — `localhost` and `127.0.0.1` get the guest provider, every other host
+expects to be behind oauth2-proxy — and that decision is compiled into the
+bundle. Explore is served at a real hostname, so it takes the second path, and
+the SSO from step 2 is what makes it work.
 
 Two things are worth finding:
 
@@ -160,47 +209,6 @@ PostgreSQL with credentials from Vault; a throwaway cluster has neither and
 nothing worth persisting, so the explore layer uses the in-memory SQLite the
 repository already uses for local development. Restart the pod and the catalog
 is rebuilt from the same files.
-
-### 3. Sign in once, and be signed in everywhere
-
-`make try` prints one account — user `demo` — and it is the only one you need.
-
-Open `https://demo.127-0-0-1.sslip.io`. You do not land on the demo app; you
-land on Keycloak. **The application has no authentication code in it.** podinfo
-is an off-the-shelf image that does not know what a session is. The gateway
-asked oauth2-proxy about your request before the pod ever saw it, oauth2-proxy
-found no cookie, and sent you to the identity provider. One line of values
-turned that on:
-
-```yaml
-auth:
-  gatewayOAuth2:
-    enabled: true
-```
-
-Sign in, and you arrive at podinfo. Now open
-`https://argocd.127-0-0-1.sslip.io` and press **Log in via Keycloak** — it does
-not ask again. Same at `https://grafana.127-0-0-1.sslip.io` with **Sign in with
-Keycloak**, and you arrive as an *Admin* rather than a Viewer, because `demo` is
-in the `platform-admin` group and Grafana is configured to map that group to
-that role.
-
-Those are two different mechanisms, and the difference is the interesting part:
-
-| | how it authenticates | why |
-|---|---|---|
-| **demo app** | gateway `ext_authz` → oauth2-proxy | the app has no auth code and should need none |
-| **Argo CD, Grafana** | their own OIDC client | they already have identity, roles and an API; a second gate in front would mean two logins |
-
-Bare metal draws the line in the same place, for the same reason.
-
-The realm is not in this repository. Keycloak does not substitute environment
-variables when importing a realm file — a `${VAR}` in a client secret is stored
-as those six characters — so a committed realm would have to carry real client
-secrets and a real password, for a cluster that publishes ports 80 and 443 on
-whatever machine runs it. Instead `make try` creates the realm with `kcadm`
-against the running pod, generating every secret as it goes, which is what
-bare metal's own bootstrap script does.
 
 ### 4. Break something and watch it heal
 

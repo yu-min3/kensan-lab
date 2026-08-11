@@ -593,22 +593,31 @@ fi
 # Backstage's probe is a liveness check on the HTTP router, not on the plugins
 # behind it. A backend whose catalog failed to start still serves the frontend
 # shell and still answers /healthcheck with 200, so the pod is Ready, the
-# Application is Healthy, and the portal is useless. The only way to know is to
-# ask the catalog something.
-info "checking that Backstage's catalog is actually serving"
-for attempt in $(seq 1 30); do
-  code="$(curl -sSk -o /dev/null -w '%{http_code}' --max-time 10 \
-    --resolve "backstage.127-0-0-1.sslip.io:443:127.0.0.1" \
-    "https://backstage.127-0-0-1.sslip.io/api/catalog/entities?limit=1" || echo 000)"
-  [[ "$code" == "200" ]] && break
+# Application is Healthy, and the portal is useless.
+#
+# Asked from the pod's own log rather than over HTTP, because the portal now
+# sits behind the SSO gate: an unauthenticated request never reaches the
+# backend, so a 302 says nothing about whether the plugins came up. The backend
+# announces both outcomes, and one line distinguishes them.
+info "checking that Backstage's plugins all initialised"
+plugins=""
+for attempt in $(seq 1 60); do
+  logs="$(kubectl -n backstage logs deploy/backstage -c backstage 2>/dev/null || true)"
+  if grep -q "threw an error during startup" <<<"$logs"; then
+    fail "a Backstage plugin failed to start. The pod stays Ready and the portal
+     serves its shell either way, so nothing else would have noticed:
+$(grep -o "Plugin '[a-z]*' threw an error during startup[^\"]*" <<<"$logs" | sort -u | head -3 | sed 's/^/       /')
+     A config value the backend type-checks at boot is the usual cause."
+  fi
+  plugins="$(grep -o "Plugin initialization complete[^\"]*" <<<"$logs" | tail -1)"
+  [[ -n "$plugins" ]] && break
   sleep 5
 done
-if [[ "$code" != "200" ]]; then
-  fail "Backstage's catalog answered HTTP ${code}, not 200.
-     The pod is Ready and the frontend loads, so this is a backend plugin that
-     failed to initialise rather than a routing or scheduling problem:
-       kubectl -n backstage logs deploy/backstage -c backstage | grep -i 'during startup'
-     A config value the backend type-checks at boot is the usual cause."
+if [[ -z "$plugins" ]]; then
+  fail "Backstage never reported its plugins as initialised.
+     Neither a success nor a failure line appeared, so it is still starting or
+     stuck before the plugins run:
+       kubectl -n backstage logs deploy/backstage -c backstage | tail -30"
 fi
 
 admin_password="$(kubectl -n argocd get secret argocd-initial-admin-secret \
