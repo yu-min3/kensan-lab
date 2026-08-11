@@ -42,14 +42,14 @@ meshConfig:
         # request 認証判断のために必要なヘッダ
         includeRequestHeadersInCheck:
           - cookie
-          # Authorization は Backstage 等のapplication tokenに使うため、
+          # Authorization は各appのapplication tokenに使うため、
           # oauth2-proxyへ渡さない。browser sessionはcookieで検証する。
           - x-forwarded-uri
           - x-forwarded-host
           - x-forwarded-proto
         # 認可後 (200) に upstream pod へ追加するidentity header。
-        # Authorizationは含めない。oauth2-proxyのKeycloak tokenで、Backstageや
-        # native auth appが送ったapplication tokenを上書きしないため。
+        # Authorizationは含めない。oauth2-proxyのKeycloak tokenで、appが送った
+        # application tokenを上書きしないため。
         headersToUpstreamOnAllow:
           - x-auth-request-user
           - x-auth-request-email

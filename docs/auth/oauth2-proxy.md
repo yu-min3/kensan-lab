@@ -32,7 +32,7 @@ See [ADR-010](../adr/010-istio-native-oauth2-absent.md) for the full rationale a
 
 ## Failure behavior
 
-Because Istio is configured with `failOpen: false`, protected hosts (Backstage / Hubble / Prometheus / Longhorn, etc.) return 503 if oauth2-proxy goes down. Grafana bypasses this entirely (app-native auth) and is outside the CUSTOM ext_authz's scope, so it's unaffected by an oauth2-proxy outage (this bypass exists specifically to avoid Grafana misreading oauth2-proxy's injected Bearer token as its own API key and returning 403 — it's passed straight through via Category 1 in `authorizationpolicy-gateway-platform-allow.yaml`).
+Because Istio is configured with `failOpen: false`, protected hosts (Hubble / Prometheus / Longhorn) return 503 if oauth2-proxy goes down. Grafana and Backstage bypass this entirely using app-native OIDC and are outside the CUSTOM ext_authz scope.
 
 - Mitigated by 2 replicas + a PodDisruptionBudget (`minAvailable: 1`)
 - Deliberately avoiding scheduling onto Pi 5 nodes: redirect / cookie validation benefits from AMD64 performance, and being exposed to the Pi 5 fleet's network instability ([cilium-wifi-stability](../runbooks/cilium-wifi-stability.md)) would take down authentication for the whole platform

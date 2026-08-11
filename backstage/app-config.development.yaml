@@ -1,4 +1,4 @@
-# Local development only. Production uses the oauth2Proxy provider from
+# Local development only. Production uses the OIDC provider from
 # app-config.kubernetes.yaml and does not expose the guest provider.
 auth:
   providers:

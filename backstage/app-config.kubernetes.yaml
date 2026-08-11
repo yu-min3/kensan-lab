@@ -67,11 +67,19 @@ catalog:
   # Examples are only available in local development (see app-config.yaml)
 
 auth:
+  environment: production
+  session:
+    secret: ${AUTH_SESSION_SECRET}
   providers:
-    oauth2Proxy:
-      signIn:
-        resolvers:
-          - resolver: emailMatchingUserEntityProfileEmail
+    oidc:
+      production:
+        metadataUrl: https://auth.yu-mins.com/realms/kensan/.well-known/openid-configuration
+        clientId: ${AUTH_OIDC_CLIENT_ID}
+        clientSecret: ${AUTH_OIDC_CLIENT_SECRET}
+        prompt: auto
+        signIn:
+          resolvers:
+            - resolver: emailMatchingUserEntityProfileEmail
 
 techdocs:
   builder: 'local'

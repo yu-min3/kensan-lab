@@ -1,5 +1,10 @@
 # Backstage SSO implementation design
 
+> **Superseded (2026-08-11):** This document records the original oauth2-proxy
+> implementation. [ADR-022](../adr/022-backstage-native-oidc.md) replaces it
+> with Backstage native OIDC after production validation exposed unnecessary
+> coupling between Gateway identity headers and Backstage application tokens.
+
 ## 結論
 
 Backstage 専用の OIDC client は作らず、既存の **Istio Gateway + oauth2-proxy + Keycloak** を認証入口として再利用し、Backstage の `oauth2Proxy` auth provider へ検証済み identity header を渡す。

@@ -2,7 +2,7 @@
 
 The Internal Developer Platform (IDP) surface — service catalog, TechDocs, and scaffolding templates — built around one idea: **an app developer ships to the cluster through a template, never by hand-editing platform YAML.**
 
-**Design thesis:** **Backstage is the only interface App Developers need.** The Golden Path template scaffolds a complete app repository (code, Dockerfile, manifests, TechDocs) and opens a PR that registers the app with Argo CD — the platform's GitOps machinery stays invisible. Backstage itself is deliberately boring to operate: one Deployment, one Postgres, all auth offloaded to the Gateway, all secrets on static rails.
+**Design thesis:** **Backstage is the only interface App Developers need.** The Golden Path template scaffolds a complete app repository (code, Dockerfile, manifests, TechDocs) and opens a PR that registers the app with Argo CD — the platform's GitOps machinery stays invisible. Backstage itself is deliberately boring to operate: one Deployment, one Postgres, native Keycloak OIDC, and secrets on static rails.
 
 **What you'll find here:** the deploy definition for Backstage (Pattern B, raw manifests — [ADR-018](https://github.com/yu-min3/kensan-lab/blob/main/docs/adr/018-backstage-manifests-placement.md)), how the Golden Path turns a form into a running app, and the auth/DB integration quirks worth stealing — what it actually takes to run Backstage behind a zero-trust gateway.
 
@@ -51,7 +51,7 @@ Step-by-step walkthrough: [Golden Path guide](https://github.com/yu-min3/kensan-
 **Three principles thread the whole design:**
 
 1. **Registration is a PR, not an API call.** The scaffolder does not push into `kensan-lab` directly — it opens a pull request adding the Application CR. The platform keeps its review gate even on the fully-automated path, and a bad template run is a closed PR, not a live deployment.
-2. **Gateway SSO establishes identity; Backstage allowlists users and issues its own application token.** Istio enforces the oauth2-proxy session and validates the Keycloak access token from `X-Auth-Request-Access-Token`, then Backstage maps the trusted email header to an explicitly registered Catalog User. Unregistered identities fail closed. The shared ext_authz provider does not replace `Authorization`, because replacing it with the Keycloak token would erase the Backstage token and make every plugin API return 401. No workload `RequestAuthentication` is attached to Backstage: it would reject Backstage's own JWT before the backend can verify it.
+2. **Backstage owns authentication and application identity.** Istio passes the Backstage hosts through as app-native auth, Backstage performs OIDC directly with Keycloak, and the verified email claim is mapped to an explicitly registered Catalog User. Unregistered identities fail closed. Backstage then issues its own token for plugin APIs, matching the native-auth pattern already used by Argo CD and Grafana ([ADR-022](https://github.com/yu-min3/kensan-lab/blob/main/docs/adr/022-backstage-native-oidc.md)).
 3. **Deploy definition next to every other component, source next to no other.** Manifests moved from `backstage/manifests/` to `kubernetes/backstage/` so that `kubernetes/` is the single answer to "what runs on the cluster" and manifest CI covers it ([ADR-018](https://github.com/yu-min3/kensan-lab/blob/main/docs/adr/018-backstage-manifests-placement.md)). The app source stays at top-level `backstage/` — it's a workload we build, not platform config.
 
 Concrete choices:

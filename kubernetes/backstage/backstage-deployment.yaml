@@ -24,7 +24,7 @@ spec:
                       - high-performance
       containers:
       - name: backstage
-        image: ghcr.io/yu-min3/backstage:v0.0.12
+        image: ghcr.io/yu-min3/kensan-lab/backstage:v0.0.13
         imagePullPolicy: Always
         ports:
         - containerPort: 7007
@@ -51,6 +51,21 @@ spec:
             secretKeyRef:
               name: backstage-secret
               key: GITHUB_TOKEN
+        - name: AUTH_OIDC_CLIENT_ID
+          valueFrom:
+            secretKeyRef:
+              name: backstage-secret
+              key: AUTH_OIDC_CLIENT_ID
+        - name: AUTH_OIDC_CLIENT_SECRET
+          valueFrom:
+            secretKeyRef:
+              name: backstage-secret
+              key: AUTH_OIDC_CLIENT_SECRET
+        - name: AUTH_SESSION_SECRET
+          valueFrom:
+            secretKeyRef:
+              name: backstage-secret
+              key: AUTH_SESSION_SECRET
         resources:
           requests:
             memory: "256Mi"
