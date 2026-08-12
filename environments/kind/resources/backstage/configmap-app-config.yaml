@@ -26,15 +26,12 @@
 ## Everything a visitor came to see — the golden path template, the catalog, the
 ## scaffolder — is unaffected: those are read from files inside the image.
 ##
-## **Auth is not overridden here, and cannot be.** The frontend chooses its
-## sign-in page by hostname — localhost and 127.0.0.1 get the guest provider,
-## every other host gets `ProxiedSignInPage` and expects to sit behind
-## oauth2-proxy — and that choice is compiled into the bundle. Explore is served
-## at backstage.127-0-0-1.sslip.io, so it takes the second path: the host is
-## listed in resources/authorizationpolicy-explore-oauth2.yaml and the OIDC
-## round trip has its own route in this directory. The sign-in resolver matches
-## on email, which is why the demo account scripts/explore-up.sh creates carries
-## the address of a User the catalog already ships.
+##   auth          Only the discovery URL. Backstage signs people in against
+##                 Keycloak itself, so the provider, the resolver and the
+##                 session handling are all the bare-metal ones; what differs is
+##                 which Keycloak. The sign-in resolver matches on email, which
+##                 is why the demo account scripts/explore-up.sh creates carries
+##                 the address of a User the catalog already ships.
 ##
 ## ── Why the scanner is neutered rather than deleted ──────────────────────────
 ##
@@ -77,6 +74,12 @@ data:
         client: better-sqlite3
         connection: ':memory:'
 
+
+    auth:
+      providers:
+        oidc:
+          production:
+            metadataUrl: https://auth.127-0-0-1.sslip.io/realms/kensan/.well-known/openid-configuration
 
     catalog:
       providers:

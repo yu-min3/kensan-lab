@@ -77,9 +77,9 @@ spec:
     kind: ClusterIssuer
     group: cert-manager.io
 ---
-## Three certificates nobody serves.
+## Four certificates nobody serves.
 ##
-## Argo CD, Grafana and oauth2-proxy all talk to Keycloak over the same HTTPS
+## Argo CD, Grafana, oauth2-proxy and Backstage all talk to Keycloak over the
 ## URL a browser uses, and that URL is served by a certificate signed by a CA
 ## this cluster generated for itself — which their trust stores have never heard
 ## of. The bundle has to reach each namespace somehow.
@@ -148,6 +148,25 @@ metadata:
 spec:
   secretName: oauth2-proxy-explore-ca-tls
   commonName: oauth2-proxy-ca-bundle-carrier
+  duration: 8760h
+  privateKey:
+    algorithm: ECDSA
+    size: 256
+  issuerRef:
+    name: explore-ca
+    kind: ClusterIssuer
+    group: cert-manager.io
+---
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: backstage-explore-ca
+  namespace: backstage
+  annotations:
+    argocd.argoproj.io/sync-wave: "2"
+spec:
+  secretName: backstage-explore-ca-tls
+  commonName: backstage-ca-bundle-carrier
   duration: 8760h
   privateKey:
     algorithm: ECDSA

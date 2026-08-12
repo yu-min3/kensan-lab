@@ -23,7 +23,12 @@ import os
 import pathlib
 import sys
 
-from playwright.sync_api import Page, TimeoutError as PlaywrightTimeout, sync_playwright
+from playwright.sync_api import (
+    Error as PlaywrightError,
+    Page,
+    TimeoutError as PlaywrightTimeout,
+    sync_playwright,
+)
 
 OUT = pathlib.Path(__file__).resolve().parent.parent / "docs" / "getting-started" / "assets"
 DEMO_USER = "demo"
@@ -133,6 +138,30 @@ def main() -> int:
         # review, which a false-negative selector wait is not.
         shot(page, "https://argocd.127-0-0-1.sslip.io/applications/argocd/explore-root",
              "argocd-tree", settle=7000)
+
+        # Backstage runs its own sign-in rather than sitting behind the gate, so
+        # it needs its own click: the button opens a popup, the popup carries the
+        # Keycloak form, and it closes itself once the identity is issued.
+        page.goto("https://backstage.127-0-0-1.sslip.io/", wait_until="domcontentloaded")
+        page.wait_for_timeout(3000)
+        button = page.locator("button", has_text="SIGN IN").first
+        if button.count():
+            with page.expect_popup(timeout=20000) as popup:
+                button.click()
+            window = popup.value
+            window.wait_for_selector("#username", timeout=20000)
+            window.fill("#username", DEMO_USER)
+            window.fill("#password", DEMO_PASSWORD)
+            try:
+                window.click("#kc-login")
+            except PlaywrightError:
+                # The popup closes the moment the identity is issued, which
+                # races the click's own acknowledgement. The result shows up on
+                # the main page either way.
+                pass
+            page.wait_for_timeout(9000)
+        shot(page, "https://backstage.127-0-0-1.sslip.io/create",
+             "backstage-create", settle=6000)
         # Backstage is missing on purpose. The image explore pins
         # (ghcr.io/yu-min3/kensan-lab/backstage) and the one bare metal pins
         # (ghcr.io/yu-min3/backstage) are different builds sharing the tag

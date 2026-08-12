@@ -146,8 +146,7 @@ Those are two different mechanisms, and the difference is the interesting part:
 | | how it authenticates | why |
 |---|---|---|
 | **demo app** | gateway `ext_authz` → oauth2-proxy | the demo has no auth code of its own |
-| **Backstage (production)** | app-native OIDC → Keycloak | Backstage resolves the verified email to a Catalog User and issues its own application token |
-| **Argo CD, Grafana** | their own OIDC client | they already have identity, roles and an API; a second gate in front would mean two logins |
+| **Backstage, Argo CD, Grafana** | their own OIDC client | they already have identity, roles and an API of their own; a gate in front would mean signing in twice. Backstage resolves the verified email to a Catalog user and then issues its own token |
 
 Bare metal draws the line in the same place, for the same reason.
 
@@ -163,18 +162,21 @@ bare metal's own bootstrap script does.
 
 This is the part that makes the repository a platform rather than a cluster.
 
-Open `https://backstage.127-0-0-1.sslip.io`. You are sent to Keycloak first,
-the same as the demo app — the portal sits behind the gateway's gate rather
-than authenticating on its own. Sign in as `demo` and you arrive as a named
-user, not a guest: the portal knows who you are because the proxy told it.
+Open `https://backstage.127-0-0-1.sslip.io`. You are already signed in — the
+portal asks Keycloak directly, Keycloak recognises the session from step 2, and
+you arrive as a named user rather than a guest.
 
-That is not a choice this layer makes. The frontend picks its sign-in page by
-hostname — `localhost` and `127.0.0.1` get the guest provider, every other host
-expects to be behind oauth2-proxy — and that decision is compiled into the
-bundle. Explore is served at a real hostname, so it takes the second path, and
-the SSO from step 2 is what makes it work.
+**Which is a different mechanism from the demo app, deliberately.** Backstage
+holds its own OIDC client and issues its own token afterwards, because it has a
+user model to attach that identity to: the email Keycloak verified is matched
+against a user in the catalog, and everything the portal shows you is scoped to
+who that turned out to be. Putting it behind the gateway's gate as well would
+mean signing in twice for no gain — so the line runs exactly where it runs on
+bare metal.
 
 Two things are worth finding:
+
+![Backstage's Create page showing the FastAPI Application template](assets/backstage-create.png)
 
 - **Create → the FastAPI template.** This is the golden path: the scaffolder a
   developer uses to start a service that arrives on the platform already wired
