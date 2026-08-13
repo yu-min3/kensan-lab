@@ -516,6 +516,17 @@ exercise 4.
 $ kubectl -n app-demo get httproute demo -o jsonpath='{.status.parents}' | jq
 ```
 
+**Signing in ends at a 403 rather than the application.** Look at the address
+bar: if it stopped at `/oauth2/callback`, the sign-in itself worked and the
+return trip was refused. Almost always this is the CSRF cookie, which lives for
+fifteen minutes — a login page left open longer than that submits a form whose
+cookie has already expired. Open the site again in a private window and sign in
+without the pause. The 403 page's own **Sign in** button restarts the flow too.
+
+**The browser warns about the certificate.** It is supposed to; see
+[step 5](#5-follow-a-request-through-the-gateway-api). Clicking through is the
+intended path. Nothing here is reachable from outside your machine.
+
 **Everything is healthy but the browser shows nothing.** DNS. Check that
 `demo.127-0-0-1.sslip.io` resolves, and use the `/etc/hosts` fallback above if
 it does not.
