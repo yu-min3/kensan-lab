@@ -132,6 +132,17 @@ to differ.
    not demonstrate observability; they demonstrate a broken cluster, which is
    the opposite of the point. The same test applies to scrape jobs — a target
    that can only ever be down is worse than an absent one.
+11. **`explore-up.sh` refuses an existing cluster, and that is not a rough edge
+    to smooth over.** Credentials are generated fresh on every run; Keycloak
+    reads its own once, at first startup, into an in-memory database. Reusing a
+    cluster therefore means either printing a password this run did not create,
+    or restarting Keycloak and losing the realm with it. Refusing and pointing
+    at `make explore-down` is the honest option, and it is why the same restart
+    takes the realm away — see the note in the quickstart.
+12. **A version tag does not identify a build.** Backstage exists as two GHCR
+    packages, and both once carried a `v0.0.12` with different contents.
+    Explore ran the older one for a while and showed a guest sign-in card
+    behind the SSO gate. Check the package, not just the tag.
 
 ## Why the substitutions are permanent
 

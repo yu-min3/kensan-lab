@@ -19,6 +19,10 @@ on:
       - "environments/**"
       - "scripts/explore-up.sh"
       - "scripts/explore-down.sh"
+      # The smoke checks are part of what this job proves. A change that breaks
+      # one of them would otherwise go untested.
+      - "scripts/explore-login-check.sh"
+      - "scripts/explore-backstage-login-check.sh"
       - ".github/workflows/explore-ci.yml"
   push:
     branches: [main]
@@ -28,6 +32,10 @@ on:
       - "environments/**"
       - "scripts/explore-up.sh"
       - "scripts/explore-down.sh"
+      # The smoke checks are part of what this job proves. A change that breaks
+      # one of them would otherwise go untested.
+      - "scripts/explore-login-check.sh"
+      - "scripts/explore-backstage-login-check.sh"
       - ".github/workflows/explore-ci.yml"
 
 # A second run of the same branch replaces the first: two kind clusters pulling
@@ -179,11 +187,23 @@ jobs:
           echo "$claims" | jq -e '.groups | index("platform-admin")' >/dev/null \
             || { echo "the token carries no platform-admin group: $claims" >&2; exit 1; }
 
-          code="$(curl -sk -o /dev/null -w '%{http_code}' \
-            --resolve demo.127-0-0-1.sslip.io:443:127.0.0.1 \
-            -H "Authorization: Bearer ${token}" https://demo.127-0-0-1.sslip.io/)"
-          echo "authenticated request: ${code}"
-          [ "$code" = "200" ] || { echo "a valid token did not get through the gate" >&2; exit 1; }
+          # Not a Bearer token through the gate. oauth2-proxy is deliberately
+          # not given the Authorization header any more, so that an
+          # application's own token survives it — which means a Bearer token no
+          # longer opens the gate, and a test using one would prove nothing a
+          # person can do. These walk the flows a browser walks.
+          code="$(scripts/explore-login-check.sh \
+            demo.127-0-0-1.sslip.io demo ci-demo-password 2>&1 || true)"
+          echo "demo (gateway ext_authz): ${code}"
+          [ "$code" = "200" ] || { echo "signing in to the demo app failed" >&2; exit 1; }
+
+          result="$(scripts/explore-backstage-login-check.sh \
+            backstage.127-0-0-1.sslip.io demo ci-demo-password 2>&1 || true)"
+          echo "backstage (native OIDC): ${result}"
+          case "$result" in
+            200*) ;;
+            *) echo "signing in to Backstage failed" >&2; exit 1 ;;
+          esac
 
       - name: Collect diagnostics
         if: failure()
