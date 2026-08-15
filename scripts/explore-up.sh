@@ -15,7 +15,24 @@ source "${ENV_DIR}/versions.sh"
 # Working files, and where every generated credential lives for the length of
 # this script. Removed on exit however it exits.
 TMP_DIR="$(mktemp -d)"
-trap 'rm -rf "${TMP_DIR}"' EXIT
+
+# Whatever kubectl was pointing at before this ran.
+#
+# On success the kind context is left current on purpose — every command in the
+# walkthrough is a plain `kubectl`, and the closing message says so. On failure
+# it is put back: a run that stopped halfway has no business leaving somebody
+# aimed at a cluster that may not exist, especially when the message explaining
+# the switch never printed.
+PREVIOUS_CONTEXT="$(kubectl config current-context 2>/dev/null || true)"
+on_exit() {
+  local status=$?
+  rm -rf "${TMP_DIR}"
+  if [[ "$status" -ne 0 && -n "$PREVIOUS_CONTEXT" ]]; then
+    kubectl config use-context "$PREVIOUS_CONTEXT" >/dev/null 2>&1 || true
+  fi
+  return "$status"
+}
+trap on_exit EXIT
 
 CLUSTER_NAME="kensan-lab-explore"
 REPO_URL="https://github.com/yu-min3/kensan-lab"
@@ -105,11 +122,29 @@ if [[ "$mem_bytes" -gt 0 && "$mem_mib" -lt "$MIN_MEM_MIB" ]]; then
      and the single sign-on it enables is worth more than the two gigabytes."
 fi
 
-cluster_exists=false
+# Reusing a cluster cannot work, so it is refused rather than half-attempted.
+#
+# Every credential below is generated fresh on each run, but Keycloak reads its
+# admin password once — at first startup, into an in-memory database. A second
+# run therefore hands Kubernetes new secrets while Keycloak keeps the old ones,
+# and the bootstrap cannot even log in to fix it:
+#
+#   Logging into http://localhost:8080 as user admin of realm master
+#   Invalid user credentials [invalid_grant]
+#
+# Reconciling the two would mean either keeping the old secrets (and printing a
+# password this run did not create) or restarting Keycloak (which drops the
+# realm, since the database is in memory). Neither is worth the machinery for a
+# cluster whose whole point is being thrown away.
 if kind get clusters 2>/dev/null | grep -qx "$CLUSTER_NAME"; then
-  cluster_exists=true
-  info "reusing the existing '${CLUSTER_NAME}' cluster (run 'make explore-down' for a clean one)"
+  fail "a '${CLUSTER_NAME}' cluster already exists, and this script cannot reuse it.
+     Every run generates fresh credentials, and Keycloak only reads its own at
+     first startup — so a second run leaves the two disagreeing.
+
+     Remove it and start again:
+       make explore-down && make try"
 fi
+cluster_exists=false
 
 # The gateway is published on host ports 80 and 443. Anything already bound
 # there wins, and the demo URL would quietly hit the wrong server.
@@ -708,7 +743,7 @@ admin_password="$(kubectl -n argocd get secret argocd-initial-admin-secret \
 
 cat <<EOF
 
-  The platform is up. Four things worth doing, in order.
+  The platform is up. Five things worth doing, in order.
 
   Every URL below is https, and your browser will warn about the certificate.
   cert-manager issued it from a CA this cluster generated a minute ago, and
@@ -741,12 +776,17 @@ cat <<EOF
   Keycloak itself is at https://auth.127-0-0-1.sslip.io — user 'admin',
   password '${KEYCLOAK_ADMIN_PASSWORD}'.
 
-  4. See what the policy engine thinks
+  4. Open the developer portal       https://backstage.127-0-0-1.sslip.io
+     Backstage signs you in against the same Keycloak, then resolves you to a
+     user in its catalog. 'Create' holds the golden path template — the demo
+     app above is what it produces.
+
+  5. See what the policy engine thinks
        kubectl get policyreport -A
      Kyverno is running the production policies in Audit mode, so violations
      are reported rather than blocked (ADR-012).
 
-  What this cluster deliberately cannot show you — the L2 load balancer, SSO,
+  What this cluster deliberately cannot show you — the L2 load balancer,
   storage replication, multi-architecture scheduling — and why:
   docs/getting-started/try-it-with-kind.md#what-kind-cannot-show
 

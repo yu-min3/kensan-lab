@@ -158,6 +158,36 @@ whatever machine runs it. Instead `make try` creates the realm with `kcadm`
 against the running pod, generating every secret as it goes, which is what
 bare metal's own bootstrap script does.
 
+**Bringing your own people.** Keycloak's admin console is at
+`https://auth.127-0-0-1.sslip.io` — user `admin`, password printed alongside the
+others — and the realm it created is `kensan`. Adding a user there is enough to
+sign in to the demo app, Argo CD and Grafana straight away: the proxy accepts
+any verified email, and both of those grant a role to anyone who arrives.
+
+Backstage is stricter, and usefully so. It matches the email against a user in
+its catalog, so a new account reaches the portal only if that email is one the
+catalog already knows. Seven are shipped, in two groups:
+
+| Email | Group |
+|---|---|
+| `demo-admin@example.com` | `platform-engineering` |
+| `demo-pe1@example.com`, `demo-pe2@example.com` | `platform-engineering` |
+| `demo-dev1@example.com` … `demo-dev3@example.com` | `application-developers` |
+
+Creating Keycloak users with two of these and signing in as each is the shortest
+way to watch ownership change: the same portal, the same catalog, different
+things owned. Grafana responds to the Keycloak group rather than the catalog —
+put an account in `platform-admin` and it arrives as an Admin, in
+`platform-dev` as an Editor, in neither as a Viewer.
+
+:::message
+Keycloak here runs `start-dev`, which keeps everything in memory. If its pod
+restarts — an eviction under memory pressure will do it — the realm, the users
+and every session go with it, and `make try` cannot rebuild them in place. Start
+over with `make explore-down && make try`. Nothing else in the cluster depends
+on Keycloak surviving.
+:::
+
 ### 3. Open the developer portal
 
 This is the part that makes the repository a platform rather than a cluster.
