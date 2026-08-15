@@ -81,7 +81,8 @@ which is what keeps this from asking you to edit `/etc/hosts`. If you are
 working offline:
 
 ```console
-$ echo "127.0.0.1 argocd.127-0-0-1.sslip.io demo.127-0-0-1.sslip.io" | sudo tee -a /etc/hosts
+$ for h in argocd backstage grafana demo auth; do \
+    echo "127.0.0.1 $h.127-0-0-1.sslip.io"; done | sudo tee -a /etc/hosts
 ```
 
 ## Take it for a walk
@@ -221,10 +222,27 @@ provider that scans the organisation for `catalog-info.yaml` files, and that one
 needs a token from Vault — so it is switched off here, and the catalog is
 whatever the repository ships. Nothing else about the portal changes.
 
-**Pressing Create needs a credential only you can supply.** The scaffolder
-creates a repository and opens a pull request, and no platform can hand a
-visitor a GitHub token for their own account — so the explore layer asks for one
-rather than pretending:
+**Pressing Create through to the end is the one thing a visitor cannot do**, and
+it is worth being exact about why. The template writes to two places, and both
+are pinned to this repository's owner: the new service's repository is created
+under `yu-min3`, and the Argo CD Application arrives as a pull request against
+`yu-min3/kensan-lab`. A token for your own account opens neither.
+
+That pinning is a guardrail on the real cluster — a scaffolder that can create
+repositories anywhere is a scaffolder nobody should hold the token for — so
+explore does not unpick it. What you can do without a token is everything up to
+that point: open the form, see the parameters a service is described by, and
+read the files it would produce in
+[`backstage/templates/fastapi-template/skeleton`](https://github.com/yu-min3/kensan-lab/tree/main/backstage/templates/fastapi-template/skeleton).
+The demo app at `demo.127-0-0-1.sslip.io` **is** that skeleton, built and
+deployed — so the output is running in front of you even though the button that
+produces it is not yours to press.
+
+If you forked this repository and want the button to work, change
+`allowedOwners` and the platform `repoUrl` in
+`backstage/templates/fastapi-template/template.yaml` to your own account, then
+publish a Backstage image from your fork. With a token that can reach your own
+repositories:
 
 ```console
 $ GITHUB_TOKEN=ghp_... make try
@@ -437,6 +455,22 @@ setting chains it onto Cilium instead. Getting this wrong — taking the chain
 over rather than joining it — cuts a node off from its own control plane, so
 CI asserts this exact output on every pull request.
 
+## If you forked this
+
+`make try` reads the repository and branch out of your checkout — `git remote
+get-url origin` and whatever branch you are on — so a fork stands up **your**
+copy, not this one. Edit something under `environments/kind/`, push, run
+`make try`, and the change is in the cluster.
+
+The one thing to remember is that Argo CD syncs over the network rather than
+from the directory you are sitting in, so a commit has to be pushed before it
+counts. `make try` checks that the branch exists on your remote and stops early
+if it does not, rather than standing a cluster up around code it cannot see.
+
+Explore CI works in a fork too, for the same reason: it runs against the
+repository the commit lives in. What it skips is a pull request *from* a fork
+*to* this repository, where the commit is in neither place Argo CD would look.
+
 ## How it is put together
 
 A **subset with substitutions**, not a fork. Every component runs the same
@@ -446,7 +480,7 @@ copying the tree.
 
 Two things differ, and both are contained in `environments/kind/`:
 
-**What is left out.** No Cilium, Vault, Keycloak, Longhorn or Cloudflare Tunnel,
+**What is left out.** No Cilium, Vault, Longhorn or Cloudflare Tunnel,
 and four of the six observability components — Loki, Tempo, the OTel collector
 and blackbox-exporter. Those need hardware, need credentials you do not have, or
 have nothing to say on a cluster with no traffic and no history.
@@ -523,7 +557,7 @@ images are private and pulled through Vault-backed credentials.
 ## Troubleshooting
 
 **A pod is Pending and the node looks full.** Docker has less memory than it
-needs. Raise it to 6 GiB or more, then `make explore-down && make try`.
+needs. Raise it to 8 GiB, then `make explore-down && make try`.
 
 **Ports 80 or 443 are in use.** Find the process with `sudo lsof -nP -iTCP:80
 -sTCP:LISTEN`. A previous explore cluster is the usual culprit — `make

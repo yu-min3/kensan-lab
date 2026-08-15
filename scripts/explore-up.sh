@@ -35,8 +35,27 @@ on_exit() {
 trap on_exit EXIT
 
 CLUSTER_NAME="kensan-lab-explore"
-REPO_URL="https://github.com/yu-min3/kensan-lab"
-REVISION="main"
+# Where Argo CD syncs from. Taken from this checkout rather than hardcoded,
+# because a fork that synced upstream would be a fork in name only: you would
+# edit your copy, run `make try`, and watch somebody else's main come up.
+#
+# `origin` is whatever `git clone` set, so a fork clone points at the fork. The
+# SSH form is rewritten because Argo CD reads over HTTPS and has no key here.
+# Falls back to upstream when there is no git checkout at all — someone who
+# downloaded a tarball still gets a working cluster.
+REPO_URL="$(git -C "${REPO_ROOT}" remote get-url origin 2>/dev/null || true)"
+REPO_URL="${REPO_URL:-https://github.com/yu-min3/kensan-lab}"
+REPO_URL="${REPO_URL%.git}"
+case "$REPO_URL" in
+  # git@github.com:owner/repo -> https://github.com/owner/repo
+  git@*) REPO_URL="https://$(printf '%s' "${REPO_URL#git@}" | sed 's|:|/|')" ;;
+  ssh://git@*) REPO_URL="https://${REPO_URL#ssh://git@}" ;;
+esac
+
+# And the branch you are actually on, so a change is one `git push` away from
+# being live. Detached HEAD or no checkout falls back to main.
+REVISION="$(git -C "${REPO_ROOT}" symbolic-ref --short HEAD 2>/dev/null || true)"
+REVISION="${REVISION:-main}"
 # Argo CD needs to pull manifests from a repository it can reach. Everything
 # below is read from git over HTTPS, so a fork has to be pushed before it can be
 # explored — there is no local-path mode, and pretending otherwise would only
@@ -111,14 +130,14 @@ docker info >/dev/null 2>&1 || fail "the Docker daemon is not running. Start Doc
 # Measured in MiB rather than GiB: `docker info` reports what the Linux VM sees,
 # which is a few hundred MiB below what Docker Desktop was told to allocate
 # (kernel reservations). Rounding that down to whole GiB rejects a correctly
-# configured 6 GiB machine, so the floor sits below the nominal setting.
+# configured 8 GiB machine, so the floor sits below the nominal setting.
 MIN_MEM_MIB=7400
 mem_bytes="$(docker info --format '{{.MemTotal}}' 2>/dev/null || echo 0)"
 mem_mib=$(( mem_bytes / 1024 / 1024 ))
 if [[ "$mem_bytes" -gt 0 && "$mem_mib" -lt "$MIN_MEM_MIB" ]]; then
   fail "Docker can use ${mem_mib}MiB of memory; this needs the equivalent of 8GiB allocated.
      Docker Desktop: Settings -> Resources -> Memory, then restart Docker.
-     Keycloak is what moved this from 6GiB to 8: an identity provider is a JVM,
+     Keycloak is what moved this from 6 GiB to 8: an identity provider is a JVM,
      and the single sign-on it enables is worth more than the two gigabytes."
 fi
 
@@ -144,6 +163,24 @@ if kind get clusters 2>/dev/null | grep -qx "$CLUSTER_NAME"; then
      Remove it and start again:
        make explore-down && make try"
 fi
+# Argo CD reads the repository over the network, not this directory. A commit
+# that only exists locally is invisible to it, and the symptom is a cluster that
+# comes up sixty seconds behind whatever you just wrote — or an Application that
+# never syncs at all because the branch is not there yet.
+if git -C "${REPO_ROOT}" rev-parse --git-dir >/dev/null 2>&1; then
+  if ! git -C "${REPO_ROOT}" ls-remote --exit-code --heads origin "$REVISION" >/dev/null 2>&1; then
+    fail "the branch '${REVISION}' is not on ${REPO_URL} yet.
+     Argo CD syncs from the repository, not from this directory, so it has
+     nothing to read. Push it first:
+       git push -u origin ${REVISION}"
+  fi
+  local_head="$(git -C "${REPO_ROOT}" rev-parse HEAD 2>/dev/null || true)"
+  remote_head="$(git -C "${REPO_ROOT}" ls-remote origin "$REVISION" 2>/dev/null | cut -f1)"
+  if [[ -n "$local_head" && -n "$remote_head" && "$local_head" != "$remote_head" ]]; then
+    info "note: local HEAD and origin/${REVISION} differ — the cluster will run what is pushed"
+  fi
+fi
+
 cluster_exists=false
 
 # The gateway is published on host ports 80 and 443. Anything already bound
