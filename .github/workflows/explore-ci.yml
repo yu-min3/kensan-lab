@@ -47,6 +47,14 @@ concurrency:
 jobs:
   kind:
     name: kind (10-minute path)
+    # Argo CD syncs the head commit over HTTPS from this repository, and a fork's
+    # commit is not in this repository. The job would stand a cluster up, wait
+    # the full fifteen minutes for Applications that can never resolve, and then
+    # fail for a reason that has nothing to do with the change. Forks run this
+    # on their own fork, where the commit is where Argo CD looks.
+    if: >-
+      github.event_name != 'pull_request' ||
+      github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
