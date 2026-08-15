@@ -32,7 +32,7 @@ $ make explore-down     # when you are done
 | **Single sign-on** | Keycloak at `https://auth.127-0-0-1.sslip.io`, with one `demo` account that reaches Argo CD, Grafana and the demo app |
 | **Istio + Gateway API** | All of them are reached through a real `Gateway` and `HTTPRoute`, not a port-forward |
 | **TLS** | cert-manager issues a wildcard certificate from a CA it generates on the spot; your browser will warn, and [that is honest](#5-follow-a-request-through-the-gateway-api) |
-| **Kyverno** | All six production `ClusterPolicy` objects, in Audit — verdicts land in `PolicyReport` within a minute |
+| **Kyverno** | All five production `ClusterPolicy` objects, in Audit — verdicts land in `PolicyReport` within a minute |
 | **A demo app** | The golden path's own output — the template's skeleton, built and deployed by `charts/app-base` exactly as a scaffolded service would be |
 | **A `longhorn` StorageClass** | Not Longhorn, but named after it, so every PVC in this repository binds unmodified |
 
@@ -357,7 +357,7 @@ OpenTelemetry one wants a collector this slice does not run.
 
 ### 7. Watch the policy engine catch you
 
-All six production policies are running, in Audit: they report rather than
+All five production policies are running, in Audit: they report rather than
 block. Start with what is already there:
 
 ```console
