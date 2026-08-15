@@ -55,6 +55,11 @@ esac
 # And the branch you are actually on, so a change is one `git push` away from
 # being live. Detached HEAD or no checkout falls back to main.
 REVISION="$(git -C "${REPO_ROOT}" symbolic-ref --short HEAD 2>/dev/null || true)"
+# Whether REVISION names a branch of this checkout, which is what makes the
+# "did you push it?" check meaningful. `--rev` clears it: the caller chose the
+# revision and knows where it lives.
+REVISION_IS_LOCAL_BRANCH=true
+[[ -n "$REVISION" ]] || REVISION_IS_LOCAL_BRANCH=false
 REVISION="${REVISION:-main}"
 # Argo CD needs to pull manifests from a repository it can reach. Everything
 # below is read from git over HTTPS, so a fork has to be pushed before it can be
@@ -95,7 +100,7 @@ EOF
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --repo) REPO_URL="$2"; shift 2 ;;
-    --rev) REVISION="$2"; shift 2 ;;
+    --rev) REVISION="$2"; REVISION_IS_LOCAL_BRANCH=false; shift 2 ;;
     --timeout) WAIT_TIMEOUT="$2"; shift 2 ;;
     -h|--help) usage; exit 0 ;;
     *) echo "unknown argument: $1" >&2; usage >&2; exit 2 ;;
@@ -167,7 +172,12 @@ fi
 # that only exists locally is invisible to it, and the symptom is a cluster that
 # comes up sixty seconds behind whatever you just wrote — or an Application that
 # never syncs at all because the branch is not there yet.
-if git -C "${REPO_ROOT}" rev-parse --git-dir >/dev/null 2>&1; then
+# Only when the revision is a branch name from this checkout. A caller that
+# passed --rev explicitly may well have named a commit SHA — CI does — and a SHA
+# is not something `ls-remote --heads` can find even when it is perfectly
+# fetchable. Checking it as a branch would refuse a run that would have worked.
+if [[ "$REVISION_IS_LOCAL_BRANCH" == true ]] \
+  && git -C "${REPO_ROOT}" rev-parse --git-dir >/dev/null 2>&1; then
   if ! git -C "${REPO_ROOT}" ls-remote --exit-code --heads origin "$REVISION" >/dev/null 2>&1; then
     fail "the branch '${REVISION}' is not on ${REPO_URL} yet.
      Argo CD syncs from the repository, not from this directory, so it has
