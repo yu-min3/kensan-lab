@@ -73,12 +73,24 @@ Keycloak is what moved the floor from 6 GiB to 8, because an identity provider
 is a JVM. On Linux the container gets the host's memory, so there is usually
 nothing to do.
 
+**No GitHub token.** Backstage does need one — an empty value fails its config
+check at startup and takes the catalog down with it — but `make try` fills the
+slot with a placeholder GitHub will reject, and nothing you do here needs a real
+one. The Create button is the exception, and it cannot complete for a visitor
+whatever token you hold; [step 3](#3-open-the-developer-portal) explains why.
+
 **Ports.** 80 and 443 must be free. The gateway is published on them, so the
 URLs below work in a browser with no proxy and no port-forward.
 
+**A network connection.** Charts come from upstream repositories, images from
+registries, and Argo CD reads this repository over HTTPS — nothing here is built
+from what is on your disk. The `/etc/hosts` fallback below covers a network that
+cannot resolve `sslip.io`, not a network that is absent.
+
 **DNS.** `*.127-0-0-1.sslip.io` is public DNS that resolves to `127.0.0.1`,
-which is what keeps this from asking you to edit `/etc/hosts`. If you are
-working offline:
+which is what keeps this from asking you to edit `/etc/hosts`. If your resolver
+will not answer for it — some corporate DNS refuses wildcard services — name the
+hosts yourself:
 
 ```console
 $ for h in argocd backstage grafana demo auth; do \
