@@ -289,11 +289,17 @@ The demo app is not port-forwarded. It is reached the way the production apps
 are: a `Gateway` that Istio implements, and an `HTTPRoute` that attaches to it.
 
 ```console
-$ curl -sk https://demo.127-0-0-1.sslip.io | head -4
+$ curl -sk -o /dev/null -w '%{http_code} -> %{redirect_url}\n' https://demo.127-0-0-1.sslip.io
+302 -> https://auth.127-0-0-1.sslip.io/realms/kensan/protocol/openid-connect/auth?...
+
 $ kubectl -n istio-system get gateway gateway-explore
 $ kubectl -n app-demo get httproute demo -o jsonpath='{.status.parents[0].conditions[*].type}'
 Accepted ResolvedRefs
 ```
+
+A redirect rather than the application, because the gate from step 2 is in
+front of it — curl has no session. That the redirect names Keycloak is the
+proof the route reached the gateway and the gateway consulted the proxy.
 
 **About that `-k`.** The gateway has two listeners and every route attaches to
 both, so each hostname answers on 80 and on 443. The certificate on 443 is real
@@ -365,7 +371,12 @@ $ kubectl -n app-demo get policyreport \
     -o custom-columns=PASS:.summary.pass,FAIL:.summary.fail
 PASS   FAIL
 5      0
+5      0
+5      0
 ```
+
+Three reports for one application: Kyverno writes one per resource it evaluated
+— the Deployment, the ReplicaSet it created, and the Pod that came from that.
 
 The demo app passes all five policies that apply to application namespaces —
 not because it was written carefully, but because `charts/app-base` sets the
