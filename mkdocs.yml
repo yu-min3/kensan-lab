@@ -236,4 +236,5 @@ nav:
       - 2026-03-02 system-infra Sync Blocked: incidents/2026-03-02-system-infra-sync-blocked.md
   - Roadmap:
       - Storage (local-path → Longhorn) — done, archived: roadmap/storage-longhorn.md
+      - AI Harness Phase 0 review: roadmap/ai-harness-phase0-review.md
   - Articles: articles.md
