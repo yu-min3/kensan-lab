@@ -635,6 +635,41 @@ info "restarting argocd-server so it picks up the CA and the OIDC client"
 kubectl -n argocd rollout restart deployment/argocd-server >/dev/null
 kubectl -n argocd rollout status deployment/argocd-server --timeout=300s >/dev/null
 
+# Backstage discovers the issuer once, at startup, and caches the outcome —
+# including a failure. Keycloak's Application reports Healthy while its JVM is
+# still coming up, so a portal that asked first holds a rejected discovery
+# promise for the life of the pod: it stays Ready, Argo CD stays green, and
+# every sign-in answers 500. Wait for the document to be servable, then replace
+# the pod so it asks again.
+info "waiting for Keycloak's realm to be servable, then restarting Backstage"
+discovery_deadline=$(( $(date +%s) + 300 ))
+while :; do
+  code="$(curl -sSk -o /dev/null -w '%{http_code}' --max-time 10 \
+    --resolve "auth.127-0-0-1.sslip.io:443:127.0.0.1" \
+    "https://auth.127-0-0-1.sslip.io/realms/kensan/.well-known/openid-configuration" \
+    || echo 000)"
+  [[ "$code" == "200" ]] && break
+  if [[ $(date +%s) -ge $discovery_deadline ]]; then
+    fail "Keycloak never served the realm's discovery document (last: HTTP ${code}).
+     The realm was created, so this is Keycloak or its route rather than SSO:
+       kubectl -n platform-auth-prod logs deploy/keycloak -c keycloak --tail=50
+       kubectl -n platform-auth-prod get httproute
+     Troubleshooting: docs/getting-started/try-it-with-kind.md#troubleshooting"
+  fi
+  sleep 5
+done
+kubectl -n backstage rollout restart deployment/backstage >/dev/null
+kubectl -n backstage rollout status deployment/backstage --timeout=300s >/dev/null
+
+# oauth2-proxy exits when discovery fails, so it recovers by itself — but by now
+# it can be deep in CrashLoopBackOff, which would otherwise be charged to the
+# visitor as minutes of waiting.
+if ! kubectl -n auth-system get deploy/oauth2-proxy \
+     -o jsonpath='{.status.readyReplicas}' 2>/dev/null | grep -q '^[1-9]'; then
+  kubectl -n auth-system rollout restart deployment/oauth2-proxy >/dev/null
+  kubectl -n auth-system rollout status deployment/oauth2-proxy --timeout=300s >/dev/null
+fi
+
 # ---------------------------------------------------------------------------
 # Smoke test
 # ---------------------------------------------------------------------------
