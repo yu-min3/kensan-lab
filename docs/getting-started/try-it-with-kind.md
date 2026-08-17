@@ -147,7 +147,16 @@ auth:
     enabled: true
 ```
 
-Sign in, and you arrive at the app. Now open
+Sign in, and you arrive at the app: a JSON object with three fields, which is
+the point. It still does not know that any of that happened. What it *is* being handed, and
+ignoring, is you — the gateway forwards `x-auth-request-user`,
+`x-auth-request-email` and `x-auth-request-groups` to the pod on every request
+it allows
+([`istiod/values.yaml`](https://github.com/yu-min3/kensan-lab/blob/main/kubernetes/network/istio/istiod/values.yaml)).
+A service that needs to know who is calling reads three headers; it never has to
+learn what OIDC is.
+
+Now open
 `https://argocd.127-0-0-1.sslip.io` and press **Log in via Keycloak** — it does
 not ask again. Same at `https://grafana.127-0-0-1.sslip.io` with **Sign in with
 Keycloak**, and you arrive as an *Admin* rather than a Viewer, because `demo` is
@@ -490,9 +499,12 @@ from the directory you are sitting in, so a commit has to be pushed before it
 counts. `make try` checks that the branch exists on your remote and stops early
 if it does not, rather than standing a cluster up around code it cannot see.
 
-Explore CI works in a fork too, for the same reason: it runs against the
-repository the commit lives in. What it skips is a pull request *from* a fork
-*to* this repository, where the commit is in neither place Argo CD would look.
+Explore CI can run in your fork, but not until you let it: GitHub disables
+Actions on a new fork and shows you a button before the first workflow will
+start. Once enabled it behaves the same way `make try` does — it stands the
+cluster up against the repository the commit lives in, which is now yours. What
+it skips is a pull request *from* a fork *to* this repository, where the commit
+is in neither place Argo CD would look.
 
 ## How it is put together
 
