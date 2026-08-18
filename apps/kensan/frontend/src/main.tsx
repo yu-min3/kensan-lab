@@ -12,6 +12,7 @@ import { ProjectsPage } from "./pages/ProjectsPage";
 import { ReviewsPage } from "./pages/ReviewsPage";
 import { NotesPage } from "./pages/NotesPage";
 import { LifeGoalsPage } from "./pages/LifeGoalsPage";
+import { MarkdownViewerPage } from "./pages/MarkdownViewerPage";
 import { NotFoundPage } from "./pages/NotFoundPage";
 import { FeedPage } from "./pages/FeedPage";
 import "./index.css";
@@ -38,6 +39,7 @@ createRoot(document.getElementById("root")!).render(
               <Route path="/notes" element={<NotesPage />} />
               <Route path="/life" element={<LifeGoalsPage />} />
               <Route path="/reviews" element={<ReviewsPage />} />
+              <Route path="/view" element={<MarkdownViewerPage />} />
               {/* 未定義ルートの受け皿（白画面防止） */}
               <Route path="*" element={<NotFoundPage />} />
             </Routes>
