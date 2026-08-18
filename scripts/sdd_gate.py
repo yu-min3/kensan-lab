@@ -9,6 +9,7 @@ from pathlib import Path
 
 
 PLACEHOLDERS = ("[NEEDS CLARIFICATION", "NNN-<", "YYYY-MM-DD", "<title>")
+AC_STATES = ("pending", "verified", "deferred", "failed")
 
 
 def section(text: str, heading: str) -> str:
@@ -16,6 +17,38 @@ def section(text: str, heading: str) -> str:
         rf"^{re.escape(heading)}\s*$\n(.*?)(?=^##\s|\Z)", text, re.MULTILINE | re.DOTALL
     )
     return match.group(1) if match else ""
+
+
+def acceptance_criteria(text: str) -> tuple[list[tuple[str, str, str, str]], list[str]]:
+    """Parse the acceptance table that is the completion-state source of truth."""
+    body = section(text, "## Acceptance criteria")
+    rows: list[tuple[str, str, str, str]] = []
+    errors: list[str] = []
+    for line in body.splitlines():
+        if not line.strip().startswith("|"):
+            continue
+        cells = [cell.strip() for cell in line.strip().strip("|").split("|")]
+        if cells[0] == "ID" or (cells[0] and set(cells[0]) <= {"-", ":"}):
+            continue
+        if len(cells) < 4:
+            errors.append(f"malformed acceptance criterion row: {line.strip()}")
+            continue
+        criterion_id, criterion, state = cells[:3]
+        evidence = " | ".join(cells[3:]).strip()
+        if not re.fullmatch(r"AC-[1-9][0-9]*", criterion_id):
+            errors.append(f"invalid acceptance criterion ID: {criterion_id}")
+            continue
+        if not criterion:
+            errors.append(f"{criterion_id} lacks a criterion")
+        if state not in AC_STATES:
+            errors.append(f"{criterion_id} has invalid state: {state}")
+        rows.append((criterion_id, criterion, state, evidence))
+    if not rows:
+        errors.append("spec.md must contain an acceptance criteria state table")
+    ids = [row[0] for row in rows]
+    if len(ids) != len(set(ids)):
+        errors.append("acceptance criterion IDs must be unique")
+    return rows, errors
 
 
 def classify(*, irreversible: bool = False, stateful: bool = False,
@@ -41,8 +74,19 @@ def validate(spec_dir: Path, stage: str) -> list[str]:
         return errors
     mode = mode_match.group(1)
     files_to_check = [spec]
-    if not re.search(r"^\s*- \[[ xX]\]\s+\S", section(text, "## Acceptance criteria"), re.MULTILINE):
-        errors.append("spec.md must contain at least one acceptance criterion")
+    criteria, criteria_errors = acceptance_criteria(text)
+    errors.extend(criteria_errors)
+    if stage == "handoff":
+        for criterion_id, _criterion, state, evidence in criteria:
+            if state in ("pending", "failed"):
+                errors.append(f"{criterion_id} is not complete: {state}")
+            if state in ("verified", "deferred") and evidence in ("", "-", "—", "N/A"):
+                errors.append(f"{criterion_id} lacks evidence or a defer reason")
+            if state == "deferred" and not (
+                re.search(r"\bReason:\s*\S", evidence)
+                and re.search(r"\bNext:\s*\S", evidence)
+            ):
+                errors.append(f"{criterion_id} deferred state requires Reason and Next")
 
     pre_review = spec_dir / "reviews" / "codex-pre-impl.md"
     impl_review = spec_dir / "reviews" / "codex-impl.md"

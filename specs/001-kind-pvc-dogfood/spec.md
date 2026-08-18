@@ -3,7 +3,7 @@ id: 001-kind-pvc-dogfood
 mode: full
 status: implemented
 created: 2026-08-11
-updated: 2026-08-12
+updated: 2026-08-17
 ---
 
 # Spec: kind demo PVC persistence dogfood
@@ -35,11 +35,15 @@ Exploreは`longhorn`という名前でkindのlocal-path provisionerを代用し�
 
 ## Acceptance criteria
 
-- [ ] `helm template app-demo charts/app-base -f environments/kind/values/demo-app.yaml`が`longhorn` StorageClassのPVCと`/data` mountを生成する。
-- [ ] 生成PVCに`argocd.argoproj.io/sync-options: Prune=false`が付く。
-- [ ] Explore CIでapp-demo PVCが`Bound`になる。
-- [ ] Explore CIで`/data`に書いたmarkerがapp-demo Pod再作成後も一致する。
-- [ ] Pod再作成後、既存demo hostが期限内にgateway経由HTTP 200へ戻る。
+| ID | Criterion | State | Evidence or defer reason |
+|---|---|---|---|
+| AC-1 | `helm template app-demo charts/app-base -f environments/kind/values/demo-app.yaml`が`longhorn` StorageClassのPVCと`/data` mountを生成する。 | verified | local Helm renderで確認。 |
+| AC-2 | 生成PVCに`argocd.argoproj.io/sync-options: Prune=false`が付く。 | verified | local Helm renderで確認。 |
+| AC-3 | Explore CIでapp-demo PVCが`Bound`になる。 | verified | isolated kindで`demo-data`（128Mi、`longhorn`）のBoundを確認。 |
+| AC-4 | Explore CIで`/data`に書いたmarkerがapp-demo Pod再作成後も一致する。 | verified | isolated kindでPod UID交代後もmarker一致を確認。 |
+| AC-5 | Pod再作成後、既存demo hostが期限内にgateway経由HTTP 200へ戻る。 | deferred | Reason: isolated kindにはGatewayを導入せず、Service HTTP 200までを確認したため。 Next: 公開revisionを参照するExplore CIでgateway routeを確認する。 |
+
+状態はこの表を正とする。`pending` / `failed`はhandoff不可、`deferred`は`Reason: ...; Next: ...`を必須とする。
 
 ## Open questions
 

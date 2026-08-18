@@ -6,7 +6,7 @@ AI Harness Phase 0は、**Claude Codeを唯一の変更主体、Codexをread-onl
 
 Full SDD dogfoodではkind demoのPVC永続性を題材に、spec → plan → pre-implementation review → implementation → verification → diff review → handoffを一周した。独立レビューの最終結果はP0/P1/P2なしで、専用kind clusterでもPVC Bound、Pod UID交代、marker永続、Service HTTP 200まで確認した。
 
-2026-08-17にlatest main（`1340773`）へrebaseし、競合なしで追従した。SDD gate・17 fixture・workflow YAML・diff checkは再通過した。Manifest runnerとdemo kubeconformはGitHub上のschema取得障害で完走できず、外部依存の再実行待ちである。また、`spec.md`のAcceptance checkboxが未更新でもhandoff gateを通過できる点は、Phase 0で残った実装上の穴である。
+2026-08-17にlatest main（`1340773`）へrebaseし、競合なしで追従した。Acceptance criteriaは`spec.md`の`ID / Criterion / State / Evidence or defer reason`表へ統合し、完了状態の唯一の正にした。handoff gateは`pending` / `failed`および証跡のない`verified` / `deferred`を停止する。SDD gate・25 fixture・workflow YAML・diff checkは再通過した。Manifest runnerとdemo kubeconformはGitHub上のschema取得障害で完走できず、外部依存の再実行待ちである。
 
 ## レビュー対象
 
@@ -36,9 +36,7 @@ Acceptance criteria（受入基準）は、**何を観測できたら「要求�
 | 4 | `/data`のmarkerがPod再作成後も一致する | isolated kind verified |
 | 5 | Pod再作成後にHTTP 200へ戻る | Service verified、GatewayはExplore CIへdefer |
 
-問題は受入基準の内容ではなく、**結果の保存場所が二重になったこと**である。実行結果は`tasks.md`のAcceptance statusへ記録した一方、要求のSoTである`spec.md`のcheckboxは`[ ]`のままになった。それでも現行gateはcriterionが存在すれば通すため、`status: implemented`と未チェックcheckboxが共存できる。
-
-したがって出荷前に判断すべきなのは「この5項目が必要か」ではなく、**完了状態をspecへ直接戻すか、criterion IDと別status表を機械照合するか**である。
+当初は実行結果を`tasks.md`へ重複記録していたが、修正後は**条件・状態・証跡を`spec.md`の同じ行に保存する**。状態は`pending` / `verified` / `deferred` / `failed`の4つで、実装中のloopはこの表を直接更新する。`tasks.md`は作業進捗と実行ログだけを持つ。
 
 ## 対象範囲
 
@@ -116,14 +114,14 @@ Fullが他条件より必ず優先される。Liteは`plan.md`と`tasks.md`を�
 
 | Check | Implement | Handoff |
 |---|---:|---:|
-| `spec.md` + mode + Acceptance criteria | 必須 | 必須 |
+| `spec.md` + mode + Acceptance criteria state table | 必須（`pending`可） | 必須（証跡付き`verified`または理由付き`deferred`のみ） |
 | Fullのplan / tasks必須section | 必須 | 必須 |
 | pre-implementation review metadata | 必須 | 必須 |
 | unresolved P0 / unknown decision | block | block |
 | Codex unavailable時のYu承認 + human reviewer/result | block | block |
 | implementation review | — | 必須 |
 
-fixtureは17件あり、空artifact、section外checkbox、review metadata欠落、unknown decision、未承認fallback、未解決P0をnegative caseとして持つ。
+fixtureは旧checkbox、重複ID、壊れた行、空artifact、review metadata欠落、unknown decision、未承認fallback、未解決P0をnegative caseとして持つ。
 
 ### Full dogfood
 
@@ -142,7 +140,7 @@ shared `app-base` chartのPVC templateにも`Prune=false`を追加した。た�
 
 | Gate | Result | Evidence |
 |---|---|---|
-| SDD fixture | PASS | 17 tests |
+| SDD fixture | PASS | 25 tests |
 | Manifest runner | PASS | 220 resources、invalid 0 |
 | Argo CD static validator | PASS | 44 Applications |
 | demo Helm render | PASS | PVC、`longhorn`、`/data` mount、`Prune=false` |
@@ -172,13 +170,11 @@ shared `app-base` chartのPVC templateにも`Prune=false`を追加した。た�
 
 ### ✅ Rebase完了 — latest mainとの差
 
-2026-08-17にmain `1340773`へ競合なしでrebaseし、behind 0になった。SDD handoff gate、17 fixture、workflow YAML、diff checkは成功した。Manifest runnerとdemo kubeconformは`raw.githubusercontent.com`からのschema取得が繰り返し失敗したため、ネットワーク回復後またはCIでの再実行が必要。
+2026-08-17にmain `1340773`へ競合なしでrebaseし、behind 0になった。SDD handoff gate、25 fixture、workflow YAML、diff checkは成功した。Manifest runnerとdemo kubeconformは`raw.githubusercontent.com`からのschema取得が繰り返し失敗したため、ネットワーク回復後またはCIでの再実行が必要。
 
-### 🟠 Acceptance checkboxの状態不整合
+### 🟢 Acceptance stateをspecへ統合済み
 
-`spec.md`は`status: implemented`だが、`## Acceptance criteria`のcheckboxは`[ ]`のままである。検証結果は`tasks.md`へ記録されているものの、要求のSoT上は未完了に見える。さらに現行`sdd_gate.py`はcriterionの存在を検査するが、handoff時に全項目が`[x]`または理由付きdeferredであることを機械検査しない。
-
-推奨は、Acceptance criteriaに状態を直接持たせるか、criterion IDと`tasks.md`のstatus tableを照合するvalidatorを追加することである。単に今回のcheckboxを手で`[x]`へ変えるだけでは再発防止にならない。
+`spec.md`のAcceptance criteria表が、条件・完了状態・証跡の唯一の正になった。実装前は`pending`、検証成功は`verified`、出荷後など別環境での確認は`Reason: ...; Next: ...`を伴う`deferred`、不成立は`failed`とする。handoff gateは`pending` / `failed`を拒否し、`verified` / `deferred`にも証跡または理由を必須化する。旧checkbox形式、重複ID、壊れた行を含むnegative fixtureも追加した。
 
 ### 🟠 Gateway E2Eは出荷後確認
 
@@ -213,6 +209,5 @@ mainのworktreeに別作業の大規模な未コミット差分が存在した�
 ## Yuが決めること
 
 1. Phase 0の運用モデルをこの形で採用するか。
-2. Acceptance criterionの完了状態をgateで強制する修正を、出荷前の必須対応にするか。
-3. Claude Code review後、latest mainへrebaseして通常の出荷フローへ渡すか。
-4. Gateway E2E成功をPhase 1完了条件にするか。
+2. Claude Code review後、通常の出荷フローへ渡すか。
+3. Gateway E2E成功をPhase 1完了条件にするか。

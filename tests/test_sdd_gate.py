@@ -14,7 +14,9 @@ updated: 2026-08-11
 ---
 # Spec: Fixture
 ## Acceptance criteria
-- [ ] observable result
+| ID | Criterion | State | Evidence or defer reason |
+|---|---|---|---|
+| AC-1 | observable result | {ac_state} | {evidence} |
 """
 
 REVIEW = """# Review
@@ -42,10 +44,12 @@ class ClassifierTest(unittest.TestCase):
 
 
 class ArtifactGateTest(unittest.TestCase):
-    def make_spec(self, mode: str) -> Path:
+    def make_spec(self, mode: str, ac_state: str = "pending", evidence: str = "—") -> Path:
         root = Path(tempfile.mkdtemp())
         (root / "reviews").mkdir()
-        (root / "spec.md").write_text(SPEC.format(mode=mode))
+        (root / "spec.md").write_text(
+            SPEC.format(mode=mode, ac_state=ac_state, evidence=evidence)
+        )
         (root / "reviews" / "codex-pre-impl.md").write_text(REVIEW)
         return root
 
@@ -59,7 +63,7 @@ class ArtifactGateTest(unittest.TestCase):
         self.assertEqual(validate(root, "implement"), [])
 
     def test_handoff_requires_implementation_review(self):
-        root = self.make_spec("lite")
+        root = self.make_spec("lite", "verified", "fixture test passed")
         self.assertIn("implementation review is required before handoff", validate(root, "handoff"))
 
     def test_unresolved_p0_blocks(self):
@@ -110,15 +114,66 @@ class ArtifactGateTest(unittest.TestCase):
     def test_acceptance_criterion_is_required(self):
         root = self.make_spec("lite")
         (root / "spec.md").write_text("---\nmode: lite\n---\n# Spec: Empty\n")
-        self.assertTrue(any("acceptance criterion" in e for e in validate(root, "implement")))
+        self.assertTrue(any("acceptance criteria state table" in e for e in validate(root, "implement")))
 
-    def test_acceptance_checkbox_must_be_in_its_section(self):
+    def test_old_acceptance_checkbox_is_not_a_state_source(self):
         root = self.make_spec("lite")
         (root / "spec.md").write_text(
-            "---\nmode: lite\n---\n# Spec: Empty\n## Acceptance criteria\nNone\n"
-            "## Verification notes\n- [ ] unrelated\n"
+            "---\nmode: lite\n---\n# Spec: Old\n## Acceptance criteria\n- [x] result\n"
         )
-        self.assertTrue(any("acceptance criterion" in e for e in validate(root, "implement")))
+        self.assertTrue(any("state table" in e for e in validate(root, "implement")))
+
+    def test_implement_allows_pending_acceptance(self):
+        root = self.make_spec("lite")
+        self.assertEqual(validate(root, "implement"), [])
+
+    def test_handoff_blocks_pending_or_failed_acceptance(self):
+        for state in ("pending", "failed"):
+            with self.subTest(state=state):
+                root = self.make_spec("lite", state, "not complete")
+                (root / "reviews" / "codex-impl.md").write_text(REVIEW)
+                self.assertTrue(any(f"is not complete: {state}" in e for e in validate(root, "handoff")))
+
+    def test_handoff_requires_evidence_or_defer_reason(self):
+        for state in ("verified", "deferred"):
+            with self.subTest(state=state):
+                root = self.make_spec("lite", state, "—")
+                (root / "reviews" / "codex-impl.md").write_text(REVIEW)
+                self.assertTrue(any("lacks evidence or a defer reason" in e for e in validate(root, "handoff")))
+
+    def test_handoff_accepts_verified_and_deferred_with_evidence(self):
+        for state, evidence in (
+            ("verified", "test passed"),
+            ("deferred", "Reason: cluster unavailable; Next: run in Explore CI"),
+        ):
+            with self.subTest(state=state):
+                root = self.make_spec("lite", state, evidence)
+                (root / "reviews" / "codex-impl.md").write_text(REVIEW)
+                self.assertEqual(validate(root, "handoff"), [])
+
+    def test_deferred_requires_reason_and_next_verification(self):
+        for evidence in ("later", "Reason: unavailable", "Next: run in CI"):
+            with self.subTest(evidence=evidence):
+                root = self.make_spec("lite", "deferred", evidence)
+                (root / "reviews" / "codex-impl.md").write_text(REVIEW)
+                self.assertTrue(any("requires Reason and Next" in e for e in validate(root, "handoff")))
+
+    def test_malformed_acceptance_row_cannot_hide_a_pending_criterion(self):
+        root = self.make_spec("lite", "verified", "test passed")
+        with (root / "spec.md").open("a") as handle:
+            handle.write("| AC-2 | hidden pending | pending |\n")
+        (root / "reviews" / "codex-impl.md").write_text(REVIEW)
+        self.assertTrue(any("malformed acceptance criterion row" in e for e in validate(root, "handoff")))
+
+    def test_acceptance_ids_are_unique(self):
+        root = self.make_spec("lite")
+        with (root / "spec.md").open("a") as handle:
+            handle.write("| AC-1 | duplicate | pending | — |\n")
+        self.assertTrue(any("IDs must be unique" in e for e in validate(root, "implement")))
+
+    def test_acceptance_state_is_known(self):
+        root = self.make_spec("lite", "done", "looks good")
+        self.assertTrue(any("invalid state" in e for e in validate(root, "implement")))
 
     def test_review_metadata_is_required(self):
         root = self.make_spec("lite")

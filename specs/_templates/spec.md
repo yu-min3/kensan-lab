@@ -29,7 +29,9 @@ updated: YYYY-MM-DD
 
 ## Acceptance criteria
 
-- [ ] <Synced / Healthy 以外を含む、観測可能な基準>
+| ID | Criterion | State | Evidence or defer reason |
+|---|---|---|---|
+| AC-1 | <Synced / Healthy 以外を含む、観測可能な基準> | pending | — |
 
 ## Open questions
 

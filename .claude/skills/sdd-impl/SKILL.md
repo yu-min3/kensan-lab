@@ -28,7 +28,7 @@ Claude Codeだけがworktree、ファイル変更、task状態、commitを所有
 - 変更に外部chartや追加renderがあればplan固有の検証を追加する。
 - cluster到達時は対象raw manifestまたは一時renderに`kubectl apply --dry-run=server`を実行する。renderは`temp/`に置きcommitしない。未到達は理由とmerge後checkを記録する。
 - 同じgateを3回修正しても成功しなければ停止する。
-- acceptance criteriaをverifiedまたはmerge-time verification（理由付き）へ仕分ける。
+- 検証のたびに`spec.md`の各acceptance criterionを`pending` / `verified` / `deferred` / `failed`のいずれかへ更新する。`verified`は証跡、`deferred`は`Reason: ...; Next: ...`として理由と次の検証点を同じ行へ記録し、tasksへ状態表を複製しない。
 
 ## 4. Independent diff review
 
@@ -40,6 +40,6 @@ Claude Codeだけがworktree、ファイル変更、task状態、commitを所有
 
 既存pull request templateへspec/plan/検証を投影した本文を`temp/`に作る。追加・変更・削除（なしも明記）、到達経路、検証の実行/skip、acceptance criteria、merge behavior、rollback、未決P1を含める。
 
-`python3 scripts/sdd_gate.py validate specs/NNN-<slug> --stage handoff`を実行し、成功後だけhandoffを提示する。
+`python3 scripts/sdd_gate.py validate specs/NNN-<slug> --stage handoff`を実行する。acceptance criteriaに`pending` / `failed`または証跡のない`verified` / `deferred`があれば停止し、成功後だけhandoffを提示する。
 
 このworkspaceではremote操作を行わない。local commit、diff、handoffをYuへ提示して停止する。ready化・mergeを行う指示はこのskillに含めない。

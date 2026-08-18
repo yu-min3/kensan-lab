@@ -17,7 +17,7 @@ argument-hint: <feature-name> [summary]
 
 1. `specs/[0-9]*` の最大番号を作成直前に再確認する。同一番号またはslugがあれば停止して再採番する。
 2. `specs/_templates/spec.md` から `specs/NNN-<slug>/spec.md` を作り、`mode`を設定する。
-3. what / why、scope、non-goals、観測可能なacceptance criteriaをユーザーと確定する。技術選定を発明しない。
+3. what / why、scope、non-goals、観測可能なacceptance criteriaをユーザーと確定する。各criterionへ一意な`AC-N`を付け、stateを`pending`で開始する。技術選定を発明しない。
 4. placeholderまたは`[NEEDS CLARIFICATION]`が残る間は次gateへ進めない。
 5. Fullは`/sdd-plan`へ、LiteはCodexによるspecのpre-implementation reviewへ案内する。
 

@@ -10,6 +10,8 @@ kensan-lab の変更は、影響と不可逆性に応じて Full SDD、Lite、SD
 
 要求、計画、進捗、レビュー結果は `specs/NNN-<slug>/` に保存する。会話履歴やターミナル出力は状態の正としない。
 
+Acceptance criteriaは`spec.md`の表を唯一の正とする。各行は一意な`AC-N`、観測可能な条件、`pending` / `verified` / `deferred` / `failed`、証跡またはdefer理由を持つ。実装中は状態を直接更新し、`tasks.md`へ別のstatus表を作らない。handoffでは`pending` / `failed`を許可せず、`verified`は証跡、`deferred`は同じセルに`Reason: ...; Next: ...`を要求する。
+
 ## Classification
 
 | Class | Apply when | Artifacts |
@@ -24,11 +26,11 @@ kensan-lab の変更は、影響と不可逆性に応じて Full SDD、Lite、SD
 
 | Gate | Owner | Exit condition |
 |---|---|---|
-| Spec | Claude | `[NEEDS CLARIFICATION]` がなく、観測可能な受入基準がある |
+| Spec | Claude | `[NEEDS CLARIFICATION]` がなく、一意なIDを持つ観測可能な受入基準が`pending`で定義されている |
 | Pre-implementation review | Codex → Claude | Full は plan、Lite は spec をレビューし、各指摘を採用・却下・保留に分類 |
 | Implementation | Claude | 既存 CI と同じ静的検査が成功し、未実行項目に理由がある |
 | Diff review | Codex → Claude | P0 解消。P1 は未決事項として明示 |
-| Handoff | Human | draft PR の内容を確認して ready / merge を判断 |
+| Handoff | Human | 全受入基準が証跡付き`verified`または理由付き`deferred`で、draft PR の内容を確認して ready / merge を判断 |
 
 同じ検証 gate を3回修正しても通らなければ停止する。Codex が利用不能な場合は自動続行せず、理由を記録して Yu の明示承認による人間レビューへ切り替える。承認がなければ停止する。
 
