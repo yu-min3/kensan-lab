@@ -1,0 +1,197 @@
+/* Two faces, chosen at deploy time rather than build time. The theme class is
+   set from /api/config, so the same image serves both. */
+
+:root {
+  --ink: #1b1a17;
+  --muted: #6b6559;
+  --card: rgba(255, 255, 255, 0.82);
+  --line: rgba(27, 26, 23, 0.14);
+  --chip: rgba(27, 26, 23, 0.08);
+}
+
+* { box-sizing: border-box; }
+
+html, body, #root { height: 100%; margin: 0; }
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "Hiragino Sans", "Noto Sans JP",
+    "Segoe UI", sans-serif;
+  color: var(--ink);
+  -webkit-font-smoothing: antialiased;
+}
+
+.shell {
+  position: relative;
+  min-height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 3rem 1.25rem;
+  overflow: hidden;
+  transition: background 600ms ease;
+  /* The theme classes below redefine --ink on this element. `color` has to be
+     re-declared here as well: body resolved var(--ink) against :root before the
+     theme was known, and descendants inherit that computed value — redefining
+     the variable further down does not reach them. Without this line the night
+     theme renders dark text on a dark sky. */
+  color: var(--ink);
+}
+
+.theme-day {
+  background: linear-gradient(180deg, #8ec5ff 0%, #ffd9a0 62%, #ffb27a 100%);
+}
+
+.theme-night {
+  --ink: #eceaf5;
+  --muted: #a09bbb;
+  --card: rgba(20, 20, 38, 0.66);
+  --line: rgba(236, 234, 245, 0.16);
+  --chip: rgba(236, 234, 245, 0.12);
+  background: linear-gradient(180deg, #0a0a1f 0%, #1a1a3d 55%, #2c2350 100%);
+}
+
+/* --- sky --- */
+
+.sky { position: absolute; inset: 0; pointer-events: none; }
+
+.sun, .moon {
+  position: absolute;
+  border-radius: 50%;
+  top: 8%;
+  right: 12%;
+}
+
+.sun {
+  width: 120px; height: 120px;
+  background: radial-gradient(circle at 35% 35%, #fff6d8, #ffd36b 60%, #ffb02e);
+  box-shadow: 0 0 90px 30px rgba(255, 196, 80, 0.55);
+  animation: bob 9s ease-in-out infinite;
+}
+
+.moon {
+  width: 96px; height: 96px;
+  background: radial-gradient(circle at 62% 38%, #fdfbff, #cdc9e8 65%, #9a95c4);
+  box-shadow: 0 0 70px 18px rgba(190, 185, 255, 0.35);
+  animation: bob 11s ease-in-out infinite;
+}
+
+@keyframes bob {
+  0%, 100% { transform: translateY(0); }
+  50%      { transform: translateY(-14px); }
+}
+
+.stars span {
+  position: absolute;
+  width: 2px; height: 2px;
+  background: #fff;
+  border-radius: 50%;
+  opacity: .75;
+  animation: twinkle 3.2s ease-in-out infinite;
+}
+
+@keyframes twinkle {
+  0%, 100% { opacity: .18; }
+  50%      { opacity: .95; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sun, .moon, .stars span { animation: none; }
+}
+
+/* --- content --- */
+
+.stage {
+  position: relative;
+  width: min(46rem, 100%);
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.eyebrow {
+  margin: 0;
+  font-size: .78rem;
+  letter-spacing: .16em;
+  text-transform: uppercase;
+  font-weight: 700;
+  color: var(--muted);
+}
+
+.greeting {
+  margin: 0;
+  font-size: clamp(2.2rem, 7vw, 4rem);
+  line-height: 1.08;
+  font-weight: 800;
+  text-wrap: balance;
+  text-shadow: 0 2px 24px rgba(0, 0, 0, .12);
+}
+
+.sub { margin: 0 0 .5rem; color: var(--muted); font-size: 1rem; }
+
+.card {
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 1.3rem 1.5rem;
+  backdrop-filter: blur(12px);
+  box-shadow: 0 18px 50px rgba(0, 0, 0, .14);
+}
+
+.card h1, .card h2 {
+  margin: 0 0 .7rem;
+  font-size: 1.05rem;
+  letter-spacing: .01em;
+}
+
+.who { margin: 0 0 .6rem; font-size: 1.15rem; }
+
+.chips { margin: 0 0 .8rem; display: flex; flex-wrap: wrap; gap: .4rem; }
+
+.chip {
+  background: var(--chip);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: .12rem .6rem;
+  font-size: .78rem;
+  font-weight: 600;
+}
+
+.muted { color: var(--muted); }
+.small { font-size: .86rem; }
+
+.headers {
+  margin: .8rem 0 0;
+  display: grid;
+  gap: .35rem;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: .78rem;
+}
+
+.headers > div {
+  display: grid;
+  grid-template-columns: minmax(0, 15rem) 1fr;
+  gap: .8rem;
+  padding: .3rem 0;
+  border-top: 1px solid var(--line);
+}
+
+.headers dt { color: var(--muted); }
+.headers dd { margin: 0; overflow-wrap: anywhere; }
+
+.trail {
+  margin: .4rem 0 0;
+  color: var(--muted);
+  font-size: .8rem;
+  overflow-wrap: anywhere;
+}
+
+code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  background: var(--chip);
+  padding: .08rem .3rem;
+  border-radius: 4px;
+}
+
+@media (max-width: 34rem) {
+  .headers > div { grid-template-columns: 1fr; gap: .1rem; }
+}

@@ -20,6 +20,21 @@ probes:
   # app/main.py serves /health; the chart defaults to /healthz.
   path: /health
 
+# What the page looks like, and what it says.
+#
+# These came from the scaffolder form and they live here rather than in the
+# image on purpose: the frontend reads them at runtime through /api/config, so
+# changing them is an edit to this file and a sync — no rebuild, no new tag.
+# That round trip (edit -> pull request -> Argo CD -> the page) is the shortest
+# demonstration of what the platform is for.
+env:
+  - name: APP_NAME
+    value: "${{ values.name }}"
+  - name: APP_THEME
+    value: "${{ values.theme }}"
+  - name: APP_MESSAGE
+    value: "${{ values.message }}"
+
 # The image declares `USER appuser`, a name rather than a number. The chart
 # asks for runAsNonRoot, and the kubelet cannot resolve a name to a UID without
 # the image's /etc/passwd — it refuses to start the container with

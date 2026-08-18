@@ -67,6 +67,37 @@ spec:
             allowedOwners:
               - yu-min3
 
+    - title: How it looks
+      required:
+        - theme
+        - message
+      properties:
+        theme:
+          title: Theme
+          type: string
+          description: |
+            画面の見た目
+
+            📌 **この値が通る経路:**
+            `deploy/values.yaml` → プラットフォームへの PR → Argo CD →
+            Deployment の環境変数 → `/api/config` → 画面
+
+            💡 イメージには焼き込まれません。後から変えるときも
+            values.yaml を編集して sync するだけで、再ビルドは不要です
+          default: day
+          enum:
+            - day
+            - night
+          enumNames:
+            - '昼 — 明るい空'
+            - '夜 — 星空'
+        message:
+          title: Greeting
+          type: string
+          description: トップに大きく出る一行。デプロイ後も values.yaml で変えられます
+          default: Hello from the platform
+          maxLength: 60
+
     - title: Domain & System
       required:
         - domain
@@ -128,6 +159,11 @@ spec:
           # Domain & System values
           domain: ${{ parameters.domain }}
           system: ${{ parameters.system }}
+          # Appearance. These are written into deploy/values.yaml rather than
+          # into the source, so they reach the running pod as environment
+          # variables and can be changed later without building anything.
+          theme: ${{ parameters.theme }}
+          message: ${{ parameters.message }}
 
     # Step 2: Create application repository
     - id: publish
