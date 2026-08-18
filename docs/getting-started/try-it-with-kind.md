@@ -259,11 +259,22 @@ The demo app at `demo.127-0-0-1.sslip.io` **is** that skeleton, built and
 deployed — so the output is running in front of you even though the button that
 produces it is not yours to press.
 
-If you forked this repository and want the button to work, change
-`allowedOwners` and the platform `repoUrl` in
-`backstage/templates/fastapi-template/template.yaml` to your own account, then
-publish a Backstage image from your fork. With a token that can reach your own
-repositories:
+If you forked this repository and want the button to work, it is five steps
+rather than one, because the templates are baked into the Backstage image rather
+than read from git — editing `template.yaml` in your fork changes nothing until
+your own image is running:
+
+1. **Enable Actions on your fork.** GitHub disables them until you press the
+   button on the Actions tab, and the next step is a workflow.
+2. In `backstage/templates/fastapi-template/template.yaml`, point
+   `allowedOwners` and the platform `repoUrl` at your own account and fork.
+3. Publish a Backstage image: **Actions → backstage-ci → Run workflow**, with a
+   tag such as `v0.0.15`. Then make the resulting GHCR package **public** —
+   explore pulls without a pull secret, so a private one fails to start.
+4. Point `environments/kind/resources/backstage/deployment.yaml` at the image
+   you just published.
+5. Push all of it, then run `make try` with a token that can reach your own
+   repositories:
 
 ```console
 $ GITHUB_TOKEN=ghp_... make try
