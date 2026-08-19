@@ -11,12 +11,16 @@ $ git clone https://github.com/yu-min3/kensan-lab && cd kensan-lab
 $ make try
 ```
 
-Nothing else to configure. A few minutes later you have Argo CD reconciling
-eighteen Applications, Backstage serving the developer portal, Grafana drawing
-the same cluster-health dashboard the real machines are watched with, Keycloak
-issuing one identity that signs you in to all of them, Istio routing over HTTPS
-through the Gateway API, and the production policy set reporting on everything
-in the cluster.
+Nothing else to configure, and nothing to sign up for. A few minutes later you
+have Argo CD reconciling eighteen Applications, Backstage serving the developer
+portal, Grafana drawing the same cluster-health dashboard the real machines are
+watched with, Keycloak issuing one identity that signs you in to all of them,
+Istio routing over HTTPS through the Gateway API, and the production policy set
+reporting on everything in the cluster.
+
+The cluster runs **your checkout**, not this repository. It carries a git server
+of its own, and `make try` fills it from the commit you have here — so editing
+something and running it again is the whole loop. No fork, no push, no token.
 
 ```console
 $ make explore-down     # when you are done
@@ -35,6 +39,7 @@ $ make explore-down     # when you are done
 | **Kyverno** | All five production `ClusterPolicy` objects, in Audit — verdicts land in `PolicyReport` within a minute |
 | **A demo app** | The golden path's own output — the template's skeleton, built and deployed by `charts/app-base` exactly as a scaffolded service would be |
 | **A `longhorn` StorageClass** | Not Longhorn, but named after it, so every PVC in this repository binds unmodified |
+| **Gitea** | `https://gitea.127-0-0-1.sslip.io` — the cluster's own git server. Argo CD reads from it, which is why your checkout is what runs |
 
 ## Prerequisites
 
@@ -73,18 +78,19 @@ Keycloak is what moved the floor from 6 GiB to 8, because an identity provider
 is a JVM. On Linux the container gets the host's memory, so there is usually
 nothing to do.
 
-**No GitHub token.** Backstage does need one — an empty value fails its config
-check at startup and takes the catalog down with it — but `make try` fills the
-slot with a placeholder GitHub will reject, and nothing you do here needs a real
-one. The Create button is the exception, and it cannot complete for a visitor
-whatever token you hold; [step 3](#3-open-the-developer-portal) explains why.
+**No GitHub token, and no GitHub account.** Nothing here reaches GitHub. The
+portal writes to the git server inside the cluster, Argo CD reads from the same
+place, and both are gone when you tear it down. Backstage still wants a token
+variable to exist, so `make try` fills it with a placeholder — which nothing
+uses.
 
 **Ports.** 80 and 443 must be free. The gateway is published on them, so the
 URLs below work in a browser with no proxy and no port-forward.
 
-**A network connection.** Charts come from upstream repositories, images from
-registries, and Argo CD reads this repository over HTTPS — nothing here is built
-from what is on your disk. The `/etc/hosts` fallback below covers a network that
+**A network connection.** Charts come from upstream repositories and images
+from registries — nothing here is built from what is on your disk. The
+manifests are the exception: those come from the git server inside the cluster,
+filled from your checkout, so that part works even when GitHub does not. The `/etc/hosts` fallback below covers a network that
 cannot resolve `sslip.io`, not a network that is absent.
 
 **DNS.** `*.127-0-0-1.sslip.io` is public DNS that resolves to `127.0.0.1`,
@@ -93,7 +99,7 @@ will not answer for it — some corporate DNS refuses wildcard services — name
 hosts yourself:
 
 ```console
-$ for h in argocd backstage grafana demo auth; do \
+$ for h in argocd backstage grafana demo auth gitea; do \
     echo "127.0.0.1 $h.127-0-0-1.sslip.io"; done | sudo tee -a /etc/hosts
 ```
 
@@ -136,7 +142,7 @@ gateway-api         Synced   Healthy
 
 Open `https://demo.127-0-0-1.sslip.io`. You do not land on the demo app; you
 land on Keycloak. **The application has no authentication code in it.** It is a
-FastAPI service with four endpoints and no idea what a session is. The gateway
+small React frontend with a FastAPI backend, and no idea what a session is. The gateway
 asked oauth2-proxy about your request before the pod ever saw it, oauth2-proxy
 found no cookie, and sent you to the identity provider. One line of values
 turned that on:
@@ -234,41 +240,40 @@ provider that scans the organisation for `catalog-info.yaml` files, and that one
 needs a token from Vault — so it is switched off here, and the catalog is
 whatever the repository ships. Nothing else about the portal changes.
 
-**Pressing Create through to the end is the one thing a visitor cannot do**, and
-it is worth being exact about why. The template writes to two places, and both
-are pinned to this repository's owner: the new service's repository is created
-under `yu-min3`, and the Argo CD Application arrives as a pull request against
-`yu-min3/kensan-lab`. A token for your own account opens neither.
+**Press Create, and it goes through.** That is the part this cluster exists to
+show, and it needs nothing from you — no account, no token, no repository
+anywhere.
 
-That pinning is a guardrail on the real cluster — a scaffolder that can create
-repositories anywhere is a scaffolder nobody should hold the token for — so
-explore does not unpick it. What you can do without a token is everything up to
-that point: open the form, see the parameters a service is described by, and
-read the files it would produce in
-[`backstage/templates/fastapi-template/skeleton`](https://github.com/yu-min3/kensan-lab/tree/main/backstage/templates/fastapi-template/skeleton).
-The demo app at `demo.127-0-0-1.sslip.io` **is** that skeleton, built and
-deployed — so the output is running in front of you even though the button that
-produces it is not yours to press.
+Fill in a name, pick a greeting and whether the service wears its day face or
+its night face, and press through. What happens next is the platform's normal
+path, run in miniature:
 
-If you forked this repository and want the button to work, change
-`allowedOwners` and the platform `repoUrl` in
-`backstage/templates/fastapi-template/template.yaml` to your own account, then
-publish a Backstage image from your fork. With a token that can reach your own
-repositories:
+1. A repository is created on the cluster's own git server, holding the service —
+   a React frontend and a small FastAPI backend, the same shape as the
+   applications on bare metal.
+2. A **pull request** is opened against the platform's copy of this repository,
+   adding the Argo CD Application and the routing the service needs.
+3. Keycloak is told to accept the new hostname, because a service nobody knew
+   about a minute ago still has to be signed in to.
 
-```console
-$ GITHUB_TOKEN=ghp_... make try
-```
+Nothing is deployed yet. **Merge the pull request** — at
+`https://gitea.127-0-0-1.sslip.io`, user `gitea-admin`, password printed at the
+end of `make try` — and Argo CD notices within three minutes. Then
+`https://<your-service>.127-0-0-1.sslip.io` starts answering, behind the same
+sign-in as everything else.
 
-Without one the cluster fills the slot with a placeholder GitHub will reject,
-rather than leaving it empty — an empty value there fails the backend's config
-type check at startup and takes the catalog down with it, while the pod stays
-Ready and Argo CD stays green. `make try` asks the catalog a question before it
-declares success, for exactly that reason.
+The page it serves is worth reading rather than glancing at. It shows the
+greeting you typed, and it shows **who you are** — pulled from headers the
+gateway attached before the pod saw the request. The service contains no
+authentication code. It also did not get rebuilt to change its appearance: what
+you chose landed in `deploy/values.yaml`, travelled through the pull request,
+and arrived as an environment variable.
 
-Without it everything above still works; only the Create button stops at the
-publish step. It is the same shape as bare metal, where the variable is filled
-from Vault instead.
+That round trip — **a form, a pull request, a merge, a running service** — is
+what a platform is for, and it is the whole reason for the git server in the
+cluster. On bare metal the same template writes to GitHub instead; the branch is
+chosen by which host you pick, and the template itself is one file for both.
+
 
 Backstage is also the only workload in this slice that runs an Istio sidecar,
 because its namespace carries `istio-injection: enabled`. `kubectl -n backstage
@@ -478,21 +483,37 @@ setting chains it onto Cilium instead. Getting this wrong — taking the chain
 over rather than joining it — cuts a node off from its own control plane, so
 CI asserts this exact output on every pull request.
 
-## If you forked this
+## Making it yours
 
-`make try` reads the repository and branch out of your checkout — `git remote
-get-url origin` and whatever branch you are on — so a fork stands up **your**
-copy, not this one. Edit something under `environments/kind/`, push, run
-`make try`, and the change is in the cluster.
+You do not need a fork to change this cluster. `make try` fills the cluster's
+git server from **the commit in your checkout**, so the loop is:
 
-The one thing to remember is that Argo CD syncs over the network rather than
-from the directory you are sitting in, so a commit has to be pushed before it
-counts. `make try` checks that the branch exists on your remote and stops early
-if it does not, rather than standing a cluster up around code it cannot see.
+```console
+$ vim environments/kind/values/prometheus.yaml
+$ git commit -am "try something"
+$ make try
+```
 
-Explore CI works in a fork too, for the same reason: it runs against the
-repository the commit lives in. What it skips is a pull request *from* a fork
-*to* this repository, where the commit is in neither place Argo CD would look.
+That commit is what runs. Nothing was pushed anywhere, and no remote was
+involved. What it carries is the commit, not the working tree — a change you
+have saved but not committed will not be in the cluster, which is worth knowing
+before you go looking for it.
+
+A **fork** is still how you would keep changes or send them back. It is the
+contributor's path rather than the visitor's, and it works the way forks
+normally do — with one thing worth knowing: GitHub disables Actions on a new
+fork, so Explore CI will not run until you press the button on the Actions tab.
+
+If you would rather have Argo CD read a real repository instead of the one in
+the cluster — which is what CI does, to prove a specific pushed commit — pass it
+in:
+
+```console
+$ scripts/explore-up.sh --repo https://github.com/you/kensan-lab --rev my-branch
+```
+
+That path skips the git server entirely, and then the commit does have to be
+pushed before Argo CD can see it.
 
 ## How it is put together
 
@@ -531,6 +552,13 @@ different, and what gets removed later — is in
 These are not gaps waiting to be filled. Each is impossible in a way worth
 being precise about, and each is a reason the bare-metal cluster is where the
 interesting parts live.
+
+**One thing here is not a subset but an addition.** The git server does not
+exist on bare metal, where Argo CD reads GitHub and the golden path writes
+there. It is here because the alternative was a Create button that stops
+halfway for everybody who is not the author — and because it means your
+checkout is what runs. Every other component is the production definition with
+a value swapped.
 
 **The load balancer.** Cilium announces a virtual IP by answering ARP on the
 LAN. kind's nodes are containers on a Docker bridge; there is no physical
