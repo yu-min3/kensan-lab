@@ -12,6 +12,9 @@ apiVersion: v1
 kind: Namespace
 metadata:
   name: gitea
+  annotations:
+    ## Namespaces go early, with the other namespaces.
+    argocd.argoproj.io/sync-wave: "0"
   labels:
     ## Two contracts at once, and missing either fails without mentioning
     ## labels: Kyverno's ns-label-contract wants environment and tier, and
@@ -32,6 +35,13 @@ kind: HTTPRoute
 metadata:
   name: gitea
   namespace: gitea
+  annotations:
+    ## After the Gateway, which is wave 2. A route applied before its parent
+    ## exists is never Accepted, and Argo CD waits for it to become healthy
+    ## before moving on — so the certificates later in this Application never
+    ## get applied, and every component that mounts the CA sits in
+    ## FailedMount. The same wave the other routes use, for the same reason.
+    argocd.argoproj.io/sync-wave: "4"
 spec:
   parentRefs:
     - group: gateway.networking.k8s.io

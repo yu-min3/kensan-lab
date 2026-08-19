@@ -507,8 +507,11 @@ kubectl apply -f "${REPO_ROOT}/kubernetes/argocd/projects/" >/dev/null
 # Patched rather than committed, because the restriction is real protection on
 # the cluster that matters and this exception belongs to the throwaway one.
 if [[ "$EXTERNAL_REPO" == false ]]; then
+  # The exact URL, not a glob. Argo CD matches sourceRepos with a glob that does
+  # not cross '/', so `${GITEA_INTERNAL_URL}/*` misses a two-segment path and the
+  # Application stays Unknown with InvalidSpecError. Measured.
   kubectl -n argocd patch appproject app-project --type json \
-    -p "[{\"op\": \"add\", \"path\": \"/spec/sourceRepos/-\", \"value\": \"${GITEA_INTERNAL_URL}/*\"}]" \
+    -p "[{\"op\": \"add\", \"path\": \"/spec/sourceRepos/-\", \"value\": \"${REPO_URL}\"}]" \
     >/dev/null
 fi
 
