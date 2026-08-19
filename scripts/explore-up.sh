@@ -27,6 +27,13 @@ PREVIOUS_CONTEXT="$(kubectl config current-context 2>/dev/null || true)"
 on_exit() {
   local status=$?
   rm -rf "${TMP_DIR}"
+  # The seed's port-forward, if one is still running. Held here rather than
+  # behind its own trap: replacing this one would drop the context restore
+  # below, and the failure would be a kubectl pointing at a cluster that no
+  # longer exists.
+  if [[ -n "${GITEA_PF_PID:-}" ]]; then
+    kill "${GITEA_PF_PID}" 2>/dev/null || true
+  fi
   if [[ "$status" -ne 0 && -n "$PREVIOUS_CONTEXT" ]]; then
     kubectl config use-context "$PREVIOUS_CONTEXT" >/dev/null 2>&1 || true
   fi
@@ -441,8 +448,7 @@ if [[ "$EXTERNAL_REPO" == false ]]; then
   # at this point and it needs nothing from Istio.
   info "seeding it with this checkout (nothing has to be pushed anywhere)"
   kubectl -n gitea port-forward svc/gitea-http 3999:3000 >/dev/null 2>&1 &
-  gitea_pf=$!
-  trap 'kill "${gitea_pf}" 2>/dev/null || true' EXIT
+  GITEA_PF_PID=$!
 
   gitea_local="http://127.0.0.1:3999"
   for _ in $(seq 1 40); do
@@ -471,8 +477,8 @@ if [[ "$EXTERNAL_REPO" == false ]]; then
      The repository was created, so this is the push itself:
        git -C . log --oneline -1"
 
-  kill "${gitea_pf}" 2>/dev/null || true
-  trap - EXIT
+  kill "${GITEA_PF_PID}" 2>/dev/null || true
+  GITEA_PF_PID=""
 
   # The portal publishes here, so it needs the same credential. Written after
   # the install rather than before, because the password is generated with it.
@@ -490,6 +496,21 @@ fi
 
 info "applying the AppProjects"
 kubectl apply -f "${REPO_ROOT}/kubernetes/argocd/projects/" >/dev/null
+
+# app-project admits sources from github.com/yu-min3 and nowhere else, which is
+# the right rule on bare metal and wrong here: the Applications now come from a
+# git server inside the cluster. Without this the scaffolded services — and the
+# demo app, which is one of them — sit at Unknown with "repo ... is not
+# permitted in project 'app-project'", a message that says nothing about
+# AppProjects being the thing to look at.
+#
+# Patched rather than committed, because the restriction is real protection on
+# the cluster that matters and this exception belongs to the throwaway one.
+if [[ "$EXTERNAL_REPO" == false ]]; then
+  kubectl -n argocd patch appproject app-project --type json \
+    -p "[{\"op\": \"add\", \"path\": \"/spec/sourceRepos/-\", \"value\": \"${GITEA_INTERNAL_URL}/*\"}]" \
+    >/dev/null
+fi
 
 # The AppProjects warn about resources no Application manages. On bare metal
 # that is a real signal. On kind it is 50-odd objects that kind itself created,
