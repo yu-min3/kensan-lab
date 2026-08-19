@@ -56,7 +56,9 @@ otel:
 httproute:
   enabled: true
   hostnames:
-    - ${{ values.name }}.app.yu-min3.com
+    # Derived by the template from where the repository went: the real domain
+    # on bare metal, the wildcard the explore certificate covers otherwise.
+    - ${{ values.hostname }}
 
 # gateway-prod protects every hostname it serves (ADR-021 inverted this from
 # opt-in to default), so the service is behind Keycloak whether or not this is

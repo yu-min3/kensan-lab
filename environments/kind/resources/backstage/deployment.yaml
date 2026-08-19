@@ -91,6 +91,30 @@ spec:
                 secretKeyRef:
                   name: backstage-secret
                   key: AUTH_SESSION_SECRET
+            ## The golden path writes to the cluster's own git server and then
+            ## teaches Keycloak to accept the hostname it just created. Neither
+            ## credential exists on bare metal, where the template takes its
+            ## GitHub branch instead.
+            - name: GITEA_ADMIN_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: backstage-explore-gitea
+                  key: username
+            - name: GITEA_ADMIN_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: backstage-explore-gitea
+                  key: password
+            - name: KEYCLOAK_ADMIN_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: backstage-explore-keycloak
+                  key: username
+            - name: KEYCLOAK_ADMIN_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: backstage-explore-keycloak
+                  key: password
             ## Backstage fetches Keycloak's discovery document over HTTPS, and
             ## that certificate is signed by a CA this cluster invented. Node
             ## reads extra roots from this variable and nowhere else — without
