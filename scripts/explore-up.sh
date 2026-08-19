@@ -480,6 +480,12 @@ if [[ "$EXTERNAL_REPO" == false ]]; then
   kill "${GITEA_PF_PID}" 2>/dev/null || true
   GITEA_PF_PID=""
 
+  # The labelled namespace and the browser-facing route. Applied here rather
+  # than left to Argo CD: they describe a component that only exists on this
+  # path, and syncing them where Gitea was never installed leaves a route with
+  # no backend and an Application stuck Degraded.
+  kubectl apply -f "${ENV_DIR}/resources-gitea/gitea.yaml" >/dev/null
+
   # The portal publishes here, so it needs the same credential. Written after
   # the install rather than before, because the password is generated with it.
   kubectl -n backstage create secret generic backstage-explore-gitea \

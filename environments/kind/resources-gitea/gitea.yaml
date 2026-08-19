@@ -1,13 +1,17 @@
 # Gitea's namespace and its route, for browsers.
 #
-# The workload itself is not here: scripts/explore-up.sh installs the chart
-# before Argo CD is pointed anywhere, because Argo CD's source is this server.
-# An Application describing Gitea would have to be read out of Gitea.
+# Applied by scripts/explore-up.sh, not by Argo CD, and deliberately outside
+# `resources/` so that Argo CD never sees it.
 #
-# What is here is everything Argo CD *can* own once it is running. The script
-# creates a bare namespace so the chart has somewhere to land; this replaces it
-# with the labelled one, the same way the Keycloak and oauth2-proxy namespaces
-# are handled.
+# The first attempt put this in `resources/` with everything else. That breaks
+# the one path where Gitea is absent: `--repo` skips the install (CI uses it to
+# point the cluster at a pushed commit), but the Application would still sync
+# this file, and an HTTPRoute whose backend Service does not exist reports
+# ResolvedRefs=False — so explore-resources sits Degraded until the timeout,
+# with the failure named after a component the run never installed.
+#
+# Keeping it beside the chart that creates the Service is what makes the two
+# appear and disappear together.
 apiVersion: v1
 kind: Namespace
 metadata:
