@@ -11,11 +11,11 @@ import {
   coreServices,
   createBackendModule,
 } from '@backstage/backend-plugin-api';
-import { scaffolderActionsExtensionPoint } from '@backstage/plugin-scaffolder-node/alpha';
+import { scaffolderActionsExtensionPoint } from '@backstage/plugin-scaffolder-node';
 import { createGiteaPullRequestAction } from './giteaPullRequest';
 import { createKeycloakRedirectUriAction } from './keycloakRedirectUri';
 
-export const exploreScaffolderActions = createBackendModule({
+export default createBackendModule({
   pluginId: 'scaffolder',
   moduleId: 'explore-actions',
   register(env) {

@@ -402,6 +402,21 @@ kubectl -n backstage create secret generic backstage-explore-keycloak \
   --from-literal=password="${KEYCLOAK_ADMIN_PASSWORD}" \
   --dry-run=client -o yaml | kubectl apply -f - >/dev/null
 
+# The credential the portal publishes with. Created on both paths, because the
+# Deployment names it either way and a secretKeyRef to a Secret that does not
+# exist stops the pod before it starts — with an error about a missing Secret
+# rather than about the git server nobody installed.
+#
+# On --repo there is no Gitea, so this is a placeholder: the integration it
+# configures points at a host that does not resolve, and nothing on that path
+# ever calls it. The same shape the GitHub token takes a few lines below, for
+# the same reason.
+GITEA_ADMIN_PASSWORD="${GITEA_ADMIN_PASSWORD:-no-gitea-on-this-path}"
+kubectl -n backstage create secret generic backstage-explore-gitea \
+  --from-literal=username=gitea-admin \
+  --from-literal=password="${GITEA_ADMIN_PASSWORD}" \
+  --dry-run=client -o yaml | kubectl apply -f - >/dev/null
+
 # Grafana reads its admin credentials from a Secret. Bare metal fills that from
 # Vault; here it is generated, printed at the end, and gone when the cluster is.
 kubectl create namespace monitoring --dry-run=client -o yaml | kubectl apply -f - >/dev/null
@@ -432,6 +447,11 @@ kubectl -n monitoring create secret generic grafana-oidc-explore \
 if [[ "$EXTERNAL_REPO" == false ]]; then
   info "installing Gitea ${GITEA_CHART_VERSION} (the cluster's own git server)"
   GITEA_ADMIN_PASSWORD="$(rand)"
+  # Replaces the placeholder written above, now that there is a real password.
+  kubectl -n backstage create secret generic backstage-explore-gitea \
+    --from-literal=username=gitea-admin \
+    --from-literal=password="${GITEA_ADMIN_PASSWORD}" \
+    --dry-run=client -o yaml | kubectl apply -f - >/dev/null
 
   kubectl create namespace gitea --dry-run=client -o yaml | kubectl apply -f - >/dev/null
   helm repo add gitea-charts "${GITEA_CHART_REPO}" >/dev/null 2>&1 || true
@@ -485,13 +505,6 @@ if [[ "$EXTERNAL_REPO" == false ]]; then
   # path, and syncing them where Gitea was never installed leaves a route with
   # no backend and an Application stuck Degraded.
   kubectl apply -f "${ENV_DIR}/resources-gitea/gitea.yaml" >/dev/null
-
-  # The portal publishes here, so it needs the same credential. Written after
-  # the install rather than before, because the password is generated with it.
-  kubectl -n backstage create secret generic backstage-explore-gitea \
-    --from-literal=username=gitea-admin \
-    --from-literal=password="${GITEA_ADMIN_PASSWORD}" \
-    --dry-run=client -o yaml | kubectl apply -f - >/dev/null
 
   # Argo CD reads over the Service rather than the gateway: the hostname only
   # resolves outside the cluster, and going through the gateway would mean

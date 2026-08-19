@@ -13,10 +13,11 @@
  * Only the explore cluster reaches this. On bare metal the template branches to
  * the GitHub actions instead, and no integrations.gitea entry exists at all.
  */
-import { createTemplateAction } from '@backstage/plugin-scaffolder-node';
-import { ScmIntegrations, getGiteaRequestOptions } from '@backstage/integration';
-import { InputError } from '@backstage/errors';
+import { resolveSafeChildPath } from '@backstage/backend-plugin-api';
 import { Config } from '@backstage/config';
+import { InputError } from '@backstage/errors';
+import { ScmIntegrations, getGiteaRequestOptions } from '@backstage/integration';
+import { createTemplateAction } from '@backstage/plugin-scaffolder-node';
 import fs from 'fs/promises';
 import path from 'path';
 
@@ -42,45 +43,30 @@ async function collectFiles(dir: string, base = dir): Promise<FileToCommit[]> {
 export function createGiteaPullRequestAction(options: { config: Config }) {
   const { config } = options;
 
-  return createTemplateAction<{
-    repoUrl: string;
-    branchName: string;
-    title: string;
-    description: string;
-    sourcePath: string;
-    targetBranch?: string;
-  }>({
+  return createTemplateAction({
     id: 'gitea:pull-request',
     description:
       'Creates a branch on a Gitea repository, commits a directory onto it, and opens a pull request',
     schema: {
       input: {
-        type: 'object',
-        required: ['repoUrl', 'branchName', 'title', 'sourcePath'],
-        properties: {
-          repoUrl: {
-            type: 'string',
-            description: 'host?owner=<owner>&repo=<repo> — the repository to open the request against',
-          },
-          branchName: { type: 'string', description: 'Branch to create' },
-          title: { type: 'string', description: 'Pull request title' },
-          description: { type: 'string', description: 'Pull request body' },
-          sourcePath: {
-            type: 'string',
-            description: 'Directory in the workspace whose contents are committed',
-          },
-          targetBranch: {
-            type: 'string',
-            description: "Branch to merge into (default: the repository's default branch)",
-          },
-        },
+        repoUrl: z =>
+          z
+            .string()
+            .describe('host?owner=<owner>&repo=<repo> — the repository to open the request against'),
+        branchName: z => z.string().describe('Branch to create'),
+        title: z => z.string().describe('Pull request title'),
+        description: z => z.string().optional().describe('Pull request body'),
+        sourcePath: z =>
+          z.string().describe('Directory in the workspace whose contents are committed'),
+        targetBranch: z =>
+          z
+            .string()
+            .optional()
+            .describe("Branch to merge into (default: the repository's default branch)"),
       },
       output: {
-        type: 'object',
-        properties: {
-          remoteUrl: { type: 'string' },
-          pullRequestNumber: { type: 'number' },
-        },
+        remoteUrl: z => z.string().describe('URL of the pull request'),
+        pullRequestNumber: z => z.number().describe('Number of the pull request'),
       },
     },
 
@@ -106,6 +92,7 @@ export function createGiteaPullRequestAction(options: { config: Config }) {
             'This action only runs where a Gitea server is configured.',
         );
       }
+
       // The same helper publish:gitea uses, rather than assembling a Basic
       // header here — it is where the credential shape is allowed to change.
       const authHeaders = getGiteaRequestOptions(integration.config).headers ?? {};
@@ -123,14 +110,14 @@ export function createGiteaPullRequestAction(options: { config: Config }) {
           body: body === undefined ? undefined : JSON.stringify(body),
         });
         if (!res.ok) {
-          throw new Error(
-            `Gitea answered ${res.status} for ${method} ${url}: ${await res.text()}`,
-          );
+          throw new Error(`Gitea answered ${res.status} for ${method} ${url}: ${await res.text()}`);
         }
         return res.status === 204 ? undefined : await res.json();
       };
 
-      const repoInfo: any = await call('GET', `/repos/${owner}/${repo}`);
+      const repoInfo = (await call('GET', `/repos/${owner}/${repo}`)) as {
+        default_branch?: string;
+      };
       const base = targetBranch ?? repoInfo.default_branch ?? 'main';
 
       ctx.logger.info(`Creating branch ${branchName} on ${owner}/${repo} from ${base}`);
@@ -139,7 +126,7 @@ export function createGiteaPullRequestAction(options: { config: Config }) {
         old_branch_name: base,
       });
 
-      const dir = ctx.resolveSafeChildPath(ctx.workspacePath, sourcePath);
+      const dir = resolveSafeChildPath(ctx.workspacePath, sourcePath);
       const files = await collectFiles(dir);
       if (files.length === 0) {
         throw new InputError(`No files under "${sourcePath}" to commit.`);
@@ -157,12 +144,12 @@ export function createGiteaPullRequestAction(options: { config: Config }) {
         });
       }
 
-      const pr: any = await call('POST', `/repos/${owner}/${repo}/pulls`, {
+      const pr = (await call('POST', `/repos/${owner}/${repo}/pulls`, {
         head: branchName,
         base,
         title,
         body: description ?? '',
-      });
+      })) as { number: number; html_url: string };
 
       ctx.output('pullRequestNumber', pr.number);
       ctx.output('remoteUrl', pr.html_url);

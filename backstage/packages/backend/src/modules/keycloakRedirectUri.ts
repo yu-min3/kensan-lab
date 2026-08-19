@@ -20,31 +20,22 @@
  * with one visitor and one cluster that cannot happen, and the read-modify-write
  * below is deliberately simple for that reason.
  */
-import { createTemplateAction } from '@backstage/plugin-scaffolder-node';
-import { InputError } from '@backstage/errors';
 import { Config } from '@backstage/config';
+import { InputError } from '@backstage/errors';
+import { createTemplateAction } from '@backstage/plugin-scaffolder-node';
 
 export function createKeycloakRedirectUriAction(options: { config: Config }) {
   const { config } = options;
 
-  return createTemplateAction<{ hostname: string; clientId?: string }>({
+  return createTemplateAction({
     id: 'keycloak:redirect-uri:add',
     description:
       "Adds https://<hostname>/oauth2/callback to a Keycloak client's redirect URIs",
     schema: {
       input: {
-        type: 'object',
-        required: ['hostname'],
-        properties: {
-          hostname: {
-            type: 'string',
-            description: 'The host the new service is served on',
-          },
-          clientId: {
-            type: 'string',
-            description: 'Client to update (default: oauth2-proxy)',
-          },
-        },
+        hostname: z => z.string().describe('The host the new service is served on'),
+        clientId: z =>
+          z.string().optional().describe('Client to update (default: oauth2-proxy)'),
       },
     },
 
@@ -100,7 +91,10 @@ export function createKeycloakRedirectUriAction(options: { config: Config }) {
         return res.status === 204 ? undefined : await res.json();
       };
 
-      const found: any[] = await admin('GET', `/clients?clientId=${encodeURIComponent(clientId)}`);
+      const found = (await admin(
+        'GET',
+        `/clients?clientId=${encodeURIComponent(clientId)}`,
+      )) as Array<{ id: string; redirectUris?: string[] }>;
       if (!found?.length) {
         throw new Error(`No client "${clientId}" in realm "${realm}".`);
       }
