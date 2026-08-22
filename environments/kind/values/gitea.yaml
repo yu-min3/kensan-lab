@@ -1,0 +1,90 @@
+# gitea — explore only. The real cluster reads from GitHub; this server is what
+# lets a visitor run the golden path end to end without holding a token, and it
+# is what Argo CD syncs from here.
+#
+# Installed by scripts/explore-up.sh rather than by an Application, because Argo
+# CD's own source is this server: an Application describing Gitea would have to
+# be read out of Gitea before Gitea exists.
+#
+# The numbers below were measured on a kind cluster rather than guessed —
+# projects/kensan-lab/records/2026-08-18-gitea-feasibility-verification.md.
+
+# The chart defaults to postgresql-ha (3) + pgpool + valkey-cluster (3): eight
+# pods and 1408 MiB of requests, against the 8 GiB the whole cluster shares.
+# Falling back to the embedded SQLite brings that down to one Deployment, and
+# these four switches are the entire difference.
+postgresql-ha:
+  enabled: false
+postgresql:
+  enabled: false
+valkey-cluster:
+  enabled: false
+valkey:
+  enabled: false
+
+replicaCount: 1
+
+# The chart sets no resources on Gitea itself. Stated here so this is not the
+# one workload in the slice without a request, and so Kyverno's audit has
+# something to read.
+resources:
+  requests:
+    cpu: 100m
+    memory: 256Mi
+  limits:
+    memory: 512Mi
+
+# The volume holds the repositories, so a rolling update would have two pods
+# reaching for the same RWO claim — the new one crash-loops until the old one
+# lets go. Recreate is not a preference here, it is the only strategy that works.
+strategy:
+  type: Recreate
+
+persistence:
+  enabled: true
+  size: 2Gi
+  # Named longhorn, backed by local-path — the same substitution the rest of the
+  # slice makes so that every PVC in this repository binds unmodified.
+  storageClass: longhorn
+
+service:
+  http:
+    type: ClusterIP
+    port: 3000
+
+gitea:
+  admin:
+    username: gitea-admin
+    email: gitea-admin@example.com
+    # Replaced on the command line by explore-up.sh with a generated value.
+    # Never a committed credential: this cluster publishes ports 80 and 443 on
+    # whatever machine runs it.
+    password: replaced-at-install-time
+  config:
+    database:
+      DB_TYPE: sqlite3
+    server:
+      # Argo CD and Backstage reach this over the in-cluster Service, but the
+      # clone URLs Gitea prints and the redirects it issues are read by a
+      # browser — so they have to carry the name a browser can resolve.
+      DOMAIN: gitea.127-0-0-1.sslip.io
+      ROOT_URL: https://gitea.127-0-0-1.sslip.io/
+      SSH_DOMAIN: gitea.127-0-0-1.sslip.io
+    service:
+      # Accounts are created by explore-up.sh. Nothing here should offer a
+      # sign-up form to whoever finds the port open.
+      DISABLE_REGISTRATION: true
+    session:
+      COOKIE_SECURE: true
+    security:
+      # Skip the first-run installer screen; the cluster is configured already.
+      INSTALL_LOCK: true
+
+# Reached through the Gateway API (resources/gitea/httproute.yaml), not the
+# chart's own Ingress.
+ingress:
+  enabled: false
+
+# Note: chart 12.x rejects an `actions` key outright — Gitea Actions moved to a
+# separate chart — so there is deliberately no `actions: {enabled: false}` here.
+# Adding one fails the render with a message about migration.

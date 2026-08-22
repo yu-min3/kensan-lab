@@ -77,6 +77,12 @@ jobs:
               "owner": "platform-engineering",
               "system": "developer-portal",
               "domain": "platform",
+              # Appearance, and where the service is served. These reach the
+              # running pod as environment variables rather than being built in,
+              # so the rendered values file is where they have to appear.
+              "theme": "night",
+              "message": "hello from CI",
+              "hostname": "widget-service.app.yu-min3.com",
           }
           # Dotted references (values.destination.x) count too — the earlier
           # pattern matched only single words, so a placeholder the scaffolder
@@ -245,6 +251,12 @@ jobs:
               "owner": "platform-engineering",
               "system": "developer-portal",
               "domain": "platform",
+              # Appearance, and where the service is served. These reach the
+              # running pod as environment variables rather than being built in,
+              # so the rendered values file is where they have to appear.
+              "theme": "night",
+              "message": "hello from CI",
+              "hostname": "widget-service.app.yu-min3.com",
           }
           pattern = re.compile(r"\$\{\{\s*values\.([\w.]+)\s*\}\}")
           missing = set()

@@ -1,5 +1,22 @@
 # syntax=docker/dockerfile:1
-# Multi-stage build for optimized FastAPI application with uv
+# Multi-stage build: a React frontend built to static files, served by a
+# FastAPI backend.
+#
+# The frontend is built here and never again. What somebody chose in the
+# scaffolder form is *not* baked in — it arrives at runtime through
+# /api/config, so one image serves every variant and changing the look is a
+# pull request against deploy/values.yaml rather than a rebuild.
+
+FROM docker.io/library/node:22-slim AS frontend
+
+WORKDIR /frontend
+
+# Dependencies first, so a change to the source does not re-resolve them.
+COPY frontend/package.json frontend/package-lock.json* ./
+RUN npm install --no-audit --no-fund
+
+COPY frontend/ ./
+RUN npm run build
 
 FROM docker.io/library/python:3.11-slim AS builder
 
@@ -35,6 +52,11 @@ COPY --from=builder /app/.venv /app/.venv
 
 # Copy application code
 COPY app/ /app/
+
+# The built frontend. main.py mounts it only if the directory exists, so a
+# checkout without a frontend build still starts — that is what `make dev`
+# relies on.
+COPY --from=frontend /frontend/dist /app/static
 
 # Create non-root user
 RUN useradd -m -u 1000 appuser && \

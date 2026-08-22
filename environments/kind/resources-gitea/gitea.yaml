@@ -1,0 +1,62 @@
+# Gitea's namespace and its route, for browsers.
+#
+# Applied by scripts/explore-up.sh, not by Argo CD, and deliberately outside
+# `resources/` so that Argo CD never sees it.
+#
+# The first attempt put this in `resources/` with everything else. That breaks
+# the one path where Gitea is absent: `--repo` skips the install (CI uses it to
+# point the cluster at a pushed commit), but the Application would still sync
+# this file, and an HTTPRoute whose backend Service does not exist reports
+# ResolvedRefs=False — so explore-resources sits Degraded until the timeout,
+# with the failure named after a component the run never installed.
+#
+# Keeping it beside the chart that creates the Service is what makes the two
+# appear and disappear together.
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: gitea
+  annotations:
+    ## Namespaces go early, with the other namespaces.
+    argocd.argoproj.io/sync-wave: "0"
+  labels:
+    ## Two contracts at once, and missing either fails without mentioning
+    ## labels: Kyverno's ns-label-contract wants environment and tier, and
+    ## gateway-explore admits routes by namespace selector — a route in a
+    ## namespace without `environment` comes back NotAllowedByListeners.
+    kensan-lab.platform/environment: infrastructure
+    kensan-lab.platform/tier: platform
+    kensan-lab.platform/app: gitea
+    kensan-lab.platform/pss-level: baseline
+    pod-security.kubernetes.io/enforce: baseline
+---
+# Argo CD does not use this route. It reads Gitea over the in-cluster Service,
+# which keeps the self-signed CA out of repo-server's trust store. This
+# hostname is for people: the repository the scaffolder created, and the pull
+# request it opened, are read here.
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: gitea
+  namespace: gitea
+  annotations:
+    ## After the Gateway, which is wave 2. A route applied before its parent
+    ## exists is never Accepted, and Argo CD waits for it to become healthy
+    ## before moving on — so the certificates later in this Application never
+    ## get applied, and every component that mounts the CA sits in
+    ## FailedMount. The same wave the other routes use, for the same reason.
+    argocd.argoproj.io/sync-wave: "4"
+spec:
+  parentRefs:
+    - group: gateway.networking.k8s.io
+      kind: Gateway
+      namespace: istio-system
+      name: gateway-explore
+  hostnames:
+    - gitea.127-0-0-1.sslip.io
+  rules:
+    - backendRefs:
+        - group: ""
+          kind: Service
+          name: gitea-http
+          port: 3000

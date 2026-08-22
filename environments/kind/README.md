@@ -144,12 +144,39 @@ to differ.
     Explore ran the older one for a while and showed a guest sign-in card
     behind the SSO gate. Check the package, not just the tag.
 
+## Gitea, and why it is not like the others
+
+Everything else here is bare metal with a value swapped. Gitea is not: the
+production cluster has no such component, and no Application describes it.
+
+It exists because the golden path could not be finished without it. Pressing
+Create in the portal writes to a git server and opens a change against the
+platform repository — and a visitor holds no credential for the author's GitHub
+account, so on GitHub that button stops halfway whatever token they bring. With
+a git server inside the cluster it completes: a repository is created, a pull
+request is opened, merging it deploys the service.
+
+It pays for itself twice. Argo CD reads from it too, so `make try` runs **the
+checkout in front of you** — no push, no fork, and no fifteen-minute wait to
+discover you forgot one.
+
+Three things about it are easy to get wrong:
+
+| | |
+|---|---|
+| **It cannot be an Application** | Argo CD's source is Gitea. A manifest describing Gitea would have to be read out of Gitea before Gitea exists. `scripts/explore-up.sh` installs it, the same way it installs Argo CD |
+| **It needs the StorageClass early** | It claims a volume before Argo CD has synced anything, so `longhorn` is applied next to the demotion of kind's built-in class rather than left to arrive with the Applications |
+| **`strategy: Recreate` is required** | The claim is RWO. A rolling update leaves two pods reaching for it and the new one crash-loops until the old one lets go |
+
+What it carries is the last commit, not the working tree — `git push HEAD`. Work
+that is committed but not pushed runs; work that is only saved does not.
+
 ## Why the substitutions are permanent
 
-Eight of the files here exist because a hostname is hardcoded in a raw
+Nine of the files here exist because a hostname is hardcoded in a raw
 manifest — the Gateway, the routes for Argo CD, Backstage, Grafana and Keycloak,
-the wildcard certificate, Keycloak's env config, and the authorization policy
-naming the protected host. For a while the plan was to centralise those values behind
+the wildcard certificate, Keycloak's env config, the route for Gitea, and the
+authorization policy naming the hosts it does *not* protect. For a while the plan was to centralise those values behind
 a `site.yaml` and delete these copies. **That is no longer planned**, so they
 stay.
 
@@ -170,7 +197,7 @@ render step at bootstrap, with plain manifests on the other side. That is a
 different kind of repository than a reference architecture, and copying its
 answer here would mean becoming one.
 
-So: expect these eight to stay, keep them small, and keep new site-specific
+So: expect these nine to stay, keep them small, and keep new site-specific
 values out of raw manifests anyway — rule 6 above still holds, because it is
 what keeps the count from growing past the hostnames that genuinely need one.
 

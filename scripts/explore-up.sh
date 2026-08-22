@@ -27,6 +27,13 @@ PREVIOUS_CONTEXT="$(kubectl config current-context 2>/dev/null || true)"
 on_exit() {
   local status=$?
   rm -rf "${TMP_DIR}"
+  # The seed's port-forward, if one is still running. Held here rather than
+  # behind its own trap: replacing this one would drop the context restore
+  # below, and the failure would be a kubectl pointing at a cluster that no
+  # longer exists.
+  if [[ -n "${GITEA_PF_PID:-}" ]]; then
+    kill "${GITEA_PF_PID}" 2>/dev/null || true
+  fi
   if [[ "$status" -ne 0 && -n "$PREVIOUS_CONTEXT" ]]; then
     kubectl config use-context "$PREVIOUS_CONTEXT" >/dev/null 2>&1 || true
   fi
@@ -61,6 +68,19 @@ REVISION="$(git -C "${REPO_ROOT}" symbolic-ref --short HEAD 2>/dev/null || true)
 REVISION_IS_LOCAL_BRANCH=true
 [[ -n "$REVISION" ]] || REVISION_IS_LOCAL_BRANCH=false
 REVISION="${REVISION:-main}"
+
+# Where Argo CD reads from.
+#
+# By default: an in-cluster Gitea, seeded from this checkout. Nothing has to be
+# pushed anywhere, a fork is not required, and the golden path can create
+# repositories without a GitHub token — which is the whole reason it is here.
+#
+# With --repo: that URL instead, and no Gitea. CI uses this to point the cluster
+# at the commit under review, where the pushed commit *is* the thing being
+# proved.
+EXTERNAL_REPO=false
+GITEA_INTERNAL_URL="http://gitea-http.gitea.svc.cluster.local:3000"
+GITEA_REPO_PATH="gitea-admin/kensan-lab.git"
 # Argo CD needs to pull manifests from a repository it can reach. Everything
 # below is read from git over HTTPS, so a fork has to be pushed before it can be
 # explored — there is no local-path mode, and pretending otherwise would only
@@ -99,7 +119,7 @@ EOF
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
-    --repo) REPO_URL="$2"; shift 2 ;;
+    --repo) REPO_URL="$2"; EXTERNAL_REPO=true; shift 2 ;;
     --rev) REVISION="$2"; REVISION_IS_LOCAL_BRANCH=false; shift 2 ;;
     --timeout) WAIT_TIMEOUT="$2"; shift 2 ;;
     -h|--help) usage; exit 0 ;;
@@ -176,7 +196,9 @@ fi
 # passed --rev explicitly may well have named a commit SHA — CI does — and a SHA
 # is not something `ls-remote --heads` can find even when it is perfectly
 # fetchable. Checking it as a branch would refuse a run that would have worked.
-if [[ "$REVISION_IS_LOCAL_BRANCH" == true ]] \
+# Only in external mode. Seeding Gitea from the checkout removes the question
+# entirely: what runs is what is on disk, pushed or not.
+if [[ "$EXTERNAL_REPO" == true && "$REVISION_IS_LOCAL_BRANCH" == true ]] \
   && git -C "${REPO_ROOT}" rev-parse --git-dir >/dev/null 2>&1; then
   if ! git -C "${REPO_ROOT}" ls-remote --exit-code --heads origin "$REVISION" >/dev/null 2>&1; then
     fail "the branch '${REVISION}' is not on ${REPO_URL} yet.
@@ -227,6 +249,14 @@ info "demoting kind's built-in StorageClass so 'longhorn' can be the default"
 kubectl patch storageclass standard \
   -p '{"metadata":{"annotations":{"storageclass.kubernetes.io/is-default-class":"false"}}}' \
   >/dev/null
+
+# The replacement is applied in the same breath as the demotion, rather than
+# left to arrive with the Applications. Gitea is installed before Argo CD is
+# pointed anywhere and it claims a volume — with the built-in class demoted and
+# `longhorn` not yet created, that claim has nothing to bind to and the pod sits
+# Pending until the timeout. Argo CD owns the same manifest a few minutes later
+# and finds it already matching.
+kubectl apply -f "${ENV_DIR}/resources/storageclass-longhorn.yaml" >/dev/null
 
 # The one name that has to mean two different things.
 #
@@ -364,6 +394,29 @@ kubectl -n backstage create secret generic backstage-explore-github \
   --from-literal=GITHUB_TOKEN="${GITHUB_TOKEN}" \
   --dry-run=client -o yaml | kubectl apply -f - >/dev/null
 
+# What the golden path writes with. The Gitea credential is created a few lines
+# further down, so the Secret is written there; this one exists now because the
+# realm's admin password is already generated.
+kubectl -n backstage create secret generic backstage-explore-keycloak \
+  --from-literal=username=admin \
+  --from-literal=password="${KEYCLOAK_ADMIN_PASSWORD}" \
+  --dry-run=client -o yaml | kubectl apply -f - >/dev/null
+
+# The credential the portal publishes with. Created on both paths, because the
+# Deployment names it either way and a secretKeyRef to a Secret that does not
+# exist stops the pod before it starts — with an error about a missing Secret
+# rather than about the git server nobody installed.
+#
+# On --repo there is no Gitea, so this is a placeholder: the integration it
+# configures points at a host that does not resolve, and nothing on that path
+# ever calls it. The same shape the GitHub token takes a few lines below, for
+# the same reason.
+GITEA_ADMIN_PASSWORD="${GITEA_ADMIN_PASSWORD:-no-gitea-on-this-path}"
+kubectl -n backstage create secret generic backstage-explore-gitea \
+  --from-literal=username=gitea-admin \
+  --from-literal=password="${GITEA_ADMIN_PASSWORD}" \
+  --dry-run=client -o yaml | kubectl apply -f - >/dev/null
+
 # Grafana reads its admin credentials from a Secret. Bare metal fills that from
 # Vault; here it is generated, printed at the end, and gone when the cluster is.
 kubectl create namespace monitoring --dry-run=client -o yaml | kubectl apply -f - >/dev/null
@@ -379,8 +432,107 @@ kubectl -n monitoring create secret generic grafana-oidc-explore \
   --from-literal=GF_AUTH_GENERIC_OAUTH_CLIENT_SECRET="${GRAFANA_CLIENT_SECRET}" \
   --dry-run=client -o yaml | kubectl apply -f - >/dev/null
 
+# ---------------------------------------------------------------------------
+# Gitea — the git server Argo CD reads from, and the one the portal writes to
+# ---------------------------------------------------------------------------
+#
+# Installed out of band for the same reason Argo CD is: it cannot be described
+# by an Application that Argo CD would have to read out of it.
+#
+# Everything else in the slice mirrors bare metal. This does not: the real
+# cluster reads from GitHub. It is the fourth substitution, and it buys two
+# things nothing else can. A visitor never pushes anything — what runs is the
+# checkout they are sitting in. And the golden path can create a repository and
+# open a pull request without a credential for somebody else's account.
+if [[ "$EXTERNAL_REPO" == false ]]; then
+  info "installing Gitea ${GITEA_CHART_VERSION} (the cluster's own git server)"
+  GITEA_ADMIN_PASSWORD="$(rand)"
+  # Replaces the placeholder written above, now that there is a real password.
+  kubectl -n backstage create secret generic backstage-explore-gitea \
+    --from-literal=username=gitea-admin \
+    --from-literal=password="${GITEA_ADMIN_PASSWORD}" \
+    --dry-run=client -o yaml | kubectl apply -f - >/dev/null
+
+  kubectl create namespace gitea --dry-run=client -o yaml | kubectl apply -f - >/dev/null
+  helm repo add gitea-charts "${GITEA_CHART_REPO}" >/dev/null 2>&1 || true
+  helm repo update gitea-charts >/dev/null
+  helm upgrade --install gitea gitea-charts/gitea \
+    --version "${GITEA_CHART_VERSION}" \
+    --namespace gitea \
+    --values "${ENV_DIR}/values/gitea.yaml" \
+    --set "gitea.admin.password=${GITEA_ADMIN_PASSWORD}" \
+    --wait --timeout 8m >/dev/null
+
+  # The gateway route for Gitea arrives with the Applications, minutes from now,
+  # so the seed cannot go through it. A port-forward is the one path that exists
+  # at this point and it needs nothing from Istio.
+  info "seeding it with this checkout (nothing has to be pushed anywhere)"
+  kubectl -n gitea port-forward svc/gitea-http 3999:3000 >/dev/null 2>&1 &
+  GITEA_PF_PID=$!
+
+  gitea_local="http://127.0.0.1:3999"
+  for _ in $(seq 1 40); do
+    curl -sf -o /dev/null --max-time 2 "${gitea_local}/api/healthz" && break
+    sleep 1
+  done
+
+  curl -sf -o /dev/null --max-time 30 \
+    -u "gitea-admin:${GITEA_ADMIN_PASSWORD}" \
+    -H 'Content-Type: application/json' \
+    -d '{"name":"kensan-lab","private":false,"auto_init":false}' \
+    "${gitea_local}/api/v1/user/repos" \
+    || fail "Gitea did not accept the repository that holds this checkout.
+     It answered on the port-forward, so this is the API rather than the pod:
+       kubectl -n gitea logs deploy/gitea --tail=50"
+
+  # http.postBuffer is not optional. Above the default 1 MiB git switches to a
+  # chunked request with no Content-Length, and the receiving end refuses it —
+  # measured against both GitHub and Gitea, so it is git's behaviour and not a
+  # property of either server. Without this the push dies with
+  # "unexpected disconnect while reading sideband packet" after writing 100%.
+  git -C "${REPO_ROOT}" -c http.postBuffer=524288000 push --quiet --force \
+    "http://gitea-admin:${GITEA_ADMIN_PASSWORD}@127.0.0.1:3999/${GITEA_REPO_PATH}" \
+    "HEAD:refs/heads/main" \
+    || fail "could not seed Gitea with this checkout.
+     The repository was created, so this is the push itself:
+       git -C . log --oneline -1"
+
+  kill "${GITEA_PF_PID}" 2>/dev/null || true
+  GITEA_PF_PID=""
+
+  # The labelled namespace and the browser-facing route. Applied here rather
+  # than left to Argo CD: they describe a component that only exists on this
+  # path, and syncing them where Gitea was never installed leaves a route with
+  # no backend and an Application stuck Degraded.
+  kubectl apply -f "${ENV_DIR}/resources-gitea/gitea.yaml" >/dev/null
+
+  # Argo CD reads over the Service rather than the gateway: the hostname only
+  # resolves outside the cluster, and going through the gateway would mean
+  # teaching repo-server about the self-signed CA for no gain.
+  REPO_URL="${GITEA_INTERNAL_URL}/${GITEA_REPO_PATH%.git}"
+  REVISION=main
+fi
+
 info "applying the AppProjects"
 kubectl apply -f "${REPO_ROOT}/kubernetes/argocd/projects/" >/dev/null
+
+# app-project admits sources from github.com/yu-min3 and nowhere else, which is
+# the right rule on bare metal and wrong here: the Applications now come from a
+# git server inside the cluster. Without this the scaffolded services — and the
+# demo app, which is one of them — sit at Unknown with "repo ... is not
+# permitted in project 'app-project'", a message that says nothing about
+# AppProjects being the thing to look at.
+#
+# Patched rather than committed, because the restriction is real protection on
+# the cluster that matters and this exception belongs to the throwaway one.
+if [[ "$EXTERNAL_REPO" == false ]]; then
+  # The exact URL, not a glob. Argo CD matches sourceRepos with a glob that does
+  # not cross '/', so `${GITEA_INTERNAL_URL}/*` misses a two-segment path and the
+  # Application stays Unknown with InvalidSpecError. Measured.
+  kubectl -n argocd patch appproject app-project --type json \
+    -p "[{\"op\": \"add\", \"path\": \"/spec/sourceRepos/-\", \"value\": \"${REPO_URL}\"}]" \
+    >/dev/null
+fi
 
 # The AppProjects warn about resources no Application manages. On bare metal
 # that is a real signal. On kind it is 50-odd objects that kind itself created,
@@ -823,6 +975,20 @@ fi
 admin_password="$(kubectl -n argocd get secret argocd-initial-admin-secret \
   -o jsonpath='{.data.password}' 2>/dev/null | base64 --decode || echo '(already rotated)')"
 
+# Composed here rather than written inline, so that --repo — which skips Gitea
+# entirely — does not print a section about a component nobody installed.
+if [[ "$EXTERNAL_REPO" == false ]]; then
+  GITEA_NOTE="
+  5. Look at the git server          https://gitea.127-0-0-1.sslip.io
+     user 'gitea-admin', password '${GITEA_ADMIN_PASSWORD}'.
+     Argo CD reads this cluster from here rather than from GitHub. That is why
+     nothing had to be pushed for your checkout to be what is running, and why
+     'Create' in the portal can make a repository without a token.
+"
+else
+  GITEA_NOTE=""
+fi
+
 cat <<EOF
 
   The platform is up. Five things worth doing, in order.
@@ -862,8 +1028,8 @@ cat <<EOF
      Backstage signs you in against the same Keycloak, then resolves you to a
      user in its catalog. 'Create' holds the golden path template — the demo
      app above is what it produces.
-
-  5. See what the policy engine thinks
+${GITEA_NOTE}
+  6. See what the policy engine thinks
        kubectl get policyreport -A
      Kyverno is running the production policies in Audit mode, so violations
      are reported rather than blocked (ADR-012).

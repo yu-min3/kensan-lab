@@ -34,21 +34,36 @@ spec:
     ## Declared in kubernetes/network/istio/istiod/values.yaml, which explore
     ## uses unmodified — the ext_authz wiring is shared, only its scope is not.
     name: oauth2-proxy
-  ## Adding a host here is half the job: the same hostname has to be a
-  ## registered redirect URI on the oauth2-proxy client, which
-  ## scripts/explore-up.sh writes. Keycloak cannot wildcard a host, so the two
-  ## lists are enumerated and have to agree — a host present here but missing
-  ## there gets as far as the login page and then "Invalid parameter:
-  ## redirect_uri".
+  ## Gated by default, with the exceptions named rather than the members.
+  ##
+  ## The inverted form is what lets the golden path work: a service scaffolded
+  ## from the portal gets a hostname nobody knew at install time, and a list of
+  ## members would have to be edited — in Git, by hand, before the service can
+  ## be signed in to. Argo CD reverts anything patched in live, so there is no
+  ## shortcut. Naming the exceptions instead means a new hostname is protected
+  ## the moment its route exists.
+  ##
+  ## The Keycloak side does *not* invert. Its redirect URIs are matched
+  ## literally, and a wildcard in the host is accepted at registration and then
+  ## refused at authorization with "Invalid parameter: redirect_uri" — measured,
+  ## not assumed. Each new hostname is registered against the oauth2-proxy
+  ## client as it is created; scripts/explore-up.sh does that for the hosts it
+  ## installs, and the scaffolder does it for the ones it creates.
   rules:
     - to:
         - operation:
             hosts:
-              - demo.127-0-0-1.sslip.io
-              ## Backstage is not here. It talks to Keycloak itself now, the
-              ## same as Argo CD and Grafana, so a gate in front would mean
-              ## signing in twice — see the table in the quickstart for which
-              ## side of that line each component sits on.
+              - "*.127-0-0-1.sslip.io"
+            ## Everything that holds its own OIDC client. A gate in front of
+            ## these would mean signing in twice — see the table in the
+            ## quickstart for which side of that line each component sits on.
+            ## Gitea is here for the same reason.
+            notHosts:
+              - auth.127-0-0-1.sslip.io
+              - argocd.127-0-0-1.sslip.io
+              - grafana.127-0-0-1.sslip.io
+              - backstage.127-0-0-1.sslip.io
+              - gitea.127-0-0-1.sslip.io
             ## The OIDC round trip cannot be gated by the thing it is trying to
             ## satisfy: ext_authz checks a cookie, and the callback is where the
             ## cookie is first set. These paths go straight to the proxy.

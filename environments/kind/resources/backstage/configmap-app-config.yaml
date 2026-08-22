@@ -81,6 +81,27 @@ data:
           production:
             metadataUrl: https://auth.127-0-0-1.sslip.io/realms/kensan/.well-known/openid-configuration
 
+    # The cluster's own git server. Present only here: bare metal has no such
+    # entry, which is what keeps the template's Gitea branch from resolving
+    # there. Reached over the Service rather than the gateway, so Node does not
+    # need to be told about the self-signed CA for this call.
+    integrations:
+      gitea:
+        - host: gitea.127-0-0-1.sslip.io
+          baseUrl: http://gitea-http.gitea.svc.cluster.local:3000
+          username: ${GITEA_ADMIN_USERNAME}
+          password: ${GITEA_ADMIN_PASSWORD}
+
+    # Read by the keycloak:redirect-uri:add action. A new service's hostname has
+    # to be accepted by Keycloak before anybody can sign in to it, and a
+    # wildcard is refused at authorization — so it is registered as it is made.
+    kensanLab:
+      keycloakAdmin:
+        baseUrl: http://keycloak.platform-auth-prod.svc.cluster.local:8080
+        realm: kensan
+        username: ${KEYCLOAK_ADMIN_USERNAME}
+        password: ${KEYCLOAK_ADMIN_PASSWORD}
+
     catalog:
       providers:
         github:

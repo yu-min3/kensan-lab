@@ -55,6 +55,7 @@ if [[ "$PRUNE_IMAGES" == true ]]; then
     'ghcr.io/dexidp/' \
     'ghcr.io/yu-min3/kensan-lab/explore-demo' \
     'quay.io/keycloak/' \
+    'docker.io/gitea/' \
     'kindest/node'
   do
     ids="$(docker images --filter "reference=${pattern}*" -q | sort -u)"
