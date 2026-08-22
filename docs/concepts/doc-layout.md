@@ -15,6 +15,10 @@ Documentation in this repository is **split by layer, each with a fixed responsi
 | **`.claude/rules/`** | **Thin AI-facing summary + globs** | `.claude/rules/<topic>.md` | 3–5 line rules, the applicable glob, a link into `docs/` | Detailed tables (belongs in `docs/`), human-oriented explanation |
 | **`CLAUDE.md`** | **The AI entry point** | `/CLAUDE.md` | Mandatory constraints, an index into `rules/`, the directory tree | The tech-stack table (belongs in the Top README), layout details (belongs in the per-dir README) |
 
+## Change-local working state
+
+`specs/NNN-<slug>/` is outside the documentation layers above. It stores the durable audit trail for one in-progress or completed change: requirements, acceptance criteria, implementation plan, tasks, and independent-review records. It is not part of MkDocs navigation and must not duplicate stable cross-cutting facts from `docs/`, ADRs, or `.claude/rules/`.
+
 ## Topic → source-of-truth map
 
 The definitive answer to "where is this information documented." When adding new information, use this table first to decide where it goes.
@@ -29,6 +33,7 @@ The definitive answer to "where is this information documented." When adding new
 | GitOps workflow | `.claude/rules/gitops-workflow.md` | `CLAUDE.md` Mandatory Constraints |
 | Cluster topology (nodes, labels, scheduling) | `.claude/rules/kubernetes-cluster.md` | `kubernetes/README.md` |
 | Tech stack | Top `README.md` | `docs/index.md` |
+| SDD workflow | `docs/guides/sdd-workflow.md` | `specs/README.md` (working-state entry point) |
 
 ## Rendering target
 

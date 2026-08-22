@@ -1,0 +1,30 @@
+name: SDD Harness CI
+
+on:
+  pull_request:
+    paths:
+      - ".claude/skills/sdd-*/**"
+      - "docs/guides/sdd-workflow.md"
+      - "scripts/sdd_gate.py"
+      - "specs/**"
+      - "tests/test_sdd_gate.py"
+      - ".github/workflows/sdd-ci.yml"
+  push:
+    branches: [main]
+    paths:
+      - ".claude/skills/sdd-*/**"
+      - "docs/guides/sdd-workflow.md"
+      - "scripts/sdd_gate.py"
+      - "specs/**"
+      - "tests/test_sdd_gate.py"
+      - ".github/workflows/sdd-ci.yml"
+
+jobs:
+  fixture-gates:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: python3 -m unittest tests/test_sdd_gate.py
+      - run: python3 scripts/sdd_gate.py classify --stateful | grep -qx full
+      - run: python3 scripts/sdd_gate.py classify --behavior-change --specific-acceptance | grep -qx lite
+      - run: python3 scripts/sdd_gate.py classify --behavior-change | grep -qx none

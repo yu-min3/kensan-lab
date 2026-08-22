@@ -57,6 +57,17 @@ ghcrPullSecret:
 # inert, but leaving it on would suggest a controller is watching it.
 reloader: false
 
+# Exercise the same stateful path as a real app. Explore maps the repository's
+# `longhorn` contract to kind's local-path provisioner, then Explore CI proves
+# that the claim binds and survives a Pod replacement.
+pvc:
+  enabled: true
+  create: true
+  name: demo-data
+  size: 128Mi
+  storageClass: longhorn
+  mountPath: /data
+
 httproute:
   enabled: true
   hostnames:
