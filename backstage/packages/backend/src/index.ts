@@ -16,11 +16,6 @@ backend.add(import('@backstage/plugin-proxy-backend'));
 // scaffolder plugin
 backend.add(import('@backstage/plugin-scaffolder-backend'));
 backend.add(import('@backstage/plugin-scaffolder-backend-module-github'));
-// Publishing to a Gitea server. Only the explore slice configures an
-// integrations.gitea entry and only its template branch reaches publish:gitea,
-// so on bare metal this module is registered and never invoked — which is the
-// cheaper half of keeping one template for both.
-backend.add(import('@backstage/plugin-scaffolder-backend-module-gitea'));
 // Two actions Backstage does not ship: opening a pull request against a Gitea
 // repository, and registering a new hostname's callback with Keycloak. Both
 // refuse to run without configuration only the explore cluster carries.
