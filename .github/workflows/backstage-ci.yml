@@ -206,12 +206,16 @@ jobs:
       # Built for one architecture first so there is something to start. The
       # multi-arch build below reuses the layer cache, so this costs a startup
       # rather than a second build.
+      # Same tag the pull request path builds, deliberately. The check below is
+      # copied verbatim between the two jobs, and the first version of this file
+      # had them build different tags — the copy still said `backstage:ci` and
+      # the release job failed on "Unable to find image". One name, no drift.
       - name: Build the image for the check
         run: |
           docker build \
             --platform linux/amd64 \
             -f packages/backend/Dockerfile \
-            -t backstage:release-check \
+            -t backstage:ci \
             .
 
       # The image builds, and that says nothing about whether it starts.
