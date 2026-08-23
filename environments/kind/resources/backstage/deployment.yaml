@@ -50,7 +50,7 @@ spec:
           ## can push to — see .github/workflows/backstage-ci.yml. Bare metal
           ## pins the same tag from the same package now, so explore and
           ## production run one artifact rather than two that share a number.
-          image: ghcr.io/yu-min3/kensan-lab/backstage:v0.0.15
+          image: ghcr.io/yu-min3/kensan-lab/backstage:v0.0.16
           imagePullPolicy: IfNotPresent
           ## The two configs baked into the image, then the explore overrides.
           ## Order matters: later files win.
