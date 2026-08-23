@@ -100,6 +100,69 @@ jobs:
             -t backstage:ci \
             .
 
+      # The image builds, and that says nothing about whether it starts.
+      #
+      # v0.0.15 was published green: yarn tsc passed, the bundle assembled, the
+      # image built and pushed, and the container came up listening on 7007 —
+      # then aborted plugin initialization on a dependency that only exists at
+      # runtime. Every route was missing, so the only signal Kubernetes could
+      # give was "Liveness probe failed: 404", nineteen minutes into the cluster
+      # job and pointing at the probe rather than at the cause.
+      #
+      # Thirty seconds here instead. Anything that stops the backend from
+      # finishing its startup — a duplicated package, a config that does not
+      # load, a migration that fails — fails at the same layer as `yarn tsc`,
+      # with the real error in the log.
+      - name: Check that the image actually starts
+        run: |
+          docker network create smoke
+          docker run -d --name smoke-db --network smoke \
+            -e POSTGRES_USER=postgres -e POSTGRES_PASSWORD=postgres \
+            postgres:16-alpine
+          until docker exec smoke-db pg_isready -U postgres >/dev/null 2>&1; do sleep 1; done
+
+          # Values a running instance requires but does not use here. The token
+          # is deliberately one GitHub will reject: an empty value fails the
+          # config type check at startup, which would make this pass or fail for
+          # the wrong reason.
+          docker run -d --name smoke-app --network smoke -p 7007:7007 \
+            -e NODE_ENV=production \
+            -e POSTGRES_HOST=smoke-db -e POSTGRES_PORT=5432 \
+            -e POSTGRES_USER=postgres -e POSTGRES_PASSWORD=postgres \
+            -e GITHUB_TOKEN=ghp_0000000000000000000000000000000000ci \
+            -e AUTH_OIDC_CLIENT_ID=ci -e AUTH_OIDC_CLIENT_SECRET=ci \
+            -e AUTH_SESSION_SECRET=ci \
+            -e GITEA_ADMIN_USERNAME=ci -e GITEA_ADMIN_PASSWORD=ci \
+            -e KEYCLOAK_ADMIN_USERNAME=ci -e KEYCLOAK_ADMIN_PASSWORD=ci \
+            backstage:ci
+
+          # Locally this takes about 29 seconds; the ceiling is generous because
+          # a runner is slower and a false red here is worse than a slow green.
+          for _ in $(seq 1 60); do
+            code=$(curl -s -o /dev/null -w '%{http_code}' --max-time 3 \
+              http://localhost:7007/healthcheck || echo 000)
+            [ "$code" = 200 ] && break
+            sleep 2
+          done
+
+          if [ "$code" != 200 ]; then
+            echo "::error::the backend never became healthy (last: HTTP $code)"
+            echo "--- container log ---"
+            docker logs smoke-app 2>&1 | tail -60
+            exit 1
+          fi
+
+          # Reached only when the routes exist, which is the thing being proved:
+          # a backend that aborted initialization answers 404 here too.
+          echo "startup completed and /healthcheck answered 200"
+
+      - name: Tear down the check
+        if: always()
+        run: |
+          docker rm -f smoke-app smoke-db >/dev/null 2>&1 || true
+          docker network rm smoke >/dev/null 2>&1 || true
+
+
   release:
     name: release (multi-arch, pushed)
     if: github.event_name == 'workflow_dispatch'
@@ -124,8 +187,94 @@ jobs:
       - name: Install
         run: yarn install --immutable
 
+      # The pull request path runs these; this one did not. A manual release
+      # could publish code that never compiled, which is not a hypothetical —
+      # it is how this job came to need the check below.
+      - run: yarn tsc
+      - run: yarn test
+
       - name: Build backend bundle
         run: yarn workspace backend build
+
+      # The same gate the pull request path runs, before anything is pushed.
+      #
+      # This job skips `verify` entirely — it is the other half of the `if` at
+      # the top of this file — so until now a manual release published without a
+      # type check, without tests, and without ever starting the thing. That is
+      # exactly how v0.0.15 was published broken.
+      #
+      # Built for one architecture first so there is something to start. The
+      # multi-arch build below reuses the layer cache, so this costs a startup
+      # rather than a second build.
+      - name: Build the image for the check
+        run: |
+          docker build \
+            --platform linux/amd64 \
+            -f packages/backend/Dockerfile \
+            -t backstage:release-check \
+            .
+
+      # The image builds, and that says nothing about whether it starts.
+      #
+      # v0.0.15 was published green: yarn tsc passed, the bundle assembled, the
+      # image built and pushed, and the container came up listening on 7007 —
+      # then aborted plugin initialization on a dependency that only exists at
+      # runtime. Every route was missing, so the only signal Kubernetes could
+      # give was "Liveness probe failed: 404", nineteen minutes into the cluster
+      # job and pointing at the probe rather than at the cause.
+      #
+      # Thirty seconds here instead. Anything that stops the backend from
+      # finishing its startup — a duplicated package, a config that does not
+      # load, a migration that fails — fails at the same layer as `yarn tsc`,
+      # with the real error in the log.
+      - name: Check that the image actually starts
+        run: |
+          docker network create smoke
+          docker run -d --name smoke-db --network smoke \
+            -e POSTGRES_USER=postgres -e POSTGRES_PASSWORD=postgres \
+            postgres:16-alpine
+          until docker exec smoke-db pg_isready -U postgres >/dev/null 2>&1; do sleep 1; done
+
+          # Values a running instance requires but does not use here. The token
+          # is deliberately one GitHub will reject: an empty value fails the
+          # config type check at startup, which would make this pass or fail for
+          # the wrong reason.
+          docker run -d --name smoke-app --network smoke -p 7007:7007 \
+            -e NODE_ENV=production \
+            -e POSTGRES_HOST=smoke-db -e POSTGRES_PORT=5432 \
+            -e POSTGRES_USER=postgres -e POSTGRES_PASSWORD=postgres \
+            -e GITHUB_TOKEN=ghp_0000000000000000000000000000000000ci \
+            -e AUTH_OIDC_CLIENT_ID=ci -e AUTH_OIDC_CLIENT_SECRET=ci \
+            -e AUTH_SESSION_SECRET=ci \
+            -e GITEA_ADMIN_USERNAME=ci -e GITEA_ADMIN_PASSWORD=ci \
+            -e KEYCLOAK_ADMIN_USERNAME=ci -e KEYCLOAK_ADMIN_PASSWORD=ci \
+            backstage:ci
+
+          # Locally this takes about 29 seconds; the ceiling is generous because
+          # a runner is slower and a false red here is worse than a slow green.
+          for _ in $(seq 1 60); do
+            code=$(curl -s -o /dev/null -w '%{http_code}' --max-time 3 \
+              http://localhost:7007/healthcheck || echo 000)
+            [ "$code" = 200 ] && break
+            sleep 2
+          done
+
+          if [ "$code" != 200 ]; then
+            echo "::error::the backend never became healthy (last: HTTP $code)"
+            echo "--- container log ---"
+            docker logs smoke-app 2>&1 | tail -60
+            exit 1
+          fi
+
+          # Reached only when the routes exist, which is the thing being proved:
+          # a backend that aborted initialization answers 404 here too.
+          echo "startup completed and /healthcheck answered 200"
+
+      - name: Tear down the check
+        if: always()
+        run: |
+          docker rm -f smoke-app smoke-db >/dev/null 2>&1 || true
+          docker network rm smoke >/dev/null 2>&1 || true
 
       # arm64 is emulated on an amd64 runner, which is slow but happens here
       # rather than on somebody's laptop. arm64 matters because the kind explore
