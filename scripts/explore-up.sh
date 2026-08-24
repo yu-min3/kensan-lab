@@ -500,11 +500,14 @@ if [[ "$EXTERNAL_REPO" == false ]]; then
   kill "${GITEA_PF_PID}" 2>/dev/null || true
   GITEA_PF_PID=""
 
-  # The labelled namespace and the browser-facing route. Applied here rather
-  # than left to Argo CD: they describe a component that only exists on this
-  # path, and syncing them where Gitea was never installed leaves a route with
-  # no backend and an Application stuck Degraded.
-  kubectl apply -f "${ENV_DIR}/resources-gitea/gitea.yaml" >/dev/null
+  # The labelled namespace. Applied here rather than left to Argo CD because it
+  # describes a component that only exists on this path — syncing it where Gitea
+  # was never installed leaves resources with nothing behind them.
+  #
+  # The route is *not* applied here. `kind: HTTPRoute` does not resolve until
+  # the Gateway API CRDs exist, and those arrive with the Applications, minutes
+  # from now. It goes on further down, once they do.
+  kubectl apply -f "${ENV_DIR}/resources-gitea/namespace.yaml" >/dev/null
 
   # Argo CD reads over the Service rather than the gateway: the hostname only
   # resolves outside the cluster, and going through the gateway would mean
@@ -783,6 +786,12 @@ done
 # Argo CD started before cert-manager had signed anything, so its CA mount
 # resolved to nothing. Now that the Secret exists, the pod has to be replaced to
 # see it — until then every OIDC login fails on an unknown authority.
+# Gitea's route, now that the Gateway API CRDs are in place. Browsers need it;
+# Argo CD does not, which is why the cluster came up without it.
+if [[ "$EXTERNAL_REPO" == false ]]; then
+  kubectl apply -f "${ENV_DIR}/resources-gitea/httproute.yaml" >/dev/null
+fi
+
 info "restarting argocd-server so it picks up the CA and the OIDC client"
 kubectl -n argocd rollout restart deployment/argocd-server >/dev/null
 kubectl -n argocd rollout status deployment/argocd-server --timeout=300s >/dev/null

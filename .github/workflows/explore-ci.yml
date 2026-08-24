@@ -46,17 +46,36 @@ concurrency:
 
 jobs:
   kind:
-    name: kind (10-minute path)
-    # Argo CD syncs the head commit over HTTPS from this repository, and a fork's
-    # commit is not in this repository. The job would stand a cluster up, wait
-    # the full fifteen minutes for Applications that can never resolve, and then
-    # fail for a reason that has nothing to do with the change. Forks run this
-    # on their own fork, where the commit is where Argo CD looks.
+    name: kind (${{ matrix.mode }})
+    # Skipped for pull requests from a fork, because the `external` half of the
+    # matrix asks Argo CD to read a commit over HTTPS from this repository and a
+    # fork's commit is not here. The job would stand a cluster up, wait the full
+    # timeout for Applications that can never resolve, and fail for a reason
+    # unrelated to the change. Forks run this on their own fork, where the
+    # commit is where Argo CD looks.
+    #
+    # The `default` half would work from a fork — it never leaves the runner —
+    # but a matrix cannot be half-skipped on this condition without splitting
+    # the job in two, and one clear rule beats two jobs that drift apart.
     if: >-
       github.event_name != 'pull_request' ||
       github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    strategy:
+      # Both paths, because they are not the same code and a bug in one is
+      # invisible from the other.
+      #
+      # `default` is what a visitor runs: Argo CD reads the cluster's own Gitea,
+      # seeded from the checkout. `external` is what this job used to run alone —
+      # Argo CD reads this repository over HTTPS at a named commit.
+      #
+      # Only external was covered, so a change that moved Gitea's manifests out
+      # of the Argo CD tree passed CI and then failed on the first `make try`:
+      # the code that broke is never reached with --repo.
+      fail-fast: false
+      matrix:
+        mode: [default, external]
     steps:
       - uses: actions/checkout@v4
 
@@ -67,10 +86,11 @@ jobs:
           # so the action is here only to put the binary on PATH.
           install_only: true
 
-      # Argo CD pulls manifests over HTTPS from GitHub, so it syncs the pushed
-      # commit rather than the checkout. `main` on a push, the head commit on a
-      # pull request — otherwise a green run would be proving main, not the
-      # change under review.
+      # In `external` mode Argo CD pulls manifests over HTTPS from GitHub, so it
+      # syncs the pushed commit rather than the checkout — `main` on a push, the
+      # head commit on a pull request, otherwise a green run would be proving
+      # main rather than the change under review. In `default` mode the question
+      # does not arise: what runs is the checkout.
       #
       # Pull requests from forks are not covered: the head commit lives in the
       # fork and Argo CD would not find it on this repository.
@@ -81,9 +101,16 @@ jobs:
           # can reach the cluster, and it is destroyed at the end of the job.
           DEMO_PASSWORD: ci-demo-password
         run: |
-          scripts/explore-up.sh \
-            --rev "${{ github.event.pull_request.head.sha || github.sha }}" \
-            --repo "${{ github.server_url }}/${{ github.repository }}"
+          if [ "${{ matrix.mode }}" = external ]; then
+            scripts/explore-up.sh \
+              --rev "${{ github.event.pull_request.head.sha || github.sha }}" \
+              --repo "${{ github.server_url }}/${{ github.repository }}"
+          else
+            # No arguments: the checkout is seeded into the cluster's git server
+            # and Argo CD reads from there. Nothing has to be pushed, so this
+            # also proves the path a visitor takes.
+            scripts/explore-up.sh
+          fi
 
       # explore-up.sh already asserts every Application is Synced/Healthy and
       # that the demo app answers 200 through the gateway. What is left is the
