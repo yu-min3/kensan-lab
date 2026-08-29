@@ -11,35 +11,35 @@ zero-trust network visibility (Hubble), and the app the platform exists to run.
 ## Hardware — bare metal, literally
 
 <figure>
-  <img src="assets/showcase/hardware-cluster.png" alt="The physical kensan-lab cluster — a stacked Raspberry Pi 5 trio, the M4 Neo worker, and a TP-Link TL-SG116E switch" width="900">
+  <img src="../assets/showcase/hardware-cluster.png" alt="The physical kensan-lab cluster — a stacked Raspberry Pi 5 trio, the M4 Neo worker, and a TP-Link TL-SG116E switch" width="900">
   <figcaption>The platform behind the dashboards: three Raspberry Pi 5 nodes and one amd64 worker, connected through a managed switch. The architecture in this repository runs on this hardware.</figcaption>
 </figure>
 
 ## Argo CD — the cluster is GitOps-managed
 
 <figure>
-  <img src="assets/showcase/argocd-app-tree.png" alt="Argo CD applications list — 38 applications Synced and Healthy, 0 OutOfSync, across platform-project and app-project" width="900">
+  <img src="../assets/showcase/argocd-app-tree.png" alt="Argo CD applications list — 38 applications Synced and Healthy, 0 OutOfSync, across platform-project and app-project" width="900">
   <figcaption>Every platform and app component reconciled by Argo CD — 38 Synced / 0 OutOfSync. A live GitOps system, not static manifests.</figcaption>
 </figure>
 
 ## Grafana — the operational layer
 
 <figure>
-  <img src="assets/showcase/grafana-cluster-health.png" alt="Grafana Cluster Health dashboard — node liveness, uptime, pressure conditions, CPU/memory/disk, and Raspberry Pi CPU temperature" width="900">
+  <img src="../assets/showcase/grafana-cluster-health.png" alt="Grafana Cluster Health dashboard — node liveness, uptime, pressure conditions, CPU/memory/disk, and Raspberry Pi CPU temperature" width="900">
   <figcaption>Cluster Health: node liveness and resources across the Pi 5 nodes and the amd64 worker — including the CPU-temperature panel that hardware reality demands.</figcaption>
 </figure>
 
 ## Backstage — the Internal Developer Platform
 
 <figure>
-  <img src="assets/showcase/backstage-catalog.png" alt="Backstage entity page for the kensan component — About panel, ownership, tags, a Relations graph, and a TechDocs link" width="900">
+  <img src="../assets/showcase/backstage-catalog.png" alt="Backstage entity page for the kensan component — About panel, ownership, tags, a Relations graph, and a TechDocs link" width="900">
   <figcaption>The kensan component in Backstage: ownership and system, a live Relations graph, and one click to its TechDocs — the catalog that turns "what runs here" into self-service.</figcaption>
 </figure>
 
 ## Hubble — zero-trust network visibility
 
 <figure>
-  <img src="assets/showcase/hubble-flows.png" alt="Hubble UI service map for the app-kensan namespace — flows from the outside world to Syncthing and from the kensan app to the OTel Collector" width="900">
+  <img src="../assets/showcase/hubble-flows.png" alt="Hubble UI service map for the app-kensan namespace — flows from the outside world to Syncthing and from the kensan app to the OTel Collector" width="900">
   <figcaption>Cilium/Hubble makes every service-to-service flow observable — here app-kensan's real traffic: Syncthing sync in, telemetry out to the OTel Collector.</figcaption>
 </figure>
 
@@ -51,7 +51,7 @@ cataloged in Backstage, secured at the Gateway, observed like any other service)
 the platform is proven against something real rather than a toy.
 
 <figure>
-  <img src="assets/showcase/kensan-app.png" alt="kensan dashboard — North Star and quarterly focus, a today lane, a prioritized backlog, memos, and a whiteboard, rendered in the Whetstone design system" width="900">
+  <img src="../assets/showcase/kensan-app.png" alt="kensan dashboard — North Star and quarterly focus, a today lane, a prioritized backlog, memos, and a whiteboard, rendered in the Whetstone design system" width="900">
   <figcaption>kensan (Go single binary + Whetstone SPA), a file-based knowledge & goal manager that reads Markdown as its single source of truth. Shown with a <strong>sample workspace</strong> — fictional data, not a live view. The UI is the author's personal tool and is currently Japanese-only (see <a href="https://github.com/yu-min3/kensan-lab/blob/main/apps/kensan/demo-workspace/">demo-workspace</a> to run it locally).</figcaption>
 </figure>
 
