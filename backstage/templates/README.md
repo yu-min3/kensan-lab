@@ -33,6 +33,11 @@ A production-ready FastAPI application template with:
 
 Templates are automatically loaded from this directory:
 
+- Production and local development load `template.yaml` (GitHub only).
+- Explore overrides the catalog location with `template-explore.yaml` (Gitea only).
+- Both entry files render the same `skeleton/`; application source and platform
+  manifests are not duplicated.
+
 ```yaml
 # In app-config.yaml (local development)
 catalog:
@@ -80,7 +85,8 @@ platform pull request is merged (ADR-006: one namespace per application).
 
 ```
 fastapi-template/
-├── template.yaml              # Backstage template definition
+├── template.yaml              # Production template (GitHub)
+├── template-explore.yaml      # Explore template (cluster-local Gitea)
 ├── catalog-info.yaml          # Backstage catalog entry
 └── skeleton/                  # Template files
     ├── app/                   # Application code
