@@ -295,14 +295,37 @@ spec:
         hostname: ${{ parameters.name }}.127-0-0-1.sslip.io
 
     # Step 4: Register component in Backstage catalog
+    #
+    # Two steps rather than one. The path form of this action resolves
+    # catalogInfoPath against the publish step's repoContentsUrl, and that
+    # resolution is wrong for Gitea: the branch disappears, leaving
+    # .../src/branch/catalog-info.yaml, which the catalog refuses with
+    #
+    #   NotFoundError: Unable to read url, no matching files found
+    #
+    # measured on the explore cluster, with both a leading slash and without.
+    # GitHub resolves correctly because git-url-parse understands its
+    # .../blob/<branch>/ shape, so that branch is left alone.
+    #
+    # The Gitea branch skips resolution altogether and hands the action the
+    # absolute URL, which it takes as given. The separator is written out
+    # because this repository's own publish:gitea returns the directory URL
+    # without a trailing slash (packages/backend/src/modules/giteaPublish.ts),
+    # unlike the upstream action of the same name.
     - id: register
       name: Register Component
+      if: ${{ (parameters.repoUrl | parseRepoUrl).host == "github.com" }}
       action: catalog:register
       input:
-        # Whichever publish ran. A skipped step has no output, so the fallback
-        # is not decoration.
-        repoContentsUrl: ${{ steps.publish.output.repoContentsUrl or steps['publish-gitea'].output.repoContentsUrl }}
+        repoContentsUrl: ${{ steps.publish.output.repoContentsUrl }}
         catalogInfoPath: '/catalog-info.yaml'
+
+    - id: register-gitea
+      name: Register Component
+      if: ${{ (parameters.repoUrl | parseRepoUrl).host != "github.com" }}
+      action: catalog:register
+      input:
+        catalogInfoUrl: ${{ steps['publish-gitea'].output.repoContentsUrl + '/catalog-info.yaml' }}
 
   output:
     text:
@@ -331,13 +354,17 @@ spec:
 
           デプロイ状況は Argo CD UI で確認できます。
 
+    # Every link below has two possible sources, because every step that
+    # produces one is branched on the host. A skipped step has no output, so
+    # without the fallback the Gitea path finishes and hands back a page of
+    # dead links.
     links:
       - title: 📦 アプリケーションリポジトリ
-        url: ${{ steps.publish.output.remoteUrl }}
+        url: ${{ steps.publish.output.remoteUrl or steps['publish-gitea'].output.remoteUrl }}
       - title: 📋 Backstageカタログで開く
         icon: catalog
-        entityRef: ${{ steps.register.output.entityRef }}
+        entityRef: ${{ steps.register.output.entityRef or steps['register-gitea'].output.entityRef }}
       - title: 🔀 Platform Config PR
-        url: ${{ steps['create-platform-pr'].output.remoteUrl }}
+        url: ${{ steps['create-platform-pr'].output.remoteUrl or steps['create-platform-pr-gitea'].output.remoteUrl }}
       - title: 🚀 Argo CD
-        url: https://argocd.platform.yu-min3.com/applications/app-${{ parameters.name }}
+        url: ${{ (parameters.repoUrl | parseRepoUrl).host == "github.com" and ("https://argocd.platform.yu-min3.com/applications/app-" + parameters.name) or ("https://argocd.127-0-0-1.sslip.io/applications/app-" + parameters.name) }}
