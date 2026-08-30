@@ -87,9 +87,27 @@ data:
     # entry, which is what keeps the template's Gitea branch from resolving
     # there. Reached over the Service rather than the gateway, so Node does not
     # need to be told about the self-signed CA for this call.
+    #
+    # The same server is declared twice, under both names it is known by, and
+    # the second one is not redundant. Integrations are looked up by the host of
+    # whatever URL is being handled:
+    #
+    #   gitea.127-0-0-1.sslip.io   what the template's repoUrl picker offers, so
+    #                              this is the name publish:gitea resolves
+    #   gitea-http...:3000         the baseUrl, so it is the name that comes back
+    #                              in that step's repoContentsUrl — and the one
+    #                              catalog:register is then asked about
+    #
+    # With only the first, the golden path publishes the repository and then
+    # fails on the last step with `No integration found for host`: the service
+    # exists, the pull request is open, and the entity never reaches the catalog.
     integrations:
       gitea:
         - host: gitea.127-0-0-1.sslip.io
+          baseUrl: http://gitea-http.gitea.svc.cluster.local:3000
+          username: ${GITEA_ADMIN_USERNAME}
+          password: ${GITEA_ADMIN_PASSWORD}
+        - host: gitea-http.gitea.svc.cluster.local:3000
           baseUrl: http://gitea-http.gitea.svc.cluster.local:3000
           username: ${GITEA_ADMIN_USERNAME}
           password: ${GITEA_ADMIN_PASSWORD}
