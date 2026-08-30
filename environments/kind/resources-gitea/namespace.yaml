@@ -1,0 +1,30 @@
+# Gitea's namespace and its route, for browsers.
+#
+# Applied by scripts/explore-up.sh, not by Argo CD, and deliberately outside
+# `resources/` so that Argo CD never sees it.
+#
+# The first attempt put this in `resources/` with everything else. Argo CD
+# reads out of the very server described here, so the description cannot be one
+# of the things it syncs: the namespace has to exist before the chart is
+# installed, and the route resolves only once the Gateway API CRDs arrive with
+# the Applications — minutes later.
+#
+# Keeping it beside the chart that creates the Service is what makes the two
+# appear and disappear together.
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: gitea
+  annotations:
+    ## Namespaces go early, with the other namespaces.
+    argocd.argoproj.io/sync-wave: "0"
+  labels:
+    ## Two contracts at once, and missing either fails without mentioning
+    ## labels: Kyverno's ns-label-contract wants environment and tier, and
+    ## gateway-explore admits routes by namespace selector — a route in a
+    ## namespace without `environment` comes back NotAllowedByListeners.
+    kensan-lab.platform/environment: infrastructure
+    kensan-lab.platform/tier: platform
+    kensan-lab.platform/app: gitea
+    kensan-lab.platform/pss-level: baseline
+    pod-security.kubernetes.io/enforce: baseline

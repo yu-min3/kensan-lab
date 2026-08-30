@@ -99,8 +99,35 @@ export function createGiteaPublishAction(options: { config: Config }) {
         commitMessage: gitCommitMessage ?? 'Initial commit from Backstage template',
       });
 
+      // Gitea answers its contents API with 500 for a short while after a
+      // push, and the next step in every template that uses this action is
+      // catalog:register — which reads exactly that endpoint. Measured on the
+      // explore cluster: the register step failed with
+      //
+      //   could not be read as .../api/v1/repos/<owner>/<repo>/contents/
+      //   catalog-info.yaml?ref=main, 500 Internal Server Error
+      //
+      // while the same URL read cleanly a minute later. So the repository is
+      // not finished being created when the push returns, and the action waits
+      // for the endpoint its consumer uses rather than for one that goes ready
+      // earlier. The upstream module waits too, on the browser-facing path.
+      //
+      // A timeout does not fail the publish: the repository exists and the
+      // commit is in it. Whatever reads next will say so more precisely than a
+      // wait loop can.
+      const readyBy = Date.now() + 30_000;
+      while (Date.now() < readyBy) {
+        const probe = await fetch(
+          `${api}/repos/${owner}/${repo}/contents?ref=${defaultBranch}`,
+          { headers: authHeaders },
+        );
+        if (probe.ok) break;
+        await new Promise(resolve => setTimeout(resolve, 1000));
+      }
+
       ctx.output('remoteUrl', created.html_url);
-      // The catalog fetches catalog-info.yaml relative to this.
+      // The catalog fetches catalog-info.yaml relative to this. No trailing
+      // slash: the templates append the separator themselves.
       ctx.output('repoContentsUrl', `${created.html_url}/src/branch/${defaultBranch}`);
       ctx.logger.info(`Pushed to ${created.html_url}`);
     },

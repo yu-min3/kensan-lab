@@ -80,9 +80,9 @@ nothing to do.
 
 **No GitHub token, and no GitHub account.** Nothing here reaches GitHub. The
 portal writes to the git server inside the cluster, Argo CD reads from the same
-place, and both are gone when you tear it down. Backstage still wants a token
-variable to exist, so `make try` fills it with a placeholder — which nothing
-uses.
+place, and both are gone when you tear it down. Backstage's config still has to
+name a GitHub token, so the explore config writes a literal one that GitHub
+would reject — there is no credential here to leak or to bring.
 
 **Ports.** 80 and 443 must be free. The gateway is published on them, so the
 URLs below work in a browser with no proxy and no port-forward.
@@ -503,17 +503,6 @@ A **fork** is still how you would keep changes or send them back. It is the
 contributor's path rather than the visitor's, and it works the way forks
 normally do — with one thing worth knowing: GitHub disables Actions on a new
 fork, so Explore CI will not run until you press the button on the Actions tab.
-
-If you would rather have Argo CD read a real repository instead of the one in
-the cluster — which is what CI does, to prove a specific pushed commit — pass it
-in:
-
-```console
-$ scripts/explore-up.sh --repo https://github.com/you/kensan-lab --rev my-branch
-```
-
-That path skips the git server entirely, and then the commit does have to be
-pushed before Argo CD can see it.
 
 ## How it is put together
 

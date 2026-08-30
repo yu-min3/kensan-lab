@@ -6,8 +6,8 @@
 ##
 ## repoURL and targetRevision appear twice: once for Argo CD to find this chart,
 ## and once as helm parameters so every child Application follows the same
-## revision. scripts/explore-up.sh rewrites both when --repo/--rev are given,
-## which is how CI points a whole cluster at a pull request SHA instead of main.
+## revision. scripts/explore-up.sh rewrites both to the cluster's own Gitea,
+## which is where the checkout it just pushed lives.
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:

@@ -40,11 +40,22 @@ case "$handler" in
   *) echo "Keycloak did not return the handler: ${handler:-<none>}" >&2; exit 1 ;;
 esac
 
-# The handler answers with a page that posts the result back to the opener; the
-# token is in that payload.
-token="$("${C[@]}" "$handler" \
-  | grep -oE '"backstageIdentity":\{[^}]*"token":"[^"]+' \
-  | grep -oE '"token":"[^"]+' | cut -d'"' -f4 | head -1)"
+# The handler answers with a page that hands the result to its opener. The
+# payload is percent-encoded inside a decodeURIComponent() call, so it has to be
+# decoded before the token can be read out — grepping the response as it stands
+# matches nothing, however successful the sign-in was.
+#
+# `|| true` on every extraction: under `set -e` with `pipefail`, a grep that
+# matches nothing kills the script inside the command substitution, before the
+# line below can say what went wrong. That is the failure this script exists to
+# stop happening elsewhere.
+frame="$("${C[@]}" "$handler" || true)"
+payload="$(printf '%s' "$frame" \
+  | sed -n "s/.*decodeURIComponent('\([^']*\)').*/\1/p" | head -1)"
+[ -n "$payload" ] || { echo "the sign-in page carried no auth payload" >&2; exit 1; }
+token="$(printf '%b' "${payload//%/\\x}" \
+  | grep -oE '"backstageIdentity":\{"token":"[^"]+' \
+  | grep -oE '"token":"[^"]+' | cut -d'"' -f4 | head -1 || true)"
 [ -n "$token" ] || { echo "signed in, but no Backstage token came back" >&2; exit 1; }
 
 echo "  signed in to the portal"
@@ -63,14 +74,14 @@ JSON
 task="$("${C[@]}" -X POST "https://${HOST}/api/scaffolder/v2/tasks" \
   -H "Authorization: Bearer ${token}" \
   -H 'Content-Type: application/json' \
-  -d "$body" | grep -oE '"id":"[^"]+' | cut -d'"' -f4 | head -1)"
+  -d "$body" | grep -oE '"id":"[^"]+' | cut -d'"' -f4 | head -1 || true)"
 [ -n "$task" ] || { echo "the scaffolder refused the request" >&2; exit 1; }
 echo "  scaffolder task ${task}"
 
 for _ in $(seq 1 60); do
   status="$("${C[@]}" "https://${HOST}/api/scaffolder/v2/tasks/${task}" \
     -H "Authorization: Bearer ${token}" \
-    | grep -oE '"status":"[^"]+' | cut -d'"' -f4 | head -1)"
+    | grep -oE '"status":"[^"]+' | cut -d'"' -f4 | head -1 || true)"
   case "$status" in
     completed) echo "  the task completed"; break ;;
     failed|cancelled)

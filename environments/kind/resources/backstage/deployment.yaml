@@ -12,10 +12,12 @@
 ##
 ##   command   adds a third --config; the other two are the ones baked into the
 ##             image and are still loaded first.
-##   env       GITHUB_TOKEN is a literal placeholder rather than a Secret. The
-##             explore config empties the integrations list, so nothing ever
-##             authenticates with it; it exists only so that config substitution
-##             resolves.
+##   env       Secrets that scripts/explore-up.sh creates rather than ones
+##             External Secrets fills from Vault, plus the credentials the
+##             golden path needs here and nowhere else (Gitea, Keycloak's
+##             admin). GITHUB_TOKEN is absent: bare metal reads a real token
+##             from Vault, and here the key is a literal in the config above,
+##             because nothing on this path reaches GitHub.
 ##   affinity  the bare-metal Deployment requires a node labelled
 ##             hardware-class=high-performance. The single kind node carries
 ##             that label (kind-cluster.yaml), so the rule is satisfied rather
@@ -48,9 +50,14 @@ spec:
         - name: backstage
           ## Namespaced under the repository because that is the package CI
           ## can push to — see .github/workflows/backstage-ci.yml. Bare metal
-          ## pins the same tag from the same package now, so explore and
-          ## production run one artifact rather than two that share a number.
-          image: ghcr.io/yu-min3/kensan-lab/backstage:v0.0.16
+          ## pulls from the same package, but the two tags move separately:
+          ## explore carries whatever the golden path needs, and production is
+          ## upgraded on its own occasions (it is on v0.0.14 as this is written).
+          ##
+          ## v0.0.17 is the first image whose scaffolder can finish a Create on
+          ## the Gitea path: it carries the register step's absolute URL and the
+          ## wait for Gitea to answer for a repository it has just been pushed.
+          image: ghcr.io/yu-min3/kensan-lab/backstage:v0.0.17
           imagePullPolicy: IfNotPresent
           ## The two configs baked into the image, then the explore overrides.
           ## Order matters: later files win.
@@ -64,15 +71,6 @@ spec:
             - --config
             - /explore/app-config.explore.yaml
           env:
-            ## Created by scripts/explore-up.sh, empty unless the person
-            ## running `make try` supplied one. Bare metal reads the same
-            ## variable from a Secret that External Secrets fills from Vault;
-            ## the shape is identical, only the source differs.
-            - name: GITHUB_TOKEN
-              valueFrom:
-                secretKeyRef:
-                  name: backstage-explore-github
-                  key: GITHUB_TOKEN
             ## Backstage signs people in against Keycloak itself. Bare metal
             ## fills these from Vault; scripts/explore-up.sh generates them and
             ## registers the matching client on the realm it creates.
