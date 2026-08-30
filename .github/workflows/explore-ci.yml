@@ -46,47 +46,19 @@ concurrency:
 
 jobs:
   kind:
-    name: kind (${{ matrix.mode }})
-    # Skipped for pull requests from a fork, because the `external` half of the
-    # matrix asks Argo CD to read a commit over HTTPS from this repository and a
-    # fork's commit is not here. The job would stand a cluster up, wait the full
-    # timeout for Applications that can never resolve, and fail for a reason
-    # unrelated to the change. Forks run this on their own fork, where the
-    # commit is where Argo CD looks.
-    #
-    # The `default` half would work from a fork — it never leaves the runner —
-    # but a matrix cannot be half-skipped on this condition without splitting
-    # the job in two, and one clear rule beats two jobs that drift apart.
-    if: >-
-      github.event_name != 'pull_request' ||
-      github.event.pull_request.head.repo.full_name == github.repository
+    name: kind
     runs-on: ubuntu-latest
     timeout-minutes: 30
-    strategy:
-      # Both paths, because they are not the same code and a bug in one is
-      # invisible from the other.
-      #
-      # `default` is what a visitor runs: Argo CD reads the cluster's own Gitea,
-      # seeded from the checkout. `external` is what this job used to run alone —
-      # Argo CD reads this repository over HTTPS at a named commit.
-      #
-      # Only external was covered, so a change that moved Gitea's manifests out
-      # of the Argo CD tree passed CI and then failed on the first `make try`:
-      # the code that broke is never reached with --repo.
-      fail-fast: false
-      matrix:
-        mode: [default, external]
     steps:
       - uses: actions/checkout@v4
         with:
-          # The default depth of 1 produces a shallow clone, and `default` mode
-          # pushes this checkout into the cluster's git server. Git refuses to
-          # send a history with no beginning:
+          # The default depth of 1 produces a shallow clone, and this checkout
+          # is pushed into the cluster's git server. Git refuses to send a
+          # history with no beginning:
           #
           #   ! [remote rejected] HEAD -> main (shallow update not allowed)
           #
-          # Depth is per-checkout, so `external` pays for it too. A repository
-          # this size costs seconds against a job measured in minutes.
+          # A repository this size costs seconds against a job in minutes.
           fetch-depth: 0
 
       - name: Install kind
@@ -96,31 +68,24 @@ jobs:
           # so the action is here only to put the binary on PATH.
           install_only: true
 
-      # In `external` mode Argo CD pulls manifests over HTTPS from GitHub, so it
-      # syncs the pushed commit rather than the checkout — `main` on a push, the
-      # head commit on a pull request, otherwise a green run would be proving
-      # main rather than the change under review. In `default` mode the question
-      # does not arise: what runs is the checkout.
+      # No arguments, which is the whole point: this runs the command a visitor
+      # runs. The checkout is seeded into a Gitea inside the cluster and Argo CD
+      # reads from there, so the code under review is what stands up — without
+      # anything being pushed to GitHub first.
       #
-      # Pull requests from forks are not covered: the head commit lives in the
-      # fork and Argo CD would not find it on this repository.
+      # This job used to pass `--repo` and a commit SHA instead, which meant it
+      # never installed Gitea and never ran `make try`. It went green while
+      # `make try` was broken on main.
+      #
+      # Fork pull requests are covered too, now that nothing here has to be
+      # reachable from outside the runner.
       - name: Bring up the explore cluster
         env:
           # Fixed rather than generated, so the SSO check below can log in
           # without scraping the script's output. Nothing outside this runner
           # can reach the cluster, and it is destroyed at the end of the job.
           DEMO_PASSWORD: ci-demo-password
-        run: |
-          if [ "${{ matrix.mode }}" = external ]; then
-            scripts/explore-up.sh \
-              --rev "${{ github.event.pull_request.head.sha || github.sha }}" \
-              --repo "${{ github.server_url }}/${{ github.repository }}"
-          else
-            # No arguments: the checkout is seeded into the cluster's git server
-            # and Argo CD reads from there. Nothing has to be pushed, so this
-            # also proves the path a visitor takes.
-            scripts/explore-up.sh
-          fi
+        run: scripts/explore-up.sh
 
       # explore-up.sh already asserts every Application is Synced/Healthy and
       # that the demo app answers 200 through the gateway. What is left is the

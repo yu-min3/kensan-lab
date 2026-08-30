@@ -3,12 +3,11 @@
 # Applied by scripts/explore-up.sh, not by Argo CD, and deliberately outside
 # `resources/` so that Argo CD never sees it.
 #
-# The first attempt put this in `resources/` with everything else. That breaks
-# the one path where Gitea is absent: `--repo` skips the install (CI uses it to
-# point the cluster at a pushed commit), but the Application would still sync
-# this file, and an HTTPRoute whose backend Service does not exist reports
-# ResolvedRefs=False — so explore-resources sits Degraded until the timeout,
-# with the failure named after a component the run never installed.
+# The first attempt put this in `resources/` with everything else. Argo CD
+# reads out of the very server described here, so the description cannot be one
+# of the things it syncs: the namespace has to exist before the chart is
+# installed, and the route resolves only once the Gateway API CRDs arrive with
+# the Applications — minutes later.
 #
 # Keeping it beside the chart that creates the Service is what makes the two
 # appear and disappear together.

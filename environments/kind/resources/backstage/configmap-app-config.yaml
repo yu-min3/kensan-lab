@@ -13,15 +13,8 @@
 ##                 away.
 ##   URLs          The real host does not resolve here.
 ##   integrations  Gitea is added, because the cluster has a git server of its
-##                 own and the golden path writes to it. GitHub is left as the
-##                 shared config has it, but only so the key exists: the token
-##                 scripts/explore-up.sh supplies is a placeholder GitHub would
-##                 reject, and nothing on this path calls it. It cannot be an
-##                 empty string — the backend type-checks the key at startup and
-##                 an empty one stops the catalog, scaffolder and techdocs
-##                 plugins from initialising, without stopping the process or
-##                 failing the probe. See the comment on the Secret in
-##                 explore-up.sh.
+##                 own and the golden path writes to it. GitHub's token is
+##                 overwritten with a literal — see below.
 ##   catalog       The organisation scanner is pushed a year into the future
 ##                 rather than removed — see below.
 ##
@@ -102,6 +95,25 @@ data:
     # fails on the last step with `No integration found for host`: the service
     # exists, the pull request is open, and the entity never reaches the catalog.
     integrations:
+      # Not a credential, and not read from anywhere. Nothing on this path
+      # reaches GitHub: the golden path writes to the cluster's own Gitea and
+      # Argo CD reads from the same place.
+      #
+      # The key still has to hold something. The shared config declares it as
+      # `${GITHUB_TOKEN}` and the backend type-checks the value at startup: an
+      # empty one does not stop the process or fail the probe, it stops the
+      # catalog, scaffolder and techdocs plugins from ever initialising. The
+      # portal then serves its shell, answers /healthcheck, reports Healthy to
+      # Argo CD, and returns 503 for every catalog request.
+      #
+      # Written here as a literal rather than passed in as a Secret and an
+      # environment variable, because there is no secret: a value GitHub will
+      # reject, in the layer whose whole claim is that no GitHub credential
+      # exists here. It also means the Deployment has one fewer thing to mount.
+      github:
+        - host: github.com
+          token: ghp_0000000000000000000000000000000000not-a-real-token
+
       gitea:
         - host: gitea.127-0-0-1.sslip.io
           baseUrl: http://gitea-http.gitea.svc.cluster.local:3000

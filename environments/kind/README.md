@@ -17,8 +17,8 @@ environments/kind/
   values/                values layered on top of the bare-metal ones
   resources/             the substitution layer — the only genuinely new manifests
   resources-gitea/       the in-cluster git server's namespace and route; applied
-                         by the script rather than synced, because Gitea exists
-                         only on the default path
+                         by the script rather than synced, because Argo CD reads
+                         out of the server they describe
 ```
 
 Argo CD is installed by `scripts/explore-up.sh` with Helm, because nothing can
@@ -34,7 +34,7 @@ something Argo CD created is already running:
 | **generates every SSO credential** | a client secret committed to a public repository is a working credential against every cluster started from it |
 | **creates the Keycloak realm with `kcadm`** | Keycloak does not substitute environment variables during realm import — verified: `${VAR}` in a client secret is stored as those six characters — so a realm file in git would have to carry real secrets |
 | **rewrites CoreDNS** | the issuer hostname has to resolve to the gateway from inside a pod and to `127.0.0.1` from the browser; that is one name with two answers |
-| **installs Gitea and pushes this checkout into it** | it is the repository Argo CD reads, so it cannot be described by an Application that Argo CD would have to read out of it. Skipped under `--repo`, where an external repository takes its place |
+| **installs Gitea and pushes this checkout into it** | it is the repository Argo CD reads, so it cannot be described by an Application that Argo CD would have to read out of it |
 
 Bare metal solves the first two the same way, with `bootstrap/keycloak/setup.sh`
 run once by hand. Explore runs its own smaller version automatically because
