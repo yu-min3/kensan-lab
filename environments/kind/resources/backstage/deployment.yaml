@@ -12,10 +12,12 @@
 ##
 ##   command   adds a third --config; the other two are the ones baked into the
 ##             image and are still loaded first.
-##   env       GITHUB_TOKEN is a literal placeholder rather than a Secret. The
-##             explore config empties the integrations list, so nothing ever
-##             authenticates with it; it exists only so that config substitution
-##             resolves.
+##   env       the same variables as bare metal, from Secrets that
+##             scripts/explore-up.sh creates rather than ones External Secrets
+##             fills from Vault — plus the credentials the golden path needs
+##             here and nowhere else (Gitea, Keycloak's admin). GITHUB_TOKEN
+##             survives as a placeholder that satisfies a config type-check;
+##             nothing on this path reaches GitHub.
 ##   affinity  the bare-metal Deployment requires a node labelled
 ##             hardware-class=high-performance. The single kind node carries
 ##             that label (kind-cluster.yaml), so the rule is satisfied rather
@@ -64,10 +66,12 @@ spec:
             - --config
             - /explore/app-config.explore.yaml
           env:
-            ## Created by scripts/explore-up.sh, empty unless the person
-            ## running `make try` supplied one. Bare metal reads the same
-            ## variable from a Secret that External Secrets fills from Vault;
-            ## the shape is identical, only the source differs.
+            ## A placeholder rather than a credential — the golden path
+            ## publishes to the cluster's own Gitea and nothing here reaches
+            ## GitHub. It exists because Backstage type-checks the key at
+            ## startup; see the Secret in scripts/explore-up.sh. Bare metal
+            ## reads the same variable from a Secret that External Secrets
+            ## fills from Vault.
             - name: GITHUB_TOKEN
               valueFrom:
                 secretKeyRef:

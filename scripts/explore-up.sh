@@ -81,16 +81,7 @@ REVISION="${REVISION:-main}"
 EXTERNAL_REPO=false
 GITEA_INTERNAL_URL="http://gitea-http.gitea.svc.cluster.local:3000"
 GITEA_REPO_PATH="gitea-admin/kensan-lab.git"
-# Argo CD needs to pull manifests from a repository it can reach. Everything
-# below is read from git over HTTPS, so a fork has to be pushed before it can be
-# explored — there is no local-path mode, and pretending otherwise would only
-# fail later and less clearly.
 WAIT_TIMEOUT=900
-# Optional. Backstage's scaffolder publishes to GitHub, and no platform can
-# hand a visitor a credential for somebody else's account — so this is the one
-# thing the explore layer asks you to bring. Without it everything still runs
-# and the golden path template is visible; only pressing Create stops short.
-GITHUB_TOKEN="${GITHUB_TOKEN:-}"
 # Optional. The demo account's password is generated and printed unless one is
 # supplied, which is what CI does so that it can drive a login without scraping
 # this script's output.
@@ -100,13 +91,14 @@ usage() {
   cat <<'EOF'
 usage: scripts/explore-up.sh [--repo URL] [--rev REVISION] [--timeout SECONDS]
 
-  --repo URL       Git repository Argo CD syncs from (default: upstream)
-  --rev REVISION   Branch, tag or SHA to sync (default: main)
+  --repo URL       Git repository Argo CD syncs from, instead of the git server
+                   inside the cluster. The revision has to be pushed there.
+  --rev REVISION   Branch, tag or SHA to sync. Meaningful only with --repo; the
+                   default path always runs this checkout's HEAD.
   --timeout SEC    How long to wait for every Application to go healthy
 
-Set GITHUB_TOKEN in the environment to let Backstage's scaffolder create
-repositories and open pull requests. Everything works without it except the
-Create button.
+With no arguments this checkout is what runs: it is pushed into a Gitea inside
+the cluster and Argo CD reads from there. No account, no token, no fork.
 
 Set DEMO_PASSWORD to choose the demo account's password instead of having one
 generated. Useful for scripting against the cluster; the generated one is
@@ -370,28 +362,19 @@ kubectl -n auth-system create secret generic oauth2-proxy-secret \
   --from-literal=cookie-secret="${OAUTH2_PROXY_COOKIE_SECRET}" \
   --dry-run=client -o yaml | kubectl apply -f - >/dev/null
 
-# The scaffolder needs a token to reach GitHub, and there is nowhere for one to
-# come from: Vault is not part of this slice, and a credential for the visitor's
-# own account cannot be generated. So it is passed in or the feature is absent —
-# the Secret is created either way, holding an empty string, so that the
-# Deployment's reference always resolves.
+# Not a credential. Nothing on this path reaches GitHub: the golden path writes
+# to the cluster's own Gitea, and Argo CD reads from the same place.
 #
-# The placeholder is not decoration. Backstage type-checks its config at
-# startup, and `integrations.github[0].token` set to an empty string fails that
-# check — which does not stop the process or fail the probe, it stops the
-# catalog, scaffolder and techdocs plugins from ever initialising. The portal
-# then serves its shell, answers /healthcheck, reports Healthy to Argo CD, and
-# returns 503 for every catalog request. A syntactically valid token that GitHub
-# will reject keeps all three plugins running and moves the failure to where it
-# belongs: the moment somebody presses Create.
-if [[ -n "$GITHUB_TOKEN" ]]; then
-  info "wiring the GitHub token into Backstage (scaffolder enabled)"
-else
-  info "no GITHUB_TOKEN set — Backstage runs without the scaffolder's publish step"
-  GITHUB_TOKEN="ghp_0000000000000000000000000000000000no-token-was-supplied"
-fi
+# The value exists because the shared config declares
+# `integrations.github[0].token` and Backstage type-checks its config at
+# startup. An empty string fails that check — which does not stop the process or
+# fail the probe, it stops the catalog, scaffolder and techdocs plugins from ever
+# initialising. The portal then serves its shell, answers /healthcheck, reports
+# Healthy to Argo CD, and returns 503 for every catalog request. A syntactically
+# valid token that GitHub would reject keeps all three plugins running, and no
+# code path ever presents it.
 kubectl -n backstage create secret generic backstage-explore-github \
-  --from-literal=GITHUB_TOKEN="${GITHUB_TOKEN}" \
+  --from-literal=GITHUB_TOKEN="ghp_0000000000000000000000000000000000not-a-real-token" \
   --dry-run=client -o yaml | kubectl apply -f - >/dev/null
 
 # What the golden path writes with. The Gitea credential is created a few lines
@@ -409,7 +392,7 @@ kubectl -n backstage create secret generic backstage-explore-keycloak \
 #
 # On --repo there is no Gitea, so this is a placeholder: the integration it
 # configures points at a host that does not resolve, and nothing on that path
-# ever calls it. The same shape the GitHub token takes a few lines below, for
+# ever calls it. The same shape the GitHub token takes a few lines above, for
 # the same reason.
 GITEA_ADMIN_PASSWORD="${GITEA_ADMIN_PASSWORD:-no-gitea-on-this-path}"
 kubectl -n backstage create secret generic backstage-explore-gitea \
@@ -783,15 +766,15 @@ ${pending}
   sleep 10
 done
 
-# Argo CD started before cert-manager had signed anything, so its CA mount
-# resolved to nothing. Now that the Secret exists, the pod has to be replaced to
-# see it — until then every OIDC login fails on an unknown authority.
 # Gitea's route, now that the Gateway API CRDs are in place. Browsers need it;
 # Argo CD does not, which is why the cluster came up without it.
 if [[ "$EXTERNAL_REPO" == false ]]; then
   kubectl apply -f "${ENV_DIR}/resources-gitea/httproute.yaml" >/dev/null
 fi
 
+# Argo CD started before cert-manager had signed anything, so its CA mount
+# resolved to nothing. Now that the Secret exists, the pod has to be replaced to
+# see it — until then every OIDC login fails on an unknown authority.
 info "restarting argocd-server so it picks up the CA and the OIDC client"
 kubectl -n argocd rollout restart deployment/argocd-server >/dev/null
 kubectl -n argocd rollout status deployment/argocd-server --timeout=300s >/dev/null

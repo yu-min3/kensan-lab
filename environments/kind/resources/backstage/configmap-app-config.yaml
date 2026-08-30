@@ -12,14 +12,16 @@
 ##                 is the correct behaviour for a cluster that is itself thrown
 ##                 away.
 ##   URLs          The real host does not resolve here.
-##   integrations  Left as the shared config has it. GITHUB_TOKEN comes from a
-##                 Secret that scripts/explore-up.sh fills with the token the
-##                 person running `make try` passed, or with a placeholder that
-##                 GitHub will reject. Not with an empty string: the backend
-##                 type-checks this key at startup and an empty one stops the
-##                 catalog, scaffolder and techdocs plugins from initialising —
-##                 without stopping the process or failing the probe. See the
-##                 comment on the Secret in explore-up.sh.
+##   integrations  Gitea is added, because the cluster has a git server of its
+##                 own and the golden path writes to it. GitHub is left as the
+##                 shared config has it, but only so the key exists: the token
+##                 scripts/explore-up.sh supplies is a placeholder GitHub would
+##                 reject, and nothing on this path calls it. It cannot be an
+##                 empty string — the backend type-checks the key at startup and
+##                 an empty one stops the catalog, scaffolder and techdocs
+##                 plugins from initialising, without stopping the process or
+##                 failing the probe. See the comment on the Secret in
+##                 explore-up.sh.
 ##   catalog       The organisation scanner is pushed a year into the future
 ##                 rather than removed — see below.
 ##
