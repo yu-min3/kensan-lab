@@ -15,12 +15,14 @@ on:
     paths:
       - "backstage/templates/**"
       - "charts/app-base/**"
+      - "environments/kind/resources/backstage/configmap-app-config.yaml"
       - ".github/workflows/template-ci.yml"
   push:
     branches: [main]
     paths:
       - "backstage/templates/**"
       - "charts/app-base/**"
+      - "environments/kind/resources/backstage/configmap-app-config.yaml"
       - ".github/workflows/template-ci.yml"
   # Publishing the explore demo image is manual: it is the same skeleton every
   # pull request already builds, so an automatic push would republish an
@@ -142,6 +144,41 @@ jobs:
           # Keycloak and then 404s the callback. The failure looks like a broken
           # login rather than a missing route, so assert the route exists.
           grep -q 'widget-service-oauth2' /tmp/rendered.yaml
+
+      - name: Check the environment-specific entry points
+        run: |
+          python3 - <<'PY'
+          import yaml
+
+          base = "backstage/templates/fastapi-template/"
+          production = yaml.safe_load(open(base + "template.yaml"))
+          explore = yaml.safe_load(open(base + "template-explore.yaml"))
+
+          def summary(template):
+              repo = template["spec"]["parameters"][0]["properties"]["repoUrl"]
+              actions = {step["id"]: step["action"] for step in template["spec"]["steps"]}
+              return repo["ui:options"]["allowedHosts"], actions
+
+          production_hosts, production_actions = summary(production)
+          explore_hosts, explore_actions = summary(explore)
+          assert production_hosts == ["github.com"]
+          assert explore_hosts == ["gitea.127-0-0-1.sslip.io"]
+          assert production_actions["publish"] == "publish:github"
+          assert production_actions["create-platform-pr"] == "publish:github:pull-request"
+          assert "register-redirect-uri" not in production_actions
+          assert explore_actions["publish"] == "publish:gitea"
+          assert explore_actions["create-platform-pr"] == "gitea:pull-request"
+          assert explore_actions["register-redirect-uri"] == "keycloak:redirect-uri:add"
+
+          outer = yaml.safe_load(open(
+              "environments/kind/resources/backstage/configmap-app-config.yaml"
+          ))
+          explore_config = yaml.safe_load(outer["data"]["app-config.explore.yaml"])
+          targets = [location["target"] for location in explore_config["catalog"]["locations"]]
+          assert "./templates/fastapi-template/template-explore.yaml" in targets
+          assert "./templates/fastapi-template/template.yaml" not in targets
+          print("production: GitHub only; explore: Gitea only")
+          PY
 
       # publish:github:pull-request globs sourcePath as a directory and joins
       # targetPath as a prefix — neither can name a destination file. So the

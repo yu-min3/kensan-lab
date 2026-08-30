@@ -91,6 +91,7 @@ Backstage: `cd backstage && make {install,dev,all TAG=...}`
 ## User Preferences
 
 - **コマンド出力**: `temp/` に `.sh` + 実行権限で書き出す（詳細: `.claude/rules/collaboration.md` の Script Output Rule が SoT）
+- **worktree の配置**: 並行作業用 worktree は `/Users/yu/kensan-lab.worktrees/<topic>` に作る。承認が毎回必要になる `/private/tmp` は使わない
 - **言語**: 日本語での対話を優先
 - **コミット**: Conventional Commits 形式で簡潔に 1 文。1 行目 50 文字以内、本文・trailer 不要（diff を見ればわかる）
   - 例: `feat(policy): Kyverno 導入`

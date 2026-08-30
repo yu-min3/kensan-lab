@@ -64,15 +64,8 @@ spec:
           ui:options:
             allowedHosts:
               - github.com
-              # The explore cluster's own git server. Listing it here is what
-              # lets one template serve both: the publish steps below branch on
-              # whichever host was chosen, so nothing needs a mode switch.
-              # On bare metal this entry is inert — there is no such server, so
-              # it never resolves and never appears as a usable option.
-              - gitea.127-0-0-1.sslip.io
             allowedOwners:
               - yu-min3
-              - gitea-admin
 
     - title: How it looks
       required:
@@ -171,20 +164,11 @@ spec:
           # variables and can be changed later without building anything.
           theme: ${{ parameters.theme }}
           message: ${{ parameters.message }}
-          # The hostname follows from where the repository went. Bare metal
-          # serves apps under the real domain; the explore cluster serves them
-          # under the wildcard its certificate covers. Deriving it here keeps
-          # deploy/values.yaml free of a mode switch.
-          hostname: ${{ (parameters.repoUrl | parseRepoUrl).host == "github.com" and (parameters.name + ".app.yu-min3.com") or (parameters.name + ".127-0-0-1.sslip.io") }}
+          hostname: ${{ parameters.name + ".app.yu-min3.com" }}
 
     # Step 2: Create the application repository.
-    #
-    # Two of these, and exactly one runs. The branch is taken from the host the
-    # repository picker offered rather than from a mode flag, so there is one
-    # template and no switch to set wrongly.
     - id: publish
       name: Publish to GitHub
-      if: ${{ (parameters.repoUrl | parseRepoUrl).host == "github.com" }}
       action: publish:github
       input:
         description: ${{ parameters.description }}
@@ -193,16 +177,6 @@ spec:
         repoVisibility: public
         deleteBranchOnMerge: true
         gitCommitMessage: 'Initial commit from Backstage template'
-
-    - id: publish-gitea
-      name: Publish to the cluster's git server
-      if: ${{ (parameters.repoUrl | parseRepoUrl).host != "github.com" }}
-      action: publish:gitea
-      input:
-        description: ${{ parameters.description }}
-        repoUrl: ${{ parameters.repoUrl }}
-        defaultBranch: main
-        repoVisibility: public
 
     # Step 3a: Create Argo CD Application CRs
     # fetch:template substitutes file *contents* only — a directory named
@@ -224,7 +198,6 @@ spec:
 
     - id: create-platform-pr
       name: Open the platform pull request
-      if: ${{ (parameters.repoUrl | parseRepoUrl).host == "github.com" }}
       action: publish:github:pull-request
       input:
         repoUrl: github.com?repo=kensan-lab&owner=yu-min3
@@ -261,71 +234,13 @@ spec:
         # tree under .backstage already mirrors this repository's layout.
         sourcePath: .backstage
 
-    - id: create-platform-pr-gitea
-      name: Open the platform pull request
-      if: ${{ (parameters.repoUrl | parseRepoUrl).host != "github.com" }}
-      action: gitea:pull-request
-      input:
-        repoUrl: ${{ (parameters.repoUrl | parseRepoUrl).host }}?repo=kensan-lab&owner=gitea-admin
-        branchName: add-app-${{ parameters.name }}
-        title: 'Add Application: ${{ parameters.name }}'
-        description: |
-          Opened by the portal, against this cluster's own copy of the platform
-          repository. Nothing left the machine.
-
-          | File | Why |
-          |---|---|
-          | `kubernetes/argocd/applications/apps/app-${{ parameters.name }}/app.yaml` | The Application: `charts/app-base` driven by the values file the service repository owns |
-          | `kubernetes/auth/oauth2-proxy/resources/referencegrant-app-${{ parameters.name }}.yaml` | Lets the service's `/oauth2` route reach oauth2-proxy across namespaces |
-
-          Merging this is what deploys the service. Argo CD notices within three
-          minutes and `${{ parameters.name }}.127-0-0-1.sslip.io` starts answering.
-        sourcePath: .backstage
-
-    # Keycloak matches redirect URIs literally — a wildcard in the host is
-    # accepted at registration and refused at authorization. So the callback for
-    # a hostname that did not exist a minute ago is registered as it is created.
-    # Bare metal does the same by hand, by re-running the bootstrap script; the
-    # GitHub branch keeps that behaviour and says so in its pull request body.
-    - id: register-redirect-uri
-      name: Let Keycloak accept the new hostname
-      if: ${{ (parameters.repoUrl | parseRepoUrl).host != "github.com" }}
-      action: keycloak:redirect-uri:add
-      input:
-        hostname: ${{ parameters.name }}.127-0-0-1.sslip.io
-
-    # Step 4: Register component in Backstage catalog
-    #
-    # Two steps rather than one. The path form of this action resolves
-    # catalogInfoPath against the publish step's repoContentsUrl, and that
-    # resolution is wrong for Gitea: the branch disappears, leaving
-    # .../src/branch/catalog-info.yaml, which the catalog refuses with
-    #
-    #   NotFoundError: Unable to read url, no matching files found
-    #
-    # measured on the explore cluster, with both a leading slash and without.
-    # GitHub resolves correctly because git-url-parse understands its
-    # .../blob/<branch>/ shape, so that branch is left alone.
-    #
-    # The Gitea branch skips resolution altogether and hands the action the
-    # absolute URL, which it takes as given. The separator is written out
-    # because this repository's own publish:gitea returns the directory URL
-    # without a trailing slash (packages/backend/src/modules/giteaPublish.ts),
-    # unlike the upstream action of the same name.
+    # Step 4: Register component in Backstage catalog.
     - id: register
       name: Register Component
-      if: ${{ (parameters.repoUrl | parseRepoUrl).host == "github.com" }}
       action: catalog:register
       input:
         repoContentsUrl: ${{ steps.publish.output.repoContentsUrl }}
         catalogInfoPath: '/catalog-info.yaml'
-
-    - id: register-gitea
-      name: Register Component
-      if: ${{ (parameters.repoUrl | parseRepoUrl).host != "github.com" }}
-      action: catalog:register
-      input:
-        catalogInfoUrl: ${{ steps['publish-gitea'].output.repoContentsUrl + '/catalog-info.yaml' }}
 
   output:
     text:
@@ -354,17 +269,13 @@ spec:
 
           デプロイ状況は Argo CD UI で確認できます。
 
-    # Every link below has two possible sources, because every step that
-    # produces one is branched on the host. A skipped step has no output, so
-    # without the fallback the Gitea path finishes and hands back a page of
-    # dead links.
     links:
       - title: 📦 アプリケーションリポジトリ
-        url: ${{ steps.publish.output.remoteUrl or steps['publish-gitea'].output.remoteUrl }}
+        url: ${{ steps.publish.output.remoteUrl }}
       - title: 📋 Backstageカタログで開く
         icon: catalog
-        entityRef: ${{ steps.register.output.entityRef or steps['register-gitea'].output.entityRef }}
+        entityRef: ${{ steps.register.output.entityRef }}
       - title: 🔀 Platform Config PR
-        url: ${{ steps['create-platform-pr'].output.remoteUrl or steps['create-platform-pr-gitea'].output.remoteUrl }}
+        url: ${{ steps['create-platform-pr'].output.remoteUrl }}
       - title: 🚀 Argo CD
-        url: ${{ (parameters.repoUrl | parseRepoUrl).host == "github.com" and ("https://argocd.platform.yu-min3.com/applications/app-" + parameters.name) or ("https://argocd.127-0-0-1.sslip.io/applications/app-" + parameters.name) }}
+        url: https://argocd.platform.yu-min3.com/applications/app-${{ parameters.name }}

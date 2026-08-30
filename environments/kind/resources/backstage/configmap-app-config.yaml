@@ -1,8 +1,8 @@
 ## Backstage configuration for the explore cluster.
 ##
 ## Layered as a third `--config` on top of the two baked into the image, so the
-## catalog locations, the entity rules and the oauth2Proxy auth provider all
-## come from the shared config and only the things that cannot work here are
+## the entity rules and the oauth2Proxy auth provider come from the shared
+## config and only the things that cannot work here are
 ## replaced:
 ##
 ##   database      Production runs PostgreSQL with credentials from Vault. There
@@ -15,11 +15,11 @@
 ##   integrations  Gitea is added, because the cluster has a git server of its
 ##                 own and the golden path writes to it. GitHub's token is
 ##                 overwritten with a literal — see below.
-##   catalog       The organisation scanner is pushed a year into the future
-##                 rather than removed — see below.
+##   catalog       Explore selects its Gitea-only template and pushes the
+##                 organisation scanner a year into the future — see below.
 ##
-## Everything a visitor came to see — the golden path template, the catalog, the
-## scaffolder — is unaffected: those are read from files inside the image.
+## Both templates and their shared skeleton are files inside the same image.
+## This config changes only which template entity the Explore catalog loads.
 ##
 ##   auth          Only the discovery URL. Backstage signs people in against
 ##                 Keycloak itself, so the provider, the resolver and the
@@ -135,6 +135,22 @@ data:
         password: ${KEYCLOAK_ADMIN_PASSWORD}
 
     catalog:
+      # Arrays are replaced by the later config layer. Repeat the shared
+      # domain/organisation locations while selecting the Explore-only entry
+      # point for the golden path.
+      locations:
+        - type: file
+          target: ./templates/fastapi-template/template-explore.yaml
+          rules:
+            - allow: [Template]
+        - type: file
+          target: ./catalog/domains/*.yaml
+          rules:
+            - allow: [Domain, System, Resource]
+        - type: file
+          target: ./catalog/organizations/*.yaml
+          rules:
+            - allow: [Group, User]
       providers:
         github:
           kensanLabApps:
