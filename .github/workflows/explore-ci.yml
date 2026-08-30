@@ -78,6 +78,16 @@ jobs:
         mode: [default, external]
     steps:
       - uses: actions/checkout@v4
+        with:
+          # The default depth of 1 produces a shallow clone, and `default` mode
+          # pushes this checkout into the cluster's git server. Git refuses to
+          # send a history with no beginning:
+          #
+          #   ! [remote rejected] HEAD -> main (shallow update not allowed)
+          #
+          # Depth is per-checkout, so `external` pays for it too. A repository
+          # this size costs seconds against a job measured in minutes.
+          fetch-depth: 0
 
       - name: Install kind
         uses: helm/kind-action@v1

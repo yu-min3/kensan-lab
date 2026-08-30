@@ -158,6 +158,21 @@ if [[ "$mem_bytes" -gt 0 && "$mem_mib" -lt "$MIN_MEM_MIB" ]]; then
      and the single sign-on it enables is worth more than the two gigabytes."
 fi
 
+# A shallow checkout cannot be pushed. Git refuses to send a history with no
+# beginning and the receiving end has no way to complete it:
+#
+#   ! [remote rejected] HEAD -> main (shallow update not allowed)
+#
+# Checked here rather than where it happens, which is ninety seconds in, after
+# the cluster is up and Gitea is installed. `--repo` does not push anything, so
+# the check belongs to the default path only.
+if [[ "$EXTERNAL_REPO" == false ]] \
+  && [[ "$(git -C "${REPO_ROOT}" rev-parse --is-shallow-repository 2>/dev/null)" == true ]]; then
+  fail "this is a shallow clone, and the cluster's git server cannot be seeded from one.
+     Complete the history first:
+       git -C . fetch --unshallow"
+fi
+
 # Reusing a cluster cannot work, so it is refused rather than half-attempted.
 #
 # Every credential below is generated fresh on each run, but Keycloak reads its
