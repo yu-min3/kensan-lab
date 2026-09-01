@@ -1,0 +1,261 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SDD 開発ガイド（infra）</title>
+<script src="https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js"></script>
+<style>
+  :root{
+    --sky:#0284C7; --sky-dark:#075985; --sky-soft:#E0F2FE;
+    --paper:#F5F2EC; --ink:#1C1917; --mut:#57534E; --line:#E7E2D8;
+    --ok:#15803D; --ok-soft:#DCFCE7; --warn:#B45309; --warn-soft:#FEF3C7;
+    --code:#0F172A;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--paper);color:var(--ink);
+    font-family:-apple-system,"Hiragino Kaku Gothic ProN","Noto Sans JP",sans-serif;
+    line-height:1.75;font-size:15px}
+  .wrap{max-width:980px;margin:0 auto;padding:48px 24px 96px}
+  h1,h2,h3{font-family:"Noto Serif JP",Georgia,serif;line-height:1.35;letter-spacing:.01em}
+  h1{font-size:30px;margin:0 0 6px}
+  .sub{color:var(--mut);font-size:15px;margin:0 0 28px}
+  h2{font-size:22px;margin:52px 0 14px;padding-bottom:8px;border-bottom:2px solid var(--line)}
+  h2 .n{display:inline-block;min-width:1.6em;color:var(--sky);font-size:.8em}
+  h3{font-size:17px;margin:26px 0 8px;color:var(--sky-dark)}
+  p{margin:10px 0}
+  code{font-family:"JetBrains Mono",ui-monospace,Menlo,monospace;font-size:.86em;
+    background:#fff;border:1px solid var(--line);border-radius:5px;padding:1px 6px;color:var(--code)}
+  .hero{background:linear-gradient(135deg,var(--sky) 0%,var(--sky-dark) 100%);
+    color:#fff;border-radius:16px;padding:30px 32px;margin:0 0 8px;
+    box-shadow:0 8px 28px -12px rgba(2,132,199,.55)}
+  .hero h1{color:#fff;margin:0 0 8px}
+  .hero p{margin:0;color:#E0F2FE}
+  .hero .pill{display:inline-block;background:rgba(255,255,255,.16);border:1px solid rgba(255,255,255,.3);
+    border-radius:999px;padding:3px 12px;font-size:12px;margin-top:14px;font-family:"JetBrains Mono",monospace}
+  .card{background:#fff;border:1px solid var(--line);border-radius:12px;padding:6px 22px;margin:16px 0;
+    box-shadow:0 1px 3px rgba(28,25,23,.04)}
+  .mermaid{margin:8px 0;text-align:center}
+  table{border-collapse:collapse;width:100%;margin:14px 0;font-size:13.5px;background:#fff;
+    border:1px solid var(--line);border-radius:10px;overflow:hidden}
+  th,td{text-align:left;padding:9px 12px;border-bottom:1px solid var(--line);vertical-align:top}
+  th{background:var(--sky-soft);color:var(--sky-dark);font-weight:700;font-size:12.5px}
+  tr:last-child td{border-bottom:none}
+  td code{white-space:nowrap}
+  .note{border-left:4px solid var(--sky);background:var(--sky-soft);border-radius:0 10px 10px 0;
+    padding:12px 16px;margin:16px 0}
+  .crit{border-left:4px solid var(--warn);background:var(--warn-soft);border-radius:0 10px 10px 0;
+    padding:12px 16px;margin:16px 0}
+  .step{border-left:4px solid var(--ok);background:#fff;border:1px solid var(--line);border-left-width:4px;
+    border-radius:0 10px 10px 0;padding:4px 18px;margin:14px 0}
+  .step h3{color:var(--ok)}
+  pre{background:var(--code);color:#E2E8F0;border-radius:10px;padding:14px 16px;overflow:auto;
+    font-family:"JetBrains Mono",monospace;font-size:12.5px;line-height:1.6}
+  pre .c{color:#94A3B8}
+  ul{margin:10px 0;padding-left:22px}
+  li{margin:5px 0}
+  .legend{display:flex;gap:14px;flex-wrap:wrap;font-size:12.5px;margin:6px 0 0}
+  .legend span{display:inline-flex;align-items:center;gap:6px}
+  .sw{width:14px;height:14px;border-radius:4px;display:inline-block}
+  .foot{margin-top:60px;padding-top:20px;border-top:1px solid var(--line);color:var(--mut);font-size:13px}
+  a{color:var(--sky-dark)}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="hero">
+    <h1>SDD 開発ガイド（infra）</h1>
+    <p>このリポジトリの infra（GitOps / <code>kubernetes/</code>）を <b>Spec-Driven Development</b> で開発する実践ガイド。<br>
+       「仕様を書く → AI が worktree で自律実装 → 必ず検証 → draft PR」を 4 コマンドで回す。</p>
+    <span class="pill">/sdd-spec · /sdd-plan · /sdd-tasks · /sdd-impl</span>
+  </div>
+  <p class="sub">設計の背景は <a href="./sdd-overview.html">sdd-overview.html</a> ／ ワークフロー定義は <code>README.md</code>。</p>
+
+  <h2><span class="n">1.</span> 全体の流れ</h2>
+  <div class="card">
+  <div class="mermaid">
+flowchart TD
+    Idea([💡 機能アイデア]):::idea --> Goal
+    Goal["（任意）/goal で受入基準をセット<br/>= 止まる前に確認する番人"]:::opt
+    Goal --> S1
+    S1["/sdd-spec name<br/>要件を対話で作成"]:::ai --> SpecMd["spec.md<br/>what / why"]:::doc
+    SpecMd --> R1{{"👤 レビュー"}}:::rev
+    R1 --> S2["/sdd-plan name<br/>技術設計"]:::ai --> PlanMd["plan.md<br/>chart · ns · secrets"]:::doc
+    PlanMd --> R2{{"👤 レビュー"}}:::rev
+    R2 --> S3["/sdd-tasks name<br/>タスク分解"]:::ai --> TasksMd["tasks.md<br/>依存順 + 必須検証"]:::doc
+    TasksMd --> R3{{"👤 レビュー"}}:::rev
+    R3 --> IMPL
+    subgraph IMPL["/sdd-impl — worktree 内で自律実装 + 検証"]
+      direction TB
+      I1["① worktree 作成<br/>~/kensan-lab.worktrees/NNN-slug"]:::ai --> I2["② tasks を順に実装・commit"]:::ai
+      I2 --> I3["③ 検証フェーズ<br/>静的ゲート →（cluster到達時）ライブ検証"]:::gate
+      I3 -->|"赤"| Fix["修正して再実行<br/>（最大3回）"]:::fix --> I3
+      I3 -->|"緑"| I4["④ push → draft PR 作成"]:::ai
+    end
+    IMPL --> PR["📥 draft PR"]:::doc
+    PR --> R4{{"👤 レビュー → ready → merge"}}:::rev
+    R4 --> Argo["🔄 Argo CD が自動 sync<br/>/argocd-sync · /cluster-status で確認"]:::live
+    Argo --> Done([✅ 本番反映]):::done
+    classDef idea fill:#FEF3C7,stroke:#B45309,color:#7C2D12;
+    classDef opt fill:#F1F5F9,stroke:#94A3B8,color:#334155;
+    classDef ai fill:#0284C7,stroke:#075985,color:#fff;
+    classDef doc fill:#fff,stroke:#0284C7,color:#075985;
+    classDef rev fill:#FEF3C7,stroke:#B45309,color:#7C2D12;
+    classDef gate fill:#0284C7,stroke:#075985,color:#fff;
+    classDef fix fill:#FEE2E2,stroke:#B91C1C,color:#7F1D1D;
+    classDef live fill:#DCFCE7,stroke:#15803D,color:#14532D;
+    classDef done fill:#15803D,stroke:#14532D,color:#fff;
+  </div>
+  <div class="legend">
+    <span><i class="sw" style="background:#0284C7"></i>AI が動く</span>
+    <span><i class="sw" style="background:#FEF3C7;border:1px solid #B45309"></i>あなたが判断する</span>
+    <span><i class="sw" style="background:#DCFCE7;border:1px solid #15803D"></i>クラスタ反映</span>
+  </div>
+  </div>
+  <p>AI が自律で走るのは <code>/sdd-impl</code> の中だけ。それ以外は必ず人間のレビューを挟む。</p>
+
+  <h2><span class="n">2.</span> 誰が何をやるか</h2>
+  <table>
+    <tr><th>ステップ</th><th>主体</th><th>やること</th></tr>
+    <tr><td><code>/sdd-spec</code></td><td>🤝 AI＋あなた</td><td>AI が 2〜4 問質問 → 要件 spec.md を一緒に固める</td></tr>
+    <tr><td><code>/sdd-plan</code></td><td>🤖 AI</td><td>コードベースを探索し技術設計 plan.md を作る</td></tr>
+    <tr><td><code>/sdd-tasks</code></td><td>🤖 AI</td><td>依存順タスク tasks.md を作る</td></tr>
+    <tr><td>レビュー（各回）</td><td>👤 あなた</td><td>成果物 md を読み、必要なら前段をやり直す</td></tr>
+    <tr><td><code>/sdd-impl</code></td><td>🤖 AI（自律）</td><td>worktree で実装 → 検証緑まで直す → draft PR</td></tr>
+    <tr><td>PR → merge</td><td>👤 あなた</td><td>draft PR をレビュー → ready 化 → merge</td></tr>
+    <tr><td>反映確認</td><td>👤 あなた</td><td><code>/argocd-sync</code> <code>/cluster-status</code> で sync を確認</td></tr>
+  </table>
+
+  <h2><span class="n">3.</span> 前提</h2>
+  <ul>
+    <li><b>作業場所</b>: infra は<b>リポジトリ root</b> で作業（Claude を root にルート）。<code>apps/kensan/</code> 配下に居ると app 用スキルが有効になり infra の <code>/sdd-*</code> は出ない。</li>
+    <li><b>必要ツール</b>: <code>helm</code> / <code>kubeconform</code> / <code>kubectl</code> / <code>argocd</code> CLI。<code>yamllint</code> は任意。</li>
+    <li><b>cluster 接続</b>: 無くても静的ゲートまで完走。あればライブ検証（server dry-run）まで走る。</li>
+  </ul>
+
+  <h2><span class="n">4.</span> ステップ・バイ・ステップ</h2>
+  <p>例として「Loki に alert ルール評価を足す」を作る。</p>
+
+  <div class="note"><b>完了の定義は spec が持つ</b>: <code>/sdd-impl</code> が「止まる前に必ず満たすゴール」として参照するのは、作った <code>spec.md</code> の <code>## Acceptance criteria</code> ＋ <code>tasks.md</code> の <code>## Verification</code>。これを Definition of Done として取り込み、全項目を満たす（or cluster 未到達で merge 後確認、と理由付きで仕分ける）まで完了にしない。<b>spec がそのまま停止ゲートの中身になる。</b></div>
+
+  <div class="step">
+    <h3>Step 0（任意）— 組み込み <code>/goal</code> を番人にする</h3>
+    <p>組み込み <code>/goal</code> は同じ「停止前確認」を harness 層で行う別レイヤー。<b>スキルからは自動セットできない</b>（手で打つ UI 機能）ので、<code>/sdd-impl</code> が Step 4 で<b>そのまま貼れる <code>/goal</code> 文字列を提示</b>する。先回りして自分で打ってもよい:</p>
+    <pre>/goal 001 の静的ゲート全緑 + spec の受入基準充足 + draft PR 作成</pre>
+    <p>貼れば harness 側でも「検証未達のまま停止」を防げる。貼らなくても <code>/sdd-impl</code> 自身の DoD ゲートで同じ規律を守るので必須ではない。</p>
+  </div>
+
+  <div class="step">
+    <h3>Step 1 — 要件を固める <code>/sdd-spec</code></h3>
+    <pre>/sdd-spec loki-ruler "Loki に alert ルール評価を足したい"</pre>
+    <ul>
+      <li>AI が目的・対象 namespace・公開有無・セキュリティ影響・受入基準を 2〜4 問質問 → <code>specs/001-loki-ruler/spec.md</code> 生成。</li>
+      <li><b>what / why だけ</b>。chart 名や version は書かない。不明点は <code>[NEEDS CLARIFICATION]</code> で残り、残る間は次に進めない。</li>
+      <li>👤 <b>レビュー</b>: 受入基準が「確認できる形」か。これが後の検証の物差し。</li>
+    </ul>
+  </div>
+
+  <div class="step">
+    <h3>Step 2 — 技術設計 <code>/sdd-plan</code></h3>
+    <pre>/sdd-plan loki-ruler</pre>
+    <ul>
+      <li>AI が <code>kubernetes/</code> の似た既存を読み <code>plan.md</code> を作る: 配置（Pattern A/B/ApplicationSet）・chart repo・<b>固定 version</b>・Argo CD project・namespace・Gateway・Secrets 方式・<code>## Affected paths</code>。</li>
+      <li>👤 <b>レビュー</b>: chart/version・namespace・secrets 方式が妥当か。<code>## Constitution check</code> で既存ルール準拠か。</li>
+    </ul>
+  </div>
+
+  <div class="step">
+    <h3>Step 3 — タスク分解 <code>/sdd-tasks</code></h3>
+    <pre>/sdd-tasks loki-ruler</pre>
+    <ul>
+      <li>spec + plan から依存順チェックボックス <code>tasks.md</code> を生成。末尾に<b>必須の検証タスク</b>が必ず入る。</li>
+      <li>👤 <b>レビュー</b>: 抜け・順序を確認。</li>
+    </ul>
+  </div>
+
+  <div class="step">
+    <h3>Step 4 — 自律実装 + 検証 + draft PR <code>/sdd-impl</code></h3>
+    <pre>/sdd-impl loki-ruler</pre>
+    <p><code>/sdd-impl</code> は次を<b>自律で</b>やる:</p>
+    <div class="mermaid">
+flowchart LR
+    A["worktree 作成"]:::ai --> B["tasks を順に実装<br/>論理単位で commit"]:::ai --> C{{"検証フェーズ"}}:::gate
+    C --> D["静的ゲート<br/>yamllint・helm template<br/>kubeconform・dry-run=client<br/>secret/version check"]:::s
+    D -->|赤| F["ソース修正<br/>(握り潰し禁止・最大3回)"]:::fix --> D
+    D -->|緑| E{"cluster 到達?"}:::q
+    E -->|Yes| G["ライブ検証<br/>kubectl dry-run=server"]:::l --> H
+    E -->|No| S["未到達を明示<br/>PR body に委譲"]:::skip --> H
+    H["push → gh pr create --draft<br/>PR URL を提示"]:::ai
+    classDef ai fill:#0284C7,stroke:#075985,color:#fff;
+    classDef gate fill:#0284C7,stroke:#075985,color:#fff;
+    classDef s fill:#E0F2FE,stroke:#0284C7,color:#075985;
+    classDef l fill:#DCFCE7,stroke:#15803D,color:#14532D;
+    classDef q fill:#FEF3C7,stroke:#B45309,color:#7C2D12;
+    classDef fix fill:#FEE2E2,stroke:#B91C1C,color:#7F1D1D;
+    classDef skip fill:#F1F5F9,stroke:#94A3B8,color:#334155;
+    </div>
+    <div class="crit"><b>偽 pass を許さない</b> — 静的ゲートが全緑になるまで「完了」と言わない／cluster 未到達の検証は黙ってスキップせず PR body に明記／ゲート回避のための握り潰し禁止（直せなければ PR を作らず人間にフラグ）。</div>
+  </div>
+
+  <div class="step">
+    <h3>Step 5 — レビュー → ready → merge（👤 あなた）</h3>
+    <p>draft PR を GitHub で確認。PR body に検証サマリ・受入基準の仕分け・merge 後 runbook が入っている。問題なければ <b>ready 化 → merge</b>。</p>
+  </div>
+
+  <div class="step">
+    <h3>Step 6 — 反映確認（👤 あなた）</h3>
+    <pre>/argocd-sync loki-ruler     <span class="c"># Synced + Healthy</span>
+/cluster-status             <span class="c"># pod / gateway / cert</span></pre>
+    <p>merge すると Argo CD が自動 sync。「merge 後でないと確認できない」受入基準をここで確認する。</p>
+  </div>
+
+  <h2><span class="n">5.</span> 検証はなぜ 2 段階か</h2>
+  <p>infra には <code>make test</code> のようなテストスイートが無く、<b>本番の正しさは merge 後の Argo CD が決める</b>。だから分けている。</p>
+  <table>
+    <tr><th>段階</th><th>いつ</th><th>何を</th><th>掴めること</th></tr>
+    <tr><td>静的ゲート</td><td>merge 前・常時</td><td>yamllint / helm template / kubeconform / dry-run=client / 安全 check</td><td>構文・スキーマ・レンダリング・version 固定・secret 漏れ</td></tr>
+    <tr><td>ライブ検証</td><td>merge 前・cluster 到達時</td><td>kubectl dry-run=server</td><td>実 API・CRD・admission（非破壊）</td></tr>
+    <tr><td>Argo CD</td><td>merge 後</td><td><code>/argocd-sync</code> <code>/cluster-status</code> <code>/cert-check</code></td><td>Synced+Healthy・pod 起動・cert 発行</td></tr>
+  </table>
+  <div class="note">検証目的の一時的な <code>kubectl --dry-run=server</code> や scratch namespace への一時 apply→即 delete は許容。ただしデプロイ自体は必ず Git 経由（GitOps）。</div>
+
+  <h2><span class="n">6.</span> Tips / FAQ</h2>
+  <ul>
+    <li><b>やり直したい</b>: 前段コマンドを再実行して md を上書き、再レビュー。下流（plan/tasks）は上流変更後に作り直す。</li>
+    <li><b>worktree の片付け</b>: PR merge 後に <code>git worktree remove ~/kensan-lab.worktrees/&lt;NNN-slug&gt;</code>。</li>
+    <li><b>cluster が無い環境</b>: 静的ゲートまで完走。ライブ検証は「未実行」と明示され merge 後の Argo CD に委ねる。</li>
+    <li><b>secrets</b>: SealedSecret は <code>temp/&lt;name&gt;-raw.yaml</code>（git-ignored）→ <code>kubeseal</code> → <code>resources/&lt;name&gt;-sealed.yaml</code>。生ファイルは絶対 commit しない。</li>
+    <li><b>app の開発は？</b>: app は <code>apps/kensan/</code> に cd して作業。app 用 SDD は今後 <code>apps/kensan/.claude/</code> + <code>apps/kensan/specs/</code> に同じ <code>/sdd-*</code> 名で用意予定（検証は <code>make test</code> / <code>npm run build</code> / Playwright に差し替え）。</li>
+  </ul>
+
+  <h2><span class="n">7.</span> チートシート</h2>
+  <pre><span class="c">（任意）</span>/goal &lt;受入基準&gt;            <span class="c"># 止まる前に確認する番人をセット</span>
+/sdd-spec  &lt;name&gt; [概要]            <span class="c"># 1. 要件 (what/why)        → spec.md</span>
+/sdd-plan  &lt;name&gt;                  <span class="c"># 2. 技術設計 (how)         → plan.md</span>
+/sdd-tasks &lt;name&gt;                  <span class="c"># 3. タスク分解             → tasks.md</span>
+/sdd-impl  &lt;name&gt;                  <span class="c"># 4. 実装+検証+draft PR     → worktree, PR</span>
+<span class="c"># merge 後</span>
+/argocd-sync &lt;component&gt; ; /cluster-status</pre>
+  <table>
+    <tr><th>成果物</th><th>場所</th><th>中身</th></tr>
+    <tr><td>spec.md</td><td><code>specs/NNN-&lt;slug&gt;/</code></td><td>what / why・受入基準</td></tr>
+    <tr><td>plan.md</td><td>〃</td><td>how・chart・ns・secrets・Affected paths</td></tr>
+    <tr><td>tasks.md</td><td>〃</td><td>依存順タスク + 必須検証</td></tr>
+    <tr><td>実装</td><td><code>~/kensan-lab.worktrees/NNN-&lt;slug&gt;</code></td><td>worktree（branch <code>feat/NNN-&lt;slug&gt;</code>）</td></tr>
+  </table>
+
+  <div class="foot">
+    kensan-lab SDD 開発ガイド · infra フロー ·
+    実践: GUIDE / 設計背景: <a href="./sdd-overview.html">sdd-overview.html</a> / 定義: README.md
+  </div>
+
+</div>
+<script>
+  mermaid.initialize({startOnLoad:true, theme:'base', themeVariables:{
+    fontFamily:'JetBrains Mono, ui-monospace, monospace', fontSize:'13px',
+    lineColor:'#94A3B8', primaryColor:'#E0F2FE', primaryBorderColor:'#0284C7', primaryTextColor:'#075985'
+  }});
+</script>
+</body>
+</html>
