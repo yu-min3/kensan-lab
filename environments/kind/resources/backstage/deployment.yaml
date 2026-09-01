@@ -54,10 +54,9 @@ spec:
           ## explore carries whatever the golden path needs, and production is
           ## upgraded on its own occasions (it is on v0.0.14 as this is written).
           ##
-          ## v0.0.17 is the first image whose scaffolder can finish a Create on
-          ## the Gitea path: it carries the register step's absolute URL and the
-          ## wait for Gitea to answer for a repository it has just been pushed.
-          image: ghcr.io/yu-min3/kensan-lab/backstage:v0.0.17
+          ## v0.0.18 contains both production and Explore template entrypoints.
+          ## The image is shared; app-config.explore.yaml selects the latter.
+          image: ghcr.io/yu-min3/kensan-lab/backstage:v0.0.18
           imagePullPolicy: IfNotPresent
           ## The two configs baked into the image, then the explore overrides.
           ## Order matters: later files win.

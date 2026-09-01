@@ -84,8 +84,9 @@ place, and both are gone when you tear it down. Backstage's config still has to
 name a GitHub token, so the explore config writes a literal one that GitHub
 would reject — there is no credential here to leak or to bring.
 
-**Ports.** 80 and 443 must be free. The gateway is published on them, so the
-URLs below work in a browser with no proxy and no port-forward.
+**Ports.** 80 and 443 must be free. The gateway is published on localhost only,
+so the URLs below work in a browser with no proxy and no port-forward, without
+making the disposable accounts reachable from another machine.
 
 **A network connection.** Charts come from upstream repositories and images
 from registries — nothing here is built from what is on your disk. The
@@ -136,7 +137,10 @@ gateway-api         Synced   Healthy
 
 ### 2. Sign in once, and be signed in everywhere
 
-`make try` prints one account — user `demo` — and it is the only one you need.
+Use `demo` / `demo`. It is the only account you need. The predictable password
+is intentional: the realm and both application databases are disposable, and
+the gateway binds only to `127.0.0.1`. Set `DEMO_PASSWORD` before `make try` if
+you want a different value.
 
 ![The Keycloak sign-in page for the kensan-lab (explore) realm](assets/keycloak-login.png)
 
@@ -171,11 +175,10 @@ Bare metal draws the line in the same place, for the same reason.
 
 The realm is not in this repository. Keycloak does not substitute environment
 variables when importing a realm file — a `${VAR}` in a client secret is stored
-as those six characters — so a committed realm would have to carry real client
-secrets and a real password, for a cluster that publishes ports 80 and 443 on
-whatever machine runs it. Instead `make try` creates the realm with `kcadm`
-against the running pod, generating every secret as it goes, which is what
-bare metal's own bootstrap script does.
+as those six characters — so a committed realm would have to carry working
+client secrets. Instead `make try` creates the realm with `kcadm` against the
+running pod, generating those secrets as it goes, which is what bare metal's
+own bootstrap script does.
 
 **Bringing your own people.** Keycloak's admin console is at
 `https://auth.127-0-0-1.sslip.io` — user `admin`, password printed alongside the

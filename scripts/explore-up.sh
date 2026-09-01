@@ -50,10 +50,10 @@ CLUSTER_NAME="kensan-lab-explore"
 GITEA_INTERNAL_URL="http://gitea-http.gitea.svc.cluster.local:3000"
 GITEA_REPO_PATH="gitea-admin/kensan-lab.git"
 WAIT_TIMEOUT=900
-# Optional. The demo account's password is generated and printed unless one is
-# supplied, which is what CI does so that it can drive a login without scraping
-# this script's output.
-DEMO_PASSWORD="${DEMO_PASSWORD:-}"
+# This is a local, disposable account rather than a credential carried into a
+# persistent environment. Keep the walkthrough memorable; callers may still
+# override it when exercising password handling itself.
+DEMO_PASSWORD="${DEMO_PASSWORD:-demo}"
 
 usage() {
   cat <<'EOF'
@@ -64,9 +64,7 @@ usage: scripts/explore-up.sh [--timeout SECONDS]
 This checkout is what runs: it is pushed into a Gitea inside the cluster and
 Argo CD reads from there. No account, no token, no fork, and nothing to push.
 
-Set DEMO_PASSWORD to choose the demo account's password instead of having one
-generated. Useful for scripting against the cluster; the generated one is
-printed either way.
+The demo account is `demo` / `demo`. Set DEMO_PASSWORD to override it.
 EOF
 }
 
@@ -132,8 +130,9 @@ fi
 
 # Reusing a cluster cannot work, so it is refused rather than half-attempted.
 #
-# Every credential below is generated fresh on each run, but Keycloak reads its
-# admin password once — at first startup, into an in-memory database. A second
+# Every runtime client credential below is generated fresh on each run, and
+# Keycloak reads its admin password once — at first startup, into an in-memory
+# database. A second
 # run therefore hands Kubernetes new secrets while Keycloak keeps the old ones,
 # and the bootstrap cannot even log in to fix it:
 #
@@ -146,7 +145,7 @@ fi
 # cluster whose whole point is being thrown away.
 if kind get clusters 2>/dev/null | grep -qx "$CLUSTER_NAME"; then
   fail "a '${CLUSTER_NAME}' cluster already exists, and this script cannot reuse it.
-     Every run generates fresh credentials, and Keycloak only reads its own at
+     Every run generates fresh client credentials, and Keycloak only reads its own at
      first startup — so a second run leaves the two disagreeing.
 
      Remove it and start again:
@@ -257,10 +256,10 @@ helm upgrade --install argocd argo/argo-cd \
 # Single sign-on credentials
 # ---------------------------------------------------------------------------
 #
-# Every secret below is generated here, now, and never written to the
-# repository. That is not squeamishness: a kind cluster publishes ports 80 and
-# 443 on the host, so a client secret committed to a public repository would be
-# a working credential against every cluster anybody ever started from it.
+# Every client and admin secret below is generated here, now, and never written
+# to the repository. The disposable demo user's password is the only exception.
+# A client secret committed to a public repository would be a working credential
+# against every cluster anybody ever started from it.
 #
 # They are created *before* Keycloak exists, and Keycloak is then told to use
 # them, rather than the other way round. The reverse order deadlocks: the
@@ -269,7 +268,7 @@ helm upgrade --install argocd argo/argo-cd \
 rand() { openssl rand -base64 24 | tr -d '/+=' | head -c 24; }
 
 KEYCLOAK_ADMIN_PASSWORD="$(rand)"
-DEMO_USER_PASSWORD="${DEMO_PASSWORD:-$(rand)}"
+DEMO_USER_PASSWORD="${DEMO_PASSWORD}"
 ARGOCD_CLIENT_SECRET="$(rand)"
 GRAFANA_CLIENT_SECRET="$(rand)"
 OAUTH2_PROXY_CLIENT_SECRET="$(rand)"
@@ -489,8 +488,7 @@ printf '%s' "$root_app" | kubectl apply -f - >/dev/null
 # It cannot be a realm file in git. Keycloak does not substitute environment
 # variables during realm import — verified: a `${VAR}` in a client secret is
 # stored as the literal six characters — so a committed realm would have to
-# carry real client secrets and a real user password, in a repository anyone can
-# read, for a cluster that publishes ports 80 and 443.
+# carry working client secrets in a repository anyone can read.
 
 # This runs *before* the wait for every Application, and it has to.
 # oauth2-proxy fetches the realm's discovery document at startup and exits if it
@@ -877,6 +875,23 @@ if [[ -z "$plugins" ]]; then
      Neither a success nor a failure line appeared, so it is still starting or
      stuck before the plugins run:
        kubectl -n backstage logs deploy/backstage -c backstage | tail -30"
+fi
+
+# A catalog location that names a file missing from the image is non-fatal to
+# Backstage: every plugin initializes, the pod is Ready, and Create renders an
+# empty list. PR #519 exposed exactly that gap when config selected the new
+# Explore entrypoint but the deployed image predated it.
+template_path=/app/templates/fastapi-template/template-explore.yaml
+info "checking that the Explore software template is in the Backstage image"
+if ! kubectl -n backstage exec deploy/backstage -c backstage -- \
+  test -f "$template_path"; then
+  fail "Backstage is Healthy but its Explore template is absent from the image:
+       ${template_path}
+     Publish an image containing template-explore.yaml and update
+     environments/kind/resources/backstage/deployment.yaml."
+fi
+if grep -Fq "file ${template_path} does not exist" <<<"$logs"; then
+  fail "Backstage could not register the Explore template from ${template_path}."
 fi
 
 admin_password="$(kubectl -n argocd get secret argocd-initial-admin-secret \

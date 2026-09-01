@@ -80,11 +80,6 @@ jobs:
       # Fork pull requests are covered too, now that nothing here has to be
       # reachable from outside the runner.
       - name: Bring up the explore cluster
-        env:
-          # Fixed rather than generated, so the SSO check below can log in
-          # without scraping the script's output. Nothing outside this runner
-          # can reach the cluster, and it is destroyed at the end of the job.
-          DEMO_PASSWORD: ci-demo-password
         run: scripts/explore-up.sh
 
       # explore-up.sh already asserts every Application is Synced/Healthy and
@@ -181,7 +176,7 @@ jobs:
           token="$(curl -sk --resolve auth.127-0-0-1.sslip.io:443:127.0.0.1 \
             -d grant_type=password -d client_id=oauth2-proxy \
             -d "client_secret=${secret}" \
-            -d username=demo -d password=ci-demo-password \
+            -d username=demo -d password=demo \
             "${realm}/protocol/openid-connect/token" | jq -r '.access_token // empty')"
           [ -n "$token" ] || { echo "the realm refused to issue a token" >&2; exit 1; }
 
@@ -203,12 +198,12 @@ jobs:
           # longer opens the gate, and a test using one would prove nothing a
           # person can do. These walk the flows a browser walks.
           code="$(scripts/explore-login-check.sh \
-            demo.127-0-0-1.sslip.io demo ci-demo-password 2>&1 || true)"
+            demo.127-0-0-1.sslip.io demo demo 2>&1 || true)"
           echo "demo (gateway ext_authz): ${code}"
           [ "$code" = "200" ] || { echo "signing in to the demo app failed" >&2; exit 1; }
 
           result="$(scripts/explore-backstage-login-check.sh \
-            backstage.127-0-0-1.sslip.io demo ci-demo-password 2>&1 || true)"
+            backstage.127-0-0-1.sslip.io demo demo 2>&1 || true)"
           echo "backstage (native OIDC): ${result}"
           case "$result" in
             200*) ;;

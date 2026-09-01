@@ -62,6 +62,11 @@ COPY --chown=node:node catalog ./catalog
 # Copy templates directory (Backstage templates)
 COPY --chown=node:node templates ./templates
 
+# Both environments select an entrypoint at runtime. A missing file otherwise
+# leaves the backend Healthy while the Create page quietly shows zero templates.
+RUN test -f templates/fastapi-template/template.yaml && \
+    test -f templates/fastapi-template/template-explore.yaml
+
 # Then copy the rest of the backend bundle, along with any other files we might want.
 COPY --chown=node:node packages/backend/dist/bundle.tar.gz app-config*.yaml ./
 RUN tar xzf bundle.tar.gz && rm bundle.tar.gz
