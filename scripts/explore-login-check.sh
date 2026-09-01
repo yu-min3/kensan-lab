@@ -3,7 +3,7 @@
 # the front door finally answers with. Used by scripts/explore-up.sh and by
 # Explore CI; safe to run by hand against a live cluster:
 #
-#   scripts/explore-login-check.sh demo.127-0-0-1.sslip.io demo <password>
+#   scripts/explore-login-check.sh demo.127-0-0-1.sslip.io demo demo
 #
 # Sign in through the gateway the way a browser does: follow the redirect to
 # Keycloak, post the login form, come back through /oauth2/callback, and end up
@@ -18,7 +18,7 @@ set -euo pipefail
 
 HOST="${1:-demo.127-0-0-1.sslip.io}"
 USER_NAME="${2:-demo}"
-PASSWORD="${3:-local-demo-password}"
+PASSWORD="${3:-demo}"
 JAR="$(mktemp)"
 trap 'rm -f "$JAR"' EXIT
 

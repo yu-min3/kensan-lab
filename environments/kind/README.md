@@ -31,7 +31,7 @@ something Argo CD created is already running:
 
 | | why it is not an Application |
 |---|---|
-| **generates every SSO credential** | a client secret committed to a public repository is a working credential against every cluster started from it |
+| **generates every SSO client credential** | a client secret committed to a public repository is a working credential against every cluster started from it; only the disposable `demo` user's password is fixed |
 | **creates the Keycloak realm with `kcadm`** | Keycloak does not substitute environment variables during realm import — verified: `${VAR}` in a client secret is stored as those six characters — so a realm file in git would have to carry real secrets |
 | **rewrites CoreDNS** | the issuer hostname has to resolve to the gateway from inside a pod and to `127.0.0.1` from the browser; that is one name with two answers |
 | **installs Gitea and pushes this checkout into it** | it is the repository Argo CD reads, so it cannot be described by an Application that Argo CD would have to read out of it |
@@ -137,12 +137,12 @@ to differ.
    the opposite of the point. The same test applies to scrape jobs — a target
    that can only ever be down is worse than an absent one.
 11. **`explore-up.sh` refuses an existing cluster, and that is not a rough edge
-    to smooth over.** Credentials are generated fresh on every run; Keycloak
-    reads its own once, at first startup, into an in-memory database. Reusing a
-    cluster therefore means either printing a password this run did not create,
-    or restarting Keycloak and losing the realm with it. Refusing and pointing
-    at `make explore-down` is the honest option, and it is why the same restart
-    takes the realm away — see the note in the quickstart.
+    to smooth over.** Runtime client credentials are generated fresh on every
+    run; Keycloak reads its own once, at first startup, into an in-memory
+    database. Reusing a cluster therefore leaves configuration and stored state
+    disagreeing. Refusing and pointing at `make explore-down` is the honest
+    option, and it is why the same restart takes the realm away — see the note
+    in the quickstart.
 12. **A version tag does not identify a build.** Backstage exists as two GHCR
     packages, and both once carried a `v0.0.12` with different contents.
     Explore ran the older one for a while and showed a guest sign-in card

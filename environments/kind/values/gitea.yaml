@@ -57,8 +57,8 @@ gitea:
     username: gitea-admin
     email: gitea-admin@example.com
     # Replaced on the command line by explore-up.sh with a generated value.
-    # Never a committed credential: this cluster publishes ports 80 and 443 on
-    # whatever machine runs it.
+    # Never a committed credential, even though the Explore gateway is bound to
+    # localhost: the same value must not work in every clone of the repository.
     password: replaced-at-install-time
   config:
     database:

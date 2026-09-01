@@ -8,7 +8,7 @@ set -euo pipefail
 
 HOST="${1:-backstage.127-0-0-1.sslip.io}"
 USER_NAME="${2:-demo}"
-PASSWORD="${3:-local-demo-password}"
+PASSWORD="${3:-demo}"
 JAR="$(mktemp)"
 trap 'rm -f "$JAR"' EXIT
 C=(/usr/bin/curl -sk --cookie-jar "$JAR" --cookie "$JAR")
