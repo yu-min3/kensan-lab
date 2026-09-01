@@ -8,6 +8,7 @@ on:
       - "environments/**"
       - ".yamllint"
       - "scripts/validate_argocd_apps.py"
+      - "scripts/validate-manifests.sh"
       - ".github/workflows/manifest-ci.yml"
   push:
     branches: [main]
@@ -17,6 +18,7 @@ on:
       - "environments/**"
       - ".yamllint"
       - "scripts/validate_argocd_apps.py"
+      - "scripts/validate-manifests.sh"
       - ".github/workflows/manifest-ci.yml"
 
 jobs:
@@ -26,7 +28,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - run: pipx install yamllint
-      - run: yamllint -c .yamllint kubernetes charts environments
+      - run: scripts/validate-manifests.sh yamllint
 
   kubeconform:
     name: kubeconform (schema validation)
@@ -40,56 +42,15 @@ jobs:
       # K8s manifest ではないため対象外。CR は -ignore-missing-schemas で skip される
       - name: Validate raw manifests
         run: |
-          find kubernetes environments -name '*.yaml' \
-            ! -name 'values.yaml' \
-            ! -name 'Chart.yaml' \
-            ! -path '*/chart/templates/*' \
-            ! -path '*/platform-values/*' \
-            ! -path 'environments/kind/applications/templates/*' \
-            ! -path 'environments/kind/values/*' \
-            -print0 | xargs -0 ./kubeconform -ignore-missing-schemas -summary
+          chmod +x kubeconform
+          PATH="$PWD:$PATH" scripts/validate-manifests.sh kubeconform
 
   helm-render:
     name: helm template (in-repo charts)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      # ApplicationSet が inject するのと同等のパラメータを渡して render が壊れていないか確認
-      - name: app-base (app-kensan values)
-        run: helm template app-kensan charts/app-base -f kubernetes/apps/app-kensan/values.yaml > /dev/null
-      # explore の Application 群と demo app。explore-ci が kind を起こす前に、
-      # render できないだけの壊れ方はここで落とす (数秒 vs 15 分)
-      - name: explore applications (kind root app)
-        run: helm template explore environments/kind/applications > /dev/null
-      - name: app-base (explore demo values)
-        run: helm template app-demo charts/app-base -f environments/kind/values/demo-app.yaml > /dev/null
-      # instance 0 件 (glob 空振り) でも fail せず、chart 単体の render を smoke check する
-      - name: vault-database-engine (per-instance values)
-        run: |
-          shopt -s nullglob
-          files=(kubernetes/secrets/vault-database-engine/platform-values/vault-database/*.yaml)
-          if [ ${#files[@]} -eq 0 ]; then
-            echo "no instances — render chart with smoke values"
-            helm template ci-smoke kubernetes/secrets/vault-database-engine/chart \
-              --set name=ci-smoke --set ns=ci-smoke > /dev/null
-          fi
-          for f in "${files[@]}"; do
-            name="postgres-$(basename "$f" .yaml)"
-            helm template "$name" kubernetes/secrets/vault-database-engine/chart -f "$f" --set "name=$name" > /dev/null
-          done
-      - name: vault-transit-engine (per-instance values)
-        run: |
-          shopt -s nullglob
-          files=(kubernetes/secrets/vault-transit-engine/platform-values/vault-transit/*.yaml)
-          if [ ${#files[@]} -eq 0 ]; then
-            echo "no instances — render chart with smoke values"
-            helm template ci-smoke kubernetes/secrets/vault-transit-engine/chart \
-              --set name=ci-smoke --set ns=ci-smoke --set keyName=ci-smoke > /dev/null
-          fi
-          for f in "${files[@]}"; do
-            name="transit-$(basename "$f" .yaml)"
-            helm template "$name" kubernetes/secrets/vault-transit-engine/chart -f "$f" --set "name=$name" > /dev/null
-          done
+      - run: scripts/validate-manifests.sh helm
 
   argocd-static-validation:
     name: Argo CD static validation
@@ -97,4 +58,4 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - run: pip install pyyaml
-      - run: python3 scripts/validate_argocd_apps.py
+      - run: scripts/validate-manifests.sh argocd

@@ -5,6 +5,10 @@ metadata:
   name: {{ include "app-base.pvcName" . }}
   labels:
     {{- include "app-base.labels" . | nindent 4 }}
+  annotations:
+    # Stateful data must survive Application/manifest removal. Deletion is an
+    # explicit human operation after ownership and backup have been checked.
+    argocd.argoproj.io/sync-options: Prune=false
 spec:
   accessModes:
     {{- toYaml .Values.pvc.accessModes | nindent 4 }}

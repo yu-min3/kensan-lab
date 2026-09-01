@@ -96,6 +96,57 @@ jobs:
             exit 1
           fi
 
+      # Prove the substitution as a workload contract, not only as a
+      # StorageClass name: the claim binds, /data is writable, and the bytes
+      # remain after Kubernetes replaces the Pod.
+      - name: Check demo PVC persistence across Pod replacement
+        run: |
+          namespace=app-demo
+          selector='app.kubernetes.io/name=demo,app.kubernetes.io/instance=app-demo'
+          marker="sdd-${GITHUB_SHA}"
+
+          wait_for_ready_pod() {
+            excluded_uid="${1:-}"
+            for attempt in $(seq 1 60); do
+              ready_pods="$(kubectl -n "$namespace" get pod -l "$selector" \
+                -o jsonpath='{range .items[*]}{.metadata.name}{" "}{.metadata.uid}{" "}{.status.containerStatuses[0].ready}{"\n"}{end}' \
+                | awk -v excluded="$excluded_uid" '$3 == "true" && $2 != excluded { print $1, $2 }')"
+              ready_count="$(printf '%s\n' "$ready_pods" | awk 'NF { count++ } END { print count+0 }')"
+              if [ "$ready_count" -eq 1 ]; then
+                printf '%s\n' "$ready_pods"
+                return 0
+              fi
+              echo "attempt $attempt: expected one Ready replacement Pod, got $ready_count" >&2
+              kubectl -n "$namespace" get pod -l "$selector" -o wide >&2 || true
+              sleep 2
+            done
+            return 1
+          }
+
+          kubectl -n "$namespace" wait \
+            --for=jsonpath='{.status.phase}'=Bound pvc/demo-data --timeout=120s
+
+          read -r old_pod old_uid <<< "$(wait_for_ready_pod)"
+          kubectl -n "$namespace" exec "$old_pod" -- sh -c \
+            'printf %s "$1" > /data/sdd-marker && test "$(cat /data/sdd-marker)" = "$1"' \
+            sh "$marker"
+
+          kubectl -n "$namespace" delete pod "$old_pod" --wait=false
+          kubectl -n "$namespace" wait --for=delete "pod/$old_pod" --timeout=120s
+          read -r new_pod new_uid <<< "$(wait_for_ready_pod "$old_uid")"
+          kubectl -n "$namespace" exec "$new_pod" -- sh -c \
+            'test "$(cat /data/sdd-marker)" = "$1"' sh "$marker"
+
+          for attempt in $(seq 1 30); do
+            code="$(curl -sS -o /dev/null -w '%{http_code}' --max-time 5 \
+              -H 'Host: demo.127-0-0-1.sslip.io' http://127.0.0.1/ || true)"
+            [ "$code" = 200 ] && exit 0
+            echo "attempt $attempt: demo gateway returned ${code:-no response}"
+            sleep 2
+          done
+          echo "demo gateway did not return HTTP 200 after Pod replacement" >&2
+          exit 1
+
       # The values file pins `cni.exclusive: false` so that istio-cni appends
       # itself to kindnet's config instead of taking the node over. Nothing else
       # would notice if that stopped working: the DaemonSet stays Healthy, and no
@@ -217,6 +268,8 @@ jobs:
           kubectl get pods -A -o wide || true
           kubectl get events -A --sort-by=.lastTimestamp | tail -50 || true
           kubectl -n istio-system get gateway,httproute,svc || true
+          kubectl -n app-demo get pod,pvc -o wide || true
+          kubectl -n app-demo get events --sort-by=.lastTimestamp || true
           for app in $(kubectl -n argocd get applications -o name 2>/dev/null); do
             echo "----- $app"
             kubectl -n argocd get "$app" -o jsonpath='{.status.conditions}{"\n"}' || true

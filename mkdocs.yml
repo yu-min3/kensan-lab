@@ -205,6 +205,7 @@ nav:
       - Guides:
           - Backstage Golden Path: guides/backstage-golden-path.md
           - OTel integration & troubleshooting: guides/observability-integration.md
+          - Spec-driven development: guides/sdd-workflow.md
           - Raspberry Pi WiFi stabilization: guides/wifi-stabilization.md
   - Architecture Decisions:
       - Overview: adr/index.md
@@ -235,4 +236,5 @@ nav:
       - 2026-03-02 system-infra Sync Blocked: incidents/2026-03-02-system-infra-sync-blocked.md
   - Roadmap:
       - Storage (local-path → Longhorn) — done, archived: roadmap/storage-longhorn.md
+      - AI Harness Phase 0 review: roadmap/ai-harness-phase0-review.md
   - Articles: articles.md

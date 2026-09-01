@@ -43,6 +43,10 @@ Backstage: `cd backstage && make {install,dev,all TAG=...}`
 | `/secret-health` | Secret 4 方式（Vault/ESO/SealedSecret）の一括健全性チェック |
 | `/argocd-sync [app]` | Check sync status & drift |
 | `/codex <依頼>` | OpenAI Codex へ委譲（レビュー・セカンドオピニオン・別解生成） |
+| `/sdd-spec <name>` | SDD 適用判定と Full/Lite の仕様作成 |
+| `/sdd-plan <name>` | Full SDD の技術計画 + Codex plan review |
+| `/sdd-tasks <name>` | Full SDD の実装・検証タスク分解 |
+| `/sdd-impl <name>` | worktree 実装 + Codex diff review + draft PR 引き渡し |
 
 ## Domain Rules (`.claude/rules/`)
 
