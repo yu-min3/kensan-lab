@@ -13,7 +13,7 @@ set -euo pipefail
 
 HOST="${1:-backstage.127-0-0-1.sslip.io}"
 USER_NAME="${2:-demo}"
-PASSWORD="${3:-local-demo-password}"
+PASSWORD="${3:-demo}"
 NAME="${4:-checkservice}"
 JAR="$(mktemp)"
 trap 'rm -f "$JAR"' EXIT

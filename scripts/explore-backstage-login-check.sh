@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Backstage's own OIDC round trip, without a browser.
+# Backstage's own OIDC round trip and Explore template lookup, without a browser.
 #
 # Different from the gateway flow: Backstage is not behind oauth2-proxy, so
 # there is no CSRF cookie and no /oauth2/callback. It starts the flow itself at
@@ -32,13 +32,27 @@ case "$handler" in
   *) echo "Keycloak did not return the handler: ${handler:-<none>}" >&2; exit 1 ;;
 esac
 
-# The handler answers with a page that posts the result back to the opener.
-# A refused sign-in says so in that payload rather than in the status code.
-body="$("${C[@]}" "$handler")"
-if grep -qi "error" <<<"$body" && ! grep -qi "backstageIdentity\|profile" <<<"$body"; then
-  echo "sign-in refused:"; echo "$body" | grep -oiE '"error[^,]{0,120}' | head -2
+# The handler answers with a page that posts a percent-encoded payload to the
+# opener. Decode it before looking for the Backstage identity token.
+frame="$("${C[@]}" "$handler" || true)"
+payload="$(printf '%s' "$frame" \
+  | sed -n "s/.*decodeURIComponent('\([^']*\)').*/\1/p" | head -1)"
+[ -n "$payload" ] || { echo "the sign-in page carried no auth payload" >&2; exit 1; }
+decoded="$(printf '%b' "${payload//%/\\x}")"
+token="$(printf '%s' "$decoded" \
+  | grep -oE '"backstageIdentity":\{"token":"[^"]+' \
+  | grep -oE '"token":"[^"]+' | cut -d'"' -f4 | head -1 || true)"
+[ -n "$token" ] || { echo "the handler returned no Backstage identity" >&2; exit 1; }
+
+# A missing catalog file is not a plugin startup failure: Backstage stays
+# Healthy and Create shows an empty page. Ask for the entity a person expects
+# to see so that this test proves the experience, not just the login.
+code="$("${C[@]}" -o /dev/null -w '%{http_code}' \
+  -H "Authorization: Bearer ${token}" \
+  "https://${HOST}/api/catalog/entities/by-name/template/default/fastapi-app-template")"
+[ "$code" = 200 ] || {
+  echo "the Explore software template is not registered (HTTP ${code})" >&2
   exit 1
-fi
-grep -qi "backstageIdentity\|profile" <<<"$body" \
-  && echo "200 (Backstage issued an identity)" \
-  || { echo "the handler returned no identity"; echo "$body" | head -c 200; exit 1; }
+}
+
+echo "200 (Backstage issued an identity; Explore template is registered)"
