@@ -49,6 +49,7 @@ CLUSTER_NAME="kensan-lab-explore"
 # exists, further down.
 GITEA_INTERNAL_URL="http://gitea-http.gitea.svc.cluster.local:3000"
 GITEA_REPO_PATH="gitea-admin/kensan-lab.git"
+EXPLORE_APP_IMAGE="kensan-lab/explore-template:local"
 WAIT_TIMEOUT=900
 # This is a local, disposable account rather than a credential carried into a
 # persistent environment. Keep the walkthrough memorable; callers may still
@@ -164,6 +165,18 @@ if [[ "$cluster_exists" == false ]] && command -v nc >/dev/null 2>&1; then
   done
 fi
 
+# The demo and every service created through the Explore template run the same
+# image. Build it from this checkout instead of pulling a hand-published demo
+# artifact: that makes the source beside `make try` the source on screen, on
+# both Apple Silicon and amd64, without a registry or a credential.
+#
+# The skeleton is deliberately directly buildable. App identity and appearance
+# arrive at runtime through deploy/values.yaml; no template substitution is
+# needed to make this image, which is exactly why one build can serve every app.
+info "building the golden path image from this checkout"
+docker build --quiet --tag "${EXPLORE_APP_IMAGE}" \
+  "${REPO_ROOT}/backstage/templates/fastapi-template/skeleton" >/dev/null
+
 # ---------------------------------------------------------------------------
 # Cluster
 # ---------------------------------------------------------------------------
@@ -178,6 +191,20 @@ fi
 # cluster no matter what the caller had selected — the one thing this script
 # must never do is touch somebody's real cluster.
 kubectl config use-context "kind-${CLUSTER_NAME}" >/dev/null
+
+info "loading the golden path image into kind"
+# `kind load` reads the node's containerd config, and environments/kind/
+# kind-cluster.yaml pins the node image by digest. A kind older than that image
+# cannot parse it, and says so as "unknown containerd config version" — after
+# the cluster is already up, which reads like a problem with this repository
+# rather than with the tool that created it.
+kind load docker-image --name "${CLUSTER_NAME}" "${EXPLORE_APP_IMAGE}" >/dev/null \
+  || fail "could not load the golden path image into the cluster.
+     If the error above mentions an unknown containerd config version, kind is
+     older than the node image this repository pins. Upgrade it and try again —
+     v0.32.0 is the version this is tested against:
+       kind version
+       brew upgrade kind    # macOS"
 
 # kind ships `standard` as the default StorageClass and the explore layer adds
 # `longhorn` pointing at the same provisioner, so that the repository's PVCs
@@ -429,11 +456,11 @@ kubectl apply -f "${REPO_ROOT}/kubernetes/argocd/projects/" >/dev/null
 #
 # Patched rather than committed, because the restriction is real protection on
 # the cluster that matters and this exception belongs to the throwaway one.
-# The exact URL, not a glob. Argo CD matches sourceRepos with a glob that does
-# not cross '/', so `${GITEA_INTERNAL_URL}/*` misses a two-segment path and the
-# Application stays Unknown with InvalidSpecError. Measured.
+# Admit repositories owned by the disposable Gitea admin. The platform repo and
+# every repository the Explore template creates live under exactly this prefix;
+# nothing outside this one in-cluster server is widened.
 kubectl -n argocd patch appproject app-project --type json \
-  -p "[{\"op\": \"add\", \"path\": \"/spec/sourceRepos/-\", \"value\": \"${REPO_URL}\"}]" \
+  -p "[{\"op\": \"add\", \"path\": \"/spec/sourceRepos/-\", \"value\": \"${GITEA_INTERNAL_URL}/gitea-admin/*\"}]" \
   >/dev/null
 
 # The AppProjects warn about resources no Application manages. On bare metal
@@ -459,8 +486,8 @@ info "handing the cluster to Argo CD (repo ${REPO_URL}, revision ${REVISION})"
 # CD a few seconds in which it is syncing main, and in CI that would silently
 # validate the wrong commit.
 #
-# repoURL appears twice (the chart source, and the helm parameter every child
-# Application inherits) and the revision once in each of the same two places.
+# repoURL and revision appear in both root sources, plus the helm parameter
+# every fixed child Application inherits.
 root_app="$(sed \
   -e "s|https://github.com/yu-min3/kensan-lab|${REPO_URL}|g" \
   -e "s|targetRevision: main|targetRevision: ${REVISION}|" \
@@ -877,21 +904,23 @@ if [[ -z "$plugins" ]]; then
        kubectl -n backstage logs deploy/backstage -c backstage | tail -30"
 fi
 
-# A catalog location that names a file missing from the image is non-fatal to
-# Backstage: every plugin initializes, the pod is Ready, and Create renders an
-# empty list. PR #519 exposed exactly that gap when config selected the new
-# Explore entrypoint but the deployed image predated it.
-template_path=/app/templates/fastapi-template/template-explore.yaml
-info "checking that the Explore software template is in the Backstage image"
+# The Explore template is read from the checkout seeded into Gitea, not from a
+# pre-published Backstage image. That is what lets a template edit be exercised
+# by the very next `make try`. A missing catalog location is non-fatal to the
+# backend, so prove the source is reachable from the consumer pod and reject a
+# processing error from the log.
+template_url="${GITEA_INTERNAL_URL}/gitea-admin/kensan-lab/src/branch/main/backstage/templates/fastapi-template/template-explore.yaml"
+template_raw_url="${GITEA_INTERNAL_URL}/gitea-admin/kensan-lab/raw/branch/main/backstage/templates/fastapi-template/template-explore.yaml"
+info "checking that Backstage can read the Explore software template from this checkout"
 if ! kubectl -n backstage exec deploy/backstage -c backstage -- \
-  test -f "$template_path"; then
-  fail "Backstage is Healthy but its Explore template is absent from the image:
-       ${template_path}
-     Publish an image containing template-explore.yaml and update
-     environments/kind/resources/backstage/deployment.yaml."
+  node -e 'fetch(process.argv[1]).then(async r => process.exit(r.ok && (await r.text()).includes("kind: Template") ? 0 : 1)).catch(() => process.exit(1))' \
+  "$template_raw_url"; then
+  fail "Backstage cannot read the Explore template from the seeded checkout:
+       ${template_url}"
 fi
-if grep -Fq "file ${template_path} does not exist" <<<"$logs"; then
-  fail "Backstage could not register the Explore template from ${template_path}."
+if grep -Fq "$template_url" <<<"$logs" && grep -Eq "Unable to read|processing.*error" <<<"$logs"; then
+  fail "Backstage reached the Explore template but could not register it:
+       ${template_url}"
 fi
 
 admin_password="$(kubectl -n argocd get secret argocd-initial-admin-secret \

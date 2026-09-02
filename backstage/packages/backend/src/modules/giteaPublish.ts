@@ -115,10 +115,11 @@ export function createGiteaPublishAction(options: { config: Config }) {
       // A timeout does not fail the publish: the repository exists and the
       // commit is in it. Whatever reads next will say so more precisely than a
       // wait loop can.
+      const catalogInfoPath = 'catalog-info.yaml';
       const readyBy = Date.now() + 30_000;
       while (Date.now() < readyBy) {
         const probe = await fetch(
-          `${api}/repos/${owner}/${repo}/contents?ref=${defaultBranch}`,
+          `${api}/repos/${owner}/${repo}/contents/${catalogInfoPath}?ref=${defaultBranch}`,
           { headers: authHeaders },
         );
         if (probe.ok) break;

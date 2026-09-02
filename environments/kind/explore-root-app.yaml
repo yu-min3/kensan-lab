@@ -4,10 +4,10 @@
 ## that directory with recurse: true, so anything left there lands on the real
 ## cluster. This separation is a hard requirement, not a preference.
 ##
-## repoURL and targetRevision appear twice: once for Argo CD to find this chart,
-## and once as helm parameters so every child Application follows the same
-## revision. scripts/explore-up.sh rewrites both to the cluster's own Gitea,
-## which is where the checkout it just pushed lives.
+## repoURL and targetRevision are repeated in every source, and again as helm
+## parameters so each fixed child Application follows the same revision.
+## scripts/explore-up.sh rewrites them all to the cluster's own Gitea, which is
+## where the checkout it just pushed lives.
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
@@ -16,17 +16,39 @@ metadata:
 spec:
   project: platform-project
 
-  source:
-    repoURL: https://github.com/yu-min3/kensan-lab
-    targetRevision: main
-    path: environments/kind/applications
-    helm:
-      releaseName: explore
-      parameters:
-        - name: repoURL
-          value: https://github.com/yu-min3/kensan-lab
-        - name: targetRevision
-          value: main
+  sources:
+    # The fixed Explore platform: the same 18 Applications on every run.
+    - repoURL: https://github.com/yu-min3/kensan-lab
+      targetRevision: main
+      path: environments/kind/applications
+      helm:
+        releaseName: explore
+        parameters:
+          - name: repoURL
+            value: https://github.com/yu-min3/kensan-lab
+          - name: targetRevision
+            value: main
+
+    # Everything Backstage generates lands here once its Platform Config PR is
+    # merged: one directory per app, holding the app's Argo CD Application and
+    # the ReferenceGrant its /oauth2 route needs. Keeping generated files out of
+    # kubernetes/ means Explore never adds a kind-only file to the paths bare
+    # metal reads, and one directory per app means a scaffolded app is removed
+    # by deleting a directory.
+    #
+    # recurse is required (the manifests sit a directory down) and is reason
+    # enough for the block to survive the round trip, so unlike the fixed
+    # Applications this needs no `include` to hold its shape (PR #382 -> #383).
+    #
+    # The grant is namespaced to auth-system rather than to this Application's
+    # argocd destination; platform-project allows every namespace, which is why
+    # this source belongs to the root and not to the app's own Application
+    # (app-project is confined to app-*).
+    - repoURL: https://github.com/yu-min3/kensan-lab
+      targetRevision: main
+      path: environments/kind/generated-applications
+      directory:
+        recurse: true
 
   destination:
     server: https://kubernetes.default.svc

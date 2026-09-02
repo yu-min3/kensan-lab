@@ -105,6 +105,17 @@ spec:
           theme: ${{ parameters.theme }}
           message: ${{ parameters.message }}
           hostname: ${{ parameters.name + ".127-0-0-1.sslip.io" }}
+          # `make try` builds this skeleton once and loads the image into the
+          # single kind node. Every generated service uses that exact image;
+          # name, theme and greeting arrive through deploy/values.yaml.
+          imageRepository: kensan-lab/explore-template
+          imageTag: local
+          ghcrPullSecretEnabled: false
+          otelEnabled: false
+          gatewayName: gateway-explore
+          gatewayNamespace: istio-system
+          platformRepoUrl: http://gitea-http.gitea.svc.cluster.local:3000/gitea-admin/kensan-lab
+          applicationRepoUrl: ${{ "http://gitea-http.gitea.svc.cluster.local:3000/gitea-admin/" + (parameters.repoUrl | parseRepoUrl).repo }}
 
     - id: publish
       name: Publish to the cluster's Gitea
@@ -117,15 +128,22 @@ spec:
 
     # fetch:template substitutes file contents but not placeholder directory
     # names. Rename the two platform files before opening the pull request.
+    #
+    # Both land in environments/kind/generated-applications/app-<name>/. The
+    # skeleton names production's paths, and neither works here: Explore's root
+    # never reads kubernetes/argocd/applications/apps, and Explore's
+    # oauth2-proxy Application takes only namespace.yaml out of
+    # kubernetes/auth/oauth2-proxy/resources, so a grant left there is silently
+    # dropped and the app's /oauth2 route dead-ends on RefNotPermitted.
     - id: rename-platform-paths
       name: Name the platform files after the service
       action: fs:rename
       input:
         files:
           - from: .backstage/kubernetes/argocd/applications/apps/APPDIR
-            to: .backstage/kubernetes/argocd/applications/apps/app-${{ parameters.name }}
+            to: .backstage/environments/kind/generated-applications/app-${{ parameters.name }}
           - from: .backstage/kubernetes/auth/oauth2-proxy/resources/REFGRANT.yaml
-            to: .backstage/kubernetes/auth/oauth2-proxy/resources/referencegrant-app-${{ parameters.name }}.yaml
+            to: .backstage/environments/kind/generated-applications/app-${{ parameters.name }}/referencegrant.yaml
 
     - id: create-platform-pr
       name: Open the platform pull request
@@ -139,8 +157,8 @@ spec:
 
           | File | Why |
           |---|---|
-          | `kubernetes/argocd/applications/apps/app-${{ parameters.name }}/app.yaml` | `charts/app-base` でアプリをデプロイする Argo CD Application |
-          | `kubernetes/auth/oauth2-proxy/resources/referencegrant-app-${{ parameters.name }}.yaml` | `/oauth2` route から oauth2-proxy への参照を許可する ReferenceGrant |
+          | `environments/kind/generated-applications/app-${{ parameters.name }}/app.yaml` | Explore root が読み、`charts/app-base` でアプリをデプロイする Argo CD Application |
+          | `environments/kind/generated-applications/app-${{ parameters.name }}/referencegrant.yaml` | `/oauth2` route から oauth2-proxy への参照を許可する ReferenceGrant |
 
           マージ後、Argo CD が変更を検出して
           `${{ parameters.name }}.127-0-0-1.sslip.io` にデプロイします。
@@ -171,8 +189,9 @@ spec:
           すべて Explore クラスタ内で作成しました。
 
           Platform Config PR をマージすると Argo CD が Application を作成します。
-          Explore は生成したアプリのコンテナイメージを自動では build しないため、
-          実際の Deployment には別途イメージが必要です。
+          コンテナは `make try` がこの Template から build 済みです。
+          Application はその同じイメージへ、フォームで選んだ名前・テーマ・
+          メッセージを環境変数として渡します。
     links:
       - title: 📦 アプリケーションリポジトリ
         url: ${{ steps.publish.output.remoteUrl }}

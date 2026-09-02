@@ -17,12 +17,14 @@ on:
       - "kubernetes/**"
       - "charts/**"
       - "environments/**"
+      - "backstage/templates/**"
       - "scripts/explore-up.sh"
       - "scripts/explore-down.sh"
       # The smoke checks are part of what this job proves. A change that breaks
       # one of them would otherwise go untested.
       - "scripts/explore-login-check.sh"
       - "scripts/explore-backstage-login-check.sh"
+      - "scripts/explore-golden-path-check.sh"
       - ".github/workflows/explore-ci.yml"
   push:
     branches: [main]
@@ -30,12 +32,14 @@ on:
       - "kubernetes/**"
       - "charts/**"
       - "environments/**"
+      - "backstage/templates/**"
       - "scripts/explore-up.sh"
       - "scripts/explore-down.sh"
       # The smoke checks are part of what this job proves. A change that breaks
       # one of them would otherwise go untested.
       - "scripts/explore-login-check.sh"
       - "scripts/explore-backstage-login-check.sh"
+      - "scripts/explore-golden-path-check.sh"
       - ".github/workflows/explore-ci.yml"
 
 # A second run of the same branch replaces the first: two kind clusters pulling
@@ -67,6 +71,12 @@ jobs:
           # The cluster is created by explore-up.sh from environments/kind/,
           # so the action is here only to put the binary on PATH.
           install_only: true
+          # Pinned, and not only for reproducibility. environments/kind/
+          # kind-cluster.yaml pins the node image by digest, and `kind load`
+          # reads that node's containerd config: a kind older than the node
+          # image fails with "unknown containerd config version: 4" *after* the
+          # cluster is already up. The action's default was that old version.
+          version: v0.32.0
 
       # No arguments, which is the whole point: this runs the command a visitor
       # runs. The checkout is seeded into a Gitea inside the cluster and Argo CD
@@ -209,6 +219,18 @@ jobs:
             200*) ;;
             *) echo "signing in to Backstage failed" >&2; exit 1 ;;
           esac
+
+      # A completed scaffolder task is only the midpoint. Merge the generated
+      # platform PR and require the app to become reachable with the values the
+      # form supplied; this is the path a visitor follows after `make try`.
+      # Block scalar, not a plain one. A plain `run:` folds its continuation
+      # onto one line and keeps the backslash, so the shell reads `\ ` as an
+      # escaped space and the first argument arrives with a space in front of
+      # it. curl then exits 3 on a malformed URL, before anything is printed.
+      - name: Check the golden path through deployment
+        run: |
+          scripts/explore-golden-path-check.sh \
+            backstage.127-0-0-1.sslip.io demo demo checkservice --deploy
 
       - name: Collect diagnostics
         if: failure()

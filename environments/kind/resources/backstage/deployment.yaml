@@ -56,7 +56,7 @@ spec:
           ##
           ## v0.0.18 contains both production and Explore template entrypoints.
           ## The image is shared; app-config.explore.yaml selects the latter.
-          image: ghcr.io/yu-min3/kensan-lab/backstage:v0.0.18
+          image: ghcr.io/yu-min3/kensan-lab/backstage:v0.0.19
           imagePullPolicy: IfNotPresent
           ## The two configs baked into the image, then the explore overrides.
           ## Order matters: later files win.

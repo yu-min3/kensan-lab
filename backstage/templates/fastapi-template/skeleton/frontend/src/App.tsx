@@ -39,6 +39,10 @@ export default function App() {
       .catch(() => setFailed(true))
   }, [])
 
+  useEffect(() => {
+    if (config) document.title = config.appName
+  }, [config])
+
   if (failed) {
     return (
       <main className="shell theme-day">

@@ -165,6 +165,14 @@ spec:
           theme: ${{ parameters.theme }}
           message: ${{ parameters.message }}
           hostname: ${{ parameters.name + ".app.yu-min3.com" }}
+          imageRepository: ${{ "ghcr.io/" + (parameters.repoUrl | parseRepoUrl).owner + "/" + (parameters.repoUrl | parseRepoUrl).repo }}
+          imageTag: v0.1.0
+          ghcrPullSecretEnabled: true
+          otelEnabled: true
+          gatewayName: gateway-prod
+          gatewayNamespace: istio-system
+          platformRepoUrl: https://github.com/yu-min3/kensan-lab
+          applicationRepoUrl: ${{ "https://github.com/" + (parameters.repoUrl | parseRepoUrl).owner + "/" + (parameters.repoUrl | parseRepoUrl).repo }}
 
     # Step 2: Create the application repository.
     - id: publish
