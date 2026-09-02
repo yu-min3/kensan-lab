@@ -71,6 +71,12 @@ jobs:
           # The cluster is created by explore-up.sh from environments/kind/,
           # so the action is here only to put the binary on PATH.
           install_only: true
+          # Pinned, and not only for reproducibility. environments/kind/
+          # kind-cluster.yaml pins the node image by digest, and `kind load`
+          # reads that node's containerd config: a kind older than the node
+          # image fails with "unknown containerd config version: 4" *after* the
+          # cluster is already up. The action's default was that old version.
+          version: v0.32.0
 
       # No arguments, which is the whole point: this runs the command a visitor
       # runs. The checkout is seeded into a Gitea inside the cluster and Argo CD

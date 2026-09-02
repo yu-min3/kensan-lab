@@ -193,7 +193,18 @@ fi
 kubectl config use-context "kind-${CLUSTER_NAME}" >/dev/null
 
 info "loading the golden path image into kind"
-kind load docker-image --name "${CLUSTER_NAME}" "${EXPLORE_APP_IMAGE}" >/dev/null
+# `kind load` reads the node's containerd config, and environments/kind/
+# kind-cluster.yaml pins the node image by digest. A kind older than that image
+# cannot parse it, and says so as "unknown containerd config version" — after
+# the cluster is already up, which reads like a problem with this repository
+# rather than with the tool that created it.
+kind load docker-image --name "${CLUSTER_NAME}" "${EXPLORE_APP_IMAGE}" >/dev/null \
+  || fail "could not load the golden path image into the cluster.
+     If the error above mentions an unknown containerd config version, kind is
+     older than the node image this repository pins. Upgrade it and try again —
+     v0.32.0 is the version this is tested against:
+       kind version
+       brew upgrade kind    # macOS"
 
 # kind ships `standard` as the default StorageClass and the explore layer adds
 # `longhorn` pointing at the same provisioner, so that the repository's PVCs
