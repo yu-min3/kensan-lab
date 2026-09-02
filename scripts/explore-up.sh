@@ -475,8 +475,8 @@ info "handing the cluster to Argo CD (repo ${REPO_URL}, revision ${REVISION})"
 # CD a few seconds in which it is syncing main, and in CI that would silently
 # validate the wrong commit.
 #
-# repoURL appears twice (the chart source, and the helm parameter every child
-# Application inherits) and the revision once in each of the same two places.
+# repoURL and revision appear in both root sources, plus the helm parameter
+# every fixed child Application inherits.
 root_app="$(sed \
   -e "s|https://github.com/yu-min3/kensan-lab|${REPO_URL}|g" \
   -e "s|targetRevision: main|targetRevision: ${REVISION}|" \

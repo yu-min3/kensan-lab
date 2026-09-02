@@ -156,6 +156,12 @@ merge_code="$(curl -sk -o /dev/null -w '%{http_code}' --max-time 30 \
 }
 echo "  merged platform PR #${pr_number}"
 
+# Argo CD polls Git on its own, but waiting for that cache interval makes this
+# check needlessly slow and can consume most of the application deadline. A
+# human sees the same eventual reconciliation; CI asks for it immediately.
+kubectl -n argocd annotate application explore-root \
+  argocd.argoproj.io/refresh=hard --overwrite >/dev/null
+
 deadline=$(( $(date +%s) + 360 ))
 while :; do
   state="$(kubectl -n argocd get application "app-${NAME}" \

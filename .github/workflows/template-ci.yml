@@ -188,49 +188,100 @@ jobs:
           assert explore_values["gatewayName"] == "gateway-explore"
           assert "gitea-http.gitea.svc.cluster.local" in explore_values["platformRepoUrl"]
           assert "gitea-http.gitea.svc.cluster.local" in explore_values["applicationRepoUrl"]
+          # Every file the explore template writes to the platform repository has
+          # to land under the path the explore root's second source reads. The
+          # first version of this shipped with one of the two renames still
+          # naming production's path: the file was committed, the pull request
+          # merged, and nothing ever applied it, so the app came up without the
+          # ReferenceGrant and its login redirect dead-ended.
+          generated_root = "environments/kind/generated-applications"
+          explore_renames = next(step for step in explore["spec"]["steps"]
+                                 if step["id"] == "rename-platform-paths")["input"]["files"]
+          assert len(explore_renames) == 2
+          for rename in explore_renames:
+              assert rename["to"].startswith(f".backstage/{generated_root}/"), rename
+
+          root_app = yaml.safe_load(open("environments/kind/explore-root-app.yaml"))
+          generated_source = next(
+              source for source in root_app["spec"]["sources"]
+              if source.get("path") == generated_root
+          )
+          # The manifests sit one directory down, under app-<name>/.
+          assert generated_source["directory"]["recurse"] is True
+
+          # Production keeps writing to the paths bare metal reads.
+          production_renames = next(step for step in production["spec"]["steps"]
+                                    if step["id"] == "rename-platform-paths")["input"]["files"]
+          for rename in production_renames:
+              assert generated_root not in rename["to"], rename
+
           print("production: GitHub only; explore: Gitea only")
           PY
 
       # publish:github:pull-request globs sourcePath as a directory and joins
       # targetPath as a prefix — neither can name a destination file. So the
       # per-app paths come from an fs:rename step, and what has to hold is that
-      # the rename targets exist and that sourcePath is a directory. Grepping
-      # template.yaml for its own strings would prove none of that.
+      # the rename sources exist, that sourcePath is a directory, and that the
+      # layout left behind is the one the reading side expects. Grepping the
+      # templates for their own strings would prove none of that.
+      #
+      # Both templates are checked. Only production was, and the explore
+      # template shipped writing its ReferenceGrant to production's directory —
+      # a path nothing in the kind cluster reads.
       - name: Check the platform pull request contents
         run: |
           python3 - <<'PY'
-          import pathlib, re, sys, yaml
+          import pathlib, re, shutil, yaml
 
-          tpl = yaml.safe_load(open("backstage/templates/fastapi-template/template.yaml"))
-          steps = {s["id"]: s for s in tpl["spec"]["steps"]}
-          root = pathlib.Path("/tmp/scaffolded")
-
-          # 1. sourcePath must be a directory in the scaffolded output, because
-          #    the action globs it with cwd set to that path.
-          src = steps["create-platform-pr"]["input"]["sourcePath"]
-          assert (root / src).is_dir(), f"sourcePath must be a directory, got {src}"
-
-          # 2. Every fs:rename source must exist, or the rename silently leaves
-          #    the placeholder name in the pull request.
+          base = "backstage/templates/fastapi-template/"
           expr = re.compile(r"\$\{\{.*?\}\}")
-          renamed = []
-          for f in steps["rename-platform-paths"]["input"]["files"]:
-              assert (root / f["from"]).exists(), f"fs:rename source missing: {f['from']}"
-              renamed.append(f["to"])
+          scaffolded = pathlib.Path("/tmp/scaffolded")
 
-          # 3. Simulate the rename so the resulting layout can be checked. The
-          #    destinations are expressions; substitute the service name the
-          #    same way the scaffolder would.
-          for f in steps["rename-platform-paths"]["input"]["files"]:
-              (root / f["from"]).rename(root / expr.sub("widget-service", f["to"]))
+          # Both templates share one skeleton, so each is checked against its own
+          # copy of the same scaffolded output.
+          def check(template, want):
+              tpl = yaml.safe_load(open(base + template))
+              steps = {s["id"]: s for s in tpl["spec"]["steps"]}
+              root = pathlib.Path("/tmp/rename-" + template)
+              shutil.rmtree(root, ignore_errors=True)
+              shutil.copytree(scaffolded, root)
 
-          want = [
+              # 1. sourcePath must be a directory in the scaffolded output,
+              #    because the action globs it with cwd set to that path.
+              src = steps["create-platform-pr"]["input"]["sourcePath"]
+              assert (root / src).is_dir(), f"sourcePath must be a directory, got {src}"
+
+              # 2. Every fs:rename source must exist, or the rename silently
+              #    leaves the placeholder name in the pull request.
+              for f in steps["rename-platform-paths"]["input"]["files"]:
+                  assert (root / f["from"]).exists(), f"fs:rename source missing: {f['from']}"
+
+              # 3. Simulate the renames in order — the explore template moves a
+              #    file into a directory an earlier entry has just created — so
+              #    the resulting layout can be checked. The destinations are
+              #    expressions; substitute the service name as the scaffolder
+              #    would.
+              for f in steps["rename-platform-paths"]["input"]["files"]:
+                  dest = root / expr.sub("widget-service", f["to"])
+                  dest.parent.mkdir(parents=True, exist_ok=True)
+                  (root / f["from"]).rename(dest)
+
+              for w in want:
+                  assert (root / w).is_file(), f"{template}: after rename, expected {w}"
+              print(f"{template} pull request would carry:", *want, sep="\n  ")
+
+          check("template.yaml", [
               ".backstage/kubernetes/argocd/applications/apps/app-widget-service/app.yaml",
               ".backstage/kubernetes/auth/oauth2-proxy/resources/referencegrant-app-widget-service.yaml",
-          ]
-          for w in want:
-              assert (root / w).is_file(), f"after rename, expected {w}"
-          print("platform pull request would carry:", *want, sep="\n  ")
+          ])
+          # Explore's root reads exactly one directory, so both files land there.
+          # Asserting the ReferenceGrant by name is the point: shipped in the
+          # wrong directory it is still committed and merged, and the only
+          # symptom is a login redirect that dead-ends after the app goes green.
+          check("template-explore.yaml", [
+              ".backstage/environments/kind/generated-applications/app-widget-service/app.yaml",
+              ".backstage/environments/kind/generated-applications/app-widget-service/referencegrant.yaml",
+          ])
           PY
 
       - name: Build the image
