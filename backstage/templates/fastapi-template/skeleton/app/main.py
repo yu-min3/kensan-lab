@@ -1,7 +1,6 @@
-"""
-${{ values.description }}
+"""Generated from the Backstage template.
 
-Generated from the Backstage template. The service is a small FastAPI backend
+The service is a small FastAPI backend
 that also serves a React frontend built into the image.
 
 Two endpoints carry the interesting part:
@@ -27,8 +26,8 @@ from prometheus_client import CONTENT_TYPE_LATEST, Counter, Histogram, generate_
 from starlette.responses import Response
 
 app = FastAPI(
-    title="${{ values.name }}",
-    description="${{ values.description }}",
+    title=os.getenv("APP_NAME", "${{ values.name }}"),
+    description=os.getenv("APP_DESCRIPTION", "${{ values.description }}"),
     version="1.0.0",
 )
 

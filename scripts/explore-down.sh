@@ -3,8 +3,9 @@
 # Tear down the kind explore cluster.
 #
 # `kind delete` removes the node containers and the kubeconfig entry, but leaves
-# the images it pulled in the local Docker cache — several gigabytes of Istio,
-# Kyverno and Argo CD that the person who tried this repository never asked for.
+# the images it pulled or built in the local Docker cache — several gigabytes of
+# Istio, Kyverno and Argo CD that the person who tried this repository never
+# asked for.
 # Cleaning those up is the difference between "I tried it" and "it left a mess",
 # so it is offered here and never done silently: the same images may be in use
 # by someone's other clusters.
@@ -53,7 +54,7 @@ if [[ "$PRUNE_IMAGES" == true ]]; then
     'ghcr.io/kyverno/' \
     'quay.io/argoproj/' \
     'ghcr.io/dexidp/' \
-    'ghcr.io/yu-min3/kensan-lab/explore-demo' \
+    'kensan-lab/explore-template' \
     'quay.io/keycloak/' \
     'docker.io/gitea/' \
     'kindest/node'

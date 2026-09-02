@@ -1,5 +1,5 @@
 {
-  "name": "${{ values.name }}-frontend",
+  "name": "golden-path-frontend",
   "private": true,
   "type": "module",
   "scripts": {

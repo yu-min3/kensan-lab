@@ -24,33 +24,16 @@ on:
       - "charts/app-base/**"
       - "environments/kind/resources/backstage/configmap-app-config.yaml"
       - ".github/workflows/template-ci.yml"
-  # Publishing the explore demo image is manual: it is the same skeleton every
-  # pull request already builds, so an automatic push would republish an
-  # identical image on every template edit. Run it when the skeleton changes in
-  # a way a visitor should see.
-  workflow_dispatch:
-    inputs:
-      tag:
-        description: "Image tag to publish (e.g. v0.1.0)"
-        required: true
-        type: string
-
 concurrency:
   group: template-${{ github.ref }}
   cancel-in-progress: true
 
 env:
   SKELETON: backstage/templates/fastapi-template/skeleton
-  # Repo-scoped so that GitHub links the package to this repository and it
-  # inherits the repository's visibility. A package named
-  # `ghcr.io/<owner>/<name>` created outside Actions has to be linked by hand in
-  # a web form, and the picker for it is empty until the first push lands.
-  DEMO_IMAGE: ghcr.io/${{ github.repository }}/explore-demo
 
 jobs:
   scaffold:
     name: scaffold, build, run
-    if: github.event_name != 'workflow_dispatch'
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
@@ -85,6 +68,14 @@ jobs:
               "theme": "night",
               "message": "hello from CI",
               "hostname": "widget-service.app.yu-min3.com",
+              "imageRepository": "ghcr.io/yu-min3/app-widget-service",
+              "imageTag": "v0.1.0",
+              "ghcrPullSecretEnabled": "true",
+              "otelEnabled": "true",
+              "gatewayName": "gateway-prod",
+              "gatewayNamespace": "istio-system",
+              "platformRepoUrl": "https://github.com/yu-min3/kensan-lab",
+              "applicationRepoUrl": "https://github.com/yu-min3/app-widget-service",
           }
           # Dotted references (values.destination.x) count too — the earlier
           # pattern matched only single words, so a placeholder the scaffolder
@@ -175,8 +166,28 @@ jobs:
           ))
           explore_config = yaml.safe_load(outer["data"]["app-config.explore.yaml"])
           targets = [location["target"] for location in explore_config["catalog"]["locations"]]
-          assert "./templates/fastapi-template/template-explore.yaml" in targets
+          assert any(target.endswith(
+              "/backstage/templates/fastapi-template/template-explore.yaml"
+          ) for target in targets)
           assert "./templates/fastapi-template/template.yaml" not in targets
+
+          production_values = {
+              key: str(value)
+              for key, value in next(step for step in production["spec"]["steps"]
+                                     if step["id"] == "fetch-base")["input"]["values"].items()
+          }
+          explore_values = {
+              key: str(value)
+              for key, value in next(step for step in explore["spec"]["steps"]
+                                     if step["id"] == "fetch-base")["input"]["values"].items()
+          }
+          assert production_values["imageRepository"].startswith("${{")
+          assert explore_values["imageRepository"] == "kensan-lab/explore-template"
+          assert explore_values["imageTag"] == "local"
+          assert explore_values["ghcrPullSecretEnabled"] == "False"
+          assert explore_values["gatewayName"] == "gateway-explore"
+          assert "gitea-http.gitea.svc.cluster.local" in explore_values["platformRepoUrl"]
+          assert "gitea-http.gitea.svc.cluster.local" in explore_values["applicationRepoUrl"]
           print("production: GitHub only; explore: Gitea only")
           PY
 
@@ -281,171 +292,3 @@ jobs:
       - name: Container logs
         if: failure()
         run: docker logs widget-service 2>&1 | tail -40
-
-  publish-demo:
-    name: publish the explore demo image
-    if: github.event_name == 'workflow_dispatch'
-    runs-on: ubuntu-latest
-    timeout-minutes: 60
-    permissions:
-      contents: read
-      packages: write
-    steps:
-      - uses: actions/checkout@v4
-
-      # Identical to the scaffold job's step, with the values a visitor sees.
-      # The point of this image is that it is not a hand-made demo: it is the
-      # skeleton, rendered the way the scaffolder renders it, so the app running
-      # at demo.127-0-0-1.sslip.io is the thing the golden path produces.
-      - name: Fill in the template variables
-        run: |
-          cp -r "${SKELETON}" /tmp/demo
-          python3 - <<'PY'
-          import pathlib, re, sys
-          sample = {
-              "name": "explore-demo",
-              "description": "A service scaffolded from the golden path",
-              "ownerSlug": "platform-engineering",
-              "repoOwner": "yu-min3",
-              "repoName": "app-explore-demo",
-              "owner": "platform-engineering",
-              "system": "developer-portal",
-              "domain": "platform",
-              # Appearance, and where the service is served. These reach the
-              # running pod as environment variables rather than being built in,
-              # so the rendered values file is where they have to appear.
-              "theme": "night",
-              "message": "hello from CI",
-              "hostname": "widget-service.app.yu-min3.com",
-          }
-          pattern = re.compile(r"\$\{\{\s*values\.([\w.]+)\s*\}\}")
-          missing = set()
-
-          def fill(match):
-              key = match.group(1)
-              if key not in sample:
-                  missing.add(key)
-                  return match.group(0)
-              return sample[key]
-
-          for path in sorted(pathlib.Path("/tmp/demo").rglob("*")):
-              if not path.is_file():
-                  continue
-              try:
-                  text = path.read_text()
-              except UnicodeDecodeError:
-                  continue
-              filled = pattern.sub(fill, text)
-              if filled != text:
-                  path.write_text(filled)
-
-          if missing:
-              print("unfilled placeholders:", sorted(missing), file=sys.stderr)
-              sys.exit(1)
-          PY
-
-      # arm64 is emulated here rather than on a visitor's laptop. It matters
-      # because the explore cluster runs on whatever architecture they have, and
-      # an amd64-only image leaves the demo app in ImagePullBackOff on Apple
-      # Silicon — which is the first thing they would see.
-      # The same gate the pull request path runs, before anything is pushed.
-      #
-      # This job is the other half of the `if` at the top of the file, so until
-      # now a manual publish shipped without ever starting the image. The
-      # Backstage image was published broken the same way and cost a cluster
-      # run to notice; one build and one startup here is cheaper than that.
-      - name: Build the image for the check
-        run: docker build -t widget-service:ci /tmp/scaffolded
-
-      - name: Run it and check the endpoints
-        run: |
-          docker run -d --name widget-service -p 8000:8000 widget-service:ci
-          for i in $(seq 1 30); do
-            if curl -fsS -m 2 http://127.0.0.1:8000/health >/dev/null 2>&1; then
-              echo "healthy after ${i}s"
-              break
-            fi
-            sleep 1
-          done
-          curl -fsS -m 5 http://127.0.0.1:8000/health
-          curl -fsS -m 5 -o /dev/null http://127.0.0.1:8000/metrics
-
-          # / now serves the built frontend, so the identity check moved to the
-          # endpoint the page reads. Same reason as before: app/main.py was once
-          # committed with the values of a test run baked in, and every
-          # scaffolded service introduced itself as "test-app-8" — a placeholder
-          # that is never substituted looks identical to a working app.
-          cfg="$(curl -fsS -m 5 http://127.0.0.1:8000/api/config)"
-          echo "$cfg"
-          echo "$cfg" | grep -q "widget-service" || {
-            echo "the running app does not know its own name" >&2; exit 1; }
-          echo "$cfg" | grep -qF '{{' && {
-            echo "an unsubstituted placeholder reached the running app" >&2; exit 1; }
-
-          # The values a scaffolder form supplies have to reach the page, not
-          # just exist in the image. This is the whole point of putting them in
-          # deploy/values.yaml rather than baking them in.
-          echo "$cfg" | grep -q '"theme"' || {
-            echo "/api/config carries no theme" >&2; exit 1; }
-
-          # The frontend has to be in the image. Without the build stage the
-          # backend still starts and only the page is missing — which is exactly
-          # the failure a developer would not notice until they opened it.
-          page="$(curl -fsS -m 5 http://127.0.0.1:8000/)"
-          echo "$page" | grep -qi "<div id=\"root\"" || {
-            echo "/ did not serve the built frontend" >&2; exit 1; }
-
-          # Identity arrives in headers the application never asked for. If the
-          # platform stops forwarding them the page silently shows nobody, so
-          # the shape is asserted here.
-          who="$(curl -fsS -m 5 -H 'x-auth-request-user: ci' \
-            -H 'x-auth-request-email: ci@example.com' \
-            -H 'x-auth-request-groups: a, b' http://127.0.0.1:8000/api/whoami)"
-          echo "$who"
-          echo "$who" | grep -q '"authenticated":true' || {
-            echo "/api/whoami did not read the gateway headers" >&2; exit 1; }
-
-          # charts/app-base runs it as UID 1000; the image must agree.
-          test "$(docker exec widget-service id -u)" = "1000"
-
-      - name: Container logs
-        if: failure()
-        run: docker logs widget-service 2>&1 | tail -40
-
-      - name: Tear down the check
-        if: always()
-        run: docker rm -f widget-service >/dev/null 2>&1 || true
-
-      - uses: docker/setup-qemu-action@v3
-      - uses: docker/setup-buildx-action@v3
-
-      - uses: docker/login-action@v3
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Build and push
-        uses: docker/build-push-action@v6
-        with:
-          context: /tmp/demo
-          platforms: linux/amd64,linux/arm64
-          push: true
-          tags: ${{ env.DEMO_IMAGE }}:${{ inputs.tag }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
-
-      - name: Confirm both architectures are in the manifest
-        run: |
-          docker buildx imagetools inspect "${DEMO_IMAGE}:${TAG}"
-          arches="$(docker buildx imagetools inspect "${DEMO_IMAGE}:${TAG}" \
-            --format '{{range .Manifest.Manifests}}{{.Platform.Architecture}} {{end}}')"
-          echo "architectures: ${arches}"
-          for want in amd64 arm64; do
-            case " ${arches} " in
-              *" ${want} "*) ;;
-              *) echo "${want} missing from the manifest list" >&2; exit 1 ;;
-            esac
-          done
-        env:
-          TAG: ${{ inputs.tag }}

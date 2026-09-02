@@ -8,15 +8,27 @@
 # Keycloak and the gateway in one go; nothing else in the smoke tests would
 # notice if any of those stopped agreeing.
 #
-# Usage: explore-golden-path-check.sh <backstage-host> <user> <password>
+# Usage: explore-golden-path-check.sh <backstage-host> <user> <password> [name] [--deploy]
 set -euo pipefail
 
 HOST="${1:-backstage.127-0-0-1.sslip.io}"
 USER_NAME="${2:-demo}"
 PASSWORD="${3:-demo}"
 NAME="${4:-checkservice}"
+MODE="${5:-}"
+if [[ -n "$MODE" && "$MODE" != "--deploy" ]]; then
+  echo "fifth argument must be --deploy, got: ${MODE}" >&2
+  exit 2
+fi
 JAR="$(mktemp)"
-trap 'rm -f "$JAR"' EXIT
+APP_PF_PID=""
+cleanup() {
+  rm -f "$JAR"
+  if [[ -n "$APP_PF_PID" ]]; then
+    kill "$APP_PF_PID" 2>/dev/null || true
+  fi
+}
+trap cleanup EXIT
 C=(/usr/bin/curl -sk --cookie-jar "$JAR" --cookie "$JAR")
 
 # The portal issues its own token after Keycloak verifies the person, and the
@@ -107,4 +119,77 @@ pr="$(curl -sk --max-time 15 --resolve "gitea.127-0-0-1.sslip.io:443:127.0.0.1" 
 [ "$pr" -gt 0 ] || { echo "no pull request was opened against the platform repository" >&2; exit 1; }
 echo "  the platform pull request is open"
 
-echo "200 (the golden path completed without a token)"
+if [[ "$MODE" != "--deploy" ]]; then
+  echo "200 (the golden path completed without a token)"
+  exit 0
+fi
+
+# CI takes the one manual step in the walkthrough, then proves the result rather
+# than treating a completed scaffolder task as a deployed application. The
+# credentials belong to this disposable cluster and are the same ones the
+# scaffolder used to open the pull request.
+gitea_user="$(kubectl -n backstage get secret backstage-explore-gitea \
+  -o go-template='{{index .data "username" | base64decode}}')"
+gitea_password="$(kubectl -n backstage get secret backstage-explore-gitea \
+  -o go-template='{{index .data "password" | base64decode}}')"
+gitea_api="https://gitea.127-0-0-1.sslip.io/api/v1"
+
+pulls="$(curl -sk --max-time 15 -u "${gitea_user}:${gitea_password}" \
+  "${gitea_api}/repos/gitea-admin/kensan-lab/pulls?state=open")"
+pr_number="$(printf '%s' "$pulls" | python3 -c '
+import json, sys
+branch = sys.argv[1]
+for pull in json.load(sys.stdin):
+    if pull.get("head", {}).get("ref") == branch:
+        print(pull["number"])
+        break
+' "add-app-${NAME}")"
+[ -n "$pr_number" ] || { echo "could not identify the platform pull request" >&2; exit 1; }
+
+merge_code="$(curl -sk -o /dev/null -w '%{http_code}' --max-time 30 \
+  -u "${gitea_user}:${gitea_password}" -H 'Content-Type: application/json' \
+  -X POST -d '{"Do":"merge"}' \
+  "${gitea_api}/repos/gitea-admin/kensan-lab/pulls/${pr_number}/merge")"
+[ "$merge_code" = 200 ] || {
+  echo "Gitea refused to merge platform PR #${pr_number} (HTTP ${merge_code})" >&2
+  exit 1
+}
+echo "  merged platform PR #${pr_number}"
+
+deadline=$(( $(date +%s) + 360 ))
+while :; do
+  state="$(kubectl -n argocd get application "app-${NAME}" \
+    -o jsonpath='{.status.sync.status}/{.status.health.status}' 2>/dev/null || true)"
+  [[ "$state" == "Synced/Healthy" ]] && break
+  if (( $(date +%s) >= deadline )); then
+    echo "app-${NAME} did not become Synced/Healthy (last: ${state:-missing})" >&2
+    kubectl -n argocd get application "app-${NAME}" -o yaml >&2 2>/dev/null || true
+    exit 1
+  fi
+  sleep 5
+done
+echo "  app-${NAME} is Synced/Healthy"
+
+kubectl -n "app-${NAME}" port-forward "svc/${NAME}" 18080:8000 >/dev/null 2>&1 &
+APP_PF_PID=$!
+for _ in $(seq 1 30); do
+  curl -sf --max-time 2 http://127.0.0.1:18080/health >/dev/null 2>&1 && break
+  sleep 1
+done
+
+config="$(curl -sf --max-time 5 http://127.0.0.1:18080/api/config || true)"
+printf '%s' "$config" | grep -q '"appName":"'"${NAME}"'"' || {
+  echo "the deployed app did not receive its name: ${config:-<no response>}" >&2; exit 1; }
+printf '%s' "$config" | grep -q '"theme":"night"' || {
+  echo "the deployed app did not receive its theme: ${config}" >&2; exit 1; }
+printf '%s' "$config" | grep -q '"message":"created without a token"' || {
+  echo "the deployed app did not receive its greeting: ${config}" >&2; exit 1; }
+curl -sf --max-time 5 http://127.0.0.1:18080/ | grep -q '<div id="root"></div>' || {
+  echo "the deployed app did not serve the React frontend" >&2; exit 1; }
+
+login="$($(dirname "$0")/explore-login-check.sh \
+  "${NAME}.127-0-0-1.sslip.io" "$USER_NAME" "$PASSWORD" 2>&1 || true)"
+[ "$login" = 200 ] || {
+  echo "the deployed app is not reachable through SSO: ${login}" >&2; exit 1; }
+
+echo "200 (the golden path built, configured and deployed the app without a token)"

@@ -10,20 +10,14 @@ nameOverride: demo
 
 # The output of the golden path, not a stand-in for it.
 #
-# This image is the template's own skeleton, rendered the way the scaffolder
-# renders it and pushed by .github/workflows/template-ci.yml. The app a visitor
-# reaches at demo.127-0-0-1.sslip.io is therefore the thing they would get by
-# pressing Create in the portal: same FastAPI service, same Dockerfile, same
-# /health and /metrics, deployed by the same chart. Nothing about the demo is
-# arranged for the demo.
-#
-# Public and multi-arch, so it resolves on Apple Silicon as well as on an amd64
-# runner. The real applications are multi-arch too; theirs are private and
-# pulled through an ExternalSecret backed by Vault, which is why they are absent
-# — architecture is not the reason.
+# `make try` builds the template's skeleton from this checkout and loads it
+# straight into the kind node before Argo CD starts. The app a visitor reaches
+# here and every app created through Backstage therefore run the same image.
+# Only the values below differ; no registry and no pre-published demo artifact
+# sit between the checkout and what is on screen.
 image:
-  repository: ghcr.io/yu-min3/kensan-lab/explore-demo
-  tag: v0.1.0
+  repository: kensan-lab/explore-template
+  tag: local
 
 ports:
   http: 8000
@@ -31,6 +25,14 @@ ports:
 probes:
   # app/main.py serves /health; the chart defaults to /healthz.
   path: /health
+
+env:
+  - name: APP_NAME
+    value: demo
+  - name: APP_THEME
+    value: day
+  - name: APP_MESSAGE
+    value: This app was already here. Create yours in Backstage.
 
 # Not an explore-specific workaround — these are the two lines the template's
 # own deploy/values.yaml ships, and for the same reason. The skeleton's

@@ -17,12 +17,14 @@ on:
       - "kubernetes/**"
       - "charts/**"
       - "environments/**"
+      - "backstage/templates/**"
       - "scripts/explore-up.sh"
       - "scripts/explore-down.sh"
       # The smoke checks are part of what this job proves. A change that breaks
       # one of them would otherwise go untested.
       - "scripts/explore-login-check.sh"
       - "scripts/explore-backstage-login-check.sh"
+      - "scripts/explore-golden-path-check.sh"
       - ".github/workflows/explore-ci.yml"
   push:
     branches: [main]
@@ -30,12 +32,14 @@ on:
       - "kubernetes/**"
       - "charts/**"
       - "environments/**"
+      - "backstage/templates/**"
       - "scripts/explore-up.sh"
       - "scripts/explore-down.sh"
       # The smoke checks are part of what this job proves. A change that breaks
       # one of them would otherwise go untested.
       - "scripts/explore-login-check.sh"
       - "scripts/explore-backstage-login-check.sh"
+      - "scripts/explore-golden-path-check.sh"
       - ".github/workflows/explore-ci.yml"
 
 # A second run of the same branch replaces the first: two kind clusters pulling
@@ -209,6 +213,13 @@ jobs:
             200*) ;;
             *) echo "signing in to Backstage failed" >&2; exit 1 ;;
           esac
+
+      # A completed scaffolder task is only the midpoint. Merge the generated
+      # platform PR and require the app to become reachable with the values the
+      # form supplied; this is the path a visitor follows after `make try`.
+      - name: Check the golden path through deployment
+        run: scripts/explore-golden-path-check.sh \
+          backstage.127-0-0-1.sslip.io demo demo checkservice --deploy
 
       - name: Collect diagnostics
         if: failure()

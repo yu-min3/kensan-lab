@@ -18,8 +18,9 @@
 ##   catalog       Explore selects its Gitea-only template and pushes the
 ##                 organisation scanner a year into the future — see below.
 ##
-## Both templates and their shared skeleton are files inside the same image.
-## This config changes only which template entity the Explore catalog loads.
+## The production template stays inside the image. Explore reads its entrypoint
+## and shared skeleton from the checkout seeded into Gitea, so changing a
+## template and running `make try` does not require publishing Backstage first.
 ##
 ##   auth          Only the discovery URL. Backstage signs people in against
 ##                 Keycloak itself, so the provider, the resolver and the
@@ -137,10 +138,12 @@ data:
     catalog:
       # Arrays are replaced by the later config layer. Repeat the shared
       # domain/organisation locations while selecting the Explore-only entry
-      # point for the golden path.
+      # point from the checkout already seeded into Gitea. `fetch:template`
+      # resolves ./skeleton relative to this URL, so Create and the local image
+      # build consume the same files.
       locations:
-        - type: file
-          target: ./templates/fastapi-template/template-explore.yaml
+        - type: url
+          target: http://gitea-http.gitea.svc.cluster.local:3000/gitea-admin/kensan-lab/src/branch/main/backstage/templates/fastapi-template/template-explore.yaml
           rules:
             - allow: [Template]
         - type: file

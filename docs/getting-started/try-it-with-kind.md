@@ -233,15 +233,17 @@ Two things are worth finding:
 - **Create → the FastAPI template.** This is the golden path: the scaffolder a
   developer uses to start a service that arrives on the platform already wired
   up, rather than assembling manifests by hand. **The app running at
-  `demo.127-0-0-1.sslip.io` is what it produces** — the same skeleton, rendered
-  the same way, built by the same Dockerfile. The demo is not a mock-up of the
-  golden path; it is the golden path's output, already deployed.
+  `demo.127-0-0-1.sslip.io` is what it produces** — `make try` builds the same
+  skeleton with the same Dockerfile and loads it directly into kind. The demo
+  is not a mock-up or a pre-published artifact; it is the golden path's runtime,
+  already deployed.
 - **Catalog.** The domains, systems and teams the platform knows about.
 
-Both are read from files inside the image. Production also runs a GitHub
-provider that scans the organisation for `catalog-info.yaml` files, and that one
-needs a token from Vault — so it is switched off here, and the catalog is
-whatever the repository ships. Nothing else about the portal changes.
+The catalog entities are bundled with Backstage, while the Explore template and
+its skeleton are read from the checkout seeded into Gitea. Production also runs
+a GitHub provider that scans the organisation for `catalog-info.yaml` files,
+and that one needs a token from Vault — so it is switched off here. Nothing
+else about the portal changes.
 
 **Press Create, and it goes through.** That is the part this cluster exists to
 show, and it needs nothing from you — no account, no token, no repository
@@ -259,7 +261,8 @@ path, run in miniature:
 3. Keycloak is told to accept the new hostname, because a service nobody knew
    about a minute ago still has to be signed in to.
 
-Nothing is deployed yet. **Merge the pull request** — at
+The image is already in kind, but the application is not declared yet.
+**Merge the pull request** — at
 `https://gitea.127-0-0-1.sslip.io`, user `gitea-admin`, password printed at the
 end of `make try` — and Argo CD notices within three minutes. Then
 `https://<your-service>.127-0-0-1.sslip.io` starts answering, behind the same
@@ -592,10 +595,10 @@ explore runs none of those. Application namespaces have no sidecar on bare metal
 either, so the demo app having a single container is faithful rather than
 broken. What you cannot see here is traffic between two meshed services.
 
-**Multiple architectures.** kind's nodes are all your host's architecture, so
-the arm64/amd64 split the real cluster schedules around cannot be reproduced.
-The applications are built for both, so that is not why they are absent — their
-images are private and pulled through Vault-backed credentials.
+**Multiple architectures.** kind's node is your host's architecture and
+`make try` builds the golden-path image for that node before loading it directly.
+Production applications are built for both arm64 and amd64 and pulled through
+Vault-backed credentials; that scheduling split cannot be reproduced here.
 
 ## Troubleshooting
 

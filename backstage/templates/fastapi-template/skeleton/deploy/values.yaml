@@ -7,11 +7,11 @@
 # application itself owns is in this directory.
 
 image:
-  # Pushed by .github/workflows/build-and-push.yaml on every tag. The value
-  # here matches the first release the README asks for, so that the initial
-  # sync finds an image instead of sitting in ImagePullBackOff.
-  repository: ghcr.io/${{ values.repoOwner }}/${{ values.repoName }}
-  tag: v0.1.0
+  # Production points this at the service's GHCR package. Explore points every
+  # generated service at the one image `make try` built from this skeleton and
+  # loaded into kind. Runtime values below are what distinguish the services.
+  repository: ${{ values.imageRepository }}
+  tag: ${{ values.imageTag }}
 
 ports:
   http: 8000
@@ -44,13 +44,13 @@ securityContext:
   runAsUser: 1000
   runAsGroup: 1000
 
-# The image is private, so the pull secret is generated in this namespace from
-# Vault by External Secrets. Set to false while the package is public.
+# Production images are private and use a pull secret from Vault. Explore's
+# image is already in the kind node and needs no registry or credential.
 ghcrPullSecret:
-  enabled: true
+  enabled: ${{ values.ghcrPullSecretEnabled }}
 
 otel:
-  enabled: true
+  enabled: ${{ values.otelEnabled }}
   serviceName: ${{ values.name }}
 
 httproute:
@@ -59,6 +59,9 @@ httproute:
     # Derived by the template from where the repository went: the real domain
     # on bare metal, the wildcard the explore certificate covers otherwise.
     - ${{ values.hostname }}
+  gateway:
+    name: ${{ values.gatewayName }}
+    namespace: ${{ values.gatewayNamespace }}
 
 # gateway-prod protects every hostname it serves (ADR-021 inverted this from
 # opt-in to default), so the service is behind Keycloak whether or not this is

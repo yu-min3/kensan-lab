@@ -23,17 +23,17 @@ spec:
   project: app-project
 
   sources:
-    - repoURL: https://github.com/yu-min3/kensan-lab
+    - repoURL: ${{ values.platformRepoUrl }}
       targetRevision: main
       path: charts/app-base
       helm:
         releaseName: ${{ values.name }}
         valueFiles:
           - $values/deploy/values.yaml
-    - repoURL: https://github.com/${{ values.repoOwner }}/${{ values.repoName }}
+    - repoURL: ${{ values.applicationRepoUrl }}
       targetRevision: main
       ref: values
-    - repoURL: https://github.com/${{ values.repoOwner }}/${{ values.repoName }}
+    - repoURL: ${{ values.applicationRepoUrl }}
       targetRevision: main
       path: deploy/resources
       directory:
