@@ -223,9 +223,14 @@ jobs:
       # A completed scaffolder task is only the midpoint. Merge the generated
       # platform PR and require the app to become reachable with the values the
       # form supplied; this is the path a visitor follows after `make try`.
+      # Block scalar, not a plain one. A plain `run:` folds its continuation
+      # onto one line and keeps the backslash, so the shell reads `\ ` as an
+      # escaped space and the first argument arrives with a space in front of
+      # it. curl then exits 3 on a malformed URL, before anything is printed.
       - name: Check the golden path through deployment
-        run: scripts/explore-golden-path-check.sh \
-          backstage.127-0-0-1.sslip.io demo demo checkservice --deploy
+        run: |
+          scripts/explore-golden-path-check.sh \
+            backstage.127-0-0-1.sslip.io demo demo checkservice --deploy
 
       - name: Collect diagnostics
         if: failure()
