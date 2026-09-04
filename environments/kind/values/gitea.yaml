@@ -79,12 +79,18 @@ gitea:
     security:
       # Skip the first-run installer screen; the cluster is configured already.
       INSTALL_LOCK: true
+    actions:
+      # Generated repositories carry the production GitHub Actions workflow,
+      # but Explore has no runner, registry or nested-container build model.
+      # Leaving Actions enabled creates checks that wait forever and makes a
+      # mergeable local PR look broken.
+      ENABLED: false
 
 # Reached through the Gateway API (resources/gitea/httproute.yaml), not the
 # chart's own Ingress.
 ingress:
   enabled: false
 
-# Note: chart 12.x rejects an `actions` key outright — Gitea Actions moved to a
-# separate chart — so there is deliberately no `actions: {enabled: false}` here.
-# Adding one fails the render with a message about migration.
+# This is Gitea's `[actions] ENABLED` application setting. It is deliberately
+# nested under `gitea.config`; the chart rejects the unrelated top-level
+# `actions` subchart key that older examples use.

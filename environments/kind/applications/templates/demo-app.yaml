@@ -22,5 +22,8 @@ spec:
     - repoURL: {{ .Values.repoURL }}
       targetRevision: {{ .Values.targetRevision }}
       ref: values
+    - repoURL: {{ .Values.repoURL }}
+      targetRevision: {{ .Values.targetRevision }}
+      path: environments/kind/resources-demo
   {{- include "explore.destination" (dict "namespace" "app-demo") | nindent 2 }}
   {{- include "explore.syncPolicy" . | nindent 2 }}

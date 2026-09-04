@@ -136,24 +136,19 @@ data:
         password: ${KEYCLOAK_ADMIN_PASSWORD}
 
     catalog:
-      # Arrays are replaced by the later config layer. Repeat the shared
-      # domain/organisation locations while selecting the Explore-only entry
-      # point from the checkout already seeded into Gitea. `fetch:template`
-      # resolves ./skeleton relative to this URL, so Create and the local image
-      # build consume the same files.
+      # Arrays are replaced by the later config layer. Select the Explore-only
+      # template and catalog instead of exposing the production teams to a
+      # first-time visitor. `fetch:template` resolves ./skeleton relative to
+      # this URL, so Create and the local image build consume the same files.
       locations:
         - type: url
           target: http://gitea-http.gitea.svc.cluster.local:3000/gitea-admin/kensan-lab/src/branch/main/backstage/templates/fastapi-template/template-explore.yaml
           rules:
             - allow: [Template]
         - type: file
-          target: ./catalog/domains/*.yaml
+          target: ./catalog/explore/*.yaml
           rules:
-            - allow: [Domain, System, Resource]
-        - type: file
-          target: ./catalog/organizations/*.yaml
-          rules:
-            - allow: [Group, User]
+            - allow: [Domain, System, Group, User]
       providers:
         github:
           kensanLabApps:
