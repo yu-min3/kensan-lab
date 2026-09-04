@@ -93,7 +93,7 @@ done
 if [[ ${#missing[@]} -gt 0 ]]; then
   fail "these tools are not installed: ${missing[*]}
      macOS:  brew install ${missing[*]}
-     Linux:  see docs/getting-started/try-it-with-kind.md#prerequisites"
+     Linux:  see docs/getting-started/try-it-with-kind.md#1-start-the-platform"
 fi
 
 docker info >/dev/null 2>&1 || fail "the Docker daemon is not running. Start Docker Desktop (or dockerd) and try again."
@@ -655,7 +655,7 @@ else
   # Backstage's oauth2Proxy sign-in uses the emailMatchingUserEntityProfileEmail
   # resolver, so it has to equal the email of a User already in the catalog or
   # the login succeeds at Keycloak and then fails at the portal. This is the
-  # demo account backstage/catalog/organizations/teams.yaml ships.
+  # demo account backstage/catalog/explore/demo.yaml ships.
   user_id="$(kcadm create users -r kensan \
     -s username=demo \
     -s enabled=true \
@@ -703,7 +703,7 @@ ${pending}
      Look at it with:
        kubectl -n argocd get applications
        kubectl -n argocd describe application <name>
-     Troubleshooting: docs/getting-started/try-it-with-kind.md#troubleshooting"
+     Troubleshooting: docs/getting-started/kind-explained.md#troubleshooting"
   fi
   sleep 10
 done
@@ -738,7 +738,7 @@ while :; do
      The realm was created, so this is Keycloak or its route rather than SSO:
        kubectl -n platform-auth-prod logs deploy/keycloak -c keycloak --tail=50
        kubectl -n platform-auth-prod get httproute
-     Troubleshooting: docs/getting-started/try-it-with-kind.md#troubleshooting"
+     Troubleshooting: docs/getting-started/kind-explained.md#troubleshooting"
   fi
   sleep 5
 done
@@ -776,7 +776,7 @@ case "$location" in
      The route works, so this is the authorization policy or oauth2-proxy:
        kubectl -n istio-system get authorizationpolicy explore-oauth2-authz -o yaml
        kubectl -n auth-system logs deploy/oauth2-proxy --tail=50
-     Troubleshooting: docs/getting-started/try-it-with-kind.md#troubleshooting" ;;
+     Troubleshooting: docs/getting-started/kind-explained.md#troubleshooting" ;;
   *)
     fail "the demo app redirected somewhere other than Keycloak: ${location}" ;;
 esac
@@ -797,7 +797,7 @@ if [[ "$code" != "302" ]]; then
      certificate is not:
        kubectl -n istio-system get certificate explore-wildcard
        kubectl -n cert-manager get certificate explore-ca
-     Troubleshooting: docs/getting-started/try-it-with-kind.md#troubleshooting"
+     Troubleshooting: docs/getting-started/kind-explained.md#troubleshooting"
 fi
 
 # Keycloak has to answer as itself, at the name it puts in its own tokens. If
@@ -936,7 +936,8 @@ GITEA_NOTE="
 
 cat <<EOF
 
-  The platform is up. Five things worth doing, in order.
+  The platform is up. The walkthrough is here:
+  docs/getting-started/try-it-with-kind.md
 
   Every URL below is https, and your browser will warn about the certificate.
   cert-manager issued it from a CA this cluster generated a minute ago, and
@@ -981,7 +982,7 @@ ${GITEA_NOTE}
 
   What this cluster deliberately cannot show you — the L2 load balancer,
   storage replication, multi-architecture scheduling — and why:
-  docs/getting-started/try-it-with-kind.md#what-kind-cannot-show
+  docs/getting-started/kind-explained.md#what-kind-cannot-demonstrate
 
   Your kubectl now points at this cluster, not whatever it pointed at before.
   'make explore-down' removes the context along with the cluster.

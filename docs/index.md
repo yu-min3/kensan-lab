@@ -11,15 +11,19 @@ A bare-metal Kubernetes homelab built with technologies typical of enterprise pl
 
 <div class="cta-row" markdown>
 
-[Get Started](getting-started/installation.md)
+[Try it locally](getting-started/try-it-with-kind.md)
 [See the Showcase](showcase.md)
 
 </div>
 
 <div class="admonition note" markdown>
-<p class="admonition-title">Reference architecture, not a turnkey solution</p>
+<p class="admonition-title">Try kind first; treat bare metal as a reference</p>
 
-Bootstrap automation (Ansible + Makefile) is planned. Adapt secrets, domains, and IP ranges to your environment — see the [Configuration Guide](getting-started/configuration.md).
+The kind path is the tested, automated way to experience the platform. The
+bare-metal pages document the live cluster's design and current build steps,
+but a clean-room bootstrap has not yet been verified end to end. Ansible and
+Makefile automation is planned. Start with the [kind walkthrough](getting-started/try-it-with-kind.md);
+use the [bare-metal bootstrap pages](bootstrapping/index.md) as a reference.
 
 </div>
 
@@ -57,9 +61,10 @@ This site is the **single source of truth** for the current state of kensan-lab.
 
 | If you want to… | Start here |
 |---|---|
+| Experience the platform locally | [Try it with kind](getting-started/try-it-with-kind.md) |
 | Understand the platform | [Architecture](#architecture) above, then [ADRs](adr/index.md) |
 | See the running system | [Showcase](showcase.md) |
-| Bring up a similar cluster | [Prerequisites](getting-started/installation.md) → [Configuration](getting-started/configuration.md) → [Bootstrapping](bootstrapping/index.md) |
+| Study the bare-metal build | [Bare-metal reference](bootstrapping/index.md) — not yet verified as a clean-room bootstrap |
 | Operate it day-to-day | [Secret Management](secret-management/index.md), [Runbooks](runbooks/index.md) |
 | Read the back-stories | [Articles](articles.md) — Zenn / dev.to deep-dive index |
 | See what broke and why | [Incidents](incidents/index.md) |
