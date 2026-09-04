@@ -1,0 +1,79 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: grafana-explore-app-dashboard
+  namespace: monitoring
+  labels:
+    grafana_dashboard: "1"
+    grafana_folder: "Explore"
+data:
+  explore-app-runtime.json: |
+    {
+      "annotations": {"list": []},
+      "description": "Watch a demo application react to kubectl operations and traffic in the disposable kind environment.",
+      "editable": false,
+      "fiscalYearStartMonth": 0,
+      "graphTooltip": 1,
+      "id": null,
+      "links": [],
+      "panels": [
+        {
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "fieldConfig": {"defaults": {"color": {"mode": "palette-classic"}, "custom": {"drawStyle": "line", "fillOpacity": 18, "lineWidth": 2, "showPoints": "never"}, "unit": "percent"}, "overrides": []},
+          "gridPos": {"h": 9, "w": 15, "x": 0, "y": 0},
+          "id": 1,
+          "options": {"legend": {"calcs": ["lastNotNull"], "displayMode": "list", "placement": "bottom"}, "tooltip": {"mode": "single", "sort": "none"}},
+          "targets": [{"expr": "sum(rate(container_cpu_usage_seconds_total{namespace=\"$namespace\",pod=~\"$workload-.*\",container=\"app\"}[1m])) * 100", "legendFormat": "$workload CPU", "refId": "A"}],
+          "title": "CPU usage — run the walkthrough load command",
+          "type": "timeseries"
+        },
+        {
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "fieldConfig": {"defaults": {"color": {"mode": "thresholds"}, "thresholds": {"mode": "absolute", "steps": [{"color": "red", "value": null}, {"color": "green", "value": 1}]}}, "overrides": []},
+          "gridPos": {"h": 4, "w": 9, "x": 15, "y": 0},
+          "id": 2,
+          "options": {"colorMode": "value", "graphMode": "area", "justifyMode": "auto", "orientation": "horizontal", "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}, "textMode": "auto"},
+          "targets": [
+            {"expr": "kube_deployment_spec_replicas{namespace=\"$namespace\",deployment=\"$workload\"}", "legendFormat": "Desired", "refId": "A"},
+            {"expr": "kube_deployment_status_replicas_available{namespace=\"$namespace\",deployment=\"$workload\"}", "legendFormat": "Available", "refId": "B"}
+          ],
+          "title": "Replicas",
+          "type": "stat"
+        },
+        {
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "fieldConfig": {"defaults": {"color": {"mode": "palette-classic"}, "unit": "reqps"}, "overrides": []},
+          "gridPos": {"h": 5, "w": 9, "x": 15, "y": 4},
+          "id": 3,
+          "options": {"legend": {"calcs": [], "displayMode": "list", "placement": "bottom"}, "tooltip": {"mode": "multi", "sort": "desc"}},
+          "targets": [{"expr": "sum(rate(http_requests_total{namespace=\"$namespace\",service=\"$workload\",exported_endpoint!=\"/metrics\"}[1m]))", "legendFormat": "requests/s", "refId": "A"}],
+          "title": "HTTP request rate",
+          "type": "timeseries"
+        },
+        {
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "fieldConfig": {"defaults": {"color": {"mode": "palette-classic"}, "unit": "s"}, "overrides": []},
+          "gridPos": {"h": 8, "w": 24, "x": 0, "y": 9},
+          "id": 4,
+          "options": {"legend": {"calcs": ["lastNotNull"], "displayMode": "list", "placement": "bottom"}, "tooltip": {"mode": "single", "sort": "none"}},
+          "targets": [{"expr": "histogram_quantile(0.95, sum by (le) (rate(http_request_duration_seconds_bucket{namespace=\"$namespace\",service=\"$workload\",exported_endpoint!=\"/metrics\"}[2m])))", "legendFormat": "p95 latency", "refId": "A"}],
+          "title": "HTTP request latency — p95",
+          "type": "timeseries"
+        }
+      ],
+      "refresh": "10s",
+      "schemaVersion": 39,
+      "tags": ["explore", "kind", "application"],
+      "templating": {
+        "list": [
+          {"current": {"selected": true, "text": "app-demo", "value": "app-demo"}, "datasource": {"type": "prometheus", "uid": "prometheus"}, "definition": "label_values(kube_deployment_labels{namespace=~\"app-.+\"},namespace)", "hide": 0, "includeAll": false, "label": "Namespace", "name": "namespace", "options": [], "query": {"query": "label_values(kube_deployment_labels{namespace=~\"app-.+\"},namespace)", "refId": "StandardVariableQuery"}, "refresh": 1, "regex": "", "skipUrlSync": false, "sort": 1, "type": "query"},
+          {"current": {"selected": true, "text": "demo", "value": "demo"}, "datasource": {"type": "prometheus", "uid": "prometheus"}, "definition": "label_values(kube_deployment_labels{namespace=\"$namespace\"},deployment)", "hide": 0, "includeAll": false, "label": "Workload", "name": "workload", "options": [], "query": {"query": "label_values(kube_deployment_labels{namespace=\"$namespace\"},deployment)", "refId": "StandardVariableQuery"}, "refresh": 1, "regex": "", "skipUrlSync": false, "sort": 1, "type": "query"}
+        ]
+      },
+      "time": {"from": "now-15m", "to": "now"},
+      "timepicker": {},
+      "timezone": "browser",
+      "title": "Explore App Runtime",
+      "uid": "explore-app-runtime",
+      "version": 1
+    }

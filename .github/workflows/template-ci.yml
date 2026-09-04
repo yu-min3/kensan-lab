@@ -169,7 +169,11 @@ jobs:
           assert any(target.endswith(
               "/backstage/templates/fastapi-template/template-explore.yaml"
           ) for target in targets)
+          assert any(target.endswith(
+              "/backstage/catalog/explore/demo.yaml"
+          ) for target in targets)
           assert "./templates/fastapi-template/template.yaml" not in targets
+          assert not any(target.startswith("./catalog/") for target in targets)
 
           production_values = {
               key: str(value)

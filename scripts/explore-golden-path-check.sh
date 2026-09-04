@@ -146,10 +146,21 @@ for pull in json.load(sys.stdin):
 ' "add-app-${NAME}")"
 [ -n "$pr_number" ] || { echo "could not identify the platform pull request" >&2; exit 1; }
 
-merge_code="$(curl -sk -o /dev/null -w '%{http_code}' --max-time 30 \
-  -u "${gitea_user}:${gitea_password}" -H 'Content-Type: application/json' \
-  -X POST -d '{"Do":"merge"}' \
-  "${gitea_api}/repos/gitea-admin/kensan-lab/pulls/${pr_number}/merge")"
+# Gitea computes mergeability asynchronously after opening a pull request. A
+# human has spent a few seconds opening the PR page by this point; CI reaches
+# the merge endpoint immediately and receives 405 until that calculation is
+# ready. Retry only that transient response — authentication and API errors
+# still fail without being hidden.
+merge_code=""
+for _ in $(seq 1 30); do
+  merge_code="$(curl -sk -o /dev/null -w '%{http_code}' --max-time 30 \
+    -u "${gitea_user}:${gitea_password}" -H 'Content-Type: application/json' \
+    -X POST -d '{"Do":"merge"}' \
+    "${gitea_api}/repos/gitea-admin/kensan-lab/pulls/${pr_number}/merge")"
+  [[ "$merge_code" == 200 ]] && break
+  [[ "$merge_code" == 405 ]] || break
+  sleep 2
+done
 [ "$merge_code" = 200 ] || {
   echo "Gitea refused to merge platform PR #${pr_number} (HTTP ${merge_code})" >&2
   exit 1

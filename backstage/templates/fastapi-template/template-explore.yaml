@@ -6,12 +6,12 @@ metadata:
   description: Create a FastAPI service entirely inside the explore cluster
   tags: [python, fastapi, gitops]
 spec:
-  owner: platform-team
+  owner: demo-team
   type: service
 
   parameters:
     - title: Application Information
-      required: [name, description, owner, repoUrl]
+      required: [name, description, repoUrl]
       properties:
         name:
           title: Application Name
@@ -27,14 +27,6 @@ spec:
           title: Description
           type: string
           description: Brief description of your application
-        owner:
-          title: Owner
-          type: string
-          description: Team or user that owns this application
-          ui:field: OwnerPicker
-          ui:options:
-            catalogFilter:
-              kind: [Group, User]
         repoUrl:
           title: Repository Location
           type: string
@@ -65,28 +57,6 @@ spec:
           default: Hello from the platform
           maxLength: 60
 
-    - title: Domain & System
-      required: [domain, system]
-      properties:
-        domain:
-          title: Domain
-          type: string
-          description: Select the domain this application belongs to
-          default: platform
-          enum: [platform, to-be-assigned]
-          enumNames:
-            - 'Platform (infrastructure and internal tools)'
-            - '📋 To be Assigned (contact Platform Engineering)'
-        system:
-          title: System
-          type: string
-          description: Select the system this application belongs to
-          default: developer-portal
-          enum: [developer-portal, to-be-assigned]
-          enumNames:
-            - 'Developer Portal (Backstage self-service platform)'
-            - '📋 To be Assigned (contact Platform Engineering)'
-
   steps:
     - id: fetch-base
       name: Fetch Base Template
@@ -96,12 +66,12 @@ spec:
         values:
           name: ${{ parameters.name }}
           description: ${{ parameters.description }}
-          owner: ${{ parameters.owner }}
-          ownerSlug: ${{ parameters.owner | replace("group:default/", "") | replace("user:default/", "") | replace("group:", "") | replace("user:", "") }}
+          owner: group:default/demo-team
+          ownerSlug: demo-team
           repoName: ${{ (parameters.repoUrl | parseRepoUrl).repo }}
           repoOwner: ${{ (parameters.repoUrl | parseRepoUrl).owner }}
-          domain: ${{ parameters.domain }}
-          system: ${{ parameters.system }}
+          domain: explore
+          system: golden-path-demo
           theme: ${{ parameters.theme }}
           message: ${{ parameters.message }}
           hostname: ${{ parameters.name + ".127-0-0-1.sslip.io" }}

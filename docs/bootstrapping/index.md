@@ -1,6 +1,19 @@
 # Infrastructure Bootstrapping Guide
 
-This document serves as a reference for building the cluster from scratch.
+This document is a **reference for the live bare-metal cluster**, not a verified
+installer. The individual commands and component configurations reflect the
+running system, but the complete sequence has not yet been exercised from a
+blank machine through a successful platform bootstrap.
+
+For a tested, automated first experience, use the [kind walkthrough](../getting-started/try-it-with-kind.md).
+Clean-room bare-metal bootstrap automation with Ansible and Makefile is planned;
+this page will become its operator-facing guide when that work is complete.
+
+:::warning "Current status"
+Do not assume that following these sections in order will reproduce the cluster
+today. Use them to understand the intended installation order and to adapt the
+configuration to your own environment.
+:::
 
 ## Architecture
 

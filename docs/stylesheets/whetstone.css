@@ -352,7 +352,12 @@ body {
   background-color: hsl(var(--diagram-surface));
   border: 1px solid hsl(var(--diagram-border));
   border-radius: var(--whetstone-radius);
+  box-sizing: border-box;
+  contain: inline-size;
+  max-width: 100%;
+  overflow-x: auto;
   padding: 1rem;
+  width: 100%;
 
   /* Material's themeCSS reads these two directly for subgraph clusters. */
   --md-default-fg-color--lighter: hsl(var(--diagram-muted-foreground) / 0.72);
@@ -398,9 +403,9 @@ body {
   .md-content__inner {
     box-sizing: border-box;
     margin-inline: 0;
-    max-width: 100vw;
+    max-width: 100%;
     padding-inline: 1rem;
-    width: 100vw;
+    width: auto;
   }
 
   .md-typeset {

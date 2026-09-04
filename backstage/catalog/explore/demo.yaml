@@ -1,0 +1,41 @@
+# Explore-only catalog. Production continues to load catalog/domains and
+# catalog/organizations; this smaller set keeps the walkthrough's pickers and
+# ownership cards focused on one disposable identity.
+apiVersion: backstage.io/v1alpha1
+kind: Group
+metadata:
+  name: demo-team
+  description: The single owner used by the local Explore walkthrough
+spec:
+  type: team
+  children: []
+
+---
+apiVersion: backstage.io/v1alpha1
+kind: User
+metadata:
+  name: demo
+spec:
+  profile:
+    displayName: Demo User
+    email: demo-admin@example.com
+  memberOf: [demo-team]
+
+---
+apiVersion: backstage.io/v1alpha1
+kind: Domain
+metadata:
+  name: explore
+  description: Disposable applications created in the local walkthrough
+spec:
+  owner: demo-team
+
+---
+apiVersion: backstage.io/v1alpha1
+kind: System
+metadata:
+  name: golden-path-demo
+  description: Applications created through the Explore golden path
+spec:
+  owner: demo-team
+  domain: explore

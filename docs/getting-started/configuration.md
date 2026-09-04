@@ -1,5 +1,12 @@
 # Configuration Guide
 
+:::warning "Bare-metal reference"
+This page records the values that must change when adapting the live homelab.
+It is not yet part of a clean-room-tested bootstrap. Start with the automated
+[kind walkthrough](try-it-with-kind.md); bare-metal Ansible and Makefile
+automation is planned.
+:::
+
 This repository uses real configuration values from the author's homelab. If you fork this repo, you'll need to replace them with your own.
 
 ## What to Replace

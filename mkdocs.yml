@@ -153,11 +153,12 @@ nav:
   - Home: index.md
   - Showcase: showcase.md
   - Getting Started:
-      - Try it with kind: getting-started/try-it-with-kind.md
-      - Prerequisites: getting-started/installation.md
-      - Configuration: getting-started/configuration.md
-      - Bootstrapping:
-          - Overview: bootstrapping/index.md
+      - Walkthrough — try it with kind: getting-started/try-it-with-kind.md
+      - How the kind environment works: getting-started/kind-explained.md
+      - Bare-metal reference:
+          - Status and scope: bootstrapping/index.md
+          - Prerequisites: getting-started/installation.md
+          - Configuration: getting-started/configuration.md
           - Stage 1 — Vault HA: bootstrapping/12-vault-stage1.md
           - Grafana independent setup: bootstrapping/11-grafana-independent.md
           - Add worker node (M4 Neo): bootstrapping/add-worker-node-m4neo.md

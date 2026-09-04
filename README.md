@@ -21,7 +21,7 @@
 [![App CI](https://github.com/yu-min3/kensan-lab/actions/workflows/app-ci.yml/badge.svg)](https://github.com/yu-min3/kensan-lab/actions/workflows/app-ci.yml)
 [![Docs](https://github.com/yu-min3/kensan-lab/actions/workflows/docs.yml/badge.svg)](https://github.com/yu-min3/kensan-lab/actions/workflows/docs.yml)
 
-### [📖 Documentation site](https://yu-min3.github.io/kensan-lab/) · [🖼️ Showcase](https://yu-min3.github.io/kensan-lab/showcase/) · [🚀 Getting Started](https://yu-min3.github.io/kensan-lab/getting-started/installation/) · [🏛️ Architecture](https://yu-min3.github.io/kensan-lab/architecture/infrastructure/)
+### [📖 Documentation site](https://yu-min3.github.io/kensan-lab/) · [🚀 Try it with kind](https://yu-min3.github.io/kensan-lab/getting-started/try-it-with-kind/) · [🖼️ Showcase](https://yu-min3.github.io/kensan-lab/showcase/) · [🏛️ Architecture](https://yu-min3.github.io/kensan-lab/architecture/infrastructure/)
 
 <sub>Everything in this README is expanded on the docs site — architecture deep-dives, ADRs, runbooks, and guides.</sub>
 
@@ -31,7 +31,7 @@
 
 A bare-metal Kubernetes homelab built with technologies typical of enterprise platform engineering — Argo CD for GitOps, Istio for service mesh, Backstage for developer self-service, and observability with Prometheus, Grafana, Loki, and Tempo. All running on Raspberry Pis and a mini PC.
 
-> This is a **reference architecture**, not a turnkey solution. A bootstrap automation (Ansible + Makefile) is planned for future release. Published as a learning resource and companion to the author's technical articles. Adapt secrets, domains, and IP ranges for your environment. See [Configuration Guide](https://yu-min3.github.io/kensan-lab/getting-started/configuration/).
+> Start with the tested, automated **[kind walkthrough](https://yu-min3.github.io/kensan-lab/getting-started/try-it-with-kind/)**. The bare-metal configuration is a reference architecture, not yet a clean-room-tested installer. Ansible + Makefile bootstrap automation is planned.
 
 ## Try it in 10 minutes
 
@@ -42,11 +42,11 @@ git clone https://github.com/yu-min3/kensan-lab && cd kensan-lab
 make try
 ```
 
-A few minutes later: Argo CD's app-of-apps tree at `https://argocd.127-0-0-1.sslip.io`, the Backstage developer portal at `https://backstage.127-0-0-1.sslip.io`, Grafana drawing the production Cluster Health dashboard at `https://grafana.127-0-0-1.sslip.io`, a demo app served through a real Istio Gateway at `https://demo.127-0-0-1.sslip.io`, and the production policy set reporting in `kubectl get policyreport -A`. One Keycloak account reaches all of them. `make explore-down` removes it.
+A few minutes later: [Argo CD](https://argocd.127-0-0-1.sslip.io), [Backstage](https://backstage.127-0-0-1.sslip.io), [Grafana](https://grafana.127-0-0-1.sslip.io), and a [demo app](https://demo.127-0-0-1.sslip.io) behind a real Istio Gateway. One `demo` / `demo` Keycloak account reaches all of them. `make explore-down` removes it.
 
-The quickstart includes a **[nine-step walkthrough](https://yu-min3.github.io/kensan-lab/getting-started/try-it-with-kind/#take-it-for-a-walk)** — sign in once and reach everything, open the developer portal and find the golden path template, break a deployment and watch Argo CD heal it, read the cluster's own health dashboard, trip a Kyverno policy and read the verdict, claim a PVC on the `longhorn` StorageClass, and see how Istio's CNI plugin chained onto the cluster's own networking.
+The concise **[walkthrough](https://yu-min3.github.io/kensan-lab/getting-started/try-it-with-kind/)** follows one story: inspect Argo CD, open the existing demo, create a visibly different app through Backstage, merge its local Gitea PR, and watch the new workload's CPU rise and fall in Grafana. The implementation details and optional platform exercises live separately in **[How the kind environment works](https://yu-min3.github.io/kensan-lab/getting-started/kind-explained/)**.
 
-It is a subset with substitutions, not a fork — no Cilium, Vault or Longhorn, and the L2 load balancer is stood in for. TLS is real, but signed by a CA the cluster generates for itself: a fork has no domain to prove ownership of, so the browser warning is the missing proof shown accurately. **[What kind cannot show you, and why](https://yu-min3.github.io/kensan-lab/getting-started/try-it-with-kind/#what-kind-cannot-show)** is the more interesting half of that list. The Explore CI badge above is this cluster coming up from scratch on every pull request.
+It is a subset with substitutions, not a fork — no Cilium, Vault or Longhorn, and the L2 load balancer is stood in for. TLS is real but signed by a local CA, so the walkthrough explains both the browser bypass and the optional trust-store route. The Explore CI badge above is this cluster coming up from scratch on every pull request.
 
 ## Why This Exists
 
@@ -176,7 +176,7 @@ docs/                             # ADRs, architecture, guides (MkDocs site)
 | ------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **Docs site**       | **[https://yu-min3.github.io/kensan-lab/](https://yu-min3.github.io/kensan-lab/)** — full documentation site |
 | **Showcase**        | [Screenshot gallery](https://yu-min3.github.io/kensan-lab/showcase/) — the running system: Argo CD, Grafana, Backstage, Hubble, kensan, and the physical cluster |
-| **Getting Started** | [Installation](https://yu-min3.github.io/kensan-lab/getting-started/installation/) / [Configuration](https://yu-min3.github.io/kensan-lab/getting-started/configuration/) / [Bootstrapping](https://yu-min3.github.io/kensan-lab/bootstrapping/) _(in progress)_ / [Secret Management](https://yu-min3.github.io/kensan-lab/secret-management/) |
+| **Getting Started** | [kind walkthrough](https://yu-min3.github.io/kensan-lab/getting-started/try-it-with-kind/) / [How kind works](https://yu-min3.github.io/kensan-lab/getting-started/kind-explained/) / [Bare-metal reference](https://yu-min3.github.io/kensan-lab/bootstrapping/) _(clean-room bootstrap not yet verified)_ |
 | **Architecture (per domain)** | [Argo CD](./kubernetes/argocd/README.md) / [Network](./kubernetes/network/README.md) / [Auth](./kubernetes/auth/README.md) / [Secrets](./kubernetes/secrets/README.md) / [Storage](./kubernetes/storage/README.md) / [Observability](./kubernetes/observability/README.md) / [Backstage](./kubernetes/backstage/README.md) — design thesis, diagrams, and rationale for each domain |
 | **Concepts & Decisions** | [Namespace Labels](https://yu-min3.github.io/kensan-lab/concepts/namespace-label-design/) / [Network Policy](https://yu-min3.github.io/kensan-lab/concepts/network-policy-guide/) / [Policy Enforcement](https://yu-min3.github.io/kensan-lab/concepts/policy-enforcement/) / [ADRs](https://yu-min3.github.io/kensan-lab/adr/) |
 

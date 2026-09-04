@@ -1,5 +1,12 @@
 # Prerequisites
 
+:::warning "Bare-metal reference"
+These prerequisites describe the live homelab, but the complete bare-metal
+bootstrap has not yet been verified from a blank machine. Start with the tested
+[kind walkthrough](try-it-with-kind.md) unless you are adapting the reference
+architecture. Ansible and Makefile automation is planned.
+:::
+
 ## Hardware
 
 - **Minimum**: 1 control plane + 1 worker (4 GB RAM, 50 GB disk each)
