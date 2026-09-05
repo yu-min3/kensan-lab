@@ -1,0 +1,151 @@
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: explore-build
+  labels:
+    pod-security.kubernetes.io/enforce: privileged
+    pod-security.kubernetes.io/audit: privileged
+    pod-security.kubernetes.io/warn: privileged
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: registry
+  namespace: explore-build
+spec:
+  # Stable because generated values files must name the registry before a
+  # cluster exists. It is inside kind's default Service CIDR.
+  clusterIP: 10.96.0.50
+  selector:
+    app.kubernetes.io/name: explore-registry
+  ports:
+    - name: registry
+      port: 5000
+      targetPort: 5000
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: registry
+  namespace: explore-build
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: explore-registry
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: explore-registry
+    spec:
+      containers:
+        - name: registry
+          image: docker.io/library/registry:2.8.3
+          ports:
+            - name: registry
+              containerPort: 5000
+          readinessProbe:
+            httpGet:
+              path: /v2/
+              port: registry
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+            limits:
+              memory: 256Mi
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: act-runner
+  namespace: explore-build
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: act-runner
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: act-runner
+    spec:
+      volumes:
+        - name: runner-data
+          emptyDir: {}
+        - name: runner-config
+          configMap:
+            name: act-runner-config
+      containers:
+        - name: runner
+          image: docker.io/gitea/act_runner:0.2.13
+          command:
+            - sh
+            - -c
+            - >-
+              while ! nc -z localhost 2375 </dev/null; do
+                echo 'waiting for Docker daemon'; sleep 2;
+              done;
+              exec /sbin/tini -- run.sh
+          env:
+            - name: DOCKER_HOST
+              value: tcp://localhost:2375
+            - name: CONFIG_FILE
+              value: /config/config.yaml
+            - name: GITEA_INSTANCE_URL
+              value: http://gitea-http.gitea.svc.cluster.local:3000
+            - name: GITEA_RUNNER_REGISTRATION_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: act-runner-registration
+                  key: token
+            - name: GITEA_RUNNER_NAME
+              value: explore-builder
+            - name: GITEA_RUNNER_LABELS
+              value: explore-builder:docker://docker.gitea.com/runner-images:ubuntu-latest
+          volumeMounts:
+            - name: runner-data
+              mountPath: /data
+            - name: runner-config
+              mountPath: /config
+              readOnly: true
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              memory: 512Mi
+        - name: daemon
+          image: docker.io/library/docker:27.5.1-dind
+          args:
+            - --insecure-registry=10.96.0.50:5000
+          env:
+            - name: DOCKER_TLS_CERTDIR
+              value: ""
+          securityContext:
+            privileged: true
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              memory: 1Gi
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: act-runner-config
+  namespace: explore-build
+data:
+  config.yaml: |-
+    log:
+      level: info
+    runner:
+      file: /data/.runner
+      capacity: 1
+      timeout: 30m
+    container:
+      network: bridge
+      options: --add-host=host.docker.internal:host-gateway
+      docker_host: tcp://localhost:2375

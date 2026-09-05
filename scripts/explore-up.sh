@@ -33,6 +33,7 @@ on_exit() {
   # longer exists.
   if [[ -n "${GITEA_PF_PID:-}" ]]; then
     kill "${GITEA_PF_PID}" 2>/dev/null || true
+    wait "${GITEA_PF_PID}" 2>/dev/null || true
   fi
   if [[ "$status" -ne 0 && -n "$PREVIOUS_CONTEXT" ]]; then
     kubectl config use-context "$PREVIOUS_CONTEXT" >/dev/null 2>&1 || true
@@ -49,7 +50,7 @@ CLUSTER_NAME="kensan-lab-explore"
 # exists, further down.
 GITEA_INTERNAL_URL="http://gitea-http.gitea.svc.cluster.local:3000"
 GITEA_REPO_PATH="gitea-admin/kensan-lab.git"
-EXPLORE_APP_IMAGE="kensan-lab/explore-template:local"
+EXPLORE_DEMO_IMAGE="kensan-lab/explore-template:local"
 WAIT_TIMEOUT=900
 # This is a local, disposable account rather than a credential carried into a
 # persistent environment. Keep the walkthrough memorable; callers may still
@@ -165,16 +166,11 @@ if [[ "$cluster_exists" == false ]] && command -v nc >/dev/null 2>&1; then
   done
 fi
 
-# The demo and every service created through the Explore template run the same
-# image. Build it from this checkout instead of pulling a hand-published demo
-# artifact: that makes the source beside `make try` the source on screen, on
-# both Apple Silicon and amd64, without a registry or a credential.
-#
-# The skeleton is deliberately directly buildable. App identity and appearance
-# arrive at runtime through deploy/values.yaml; no template substitution is
-# needed to make this image, which is exactly why one build can serve every app.
-info "building the golden path image from this checkout"
-docker build --quiet --tag "${EXPLORE_APP_IMAGE}" \
+# The built-in demo is available before somebody exercises the Golden Path.
+# Generated services do not reuse it: Gitea Actions builds each repository and
+# pushes a commit-SHA image to the disposable registry created below.
+info "building the built-in demo image from this checkout"
+docker build --quiet --tag "${EXPLORE_DEMO_IMAGE}" \
   "${REPO_ROOT}/backstage/templates/fastapi-template/skeleton" >/dev/null
 
 # ---------------------------------------------------------------------------
@@ -192,14 +188,14 @@ fi
 # must never do is touch somebody's real cluster.
 kubectl config use-context "kind-${CLUSTER_NAME}" >/dev/null
 
-info "loading the golden path image into kind"
+info "loading the built-in demo image into kind"
 # `kind load` reads the node's containerd config, and environments/kind/
 # kind-cluster.yaml pins the node image by digest. A kind older than that image
 # cannot parse it, and says so as "unknown containerd config version" — after
 # the cluster is already up, which reads like a problem with this repository
 # rather than with the tool that created it.
-kind load docker-image --name "${CLUSTER_NAME}" "${EXPLORE_APP_IMAGE}" >/dev/null \
-  || fail "could not load the golden path image into the cluster.
+kind load docker-image --name "${CLUSTER_NAME}" "${EXPLORE_DEMO_IMAGE}" >/dev/null \
+  || fail "could not load the built-in demo image into the cluster.
      If the error above mentions an unknown containerd config version, kind is
      older than the node image this repository pins. Upgrade it and try again —
      v0.32.0 is the version this is tested against:
@@ -426,7 +422,47 @@ git -C "${REPO_ROOT}" -c http.postBuffer=524288000 push --quiet --force \
    The repository was created, so this is the push itself:
      git -C . log --oneline -1"
 
+# A generated repository must run its own code, not the built-in demo image.
+# The runner builds inside DinD, pushes to the registry's fixed ClusterIP, and
+# commits the resulting source SHA to the repository's values file. Both are
+# disposable and reachable only inside this kind cluster.
+info "starting the Golden Path image registry and Gitea Actions runner"
+RUNNER_TOKEN_RESPONSE="$(curl -sf --max-time 30 -X POST \
+  -u "gitea-admin:${GITEA_ADMIN_PASSWORD}" \
+  "${gitea_local}/api/v1/admin/actions/runners/registration-token")"
+RUNNER_TOKEN="$(printf '%s' "${RUNNER_TOKEN_RESPONSE}" \
+  | sed -n 's/.*"token"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p')"
+[[ -n "${RUNNER_TOKEN}" ]] \
+  || fail "Gitea did not issue an Actions runner registration token."
+
+kubectl create namespace explore-build --dry-run=client -o yaml \
+  | kubectl apply -f - >/dev/null
+kubectl -n explore-build create secret generic act-runner-registration \
+  --from-literal=token="${RUNNER_TOKEN}" \
+  --dry-run=client -o yaml | kubectl apply -f - >/dev/null
+kubectl apply -f "${ENV_DIR}/resources-gitea/build-infrastructure.yaml" >/dev/null
+kubectl -n explore-build rollout status deployment/registry --timeout=3m >/dev/null
+kubectl -n explore-build rollout status deployment/act-runner --timeout=5m >/dev/null
+
+runner_online=false
+for _ in $(seq 1 60); do
+  runners="$(curl -sf --max-time 5 \
+    -u "gitea-admin:${GITEA_ADMIN_PASSWORD}" \
+    "${gitea_local}/api/v1/admin/actions/runners" || true)"
+  if printf '%s' "${runners}" | tr -d '[:space:]' \
+    | grep -q '"name":"explore-builder".*"status":"online"'; then
+    runner_online=true
+    break
+  fi
+  sleep 2
+done
+[[ "${runner_online}" == true ]] \
+  || fail "the Explore Actions runner registered but did not come online.
+     Inspect it with:
+       kubectl -n explore-build logs deploy/act-runner -c runner --tail=100"
+
 kill "${GITEA_PF_PID}" 2>/dev/null || true
+wait "${GITEA_PF_PID}" 2>/dev/null || true
 GITEA_PF_PID=""
 
 # The labelled namespace. Applied here rather than left to Argo CD because it
@@ -973,7 +1009,8 @@ cat <<EOF
   4. Open the developer portal       https://backstage.127-0-0-1.sslip.io
      Backstage signs you in against the same Keycloak, then resolves you to a
      user in its catalog. 'Create' holds the golden path template — the demo
-     app above is what it produces.
+     app above shows its shape. Each created repository is tested and built by
+     the local Gitea Actions runner before Argo CD deploys its own image.
 ${GITEA_NOTE}
   6. See what the policy engine thinks
        kubectl get policyreport -A

@@ -186,12 +186,21 @@ jobs:
                                      if step["id"] == "fetch-base")["input"]["values"].items()
           }
           assert production_values["imageRepository"].startswith("${{")
-          assert explore_values["imageRepository"] == "kensan-lab/explore-template"
-          assert explore_values["imageTag"] == "local"
+          assert "10.96.0.50:5000/gitea-admin/" in explore_values["imageRepository"]
+          assert explore_values["imageTag"] == "pending"
           assert explore_values["ghcrPullSecretEnabled"] == "False"
           assert explore_values["gatewayName"] == "gateway-explore"
           assert "gitea-http.gitea.svc.cluster.local" in explore_values["platformRepoUrl"]
           assert "gitea-http.gitea.svc.cluster.local" in explore_values["applicationRepoUrl"]
+
+          workflow = open(
+              base + "skeleton/.gitea/workflows/explore-build.yaml"
+          ).read()
+          assert "runs-on: explore-builder" in workflow
+          assert "docker build --target test" in workflow
+          assert "docker push" in workflow
+          assert "gitea.sha" in workflow
+          assert "[skip ci]" in workflow
           # Every file the explore template writes to the platform repository has
           # to land under the path the explore root's second source reads. The
           # first version of this shipped with one of the two renames still
@@ -287,6 +296,9 @@ jobs:
               ".backstage/environments/kind/generated-applications/app-widget-service/referencegrant.yaml",
           ])
           PY
+
+      - name: Run the image build's test stage
+        run: docker build --target test -t widget-service:test /tmp/scaffolded
 
       - name: Build the image
         run: docker build -t widget-service:ci /tmp/scaffolded

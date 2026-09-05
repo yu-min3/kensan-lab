@@ -2,10 +2,9 @@
 # Multi-stage build: a React frontend built to static files, served by a
 # FastAPI backend.
 #
-# The frontend is built here and never again. What somebody chose in the
-# scaffolder form is *not* baked in — it arrives at runtime through
-# /api/config, so one image serves every variant and changing the look is a
-# pull request against deploy/values.yaml rather than a rebuild.
+# The frontend is built from each generated repository. What somebody chose in
+# the scaffolder form is still runtime configuration, but edits to either the
+# Python or React source now produce a new immutable image.
 
 FROM docker.io/library/node:22-slim AS frontend
 
@@ -38,6 +37,17 @@ RUN uv sync --frozen --no-install-project --no-dev
 
 # Install OpenTelemetry auto-instrumentation libraries
 RUN /app/.venv/bin/opentelemetry-bootstrap -a install
+
+# CI asks Docker to build this target first. Keeping tests in the same build
+# graph as the runtime image means the disposable runner needs only Docker and
+# the exact dependency lock the service owns.
+FROM builder AS test
+COPY README.md /app/README.md
+COPY app/ /app/app/
+COPY tests/ /app/tests/
+RUN uv sync --frozen --no-install-project --all-extras
+RUN uv run ruff check app/ && uv run ruff format --check app/
+RUN uv run pytest tests/ -v
 
 # Final stage
 FROM docker.io/library/python:3.11-slim
