@@ -1,0 +1,41 @@
+{% raw %}
+name: Build and deploy in Explore
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    # The final commit records the immutable image tag. It must update Argo CD
+    # without recursively building an identical image forever.
+    if: ${{ !contains(gitea.event.head_commit.message, '[skip ci]') }}
+    runs-on: explore-builder
+    steps:
+      - name: Check out this generated service
+        uses: actions/checkout@v4
+
+      - name: Test the generated source
+        run: docker build --target test --tag explore-test:${{ gitea.sha }} .
+
+      - name: Build and push the commit image
+        env:
+          IMAGE: 10.96.0.50:5000/${{ gitea.repository }}:${{ gitea.sha }}
+        run: |
+          docker build --tag "$IMAGE" .
+          docker push "$IMAGE"
+
+      - name: Record the image consumed by Argo CD
+        env:
+          IMAGE_TAG: ${{ gitea.sha }}
+        run: |
+          sed -i -E "s|^(  tag: ).*|\1${IMAGE_TAG}|" deploy/values.yaml
+          git config user.name gitea-actions
+          git config user.email gitea-actions@explore.local
+          git add deploy/values.yaml
+          git commit -m "Deploy ${IMAGE_TAG} [skip ci]"
+          git push
+{% endraw %}

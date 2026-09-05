@@ -80,11 +80,10 @@ gitea:
       # Skip the first-run installer screen; the cluster is configured already.
       INSTALL_LOCK: true
     actions:
-      # Generated repositories carry the production GitHub Actions workflow,
-      # but Explore has no runner, registry or nested-container build model.
-      # Leaving Actions enabled creates checks that wait forever and makes a
-      # mergeable local PR look broken.
-      ENABLED: false
+      # Explore has its own disposable runner and registry. Generated services
+      # therefore exercise the real source -> image -> GitOps path instead of
+      # reusing the demo image that `make try` loaded into the node.
+      ENABLED: true
 
 # Reached through the Gateway API (resources/gitea/httproute.yaml), not the
 # chart's own Ingress.

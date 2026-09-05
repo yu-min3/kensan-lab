@@ -48,7 +48,7 @@ $ cd kensan-lab
 $ make try
 ```
 
-`make try` checks the prerequisites, builds one local demo image, creates the
+`make try` checks the prerequisites, builds the built-in demo image, creates the
 cluster, and waits until every Argo CD Application is healthy. It prints the
 random local-admin passwords at the end. Keep that terminal output open.
 
@@ -164,17 +164,19 @@ flowchart TD
     A --> C[Open platform-config PR]
     A --> D[Register app2 in the catalog]
     A --> E[Register the new SSO callback]
-    C --> F{You merge the PR}
-    F --> G[Argo CD discovers app-app2]
-    B --> G
-    G --> H[app2 is running]
+    B --> F[Gitea Actions tests and builds app2]
+    F --> G[Push commit-SHA image]
+    G --> H[Record image tag in deploy/values.yaml]
+    C --> I{You merge the PR}
+    H --> J[Argo CD discovers app-app2]
+    I --> J
+    J --> K[app2 is running]
 ```
 
-The Create step is intentionally fast. `make try` already built the template
-image once and loaded it into kind. Every generated app reuses that image;
-the name, theme, and greeting arrive later as runtime values. There is no
-per-app CI build in the Explore environment. The production path does build and
-push an application-specific multi-architecture image in GitHub Actions.
+Repository and PR creation finish quickly, but the application is not ready to
+merge yet. Follow **Build status** and wait for **Build and deploy in Explore**
+to turn green. That run tests the generated source, builds an app2-specific
+image and writes its immutable commit SHA into `deploy/values.yaml`.
 
 ## 6. Merge the local pull request
 
@@ -182,10 +184,9 @@ Follow **Platform Config PR** from Backstage, or open
 [Gitea](https://gitea.127-0-0-1.sslip.io). Gitea has a separate local session,
 so sign in as `gitea-admin` with the password printed by `make try`.
 
-The pull request adds two files under
-`environments/kind/generated-applications/app-app2/`. Merge it. Explore does not
-run Gitea Actions: the generated GitHub workflows belong to the production path
-and would have no runner, registry, or GitHub credentials here.
+After the application repository's build is green, return to the Platform
+Config PR. It adds two files under
+`environments/kind/generated-applications/app-app2/`; merge it.
 
 Watch the new Argo CD Application appear:
 
@@ -195,8 +196,16 @@ $ kubectl -n argocd get application app-app2 -w
 
 When it is `Synced` and `Healthy`, open the
 [new app2 application](https://app2.127-0-0-1.sslip.io). Compare it with the
-[original demo](https://demo.127-0-0-1.sslip.io): the container image is shared,
-but the night theme and greeting came from app2's Git-managed values.
+[original demo](https://demo.127-0-0-1.sslip.io). app2 now runs an image built
+from its own repository; its night theme and greeting came from Git-managed
+runtime values.
+
+To prove source delivery continues after scaffolding, open
+`frontend/src/App.tsx` in the app2 repository, use Gitea's edit button to change
+one visible sentence, and commit to `main`. A second Actions run produces a new
+SHA tag. Argo CD then replaces the app2 pod; refresh the page to see the code
+change. A failed test or build never updates the tag, so the last good pod stays
+running.
 
 ## 7. Watch CPU rise and fall in Grafana
 
@@ -232,7 +241,7 @@ $ make explore-down
 ## Want the details?
 
 Continue to [How the kind environment works](kind-explained.md) for the component
-map, shared-image build path, Gateway API and certificate design, optional
+map, per-application build path, Gateway API and certificate design, optional
 Kyverno/storage/CNI exercises, limitations, and troubleshooting.
 
 The [bare-metal bootstrap guide](../bootstrapping/index.md) is a reference for

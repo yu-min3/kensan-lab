@@ -38,40 +38,39 @@ flowchart TB
 | Kyverno | Runs the production policy set in Audit mode |
 | `longhorn` StorageClass | Uses kind's local-path provisioner under the production class name |
 
-## Why the generated app appears so quickly
+## How a generated app becomes an image
 
-Explore proves the platform delivery path, not a complete CI supply chain.
+Explore includes a disposable CI supply chain so that the code in each
+generated repository is the code that actually runs.
 
 ```mermaid
-flowchart LR
-    subgraph Startup[make try — once]
-      S[Skeleton source] --> B[docker build]
-      B --> L[kind load image]
-    end
-    subgraph Create[Each Backstage Create]
-      F[Form values] --> R[App repository]
-      F --> P[Platform PR]
-      P --> A[Argo CD sync]
-      R --> A
-      L --> Pod[Pod starts]
-      A --> Pod
-    end
+flowchart TD
+    F[Backstage form] --> R[Generated Gitea repository]
+    R --> T[Gitea Actions: test]
+    T --> B[Build repository source]
+    B --> I[Push commit-SHA image<br/>to disposable registry]
+    I --> V[Commit SHA tag to deploy/values.yaml]
+    V --> A[Argo CD sync]
+    P[Platform PR merged] --> A
+    A --> Pod[New application pod]
 ```
 
-`make try` builds `kensan-lab/explore-template:local` from the Backstage
-skeleton once, then loads it directly into kind. The built-in demo and every
-generated app use that image. Application name, theme, and greeting remain in
-`deploy/values.yaml` and become environment variables at runtime.
+`make try` still builds and loads the fixed `app-demo` image so the platform has
+something to show immediately. It also starts an Explore-only Gitea Actions
+runner and registry. Every repository created afterward runs tests, builds its
+own Python and React source, pushes an image tagged with the source commit SHA,
+and commits that tag to `deploy/values.yaml`. The tag commit contains
+`[skip ci]`, preventing an identical recursive build.
 
-This is why Create does not wait for a build or image pull. A generated
-repository still contains the production GitHub Actions workflow, but Gitea
-Actions is disabled in Explore: there is deliberately no runner, in-cluster
-registry, GHCR credential, QEMU setup, or Docker-in-Docker execution model.
+Changing source on `main` repeats that path and changes the Deployment pod
+template, so Kubernetes replaces the pod. Changing only the theme or greeting
+still needs no rebuild: those values remain runtime configuration managed by
+Argo CD.
 
-On bare metal, the production template publishes to GitHub. Its workflow runs
-lint and tests, builds a multi-architecture image, pushes it to GHCR, and the
-application points at that app-specific image. Adding that supply-chain
-experience to Explore is a separate future phase.
+The runner uses privileged Docker-in-Docker. That is acceptable only because
+this cluster is single-user, bound to localhost and deleted as a unit. Bare
+metal uses GitHub Actions, GHCR and a multi-architecture build instead; the
+Explore image contains only the host architecture.
 
 ## Identity and request routing
 
@@ -207,7 +206,7 @@ attempt to emulate Cilium L2 announcements on Docker's bridge network.
 | Vault root of trust | unseal material and production credentials cannot be transferred to a visitor |
 | Publicly trusted TLS | the visitor does not own the production domain or its DNS credentials |
 | Hardware telemetry | temperature, Wi-Fi, disk, and router probes do not exist inside the Docker node |
-| Full CI image supply chain | Explore has no runner, registry, GHCR credential, or nested-container execution model |
+| Production image supply chain | Explore has a local runner and registry, but not GHCR credentials, release retention, signing, or multi-architecture builds |
 
 The bare-metal [architecture pages](../architecture/infrastructure.md) describe
 these capabilities. The [bootstrap guide](../bootstrapping/index.md) is a

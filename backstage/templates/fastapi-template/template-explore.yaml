@@ -75,11 +75,11 @@ spec:
           theme: ${{ parameters.theme }}
           message: ${{ parameters.message }}
           hostname: ${{ parameters.name + ".127-0-0-1.sslip.io" }}
-          # `make try` builds this skeleton once and loads the image into the
-          # single kind node. Every generated service uses that exact image;
-          # name, theme and greeting arrive through deploy/values.yaml.
-          imageRepository: kensan-lab/explore-template
-          imageTag: local
+          # Each generated repository is built by the Explore Gitea runner.
+          # The first successful run replaces `pending` with the source commit
+          # SHA, which gives Argo CD an immutable image and a rollout signal.
+          imageRepository: ${{ "10.96.0.50:5000/gitea-admin/" + (parameters.repoUrl | parseRepoUrl).repo }}
+          imageTag: pending
           ghcrPullSecretEnabled: false
           otelEnabled: false
           gatewayName: gateway-explore
@@ -158,10 +158,10 @@ spec:
           アプリケーションリポジトリ、Platform Config PR、カタログ登録を
           すべて Explore クラスタ内で作成しました。
 
-          Platform Config PR をマージすると Argo CD が Application を作成します。
-          コンテナは `make try` がこの Template から build 済みです。
-          Application はその同じイメージへ、フォームで選んだ名前・テーマ・
-          メッセージを環境変数として渡します。
+          Gitea Actions がこのリポジトリ固有のソースをテストしてコンテナを
+          build し、commit SHA のタグを `deploy/values.yaml` に記録します。
+          Build が成功してから Platform Config PR をマージすると、Argo CD が
+          そのイメージをデプロイします。
     links:
       - title: 📦 アプリケーションリポジトリ
         url: ${{ steps.publish.output.remoteUrl }}
@@ -170,5 +170,7 @@ spec:
         entityRef: ${{ steps.register.output.entityRef }}
       - title: 🔀 Platform Config PR
         url: ${{ steps['create-platform-pr'].output.remoteUrl }}
+      - title: 🏗️ Build status
+        url: ${{ steps.publish.output.remoteUrl + '/actions' }}
       - title: 🚀 Argo CD
         url: https://argocd.127-0-0-1.sslip.io/applications/app-${{ parameters.name }}

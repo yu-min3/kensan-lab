@@ -8,13 +8,10 @@
 
 nameOverride: demo
 
-# The output of the golden path, not a stand-in for it.
-#
-# `make try` builds the template's skeleton from this checkout and loads it
-# straight into the kind node before Argo CD starts. The app a visitor reaches
-# here and every app created through Backstage therefore run the same image.
-# Only the values below differ; no registry and no pre-published demo artifact
-# sit between the checkout and what is on screen.
+# A built-in preview of the template. `make try` builds it from this checkout
+# and loads it straight into kind so there is an app before the visitor creates
+# one. Golden Path applications take the stricter route: their own Gitea
+# repository is tested, built and pushed to the disposable Explore registry.
 image:
   repository: kensan-lab/explore-template
   tag: local
@@ -50,8 +47,8 @@ securityContext:
   runAsUser: 1000
   runAsGroup: 1000
 
-# Bare metal pulls from a private GHCR through an ExternalSecret backed by
-# Vault. Explore has no Vault, and the image is public anyway.
+# This particular image is loaded directly into kind. Generated applications
+# also need no pull secret because their registry is inside the cluster.
 ghcrPullSecret:
   enabled: false
 
