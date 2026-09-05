@@ -199,7 +199,9 @@ nav:
       - Observability (Prometheus / Loki / Tempo):
           - architecture/observability.md
           - Cluster health monitoring: architecture/cluster-health-monitoring.md
-      - Policy (Kyverno): architecture/policy-enforcement.md
+      - Policy (Kyverno):
+          - architecture/policy.md
+          - Policy enforcement: architecture/policy-enforcement.md
       - Backstage:
           - architecture/backstage.md
           - Golden Path: architecture/backstage-golden-path.md
