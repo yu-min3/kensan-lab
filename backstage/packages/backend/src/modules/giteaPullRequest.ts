@@ -151,9 +151,13 @@ export function createGiteaPullRequestAction(options: { config: Config }) {
         body: description ?? '',
       })) as { number: number; html_url: string };
 
+      // The API is reached through a cluster-local baseUrl, so Gitea's
+      // html_url is cluster-local too. Output the browser-facing host from the
+      // template's repoUrl instead.
+      const browserUrl = `https://${host}/${owner}/${repo}/pulls/${pr.number}`;
       ctx.output('pullRequestNumber', pr.number);
-      ctx.output('remoteUrl', pr.html_url);
-      ctx.logger.info(`Opened ${pr.html_url}`);
+      ctx.output('remoteUrl', browserUrl);
+      ctx.logger.info(`Opened ${browserUrl}`);
     },
   });
 }

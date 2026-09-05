@@ -75,6 +75,8 @@ spec:
           theme: ${{ parameters.theme }}
           message: ${{ parameters.message }}
           hostname: ${{ parameters.name + ".127-0-0-1.sslip.io" }}
+          applicationUrl: ${{ "https://" + parameters.name + ".127-0-0-1.sslip.io" }}
+          argocdUrl: ${{ "https://argocd.127-0-0-1.sslip.io/applications/app-" + parameters.name }}
           # Each generated repository is built by the Explore Gitea runner.
           # The first successful run replaces `pending` with the source commit
           # SHA, which gives Argo CD an immutable image and a rollout signal.

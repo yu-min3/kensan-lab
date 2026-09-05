@@ -126,11 +126,17 @@ export function createGiteaPublishAction(options: { config: Config }) {
         await new Promise(resolve => setTimeout(resolve, 1000));
       }
 
-      ctx.output('remoteUrl', created.html_url);
+      // baseUrl is deliberately the cluster-local service so Backstage can
+      // call Gitea without sending traffic through the localhost gateway.
+      // Gitea consequently returns cluster-local html_url values. Never hand
+      // those to the browser: the RepoUrlPicker host is the public Explore
+      // hostname and is the URL the visitor can actually open.
+      const browserRepoUrl = `https://${host}/${owner}/${repo}`;
+      ctx.output('remoteUrl', browserRepoUrl);
       // The catalog fetches catalog-info.yaml relative to this. No trailing
       // slash: the templates append the separator themselves.
       ctx.output('repoContentsUrl', `${created.html_url}/src/branch/${defaultBranch}`);
-      ctx.logger.info(`Pushed to ${created.html_url}`);
+      ctx.logger.info(`Pushed to ${browserRepoUrl}`);
     },
   });
 }

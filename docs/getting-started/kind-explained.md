@@ -91,19 +91,22 @@ Explore image contains only the host architecture.
 The Gateway admits an application route only from a namespace with the expected
 environment label. Check one route:
 
-```console
-$ kubectl -n app-demo get httproute demo \
+```bash
+kubectl -n app-demo get httproute demo \
     -o jsonpath='{.status.parents[0].conditions[*].type}'
-Accepted ResolvedRefs
 ```
+
+Expected result: `Accepted ResolvedRefs`.
 
 Without a browser session, the same route redirects to Keycloak:
 
-```console
-$ curl -sk -o /dev/null -w '%{http_code} -> %{redirect_url}\n' \
+```bash
+curl -sk -o /dev/null -w '%{http_code} -> %{redirect_url}\n' \
     https://demo.127-0-0-1.sslip.io
-302 -> https://auth.127-0-0-1.sslip.io/realms/kensan/...
 ```
+
+Expected result: a `302` redirect to
+`https://auth.127-0-0-1.sslip.io/realms/kensan/...`.
 
 ## Why the certificate warning is accurate
 
@@ -129,9 +132,9 @@ the host.
 
 Scale the original demo by hand:
 
-```console
-$ kubectl -n app-demo scale deploy demo --replicas=3
-$ kubectl -n app-demo get deploy demo -w
+```bash
+kubectl -n app-demo scale deploy demo --replicas=3
+kubectl -n app-demo get deploy demo -w
 ```
 
 Argo CD returns it to the Git-declared single replica within roughly ten
@@ -161,12 +164,12 @@ All production `ClusterPolicy` objects run in Audit mode. The generated apps
 pass because the platform chart supplies security context and resource requests.
 Create a deliberately non-compliant pod:
 
-```console
-$ kubectl -n app-demo run oops --image=nginx:latest --restart=Never
-$ sleep 70
-$ kubectl -n app-demo get policyreport -o json \
+```bash
+kubectl -n app-demo run oops --image=nginx:latest --restart=Never
+sleep 70
+kubectl -n app-demo get policyreport -o json \
     | jq -r '.items[].results[] | select(.result=="fail") | "\(.policy): \(.message)"'
-$ kubectl -n app-demo delete pod oops
+kubectl -n app-demo delete pod oops
 ```
 
 You should see the mutable `:latest` tag and missing resource requests reported.
@@ -180,12 +183,12 @@ Production workloads request `storageClassName: longhorn`. Explore provides the
 same class name through kind's local-path provisioner so manifests bind without
 being rewritten:
 
-```console
-$ kubectl get storageclass
-NAME                 PROVISIONER             VOLUMEBINDINGMODE
-longhorn (default)   rancher.io/local-path   WaitForFirstConsumer
-standard             rancher.io/local-path   WaitForFirstConsumer
+```bash
+kubectl get storageclass
 ```
+
+The output should show both `longhorn (default)` and `standard` using the
+`rancher.io/local-path` provisioner.
 
 This demonstrates the contract, not Longhorn's behavior. There is no replica
 rebuild, snapshot, backup, expansion, or node failover in a single-node cluster.
@@ -194,12 +197,13 @@ rebuild, snapshot, backup, expansion, or node failover in a single-node cluster.
 
 Istio CNI appends itself to kindnet rather than replacing the cluster network:
 
-```console
-$ docker exec kensan-lab-explore-control-plane \
+```bash
+docker exec kensan-lab-explore-control-plane \
     cat /etc/cni/net.d/10-kindnet.conflist \
     | jq -r '[.plugins[].type] | join(" ")'
-ptp portmap istio-cni
 ```
+
+Expected result: `ptp portmap istio-cni`.
 
 On bare metal, the same setting chains Istio onto Cilium. Explore does not
 attempt to emulate Cilium L2 announcements on Docker's bridge network.
@@ -234,8 +238,8 @@ A previous Explore cluster is the usual cause.
 
 ### An Argo CD Application does not become healthy
 
-```console
-$ kubectl -n argocd describe application <name>
+```bash
+kubectl -n argocd describe application <name>
 ```
 
 Sync waves order Application creation, not every dependency's readiness. Argo
@@ -255,8 +259,8 @@ Gitea administrator owns the repository and can merge.
 
 Some corporate resolvers block wildcard DNS services:
 
-```console
-$ for h in argocd backstage grafana demo auth gitea app2; do \
+```bash
+for h in argocd backstage grafana demo auth gitea app2; do \
     echo "127.0.0.1 $h.127-0-0-1.sslip.io"; done | sudo tee -a /etc/hosts
 ```
 

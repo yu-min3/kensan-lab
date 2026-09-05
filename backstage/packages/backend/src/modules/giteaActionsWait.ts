@@ -65,7 +65,12 @@ export function createGiteaActionsWaitAction(options: { config: Config }) {
 
       const baseUrl = integration.config.baseUrl ?? `https://${host}`;
       const api = `${baseUrl}/api/v1`;
-      const actionsUrl = `${baseUrl}/${owner}/${repo}/actions`;
+      const actionsUrl = `https://${host}/${owner}/${repo}/actions`;
+      const toBrowserUrl = (url?: string) => {
+        if (!url) return actionsUrl;
+        const parsed = new URL(url, baseUrl);
+        return `https://${host}${parsed.pathname}${parsed.search}${parsed.hash}`;
+      };
       const deadline = Date.now() + (ctx.input.timeoutSeconds ?? 900) * 1000;
       let run: WorkflowRun | undefined;
 
@@ -95,7 +100,7 @@ export function createGiteaActionsWaitAction(options: { config: Config }) {
           if (run.conclusion !== 'success') {
             throw new Error(
               `The generated service build finished with ${run.conclusion ?? 'an unknown result'}. ` +
-                `Inspect ${run.html_url ?? actionsUrl}`,
+                `Inspect ${toBrowserUrl(run.html_url)}`,
             );
           }
           break;
@@ -106,7 +111,7 @@ export function createGiteaActionsWaitAction(options: { config: Config }) {
 
       if (run?.status !== 'completed' || run.conclusion !== 'success' || !run.head_sha) {
         throw new Error(
-          `Timed out waiting for the generated service build. Inspect ${run?.html_url ?? actionsUrl}`,
+          `Timed out waiting for the generated service build. Inspect ${toBrowserUrl(run?.html_url)}`,
         );
       }
 
@@ -129,11 +134,14 @@ export function createGiteaActionsWaitAction(options: { config: Config }) {
       if (!recorded) {
         throw new Error(
           `Build succeeded, but deploy/values.yaml did not record ${run.head_sha}. ` +
-            `Inspect ${run.html_url ?? actionsUrl}`,
+            `Inspect ${toBrowserUrl(run.html_url)}`,
         );
       }
 
-      ctx.output('buildUrl', run.html_url ?? actionsUrl);
+      // run.html_url inherits the cluster-local API base URL. Preserve its
+      // path (including the exact run id), but replace the origin with the
+      // browser-facing host chosen in Backstage.
+      ctx.output('buildUrl', toBrowserUrl(run.html_url));
       ctx.output('imageTag', run.head_sha);
       ctx.logger.info(`Build succeeded with immutable image tag ${run.head_sha}`);
     },
