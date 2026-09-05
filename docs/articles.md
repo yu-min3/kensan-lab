@@ -21,7 +21,7 @@ The author writes long-form on [Zenn](https://zenn.dev/yuu7751), a Japanese engi
 
 ## Auth & Identity
 
-- [KeycloakでCondition - User Roleを使った認証＋認可フロー構築](https://zenn.dev/yuu7751/articles/49669d360856d8) (2025-08) — building an authn + authz flow with Keycloak's Condition - User Role. Predates the current oauth2-proxy `ext_authz` design described in [Auth](architecture/auth.md).
+- [KeycloakでCondition - User Roleを使った認証＋認可フロー構築](https://zenn.dev/yuu7751/articles/49669d360856d8) (2025-08) — building an authn + authz flow with Keycloak's Condition - User Role. Predates the current oauth2-proxy `ext_authz` design described in [Auth](architecture/auth/index.md).
 
 ## Bare metal & cluster build
 
@@ -42,7 +42,7 @@ The remaining certification guides (PCA / CGoA / CBA / CCA / ICA / LFCS / CNPA /
 
 ## Not yet written
 
-Storage (Longhorn), Vault, GitOps, and observability have no article yet — those subjects currently live only in this site's [Architecture](architecture/infrastructure.md) section and the [ADRs](adr/index.md).
+Storage (Longhorn), Vault, GitOps, and observability have no article yet — those subjects currently live only in this site's [Architecture](architecture/index.md) section and the [ADRs](adr/index.md).
 
 ## How these are written
 

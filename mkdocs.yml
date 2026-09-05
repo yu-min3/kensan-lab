@@ -52,7 +52,11 @@ theme:
     # shows the section you are in. Without this, all of Architecture — the 22
     # ADRs included — sits in one column next to every other section.
     - navigation.tabs
-    - navigation.sections
+    # navigation.sections is deliberately NOT enabled. With tabs on, it renders
+    # level-2 items as static section headings, which stops navigation.indexes
+    # from attaching a domain's overview to the domain name — the overview's h1
+    # ("Network: Cilium for L3/4, Istio for L7, ...") then shows as a second,
+    # wrapping row under it. Without it, the domain name is the link.
     - navigation.indexes
     - navigation.top
     - navigation.footer
@@ -73,6 +77,7 @@ plugins:
   # These pages are linked from published articles, so the old URLs keep working.
   - redirects:
       redirect_maps:
+        architecture/infrastructure.md: architecture/index.md
         concepts/doc-layout.md: reference/doc-layout.md
         concepts/namespace-label-design.md: architecture/namespace-label-design.md
         concepts/network-policy-guide.md: architecture/network-policy-guide.md
@@ -179,30 +184,30 @@ nav:
       - getting-started/try-it-with-kind.md
       - How the kind environment works: getting-started/kind-explained.md
   - Architecture:
-      - architecture/infrastructure.md
+      - architecture/index.md
       - Namespace & label contract: architecture/namespace-label-design.md
       - Argo CD: architecture/argocd.md
       - Network (Cilium + Istio):
-          - architecture/network.md
+          - architecture/network/index.md
           - Cloudflare Tunnel & Access: architecture/cloudflare-tunnel.md
           - Network policy: architecture/network-policy-guide.md
       - Auth (Keycloak):
-          - architecture/auth.md
+          - architecture/auth/index.md
           - Gateway OIDC (Path A): auth/gateway-oidc.md
           - oauth2-proxy: auth/oauth2-proxy.md
           - ArgoCD ↔ Keycloak (Path B): auth/argocd-keycloak-integration.md
       - Secrets (Vault):
-          - architecture/secrets.md
+          - architecture/secrets/index.md
           - Secret management: secret-management/index.md
       - Storage (Longhorn): architecture/storage.md
       - Observability (Prometheus / Loki / Tempo):
-          - architecture/observability.md
+          - architecture/observability/index.md
           - Cluster health monitoring: architecture/cluster-health-monitoring.md
       - Policy (Kyverno):
-          - architecture/policy.md
+          - architecture/policy/index.md
           - Policy enforcement: architecture/policy-enforcement.md
       - Backstage:
-          - architecture/backstage.md
+          - architecture/backstage/index.md
           - Golden Path: architecture/backstage-golden-path.md
       - Decisions:
           - adr/index.md

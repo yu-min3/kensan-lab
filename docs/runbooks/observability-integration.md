@@ -1,6 +1,6 @@
 # Observability integration & troubleshooting
 
-Operational companion to the [observability architecture page](../architecture/observability.md): how to point an application at the telemetry pipeline, verify the stack is healthy, and debug the usual "my data isn't showing up" cases.
+Operational companion to the [observability architecture page](../architecture/observability/index.md): how to point an application at the telemetry pipeline, verify the stack is healthy, and debug the usual "my data isn't showing up" cases.
 
 ## Instrumenting an application
 

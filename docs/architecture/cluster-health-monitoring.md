@@ -1,6 +1,6 @@
 # Cluster Health Monitoring design
 
-A design for surfacing kensan-lab's health (node liveness, resources, endpoint reachability) in a single Grafana view and notifying Slack on anomalies. Builds in three phases on top of the existing observability stack ([observability.md](./observability.md)).
+A design for surfacing kensan-lab's health (node liveness, resources, endpoint reachability) in a single Grafana view and notifying Slack on anomalies. Builds in three phases on top of the existing observability stack ([observability.md](./observability/index.md)).
 
 ## Background and gaps
 
@@ -120,6 +120,6 @@ Puts "monitoring the monitoring, plus a dashboard that stays visible during an o
 
 ## Related
 
-- Overview of the existing stack: [observability.md](./observability.md)
+- Overview of the existing stack: [observability.md](./observability/index.md)
 - Node topology and labels: `.claude/rules/kubernetes-cluster.md`
-- The wired/WiFi dual-path setup: [network.md](./network.md)
+- The wired/WiFi dual-path setup: [network.md](./network/index.md)
