@@ -6,15 +6,15 @@ picture in the guide quietly starts describing a cluster nobody runs any more.
 This script exists so that fixing that is one command against a live explore
 cluster rather than an afternoon of cropping.
 
-    scripts/explore-up.sh --rev <branch>          # stand a cluster up
-    DEMO_PASSWORD=... scripts/explore-screenshots.py
+    make try                                      # stand a cluster up
+    DEMO_PASSWORD=... scripts/explore-screenshots.py argocd-tree demo-application
 
 Everything it photographs is reached the way the guide tells a visitor to reach
 it — through the gateway, signing in as `demo` at Keycloak — so a screenshot
 that cannot be taken is a sign the documented path is broken.
 
-Two of them contradict each other about when to run, which is why a run can be
-narrowed to named screenshots:
+Two of them contradict each other about when to run, so every run names what it
+captures:
 
     DEMO_PASSWORD=... scripts/explore-screenshots.py argocd-tree   # before
     ... run the Golden Path and leave its pull request open ...
@@ -23,8 +23,8 @@ narrowed to named screenshots:
 `argocd-tree` illustrates step 3, where the visitor has not created anything
 yet, so a generated application must not be in the picture. `gitea-platform-pr`
 illustrates step 6 and needs the pull request that only exists after the Golden
-Path has run. Passing no names takes all of them, which is correct only when
-nothing has been generated in the cluster yet.
+Path has run. A run with no names is refused rather than silently producing a
+stale image.
 
 Needs playwright with a real Chrome (`channel="chrome"`); no bundled browser
 download is required.
@@ -38,7 +38,6 @@ import pathlib
 import sys
 
 from playwright.sync_api import (
-    Error as PlaywrightError,
     Page,
     TimeoutError as PlaywrightTimeout,
     sync_playwright,
@@ -121,7 +120,7 @@ def shot(page: Page, url: str, name: str, *, wait_for: str | None = None,
     print(f"  {path.relative_to(OUT.parent.parent.parent)}")
 
 
-def sign_in_to_gitea(page: Page) -> None:
+def sign_in_to_gitea(page: Page) -> str:
     """Sign in to Gitea's separate local session with the demo credentials."""
     credentials = base64.b64encode(
         f"{DEMO_USER}:{DEMO_PASSWORD}".encode()
@@ -154,17 +153,29 @@ def sign_in_to_gitea(page: Page) -> None:
     )
     if status != 200:
         raise SystemExit(f"Gitea rejected the English locale update (HTTP {status})")
+    pull_url = page.evaluate(
+        """credentials => fetch('/api/v1/repos/demo/kensan-lab/pulls?state=open', {
+          headers: {'Authorization': `Basic ${credentials}`},
+        }).then(response => response.json()).then(pulls => {
+          const pull = pulls.find(item => item.title.startsWith('Add Application:'));
+          return pull ? pull.html_url : null;
+        })""",
+        credentials,
+    )
+    if not pull_url:
+        raise SystemExit(
+            "gitea-platform-pr: no Golden Path pull request is open.\n"
+            "  Run the Golden Path first and leave its pull request unmerged."
+        )
+    return pull_url
 
 
 # In capture order. `main` refuses a name that is not here rather than taking
 # every screenshot when one is misspelled.
 NAMES = (
-    "keycloak-login",
     "demo-application",
     "argocd-tree",
-    "backstage-create",
     "gitea-platform-pr",
-    "grafana-cluster-health",
 )
 
 
@@ -172,12 +183,20 @@ def main(argv: list[str]) -> int:
     if not DEMO_PASSWORD:
         print("DEMO_PASSWORD is not set — pass the one `make try` printed.", file=sys.stderr)
         return 2
+    if not argv:
+        print(
+            "name the screenshot phase explicitly:\n"
+            "  before Golden Path: argocd-tree demo-application\n"
+            "  with an open PR:    gitea-platform-pr",
+            file=sys.stderr,
+        )
+        return 2
     unknown = [name for name in argv if name not in NAMES]
     if unknown:
         print(f"not a screenshot: {', '.join(unknown)}\n"
               f"  known: {', '.join(NAMES)}", file=sys.stderr)
         return 2
-    wanted = set(argv) or set(NAMES)
+    wanted = set(argv)
     OUT.mkdir(parents=True, exist_ok=True)
 
     with sync_playwright() as p:
@@ -193,18 +212,9 @@ def main(argv: list[str]) -> int:
 
         print("taking screenshots:")
 
-        # Unauthenticated first: this is the page a visitor meets before they
-        # have signed in anywhere, and taking it after login would be impossible.
-        # The visit happens whatever was asked for, because every screenshot
-        # below is taken through the session it establishes.
-        page.goto("https://demo.127-0-0-1.sslip.io/", wait_until="domcontentloaded")
-        page.wait_for_selector("#username", timeout=30000)
-        page.wait_for_timeout(1500)
-        if "keycloak-login" in wanted:
-            (OUT / "keycloak-login.png").write_bytes(page.screenshot())
-            print(f"  docs/getting-started/assets/keycloak-login.png")
-
-        sign_in(page)
+        if wanted & {"demo-application", "argocd-tree"}:
+            page.goto("https://demo.127-0-0-1.sslip.io/", wait_until="domcontentloaded")
+            sign_in(page)
 
         if "demo-application" in wanted:
             shot(page, "https://demo.127-0-0-1.sslip.io/",
@@ -218,56 +228,12 @@ def main(argv: list[str]) -> int:
             shot(page, "https://argocd.127-0-0-1.sslip.io/applications/argocd/explore-root",
                  "argocd-tree", settle=7000)
 
-        # Backstage runs its own sign-in rather than sitting behind the gate, so
-        # it needs its own click: the button opens a popup, the popup carries the
-        # Keycloak form, and it closes itself once the identity is issued.
-        if "backstage-create" in wanted:
-            page.goto("https://backstage.127-0-0-1.sslip.io/", wait_until="domcontentloaded")
-            page.wait_for_timeout(3000)
-            button = page.locator("button", has_text="SIGN IN").first
-            if button.count():
-                with page.expect_popup(timeout=20000) as popup:
-                    button.click()
-                window = popup.value
-                window.wait_for_selector("#username", timeout=20000)
-                window.fill("#username", DEMO_USER)
-                window.fill("#password", DEMO_PASSWORD)
-                try:
-                    window.click("#kc-login")
-                except PlaywrightError:
-                    # The popup closes the moment the identity is issued, which
-                    # races the click's own acknowledgement. The result shows up
-                    # on the main page either way.
-                    pass
-                page.wait_for_timeout(9000)
-            shot(page, "https://backstage.127-0-0-1.sslip.io/create",
-                 "backstage-create", settle=6000)
-
         # Gitea intentionally has a separate local session. Capture the pull
         # request itself rather than the list, so the screenshot shows what the
         # platform administrator is asked to review.
         if "gitea-platform-pr" in wanted:
-            sign_in_to_gitea(page)
-            pulls_url = "https://gitea.127-0-0-1.sslip.io/demo/kensan-lab/pulls"
-            page.goto(pulls_url, wait_until="domcontentloaded")
-            pull = page.locator('a[href*="/demo/kensan-lab/pulls/"]',
-                                has_text="Add Application").first
-            if not pull.count():
-                raise SystemExit(
-                    "gitea-platform-pr: no Golden Path pull request is open.\n"
-                    "  Run the Golden Path first and leave its pull request unmerged."
-                )
-            shot(page, f"https://gitea.127-0-0-1.sslip.io{pull.get_attribute('href')}",
-                 "gitea-platform-pr", settle=4000)
-
-        # The dashboard itself rather than the list of them. `kiosk` drops Grafana's chrome so
-        # the picture is the panels rather than a navigation bar, and the fixed
-        # window keeps two runs comparable.
-        if "grafana-cluster-health" in wanted:
-            shot(page,
-                 "https://grafana.127-0-0-1.sslip.io/d/cluster-health/cluster-health"
-                 "?orgId=1&from=now-30m&to=now&kiosk",
-                 "grafana-cluster-health", settle=9000)
+            pull_url = sign_in_to_gitea(page)
+            shot(page, pull_url, "gitea-platform-pr", settle=4000)
 
         context.close()
         browser.close()
