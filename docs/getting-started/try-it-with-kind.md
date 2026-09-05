@@ -49,16 +49,16 @@ $ cd kensan-lab
 $ make try
 ```
 
-`make try` checks the prerequisites, builds the built-in demo image, creates the
-cluster, and waits until every Argo CD Application is healthy. It prints the
-random local-admin passwords at the end. Keep that terminal output open.
+`make try` checks the prerequisites, builds the demo and Backstage images from
+your checkout, creates the cluster, and waits until every Argo CD Application
+is healthy. The initial image build can take several minutes; later runs reuse
+Docker's layer cache.
 
 The account used across the platform is fixed for this disposable environment:
 
 | User | Password | Used for |
 |---|---|---|
-| `demo` | `demo` | Demo apps, Argo CD SSO, Backstage, Grafana SSO |
-| `gitea-admin` | printed by `make try` | Gitea and pull-request merge |
+| `demo` | `demo` | Demo apps, Argo CD SSO, Backstage, Grafana SSO, and Gitea |
 
 ## 2. Accept the local certificate
 
@@ -111,6 +111,12 @@ Open `explore-root`. It is the root Application that creates the platform's
 other Applications. `app-demo`, `backstage`, `grafana`, and the rest should be
 `Synced` and `Healthy`.
 
+Argo CD is the GitOps controller for this cluster. It continuously traces the
+`kensan-lab` repository in the in-cluster Gitea, renders the declared Helm and
+Kubernetes resources, and reconciles them into the cluster. A green
+`Synced / Healthy` application therefore means both that the live resources
+match Git and that their workloads are running successfully.
+
 ![Argo CD showing explore-root and the Applications it created](assets/argocd-tree.png)
 
 The same state is available from the terminal:
@@ -128,6 +134,8 @@ The app displays its name, theme, greeting, and the identity headers attached by
 the gateway. The application itself contains no login implementation: Istio
 asks oauth2-proxy to authenticate the request before it reaches the pod.
 
+![The existing demo application after signing in](assets/demo-application.png)
+
 ```mermaid
 sequenceDiagram
     participant Browser
@@ -144,7 +152,7 @@ sequenceDiagram
 ## 5. Create a different app in Backstage
 
 Open [Backstage](https://backstage.127-0-0-1.sslip.io), then select **Create →
-FastAPI Application**. The Explore catalog has one owner, `demo-team`, so the
+Golden Path Application**. The Explore catalog has one owner, `demo-team`, so the
 walkthrough does not ask you to choose among production teams.
 
 Use these example values:
@@ -153,7 +161,7 @@ Use these example values:
 |---|---|
 | Application Name | `app2` |
 | Description | `Second walkthrough application` |
-| Repository | owner `gitea-admin`, repository `app2` |
+| Repository | owner `demo`, repository `app2` |
 | Theme | `night` |
 | Greeting | `Hello from the golden path` |
 
@@ -162,32 +170,36 @@ Review the values and press **Create**. Backstage now:
 ```mermaid
 flowchart TD
     A[Backstage form] --> B[Create app2 repository in local Gitea]
-    A --> C[Open platform-config PR]
-    A --> D[Register app2 in the catalog]
-    A --> E[Register the new SSO callback]
     B --> F[Gitea Actions tests and builds app2]
     F --> G[Push commit-SHA image]
     G --> H[Record image tag in deploy/values.yaml]
+    H --> C[Open platform-config PR]
+    C --> D[Register app2 in the catalog]
+    C --> E[Register the new SSO callback]
     C --> I{You merge the PR}
-    H --> J[Argo CD discovers app-app2]
     I --> J
+    J[Argo CD discovers app-app2]
     J --> K[app2 is running]
 ```
 
-Repository and PR creation finish quickly, but the application is not ready to
-merge yet. Follow **Build status** and wait for **Build and deploy in Explore**
-to turn green. That run tests the generated source, builds an app2-specific
-image and writes its immutable commit SHA into `deploy/values.yaml`.
+The task stays open while Gitea Actions tests the generated source, builds an
+app2-specific image, pushes it, and writes its immutable commit SHA into
+`deploy/values.yaml`. A failed build fails the Backstage task and no platform
+pull request is created. A completed task means the pull request is safe to
+review and merge.
 
 ## 6. Merge the local pull request
 
-Follow **Platform Config PR** from Backstage, or open
-[Gitea](https://gitea.127-0-0-1.sslip.io). Gitea has a separate local session,
-so sign in as `gitea-admin` with the password printed by `make try`.
+Follow **Review the kensan-lab pull request** from Backstage, or open
+[the `kensan-lab` pull requests in Gitea](https://gitea.127-0-0-1.sslip.io/demo/kensan-lab/pulls).
+Gitea does not share the Keycloak browser session, but it uses the same memorable
+credentials: sign in with `demo` / `demo`.
 
-After the application repository's build is green, return to the Platform
-Config PR. It adds two files under
-`environments/kind/generated-applications/app-app2/`; merge it.
+You are the platform administrator for this part of the walkthrough. The new
+Platform Config PR should already be waiting in `demo/kensan-lab`. It adds two
+files under `environments/kind/generated-applications/app-app2/`; merge it.
+
+![Gitea showing the platform pull request ready for review](assets/gitea-platform-pr.png)
 
 Watch the new Argo CD Application appear:
 

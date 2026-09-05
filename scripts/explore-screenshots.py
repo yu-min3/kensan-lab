@@ -107,6 +107,15 @@ def shot(page: Page, url: str, name: str, *, wait_for: str | None = None,
     print(f"  {path.relative_to(OUT.parent.parent.parent)}")
 
 
+def sign_in_to_gitea(page: Page) -> None:
+    """Sign in to Gitea's separate local session with the demo credentials."""
+    page.goto("https://gitea.127-0-0-1.sslip.io/user/login", wait_until="domcontentloaded")
+    page.locator('input[name="user_name"]').fill(DEMO_USER)
+    page.locator('input[name="password"]').fill(DEMO_PASSWORD)
+    page.locator('button[type="submit"]').click()
+    page.wait_for_url(lambda url: "/user/login" not in url, timeout=20000)
+
+
 def main() -> int:
     if not DEMO_PASSWORD:
         print("DEMO_PASSWORD is not set — pass the one `make try` printed.", file=sys.stderr)
@@ -131,6 +140,9 @@ def main() -> int:
         print(f"  docs/getting-started/assets/keycloak-login.png")
 
         sign_in(page)
+
+        shot(page, "https://demo.127-0-0-1.sslip.io/",
+             "demo-application", settle=4000)
 
         # No selector waits below: these UIs render their content into
         # containers whose text a locator does not always see, and a screenshot
@@ -162,12 +174,14 @@ def main() -> int:
             page.wait_for_timeout(9000)
         shot(page, "https://backstage.127-0-0-1.sslip.io/create",
              "backstage-create", settle=6000)
-        # Backstage is missing on purpose. The image explore pins
-        # (ghcr.io/yu-min3/kensan-lab/backstage) and the one bare metal pins
-        # (ghcr.io/yu-min3/backstage) are different builds sharing the tag
-        # v0.0.12, and only the second has the single sign-on frontend. Until
-        # that is reconciled a screenshot here would show a guest card behind an
-        # SSO gate, which describes neither cluster.
+
+        # Gitea intentionally has a separate local session. Capture the pull
+        # request list after a Golden Path run so the screenshot shows the
+        # platform-administrator handoff described by the walkthrough.
+        sign_in_to_gitea(page)
+        shot(page, "https://gitea.127-0-0-1.sslip.io/demo/kensan-lab/pulls",
+             "gitea-platform-pr", settle=4000)
+
         # The dashboard itself rather than the list of them. `kiosk` drops Grafana's chrome so
         # the picture is the panels rather than a navigation bar, and the fixed
         # window keeps two runs comparable.

@@ -11,9 +11,6 @@ node_modules
 packages/*/node_modules
 **/node_modules
 
-# Source files (not needed in production image)
-packages/*/src
-
 # Plugins (development only)
 plugins
 
@@ -25,11 +22,9 @@ app-config.local.yaml
 examples
 docs
 
-# Build artifacts
+# Build artifacts from the host. The Dockerfile builds the backend bundle from
+# source so `make try` always runs the checkout being explored.
 dist
-# The runtime image is assembled from the backend bundle built immediately
-# before `docker build`; excluding it lets BuildKit reuse a stale COPY layer.
-!packages/backend/dist/**
 coverage
 .turbo
 

@@ -1,16 +1,18 @@
-# This dockerfile builds an image for the backend package.
-# It should be executed with the root of the repo as docker context.
-#
-# Before building this image, be sure to have run the following commands in the repo root:
-#
-# yarn install --immutable
-# yarn tsc
-# yarn build:backend
-#
-# Once the commands have been run, you can build the image using `yarn build-image`
-#
-# Alternatively, there is also a multi-stage Dockerfile documented here:
-# https://backstage.io/docs/deployment/docker#multi-stage-build
+# Build the backend bundle inside the image build. Explore must execute custom
+# scaffolder actions from the checkout passed to `make try`, not from whichever
+# published Backstage tag happens to be pinned in a manifest.
+FROM --platform=$BUILDPLATFORM node:22-bookworm-slim AS bundle-builder
+
+ENV PYTHON=/usr/bin/python3
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends python3 g++ build-essential && \
+    rm -rf /var/lib/apt/lists/*
+
+USER node
+WORKDIR /build
+COPY --chown=node:node . .
+RUN node .yarn/releases/yarn-4.4.1.cjs install --immutable && \
+    node .yarn/releases/yarn-4.4.1.cjs workspace backend build
 
 FROM node:22-bookworm-slim
 
@@ -48,7 +50,8 @@ ENV NODE_OPTIONS="--no-node-snapshot"
 # Copy repo skeleton first, to avoid unnecessary docker cache invalidation.
 # The skeleton contains the package.json of each package in the monorepo,
 # and along with yarn.lock and the root package.json, that's enough to run yarn install.
-COPY --chown=node:node yarn.lock package.json packages/backend/dist/skeleton.tar.gz ./
+COPY --chown=node:node yarn.lock package.json ./
+COPY --from=bundle-builder --chown=node:node /build/packages/backend/dist/skeleton.tar.gz ./
 RUN tar xzf skeleton.tar.gz && rm skeleton.tar.gz
 
 RUN yarn workspaces focus --all --production && rm -rf "$(yarn cache clean)"
@@ -68,7 +71,8 @@ RUN test -f templates/fastapi-template/template.yaml && \
     test -f templates/fastapi-template/template-explore.yaml
 
 # Then copy the rest of the backend bundle, along with any other files we might want.
-COPY --chown=node:node packages/backend/dist/bundle.tar.gz app-config*.yaml ./
+COPY --from=bundle-builder --chown=node:node /build/packages/backend/dist/bundle.tar.gz ./
+COPY --chown=node:node app-config*.yaml ./
 RUN tar xzf bundle.tar.gz && rm bundle.tar.gz
 
 # Links the published package to this repository, which is what lets the

@@ -49,8 +49,10 @@ CLUSTER_NAME="kensan-lab-explore"
 # whole reason it is here. REPO_URL and REVISION are set once that server
 # exists, further down.
 GITEA_INTERNAL_URL="http://gitea-http.gitea.svc.cluster.local:3000"
-GITEA_REPO_PATH="gitea-admin/kensan-lab.git"
+GITEA_USERNAME="demo"
+GITEA_REPO_PATH="${GITEA_USERNAME}/kensan-lab.git"
 EXPLORE_DEMO_IMAGE="kensan-lab/explore-template:local"
+EXPLORE_BACKSTAGE_IMAGE="kensan-lab/backstage-explore:local"
 WAIT_TIMEOUT=900
 # This is a local, disposable account rather than a credential carried into a
 # persistent environment. Keep the walkthrough memorable; callers may still
@@ -173,6 +175,14 @@ info "building the built-in demo image from this checkout"
 docker build --quiet --tag "${EXPLORE_DEMO_IMAGE}" \
   "${REPO_ROOT}/backstage/templates/fastapi-template/skeleton" >/dev/null
 
+# Explore templates are loaded from Gitea at runtime, but custom scaffolder
+# actions are backend code. Building the portal here makes this checkout the
+# source of truth for both; a published image tag must never hide a local edit.
+info "building the Explore Backstage image from this checkout"
+docker build --quiet --tag "${EXPLORE_BACKSTAGE_IMAGE}" \
+  --file "${REPO_ROOT}/backstage/packages/backend/Dockerfile" \
+  "${REPO_ROOT}/backstage" >/dev/null
+
 # ---------------------------------------------------------------------------
 # Cluster
 # ---------------------------------------------------------------------------
@@ -201,6 +211,10 @@ kind load docker-image --name "${CLUSTER_NAME}" "${EXPLORE_DEMO_IMAGE}" >/dev/nu
      v0.32.0 is the version this is tested against:
        kind version
        brew upgrade kind    # macOS"
+
+info "loading the Explore Backstage image into kind"
+kind load docker-image --name "${CLUSTER_NAME}" "${EXPLORE_BACKSTAGE_IMAGE}" >/dev/null \
+  || fail "could not load the locally built Backstage image into the cluster."
 
 # kind ships `standard` as the default StorageClass and the explore layer adds
 # `longhorn` pointing at the same provisioner, so that the repository's PVCs
@@ -371,10 +385,10 @@ kubectl -n monitoring create secret generic grafana-oidc-explore \
 # original design, and `--repo` survived the move as an option nobody had reason
 # to pass: a fork runs `make try` like everyone else.
 info "installing Gitea ${GITEA_CHART_VERSION} (the cluster's own git server)"
-GITEA_ADMIN_PASSWORD="$(rand)"
+GITEA_ADMIN_PASSWORD="${DEMO_USER_PASSWORD}"
 # What the portal publishes with.
 kubectl -n backstage create secret generic backstage-explore-gitea \
-  --from-literal=username=gitea-admin \
+  --from-literal=username="${GITEA_USERNAME}" \
   --from-literal=password="${GITEA_ADMIN_PASSWORD}" \
   --dry-run=client -o yaml | kubectl apply -f - >/dev/null
 
@@ -402,7 +416,7 @@ for _ in $(seq 1 40); do
 done
 
 curl -sf -o /dev/null --max-time 30 \
-  -u "gitea-admin:${GITEA_ADMIN_PASSWORD}" \
+  -u "${GITEA_USERNAME}:${GITEA_ADMIN_PASSWORD}" \
   -H 'Content-Type: application/json' \
   -d '{"name":"kensan-lab","private":false,"auto_init":false}' \
   "${gitea_local}/api/v1/user/repos" \
@@ -416,7 +430,7 @@ curl -sf -o /dev/null --max-time 30 \
 # property of either server. Without this the push dies with
 # "unexpected disconnect while reading sideband packet" after writing 100%.
 git -C "${REPO_ROOT}" -c http.postBuffer=524288000 push --quiet --force \
-  "http://gitea-admin:${GITEA_ADMIN_PASSWORD}@127.0.0.1:3999/${GITEA_REPO_PATH}" \
+  "http://${GITEA_USERNAME}:${GITEA_ADMIN_PASSWORD}@127.0.0.1:3999/${GITEA_REPO_PATH}" \
   "HEAD:refs/heads/main" \
   || fail "could not seed Gitea with this checkout.
    The repository was created, so this is the push itself:
@@ -428,7 +442,7 @@ git -C "${REPO_ROOT}" -c http.postBuffer=524288000 push --quiet --force \
 # disposable and reachable only inside this kind cluster.
 info "starting the Golden Path image registry and Gitea Actions runner"
 RUNNER_TOKEN_RESPONSE="$(curl -sf --max-time 30 -X POST \
-  -u "gitea-admin:${GITEA_ADMIN_PASSWORD}" \
+  -u "${GITEA_USERNAME}:${GITEA_ADMIN_PASSWORD}" \
   "${gitea_local}/api/v1/admin/actions/runners/registration-token")"
 RUNNER_TOKEN="$(printf '%s' "${RUNNER_TOKEN_RESPONSE}" \
   | sed -n 's/.*"token"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p')"
@@ -447,7 +461,7 @@ kubectl -n explore-build rollout status deployment/act-runner --timeout=5m >/dev
 runner_online=false
 for _ in $(seq 1 60); do
   runners="$(curl -sf --max-time 5 \
-    -u "gitea-admin:${GITEA_ADMIN_PASSWORD}" \
+    -u "${GITEA_USERNAME}:${GITEA_ADMIN_PASSWORD}" \
     "${gitea_local}/api/v1/admin/actions/runners" || true)"
   if printf '%s' "${runners}" | tr -d '[:space:]' \
     | grep -q '"name":"explore-builder".*"status":"online"'; then
@@ -496,7 +510,7 @@ kubectl apply -f "${REPO_ROOT}/kubernetes/argocd/projects/" >/dev/null
 # every repository the Explore template creates live under exactly this prefix;
 # nothing outside this one in-cluster server is widened.
 kubectl -n argocd patch appproject app-project --type json \
-  -p "[{\"op\": \"add\", \"path\": \"/spec/sourceRepos/-\", \"value\": \"${GITEA_INTERNAL_URL}/gitea-admin/*\"}]" \
+  -p "[{\"op\": \"add\", \"path\": \"/spec/sourceRepos/-\", \"value\": \"${GITEA_INTERNAL_URL}/${GITEA_USERNAME}/*\"}]" \
   >/dev/null
 
 # The AppProjects warn about resources no Application manages. On bare metal
@@ -945,8 +959,8 @@ fi
 # by the very next `make try`. A missing catalog location is non-fatal to the
 # backend, so prove the source is reachable from the consumer pod and reject a
 # processing error from the log.
-template_url="${GITEA_INTERNAL_URL}/gitea-admin/kensan-lab/src/branch/main/backstage/templates/fastapi-template/template-explore.yaml"
-template_raw_url="${GITEA_INTERNAL_URL}/gitea-admin/kensan-lab/raw/branch/main/backstage/templates/fastapi-template/template-explore.yaml"
+template_url="${GITEA_INTERNAL_URL}/${GITEA_USERNAME}/kensan-lab/src/branch/main/backstage/templates/fastapi-template/template-explore.yaml"
+template_raw_url="${GITEA_INTERNAL_URL}/${GITEA_USERNAME}/kensan-lab/raw/branch/main/backstage/templates/fastapi-template/template-explore.yaml"
 info "checking that Backstage can read the Explore software template from this checkout"
 if ! kubectl -n backstage exec deploy/backstage -c backstage -- \
   node -e 'fetch(process.argv[1]).then(async r => process.exit(r.ok && (await r.text()).includes("kind: Template") ? 0 : 1)).catch(() => process.exit(1))' \
@@ -964,7 +978,7 @@ admin_password="$(kubectl -n argocd get secret argocd-initial-admin-secret \
 
 GITEA_NOTE="
   5. Look at the git server          https://gitea.127-0-0-1.sslip.io
-     user 'gitea-admin', password '${GITEA_ADMIN_PASSWORD}'.
+     user 'demo', password '${GITEA_ADMIN_PASSWORD}'.
      Argo CD reads this cluster from here rather than from GitHub. That is why
      nothing had to be pushed for your checkout to be what is running, and why
      'Create' in the portal can make a repository without a token.
@@ -980,9 +994,12 @@ cat <<EOF
   nothing on your machine has a reason to trust that — there is no domain here
   to prove ownership of. Clicking through is the intended path.
 
-  Single sign-on works here. One account reaches all of it:
+  One memorable credential pair reaches every screen:
 
        user 'demo', password '${DEMO_USER_PASSWORD}'
+
+  Argo CD, Backstage, Grafana and the apps share a Keycloak session. Gitea uses
+  a separate local account with the same credentials; it does not share SSO.
 
   1. Open the demo app               https://demo.127-0-0-1.sslip.io
      You will land on Keycloak first. The app has no authentication code and

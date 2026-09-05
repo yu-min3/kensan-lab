@@ -50,17 +50,19 @@ flowchart TD
     T --> B[Build repository source]
     B --> I[Push commit-SHA image<br/>to disposable registry]
     I --> V[Commit SHA tag to deploy/values.yaml]
-    V --> A[Argo CD sync]
-    P[Platform PR merged] --> A
+    V --> P[Backstage opens platform PR]
+    P --> M[Platform administrator merges PR]
+    M --> A[Argo CD sync]
     A --> Pod[New application pod]
 ```
 
-`make try` still builds and loads the fixed `app-demo` image so the platform has
-something to show immediately. It also starts an Explore-only Gitea Actions
-runner and registry. Every repository created afterward runs tests, builds its
-own Python and React source, pushes an image tagged with the source commit SHA,
-and commits that tag to `deploy/values.yaml`. The tag commit contains
-`[skip ci]`, preventing an identical recursive build.
+`make try` builds and loads the fixed `app-demo` image so the platform has
+something to show immediately. It also builds Backstage from the current
+checkout, then starts an Explore-only Gitea Actions runner and registry. Every
+repository created afterward runs tests, builds its own Python and React source,
+pushes an image tagged with the source commit SHA, and commits that tag to
+`deploy/values.yaml`. The tag commit contains `[skip ci]`, preventing an
+identical recursive build.
 
 Changing source on `main` repeats that path and changes the Deployment pod
 template, so Kubernetes replaces the pod. Changing only the theme or greeting
@@ -78,7 +80,7 @@ Explore image contains only the host architecture.
 |---|---|---|
 | Demo and generated apps | Gateway `ext_authz` → oauth2-proxy | The application contains no authentication code |
 | Argo CD, Backstage, Grafana | Native OIDC client → Keycloak | Each product has its own user and role model |
-| Gitea | Local `gitea-admin` account | The PR merge is a separate administrative action |
+| Gitea | Local `demo` / `demo` account | The PR merge is a separate platform-administration action; this is not SSO |
 
 The Gateway admits an application route only from a namespace with the expected
 environment label. Check one route:
@@ -240,8 +242,8 @@ to bypass it or trust the generated root explicitly.
 
 ### Gitea says you cannot merge the pull request
 
-That is usually the signed-out view. Sign in with `gitea-admin` and the generated
-password printed by `make try`. The account owns the repository and can merge.
+That is usually the signed-out view. Sign in with `demo` / `demo`. This local
+Gitea administrator owns the repository and can merge.
 
 ### Everything is healthy but a browser URL does not resolve
 
