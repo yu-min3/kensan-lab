@@ -48,6 +48,10 @@ theme:
   features:
     - navigation.instant
     - navigation.tracking
+    # Top-level sections become tabs in the header, so the sidebar only ever
+    # shows the section you are in. Without this, all of Architecture — the 22
+    # ADRs included — sits in one column next to every other section.
+    - navigation.tabs
     - navigation.sections
     - navigation.indexes
     - navigation.top
@@ -56,7 +60,10 @@ theme:
     - search.suggest
     - search.highlight
     - content.code.copy
-    - content.action.edit
+    # "View source", not "Edit this page": the site is published as a reference,
+    # and pull requests are not being solicited. The link is still built from
+    # edit_uri above — dropping that setting would remove this button too.
+    - content.action.view
     - content.tabs.link
 
 plugins:
@@ -152,88 +159,91 @@ extra_css:
 nav:
   - Home: index.md
   - Showcase: showcase.md
-  - Getting Started:
-      - Walkthrough — try it with kind: getting-started/try-it-with-kind.md
+  - Try it in one command:
+      - getting-started/try-it-with-kind.md
       - How the kind environment works: getting-started/kind-explained.md
-      - Bare-metal reference:
+  - Architecture:
+      - architecture/infrastructure.md
+      - Namespace & label contract: concepts/namespace-label-design.md
+      - Argo CD: architecture/argocd.md
+      - Network (Cilium + Istio):
+          - architecture/network.md
+          - Cloudflare Tunnel & Access: architecture/cloudflare-tunnel.md
+          - Network policy: concepts/network-policy-guide.md
+      - Auth (Keycloak):
+          - architecture/auth.md
+          - Gateway OIDC (Path A): auth/gateway-oidc.md
+          - oauth2-proxy: auth/oauth2-proxy.md
+          - Backstage SSO design: auth/backstage-sso-design.md
+          - ArgoCD ↔ Keycloak (Path B): auth/argocd-keycloak-integration.md
+      - Secrets (Vault):
+          - architecture/secrets.md
+          - Secret management: secret-management/index.md
+      - Storage (Longhorn): architecture/storage.md
+      - Observability (Prometheus / Loki / Tempo):
+          - architecture/observability.md
+          - Cluster health monitoring: architecture/cluster-health-monitoring.md
+      - Policy (Kyverno): concepts/policy-enforcement.md
+      - Backstage:
+          - architecture/backstage.md
+          - Golden Path: guides/backstage-golden-path.md
+      - Decisions:
+          - adr/index.md
+          - 001 — TLS Termination Pattern: adr/001-tls-termination-pattern.md
+          - 002 — Authentication & Authorization: adr/002-authentication-authorization-architecture.md
+          - 003 — ApplicationSet Migration: adr/003-applicationset-migration-strategy.md
+          - 004 — Network Policy Design: adr/004-network-policy-design.md
+          - 005 — Istio Native OAuth2: adr/005-istio-native-oauth2.md
+          - 006 — Namespace Naming: adr/006-namespace-naming.md
+          - 007 — No Vault PKI: adr/007-no-vault-pki.md
+          - 008 — Keycloak DB Credentials: adr/008-keycloak-db-credentials.md
+          - 009 — Shared Allow-Istio NetworkPolicy: adr/009-shared-allow-istio-network-policy.md
+          - 010 — Istio Native OAuth2 (Absent): adr/010-istio-native-oauth2-absent.md
+          - 011 — Vault Version Pinning: adr/011-vault-version-pinning.md
+          - 012 — Policy Enforcement with Kyverno: adr/012-policy-enforcement-kyverno.md
+          - 013 — Keycloak DB Credentials → Vault Dynamic: adr/013-keycloak-db-credentials-vault-dynamic.md
+          - 014 — Namespace Naming & Label Contract v2: adr/014-namespace-naming-label-contract-v2.md
+          - 015 — VCO + Setup-Script Hybrid: adr/015-vco-setup-script-hybrid.md
+          - 016 — LAN-Frictionless + External-Gate Model: adr/016-lan-frictionless-cf-access-external-gate.md
+          - 017 — Remove kensan-legacy (tag archive): adr/017-kensan-legacy-removal.md
+          - 018 — Backstage Manifests Placement: adr/018-backstage-manifests-placement.md
+          - 019 — Keycloak DB Credentials → Revert to Static: adr/019-keycloak-db-credentials-revert-to-static.md
+          - 020 — Namespace Lifecycle App Cleanup: adr/020-namespace-lifecycle-app-cleanup.md
+          - 021 — gateway-prod Default-Protected Authorization: adr/021-gateway-prod-default-protected.md
+          - 022 — Backstage Native OIDC: adr/022-backstage-native-oidc.md
+  - Reference:
+      - Bare-metal bootstrap:
           - Status and scope: bootstrapping/index.md
           - Prerequisites: getting-started/installation.md
           - Configuration: getting-started/configuration.md
           - Stage 1 — Vault HA: bootstrapping/12-vault-stage1.md
           - Grafana independent setup: bootstrapping/11-grafana-independent.md
           - Add worker node (M4 Neo): bootstrapping/add-worker-node-m4neo.md
-  - Architecture:
-      - Infrastructure overview: architecture/infrastructure.md
-      - Argo CD (GitOps): architecture/argocd.md
-      - Auth (Keycloak + oauth2-proxy): architecture/auth.md
-      - Secrets (Vault): architecture/secrets.md
-      - Network (Cilium + Istio): architecture/network.md
-      - Cloudflare Tunnel & Access: architecture/cloudflare-tunnel.md
-      - Observability (Prometheus/Loki/Tempo): architecture/observability.md
-      - Storage (Longhorn): architecture/storage.md
-      - Backstage (IDP): architecture/backstage.md
-      - Cluster health monitoring: architecture/cluster-health-monitoring.md
-  - Concepts:
+      - Operations:
+          - Runbooks:
+              - runbooks/index.md
+              - Vault Raft auto-join: runbooks/vault-raft-join.md
+              - Vault storage migration (Longhorn): runbooks/vault-storage-migration-longhorn.md
+              - VCO drift after Vault rebuild: runbooks/vco-vault-state-drift.md
+              - Cilium WiFi stability: runbooks/cilium-wifi-stability.md
+              - Raspberry Pi WiFi stabilization: guides/wifi-stabilization.md
+              - Cilium update strategy: runbooks/cilium-update-strategy.md
+              - Longhorn restore test: runbooks/longhorn-restore-test.md
+              - ArgoCD repo-server tuning: runbooks/argocd-repo-server-tuning.md
+              - OTel integration & troubleshooting: guides/observability-integration.md
+          - Recovery:
+              - Workspace volume recovery: operations/kensan-workspace-volume-recovery.md
+              - Syncthing pairing recovery: operations/syncthing-pairing-recovery.md
+          - Incidents:
+              - incidents/index.md
+              - 2026-03-02 system-infra Sync Blocked: incidents/2026-03-02-system-infra-sync-blocked.md
       - Documentation Layout: concepts/doc-layout.md
-      - Namespace Label Design: concepts/namespace-label-design.md
-      - Network Policy: concepts/network-policy-guide.md
-      - Policy Enforcement: concepts/policy-enforcement.md
-  - Design System:
-      - Overview: design/index.md
-      - Components: design/components.md
-      - Patterns: design/patterns.md
-      - Adoption Status: design/adoption-status.md
-      - Brand Assets: design/brand/README.md
-  - Operations:
-      - Secret Management: secret-management/index.md
-      - Auth integration:
-          - Backstage SSO design: auth/backstage-sso-design.md
-          - ArgoCD ↔ Keycloak (Path B): auth/argocd-keycloak-integration.md
-          - Gateway OIDC (Path A): auth/gateway-oidc.md
-          - oauth2-proxy: auth/oauth2-proxy.md
-      - Runbooks:
-          - runbooks/index.md
-          - Vault Raft auto-join: runbooks/vault-raft-join.md
-          - Vault storage migration (Longhorn): runbooks/vault-storage-migration-longhorn.md
-          - VCO drift after Vault rebuild: runbooks/vco-vault-state-drift.md
-          - Cilium WiFi stability: runbooks/cilium-wifi-stability.md
-          - Cilium update strategy: runbooks/cilium-update-strategy.md
-          - Longhorn restore test: runbooks/longhorn-restore-test.md
-          - ArgoCD repo-server tuning: runbooks/argocd-repo-server-tuning.md
-      - Recovery:
-          - Workspace volume recovery: operations/kensan-workspace-volume-recovery.md
-          - Syncthing pairing recovery: operations/syncthing-pairing-recovery.md
-      - Guides:
-          - Backstage Golden Path: guides/backstage-golden-path.md
-          - OTel integration & troubleshooting: guides/observability-integration.md
-          - Raspberry Pi WiFi stabilization: guides/wifi-stabilization.md
-  - Architecture Decisions:
-      - Overview: adr/index.md
-      - 001 — TLS Termination Pattern: adr/001-tls-termination-pattern.md
-      - 002 — Authentication & Authorization: adr/002-authentication-authorization-architecture.md
-      - 003 — ApplicationSet Migration: adr/003-applicationset-migration-strategy.md
-      - 004 — Network Policy Design: adr/004-network-policy-design.md
-      - 005 — Istio Native OAuth2: adr/005-istio-native-oauth2.md
-      - 006 — Namespace Naming: adr/006-namespace-naming.md
-      - 007 — No Vault PKI: adr/007-no-vault-pki.md
-      - 008 — Keycloak DB Credentials: adr/008-keycloak-db-credentials.md
-      - 009 — Shared Allow-Istio NetworkPolicy: adr/009-shared-allow-istio-network-policy.md
-      - 010 — Istio Native OAuth2 (Absent): adr/010-istio-native-oauth2-absent.md
-      - 011 — Vault Version Pinning: adr/011-vault-version-pinning.md
-      - 012 — Policy Enforcement with Kyverno: adr/012-policy-enforcement-kyverno.md
-      - 013 — Keycloak DB Credentials → Vault Dynamic: adr/013-keycloak-db-credentials-vault-dynamic.md
-      - 014 — Namespace Naming & Label Contract v2: adr/014-namespace-naming-label-contract-v2.md
-      - 015 — VCO + Setup-Script Hybrid: adr/015-vco-setup-script-hybrid.md
-      - 016 — LAN-Frictionless + External-Gate Model: adr/016-lan-frictionless-cf-access-external-gate.md
-      - 017 — Remove kensan-legacy (tag archive): adr/017-kensan-legacy-removal.md
-      - 018 — Backstage Manifests Placement: adr/018-backstage-manifests-placement.md
-      - 019 — Keycloak DB Credentials → Revert to Static: adr/019-keycloak-db-credentials-revert-to-static.md
-      - 020 — Namespace Lifecycle App Cleanup: adr/020-namespace-lifecycle-app-cleanup.md
-      - 021 — gateway-prod Default-Protected Authorization: adr/021-gateway-prod-default-protected.md
-      - 022 — Backstage Native OIDC: adr/022-backstage-native-oidc.md
-  - Incidents:
-      - incidents/index.md
-      - 2026-03-02 system-infra Sync Blocked: incidents/2026-03-02-system-infra-sync-blocked.md
-  - Roadmap:
-      - Storage (local-path → Longhorn) — done, archived: roadmap/storage-longhorn.md
-  - Articles: articles.md
+      - Design System:
+          - Overview: design/index.md
+          - Components: design/components.md
+          - Patterns: design/patterns.md
+          - Adoption Status: design/adoption-status.md
+          - Brand Assets: design/brand/README.md
+      - Articles: articles.md
+      - Archive:
+          - Storage (local-path → Longhorn) — done: roadmap/storage-longhorn.md
