@@ -64,6 +64,12 @@ pushes an image tagged with the source commit SHA, and commits that tag to
 `deploy/values.yaml`. The tag commit contains `[skip ci]`, preventing an
 identical recursive build.
 
+The seeded copy of this repository is the one exception. Its workflows are
+written for GitHub's hosted runners, and Gitea reads `.github/workflows` too, so
+`make try` turns Actions off for that repository alone. Left on, the platform
+pull request you are asked to merge would arrive showing failed checks that
+nothing in this cluster could ever satisfy.
+
 Changing source on `main` repeats that path and changes the Deployment pod
 template, so Kubernetes replaces the pod. Changing only the theme or greeting
 still needs no rebuild: those values remain runtime configuration managed by

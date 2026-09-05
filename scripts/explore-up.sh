@@ -424,6 +424,22 @@ curl -sf -o /dev/null --max-time 30 \
    It answered on the port-forward, so this is the API rather than the pod:
      kubectl -n gitea logs deploy/gitea --tail=50"
 
+# This checkout carries .github/workflows, and Gitea reads that directory the
+# same way GitHub does. Left enabled, every push and every Golden Path pull
+# request queues jobs meant for GitHub's runners — they cancel or sit at
+# "Waiting to run" forever, and the platform pull request the walkthrough asks
+# a visitor to merge arrives already showing "checks failed". Turned off before
+# the first push, so no run is ever recorded. Actions stay on for the server as
+# a whole; generated repositories still build their own images.
+curl -sf -o /dev/null --max-time 30 -X PATCH \
+  -u "${GITEA_USERNAME}:${GITEA_ADMIN_PASSWORD}" \
+  -H 'Content-Type: application/json' \
+  -d '{"has_actions":false}' \
+  "${gitea_local}/api/v1/repos/${GITEA_USERNAME}/kensan-lab" \
+  || fail "Gitea would not disable Actions on the platform repository.
+   Without it the Golden Path pull request shows failed checks:
+     kubectl -n gitea logs deploy/gitea --tail=50"
+
 # http.postBuffer is not optional. Above the default 1 MiB git switches to a
 # chunked request with no Content-Length, and the receiving end refuses it —
 # measured against both GitHub and Gitea, so it is git's behaviour and not a
