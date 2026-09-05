@@ -112,6 +112,24 @@ for _ in $(seq 1 180); do
 done
 [ "$status" = completed ] || { echo "the scaffolder task never finished" >&2; exit 1; }
 
+# Backstage calls Gitea through its cluster-local Service, but every link it
+# gives the visitor must use the gateway hostname. Checking only the repository
+# and PR through curl would miss a completion page full of unopenable `.svc`
+# links — the exact failure this walkthrough test is meant to catch.
+task_events="$("${C[@]}" "https://${HOST}/api/scaffolder/v2/tasks/${task}/events" \
+  -H "Authorization: Bearer ${token}")"
+for browser_url in \
+  "https://gitea.127-0-0-1.sslip.io/demo/${NAME}" \
+  "https://gitea.127-0-0-1.sslip.io/demo/kensan-lab/pulls/" \
+  "https://gitea.127-0-0-1.sslip.io/demo/${NAME}/actions/" \
+  "https://argocd.127-0-0-1.sslip.io/applications/app-${NAME}"; do
+  [[ "$task_events" == *"$browser_url"* ]] || {
+    echo "the Backstage result is missing browser link: ${browser_url}" >&2
+    exit 1
+  }
+done
+echo "  Backstage returned browser-facing repository, build, PR, and Argo CD links"
+
 # What it was supposed to leave behind, checked where a person would look.
 code="$(curl -sk -o /dev/null -w '%{http_code}' --max-time 15 \
   --resolve "gitea.127-0-0-1.sslip.io:443:127.0.0.1" \
