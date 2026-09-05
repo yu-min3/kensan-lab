@@ -27,9 +27,11 @@ cleanup() {
   rm -f "$JAR"
   if [[ -n "$APP_PF_PID" ]]; then
     kill "$APP_PF_PID" 2>/dev/null || true
+    wait "$APP_PF_PID" 2>/dev/null || true
   fi
   if [[ -n "$REGISTRY_PF_PID" ]]; then
     kill "$REGISTRY_PF_PID" 2>/dev/null || true
+    wait "$REGISTRY_PF_PID" 2>/dev/null || true
   fi
 }
 trap cleanup EXIT
@@ -330,6 +332,7 @@ second_pod_uid="$(kubectl -n "app-${NAME}" get pod \
   || { echo "the image changed without replacing the application pod" >&2; exit 1; }
 
 kill "${APP_PF_PID}" 2>/dev/null || true
+wait "${APP_PF_PID}" 2>/dev/null || true
 APP_PF_PID=""
 kubectl -n "app-${NAME}" port-forward "svc/${NAME}" 18080:8000 >/dev/null 2>&1 &
 APP_PF_PID=$!
@@ -342,4 +345,79 @@ done
   || { echo "the rebuilt pod does not serve the committed source change" >&2; exit 1; }
 
 echo "  source edit produced ${NAME}:${second_image_tag:0:12} and a new pod"
+
+# A red build must leave the last good image running. Commit a deliberate Ruff
+# failure, wait for Actions to reject it, then restore the good source with a
+# skip marker so the disposable repository is not left broken.
+good_source_file="$(curl -sk --max-time 15 -u "${gitea_user}:${gitea_password}" \
+  "${gitea_api}/repos/gitea-admin/${NAME}/contents/app/main.py?ref=main")"
+bad_update_body="$(printf '%s' "${good_source_file}" | python3 -c '
+import base64, json, sys
+item = json.load(sys.stdin)
+source = base64.b64decode(item["content"]).decode() + "\nBROKEN = undefined_name\n"
+print(json.dumps({
+    "branch": "main",
+    "message": "Exercise the failed-build guard",
+    "sha": item["sha"],
+    "content": base64.b64encode(source.encode()).decode(),
+}))
+')"
+bad_update="$(curl -sk --max-time 30 -u "${gitea_user}:${gitea_password}" \
+  -H 'Content-Type: application/json' -X PUT -d "${bad_update_body}" \
+  "${gitea_api}/repos/gitea-admin/${NAME}/contents/app/main.py")"
+bad_commit="$(printf '%s' "${bad_update}" \
+  | python3 -c 'import json,sys; print(json.load(sys.stdin).get("commit",{}).get("sha",""))')"
+[[ -n "${bad_commit}" ]] || { echo "could not create the failed-build fixture" >&2; exit 1; }
+
+bad_status=""
+deadline=$(( $(date +%s) + 300 ))
+while [[ "${bad_status}" != "failure" ]]; do
+  bad_status="$(curl -sk --max-time 15 -u "${gitea_user}:${gitea_password}" \
+    "${gitea_api}/repos/gitea-admin/${NAME}/actions/tasks" \
+    | python3 -c '
+import json, sys
+sha = sys.argv[1]
+for run in json.load(sys.stdin).get("workflow_runs", []):
+    if run.get("head_sha") == sha:
+        print(run.get("status", ""))
+        break
+' "${bad_commit}")"
+  [[ "${bad_status}" == "failure" ]] && break
+  [[ "${bad_status}" != "success" ]] \
+    || { echo "the deliberately invalid source passed its build" >&2; exit 1; }
+  if (( $(date +%s) >= deadline )); then
+    echo "the deliberately invalid source build never finished" >&2
+    exit 1
+  fi
+  sleep 5
+done
+
+[[ "$(image_tag)" == "${second_image_tag}" ]] \
+  || { echo "a failed build changed the deploy image tag" >&2; exit 1; }
+current_pod_uid="$(kubectl -n "app-${NAME}" get pod \
+  -l "app.kubernetes.io/name=${NAME}" -o jsonpath='{.items[0].metadata.uid}')"
+[[ "${current_pod_uid}" == "${second_pod_uid}" ]] \
+  || { echo "a failed build replaced the last good pod" >&2; exit 1; }
+
+bad_source_file="$(curl -sk --max-time 15 -u "${gitea_user}:${gitea_password}" \
+  "${gitea_api}/repos/gitea-admin/${NAME}/contents/app/main.py?ref=main")"
+restore_body="$(python3 -c '
+import json, sys
+good = json.loads(sys.argv[1])
+bad = json.loads(sys.argv[2])
+print(json.dumps({
+    "branch": "main",
+    "message": "Restore the last good source [skip ci]",
+    "sha": bad["sha"],
+    "content": good["content"],
+}))
+' "${good_source_file}" "${bad_source_file}")"
+restore_code="$(curl -sk -o /dev/null -w '%{http_code}' --max-time 30 \
+  -u "${gitea_user}:${gitea_password}" -H 'Content-Type: application/json' \
+  -X PUT -d "${restore_body}" \
+  "${gitea_api}/repos/gitea-admin/${NAME}/contents/app/main.py")"
+[[ "${restore_code}" == 200 || "${restore_code}" == 201 ]] \
+  || { echo "could not restore the failed-build fixture" >&2; exit 1; }
+echo "  failed source was rejected; the last good image and pod stayed running"
+
 echo "200 (the golden path built, deployed and rebuilt the generated source)"

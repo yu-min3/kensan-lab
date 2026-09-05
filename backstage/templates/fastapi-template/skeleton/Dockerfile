@@ -42,9 +42,10 @@ RUN /app/.venv/bin/opentelemetry-bootstrap -a install
 # graph as the runtime image means the disposable runner needs only Docker and
 # the exact dependency lock the service owns.
 FROM builder AS test
+COPY README.md /app/README.md
 COPY app/ /app/app/
 COPY tests/ /app/tests/
-RUN uv sync --frozen --no-install-project
+RUN uv sync --frozen --no-install-project --all-extras
 RUN uv run ruff check app/ && uv run ruff format --check app/
 RUN uv run pytest tests/ -v
 

@@ -72,10 +72,11 @@ spec:
         app.kubernetes.io/name: act-runner
     spec:
       volumes:
-        - name: docker-certs
-          emptyDir: {}
         - name: runner-data
           emptyDir: {}
+        - name: runner-config
+          configMap:
+            name: act-runner-config
       containers:
         - name: runner
           image: docker.io/gitea/act_runner:0.2.13
@@ -83,17 +84,15 @@ spec:
             - sh
             - -c
             - >-
-              while ! nc -z localhost 2376 </dev/null; do
+              while ! nc -z localhost 2375 </dev/null; do
                 echo 'waiting for Docker daemon'; sleep 2;
               done;
-              /sbin/tini -- /opt/act/run.sh
+              exec /sbin/tini -- run.sh
           env:
             - name: DOCKER_HOST
-              value: tcp://localhost:2376
-            - name: DOCKER_CERT_PATH
-              value: /certs/client
-            - name: DOCKER_TLS_VERIFY
-              value: "1"
+              value: tcp://localhost:2375
+            - name: CONFIG_FILE
+              value: /config/config.yaml
             - name: GITEA_INSTANCE_URL
               value: http://gitea-http.gitea.svc.cluster.local:3000
             - name: GITEA_RUNNER_REGISTRATION_TOKEN
@@ -106,10 +105,11 @@ spec:
             - name: GITEA_RUNNER_LABELS
               value: explore-builder:docker://docker.gitea.com/runner-images:ubuntu-latest
           volumeMounts:
-            - name: docker-certs
-              mountPath: /certs
             - name: runner-data
               mountPath: /data
+            - name: runner-config
+              mountPath: /config
+              readOnly: true
           resources:
             requests:
               cpu: 100m
@@ -122,15 +122,30 @@ spec:
             - --insecure-registry=10.96.0.50:5000
           env:
             - name: DOCKER_TLS_CERTDIR
-              value: /certs
+              value: ""
           securityContext:
             privileged: true
-          volumeMounts:
-            - name: docker-certs
-              mountPath: /certs
           resources:
             requests:
               cpu: 100m
               memory: 256Mi
             limits:
               memory: 1Gi
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: act-runner-config
+  namespace: explore-build
+data:
+  config.yaml: |-
+    log:
+      level: info
+    runner:
+      file: /data/.runner
+      capacity: 1
+      timeout: 30m
+    container:
+      network: bridge
+      options: --add-host=host.docker.internal:host-gateway
+      docker_host: tcp://localhost:2375

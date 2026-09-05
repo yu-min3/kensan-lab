@@ -8,6 +8,11 @@ on:
 permissions:
   contents: write
 
+env:
+  # The job itself is a container created by the runner's DinD daemon. This
+  # stable host-gateway name reaches that parent daemon for nested image builds.
+  DOCKER_HOST: tcp://host.docker.internal:2375
+
 jobs:
   build:
     # The final commit records the immutable image tag. It must update Argo CD
