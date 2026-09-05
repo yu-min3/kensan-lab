@@ -26,7 +26,7 @@ platform-{component}  # 例: platform-auth-prod, platform-keycloak（既存命�
 
 旧 `app-{env}-<name>` 命名（`app-prod-foo` 等）は当面 coexistence。新規は `app-{name}` flat で作る。`app-prod` は env-shared landing zone として残置（空になり次第削除候補）。
 
-詳細 (label 定義、選定理由、移行方針): [ADR-006](../../docs/adr/006-namespace-naming.md) / [`docs/concepts/namespace-label-design.md`](../../docs/concepts/namespace-label-design.md)
+詳細 (label 定義、選定理由、移行方針): [ADR-006](../../docs/adr/006-namespace-naming.md) / [`docs/architecture/namespace-label-design.md`](../../docs/architecture/namespace-label-design.md)
 
 ## Multi-Repository Strategy
 

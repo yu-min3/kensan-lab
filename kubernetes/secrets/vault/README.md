@@ -19,5 +19,5 @@ Vault HA server (3 replica、AWS KMS auto-unseal、Raft storage)。KV / Database
 ## 関連
 
 - 4 方式の使い分けと運用詳細: [`docs/secret-management/index.md`](../../../docs/secret-management/index.md)
-- bootstrap (初回 unseal、root token): [`docs/bootstrapping/12-vault-stage1.md`](../../../docs/bootstrapping/12-vault-stage1.md)
+- bootstrap (初回 unseal、root token): [`docs/bootstrapping/vault-stage1.md`](../../../docs/bootstrapping/vault-stage1.md)
 - ADR: [007 No Vault PKI](../../../docs/adr/007-no-vault-pki.md) / [011 Version Pinning](../../../docs/adr/011-vault-version-pinning.md)

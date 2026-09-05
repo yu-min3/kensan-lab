@@ -14,6 +14,6 @@ PSA label (`pod-security.kubernetes.io/*`) も移行期として併存してい�
 
 ## 関連
 
-- ポリシー強制の設計: [ADR-012](../../docs/adr/012-policy-enforcement-kyverno.md) / [`docs/concepts/policy-enforcement.md`](../../docs/concepts/policy-enforcement.md)
-- Namespace label の設計: [`docs/concepts/namespace-label-design.md`](../../docs/concepts/namespace-label-design.md)
+- ポリシー強制の設計: [ADR-012](../../docs/adr/012-policy-enforcement-kyverno.md) / [`docs/architecture/policy-enforcement.md`](../../docs/architecture/policy-enforcement.md)
+- Namespace label の設計: [`docs/architecture/namespace-label-design.md`](../../docs/architecture/namespace-label-design.md)
 - 命名規約: [ADR-006](../../docs/adr/006-namespace-naming.md)

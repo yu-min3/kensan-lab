@@ -23,7 +23,7 @@ The definitive answer to "where is this information documented." When adding new
 |---|---|---|
 | Per-domain architecture (argocd / auth / network / secrets / storage / observability / backstage) | `kubernetes/<cat>/README.md` (**Model A**: `docs/architecture/<cat>.md` transcludes it. `storage` includes R2 backups, RecurringJobs, and StorageClasses) | The corresponding topic under `.claude/rules/` |
 | Secret management (the matrix of the 4 methods, inventory, operational procedures) | `docs/secret-management/index.md` (architecture and design rationale live in `kubernetes/secrets/README.md` — a deliberate split of responsibilities) | `.claude/rules/security-secrets.md` |
-| Backstage Golden Path (procedures for App Developers) | `docs/guides/backstage-golden-path.md` | `kubernetes/backstage/README.md`, `.claude/rules/environment-separation.md` |
+| Backstage Golden Path (procedures for App Developers) | `docs/architecture/backstage-golden-path.md` | `kubernetes/backstage/README.md`, `.claude/rules/environment-separation.md` |
 | Namespace naming | `docs/adr/006-namespace-naming.md` (why) + `.claude/rules/environment-separation.md` (how) | `kubernetes/namespaces/README.md` |
 | Helm multi-source layout convention | `kubernetes/README.md` (Pattern A/B) | `.claude/rules/helm-multisource.md` |
 | GitOps workflow | `.claude/rules/gitops-workflow.md` | `CLAUDE.md` Mandatory Constraints |

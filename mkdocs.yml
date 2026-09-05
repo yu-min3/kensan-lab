@@ -68,6 +68,22 @@ theme:
 
 plugins:
   - search
+  # The 2026-09 nav restructure renamed docs/ directories to match the sections
+  # a reader sees (concepts/ and guides/ stopped corresponding to anything).
+  # These pages are linked from published articles, so the old URLs keep working.
+  - redirects:
+      redirect_maps:
+        concepts/doc-layout.md: reference/doc-layout.md
+        concepts/namespace-label-design.md: architecture/namespace-label-design.md
+        concepts/network-policy-guide.md: architecture/network-policy-guide.md
+        concepts/policy-enforcement.md: architecture/policy-enforcement.md
+        guides/backstage-golden-path.md: architecture/backstage-golden-path.md
+        guides/observability-integration.md: runbooks/observability-integration.md
+        guides/wifi-stabilization.md: runbooks/wifi-stabilization.md
+        operations/kensan-workspace-volume-recovery.md: recovery/kensan-workspace-volume-recovery.md
+        operations/syncthing-pairing-recovery.md: recovery/syncthing-pairing-recovery.md
+        bootstrapping/11-grafana-independent.md: bootstrapping/grafana-independent.md
+        bootstrapping/12-vault-stage1.md: bootstrapping/vault-stage1.md
   - glightbox:
       touchNavigation: true
       loop: false
@@ -90,31 +106,31 @@ plugins:
         Vault, Keycloak, Backstage, and full observability (Prometheus, Grafana,
         Loki, Tempo), running on Raspberry Pis and a mini PC.
       sections:
-        Getting started:
+        Overview:
           - index.md
           - showcase.md
-          - getting-started/*.md
+        Try it in one command:
+          - getting-started/try-it-with-kind.md
+          - getting-started/kind-explained.md
         Architecture:
           - architecture/*.md
-        Concepts:
-          - concepts/*.md
-        Design system:
-          - design/*.md
-        Bootstrapping:
-          - bootstrapping/*.md
-        Secret management & auth:
-          - secret-management/*.md
+        Auth & secrets:
           - auth/*.md
-        Runbooks & operations:
-          - runbooks/*.md
-          - operations/*.md
-          - guides/*.md
+          - secret-management/*.md
         Architecture decisions:
           - adr/*.md
-        Incidents & roadmap:
+        Bare-metal bootstrap:
+          - getting-started/installation.md
+          - getting-started/configuration.md
+          - bootstrapping/*.md
+        Operations:
+          - runbooks/*.md
+          - recovery/*.md
           - incidents/*.md
+        Reference:
+          - reference/*.md
+          - design/*.md
           - roadmap/*.md
-        Articles:
           - articles.md
 
 markdown_extensions:
@@ -164,12 +180,12 @@ nav:
       - How the kind environment works: getting-started/kind-explained.md
   - Architecture:
       - architecture/infrastructure.md
-      - Namespace & label contract: concepts/namespace-label-design.md
+      - Namespace & label contract: architecture/namespace-label-design.md
       - Argo CD: architecture/argocd.md
       - Network (Cilium + Istio):
           - architecture/network.md
           - Cloudflare Tunnel & Access: architecture/cloudflare-tunnel.md
-          - Network policy: concepts/network-policy-guide.md
+          - Network policy: architecture/network-policy-guide.md
       - Auth (Keycloak):
           - architecture/auth.md
           - Gateway OIDC (Path A): auth/gateway-oidc.md
@@ -183,10 +199,10 @@ nav:
       - Observability (Prometheus / Loki / Tempo):
           - architecture/observability.md
           - Cluster health monitoring: architecture/cluster-health-monitoring.md
-      - Policy (Kyverno): concepts/policy-enforcement.md
+      - Policy (Kyverno): architecture/policy-enforcement.md
       - Backstage:
           - architecture/backstage.md
-          - Golden Path: guides/backstage-golden-path.md
+          - Golden Path: architecture/backstage-golden-path.md
       - Decisions:
           - adr/index.md
           - 001 — TLS Termination Pattern: adr/001-tls-termination-pattern.md
@@ -216,8 +232,8 @@ nav:
           - Status and scope: bootstrapping/index.md
           - Prerequisites: getting-started/installation.md
           - Configuration: getting-started/configuration.md
-          - Stage 1 — Vault HA: bootstrapping/12-vault-stage1.md
-          - Grafana independent setup: bootstrapping/11-grafana-independent.md
+          - Stage 1 — Vault HA: bootstrapping/vault-stage1.md
+          - Grafana independent setup: bootstrapping/grafana-independent.md
           - Add worker node (M4 Neo): bootstrapping/add-worker-node-m4neo.md
       - Operations:
           - Runbooks:
@@ -226,18 +242,18 @@ nav:
               - Vault storage migration (Longhorn): runbooks/vault-storage-migration-longhorn.md
               - VCO drift after Vault rebuild: runbooks/vco-vault-state-drift.md
               - Cilium WiFi stability: runbooks/cilium-wifi-stability.md
-              - Raspberry Pi WiFi stabilization: guides/wifi-stabilization.md
+              - Raspberry Pi WiFi stabilization: runbooks/wifi-stabilization.md
               - Cilium update strategy: runbooks/cilium-update-strategy.md
               - Longhorn restore test: runbooks/longhorn-restore-test.md
               - ArgoCD repo-server tuning: runbooks/argocd-repo-server-tuning.md
-              - OTel integration & troubleshooting: guides/observability-integration.md
+              - OTel integration & troubleshooting: runbooks/observability-integration.md
           - Recovery:
-              - Workspace volume recovery: operations/kensan-workspace-volume-recovery.md
-              - Syncthing pairing recovery: operations/syncthing-pairing-recovery.md
+              - Workspace volume recovery: recovery/kensan-workspace-volume-recovery.md
+              - Syncthing pairing recovery: recovery/syncthing-pairing-recovery.md
           - Incidents:
               - incidents/index.md
               - 2026-03-02 system-infra Sync Blocked: incidents/2026-03-02-system-infra-sync-blocked.md
-      - Documentation Layout: concepts/doc-layout.md
+      - Documentation Layout: reference/doc-layout.md
       - Design System:
           - Overview: design/index.md
           - Components: design/components.md

@@ -7,7 +7,7 @@ convention and the 3-axis label table). ADR-006's `app-{name}` flat naming and t
 selector strategy remain in force.
 
 > **Note on timing**: This ADR is a *retroactive record*. The implementation and
-> `docs/concepts/namespace-label-design.md` drifted away from ADR-006 incrementally (bare-name platform
+> `docs/architecture/namespace-label-design.md` drifted away from ADR-006 incrementally (bare-name platform
 > namespaces, `tier` / `component` labels, Kyverno enforcement) without the ADR being updated. The
 > 2026-06-07 design review found ADR-006 and the concept doc defining "3-axis" as two different things.
 > This document records what is actually decided and enforced.
@@ -73,7 +73,7 @@ namespaces today — not three equally-enforced axes. The table above is the nor
 
 ### 3. Single sources of truth
 
-- **Label semantics / value catalogs**: [`docs/concepts/namespace-label-design.md`](../concepts/namespace-label-design.md)
+- **Label semantics / value catalogs**: [`docs/architecture/namespace-label-design.md`](../architecture/namespace-label-design.md)
 - **Enforcement**: Kyverno `ns-label-contract` (`kubernetes/policy/kyverno-policies/`), per ADR-012
 - **Why**: this ADR (and ADR-006 for the parts that survive)
 
@@ -98,4 +98,4 @@ A future change to label keys/values is a change to `ns-label-contract` + the co
 - [ADR-006](006-namespace-naming.md) — partially superseded; `app-{name}` flat naming and the
   label-selector insight remain its lasting contributions
 - [ADR-012](012-policy-enforcement-kyverno.md) — `ns-label-contract` as the enforcement mechanism
-- `docs/concepts/namespace-label-design.md` — label SoT
+- `docs/architecture/namespace-label-design.md` — label SoT

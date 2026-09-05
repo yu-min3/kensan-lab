@@ -57,7 +57,7 @@ spec:
         # global discovery / relay / NAT traversal は Syncthing default が有効のため、
         # config PVC が空（fresh bootstrap / 再作成）でも、手動設定が drift しても、
         # pod 起動のたびにここで無効化される。device ペアリング等の機能設定は
-        # runbook（docs/operations/syncthing-pairing-recovery.md）のまま。
+        # runbook（docs/recovery/syncthing-pairing-recovery.md）のまま。
         - name: config-guard
           image: syncthing/syncthing:2.1.1
           command:

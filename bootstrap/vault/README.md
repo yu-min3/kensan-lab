@@ -78,7 +78,7 @@ Vault API (HTTP / CLI) でしか操作できない。ArgoCD は Vault API call �
 Pattern A' は「bash の脆さを TF で代替、ただし state は持たない」が要旨。
 state を持たないので **永続的な Vault 設定**は VCO + ArgoCD に任せられる (思想を保てる)。
 
-詳細な設計判断の経緯は `docs/bootstrapping/12-vault-stage1.md`（Stage 1 完了後に作成予定）に集約する。
+詳細な設計判断の経緯は `docs/bootstrapping/vault-stage1.md`（Stage 1 完了後に作成予定）に集約する。
 
 ## Stage 1 全体フロー
 
@@ -217,7 +217,7 @@ state 破棄前提なので、実行のたびに「全部新規作成」され�
 
 ## 関連ドキュメント
 
-- `docs/bootstrapping/12-vault-stage1.md` — Stage 1 設計判断と運用手順 (Stage 1 完了後に作成予定)
+- `docs/bootstrapping/vault-stage1.md` — Stage 1 設計判断と運用手順 (Stage 1 完了後に作成予定)
 - `docs/bootstrapping/index.md` — Cluster bootstrap 全体の Index
 - `docs/secret-management/index.md` — Sealed Secrets 含む secret 管理の方針
 - `docs/adr/` — 関連 ADR (起票予定: Vault PKI 不採用、Keycloak DB Vault 不寄せ等)
