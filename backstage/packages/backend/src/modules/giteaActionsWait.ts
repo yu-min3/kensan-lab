@@ -83,6 +83,9 @@ export function createGiteaActionsWaitAction(options: { config: Config }) {
         }
 
         const runs = (await response.json()) as WorkflowRunsResponse;
+        // Gitea answers newest first. This action runs once, immediately after
+        // the repository was published, so the last entry is that repository's
+        // first build — the run whose image the pull request will point at.
         run = runs.workflow_runs?.at(-1);
         if (!run) {
           await pause(3000);
