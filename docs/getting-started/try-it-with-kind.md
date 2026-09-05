@@ -10,9 +10,10 @@ flowchart LR
     A[make try] --> B[Argo CD<br/>platform is healthy]
     B --> C[Demo app<br/>sign in once]
     C --> D[Backstage<br/>create app2]
-    D --> E[Gitea<br/>merge PR]
-    E --> F[Argo CD<br/>deploys app2]
-    F --> G[Grafana<br/>watch CPU]
+    D --> E[Gitea Actions<br/>test and build app2]
+    E --> F[Gitea<br/>merge platform PR]
+    F --> G[Argo CD<br/>deploys app2 image]
+    G --> H[Grafana<br/>watch CPU]
 ```
 
 The bare-metal cluster is not required. This walkthrough runs a disposable,

@@ -68,8 +68,8 @@ httproute:
 # authentication code and no idea it is protected: the gateway sends every
 # request for this hostname to oauth2-proxy first, and only a request carrying a
 # valid Keycloak session reaches the pod. This line and a ReferenceGrant are the
-# entire cost — and since this app is the golden path's own output, that is the
-# cost to every service scaffolded from it.
+# entire cost. Generated services use this same chart and route shape after
+# their repository-specific image has been built.
 auth:
   gatewayOAuth2:
     enabled: true

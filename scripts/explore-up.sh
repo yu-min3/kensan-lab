@@ -33,6 +33,7 @@ on_exit() {
   # longer exists.
   if [[ -n "${GITEA_PF_PID:-}" ]]; then
     kill "${GITEA_PF_PID}" 2>/dev/null || true
+    wait "${GITEA_PF_PID}" 2>/dev/null || true
   fi
   if [[ "$status" -ne 0 && -n "$PREVIOUS_CONTEXT" ]]; then
     kubectl config use-context "$PREVIOUS_CONTEXT" >/dev/null 2>&1 || true
@@ -461,6 +462,7 @@ done
        kubectl -n explore-build logs deploy/act-runner -c runner --tail=100"
 
 kill "${GITEA_PF_PID}" 2>/dev/null || true
+wait "${GITEA_PF_PID}" 2>/dev/null || true
 GITEA_PF_PID=""
 
 # The labelled namespace. Applied here rather than left to Argo CD because it
@@ -1007,7 +1009,8 @@ cat <<EOF
   4. Open the developer portal       https://backstage.127-0-0-1.sslip.io
      Backstage signs you in against the same Keycloak, then resolves you to a
      user in its catalog. 'Create' holds the golden path template — the demo
-     app above is what it produces.
+     app above shows its shape. Each created repository is tested and built by
+     the local Gitea Actions runner before Argo CD deploys its own image.
 ${GITEA_NOTE}
   6. See what the policy engine thinks
        kubectl get policyreport -A

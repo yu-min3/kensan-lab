@@ -297,6 +297,9 @@ jobs:
           ])
           PY
 
+      - name: Run the image build's test stage
+        run: docker build --target test -t widget-service:test /tmp/scaffolded
+
       - name: Build the image
         run: docker build -t widget-service:ci /tmp/scaffolded
 
