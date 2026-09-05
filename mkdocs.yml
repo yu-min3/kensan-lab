@@ -228,6 +228,7 @@ nav:
           - 021 — gateway-prod Default-Protected Authorization: adr/021-gateway-prod-default-protected.md
           - 022 — Backstage Native OIDC: adr/022-backstage-native-oidc.md
   - Reference:
+      - reference/index.md
       - Bare-metal bootstrap:
           - Status and scope: bootstrapping/index.md
           - Prerequisites: getting-started/installation.md
