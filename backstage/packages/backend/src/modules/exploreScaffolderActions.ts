@@ -17,6 +17,7 @@ import {
   createBackendModule,
 } from '@backstage/backend-plugin-api';
 import { scaffolderActionsExtensionPoint } from '@backstage/plugin-scaffolder-node';
+import { createGiteaActionsWaitAction } from './giteaActionsWait';
 import { createGiteaPublishAction } from './giteaPublish';
 import { createGiteaPullRequestAction } from './giteaPullRequest';
 import { createKeycloakRedirectUriAction } from './keycloakRedirectUri';
@@ -33,6 +34,7 @@ export default createBackendModule({
       async init({ scaffolder, config }) {
         scaffolder.addActions(
           createGiteaPublishAction({ config }),
+          createGiteaActionsWaitAction({ config }),
           createGiteaPullRequestAction({ config }),
           createKeycloakRedirectUriAction({ config }),
         );

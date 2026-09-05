@@ -2,8 +2,8 @@ apiVersion: scaffolder.backstage.io/v1beta3
 kind: Template
 metadata:
   name: fastapi-app-template
-  title: FastAPI Application
-  description: Create a FastAPI service entirely inside the explore cluster
+  title: Golden Path Application
+  description: Create, build, and prepare an application for deployment inside the Explore cluster
   tags: [python, fastapi, gitops]
 spec:
   owner: demo-team
@@ -17,10 +17,10 @@ spec:
           title: Application Name
           type: string
           description: |
-            アプリケーション名（小文字、英数字、ハイフンのみ）
+            Application name using lowercase letters, numbers, and hyphens.
 
-            この名前から namespace `app-{name}` と公開ホスト
-            `{name}.127-0-0-1.sslip.io` を作ります。
+            This creates namespace `app-{name}` and public hostname
+            `{name}.127-0-0-1.sslip.io`.
           pattern: '^[a-z0-9-]+$'
           ui:autofocus: true
         description:
@@ -31,12 +31,12 @@ spec:
           title: Repository Location
           type: string
           description: |
-            Explore クラスタ内の Gitea に作るリポジトリを指定します。
-            クラスタ外へリポジトリや資格情報は送りません。
+            Choose the repository to create in the Explore cluster's Gitea.
+            No repository or credential leaves the cluster.
           ui:field: RepoUrlPicker
           ui:options:
             allowedHosts: [gitea.127-0-0-1.sslip.io]
-            allowedOwners: [gitea-admin]
+            allowedOwners: [demo]
 
     - title: How it looks
       required: [theme, message]
@@ -44,16 +44,16 @@ spec:
         theme:
           title: Theme
           type: string
-          description: deploy/values.yaml に保存する画面テーマ
+          description: Visual theme stored in deploy/values.yaml
           default: day
           enum: [day, night]
           enumNames:
-            - '昼 — 明るい空'
-            - '夜 — 星空'
+            - 'Day — bright sky'
+            - 'Night — starry sky'
         message:
           title: Greeting
           type: string
-          description: トップに表示する一行。デプロイ後も values.yaml で変更できます
+          description: A headline shown by the app; it remains configurable through values.yaml
           default: Hello from the platform
           maxLength: 60
 
@@ -78,14 +78,14 @@ spec:
           # Each generated repository is built by the Explore Gitea runner.
           # The first successful run replaces `pending` with the source commit
           # SHA, which gives Argo CD an immutable image and a rollout signal.
-          imageRepository: ${{ "10.96.0.50:5000/gitea-admin/" + (parameters.repoUrl | parseRepoUrl).repo }}
+          imageRepository: ${{ "10.96.0.50:5000/demo/" + (parameters.repoUrl | parseRepoUrl).repo }}
           imageTag: pending
           ghcrPullSecretEnabled: false
           otelEnabled: false
           gatewayName: gateway-explore
           gatewayNamespace: istio-system
-          platformRepoUrl: http://gitea-http.gitea.svc.cluster.local:3000/gitea-admin/kensan-lab
-          applicationRepoUrl: ${{ "http://gitea-http.gitea.svc.cluster.local:3000/gitea-admin/" + (parameters.repoUrl | parseRepoUrl).repo }}
+          platformRepoUrl: http://gitea-http.gitea.svc.cluster.local:3000/demo/kensan-lab
+          applicationRepoUrl: ${{ "http://gitea-http.gitea.svc.cluster.local:3000/demo/" + (parameters.repoUrl | parseRepoUrl).repo }}
 
     - id: publish
       name: Publish to the cluster's Gitea
@@ -95,6 +95,13 @@ spec:
         repoUrl: ${{ parameters.repoUrl }}
         defaultBranch: main
         repoVisibility: public
+
+    - id: wait-for-build
+      name: Test and build the generated application
+      action: gitea:actions:wait
+      input:
+        repoUrl: ${{ parameters.repoUrl }}
+        timeoutSeconds: 900
 
     # fetch:template substitutes file contents but not placeholder directory
     # names. Rename the two platform files before opening the pull request.
@@ -119,19 +126,20 @@ spec:
       name: Open the platform pull request
       action: gitea:pull-request
       input:
-        repoUrl: gitea.127-0-0-1.sslip.io?repo=kensan-lab&owner=gitea-admin
+        repoUrl: gitea.127-0-0-1.sslip.io?repo=kensan-lab&owner=demo
         branchName: add-app-${{ parameters.name }}
         title: 'Add Application: ${{ parameters.name }}'
         description: |
-          Explore クラスタ内の Backstage が作成しました。
+          Backstage created this pull request inside the Explore cluster after
+          the generated application's tests and image build succeeded.
 
           | File | Why |
           |---|---|
-          | `environments/kind/generated-applications/app-${{ parameters.name }}/app.yaml` | Explore root が読み、`charts/app-base` でアプリをデプロイする Argo CD Application |
-          | `environments/kind/generated-applications/app-${{ parameters.name }}/referencegrant.yaml` | `/oauth2` route から oauth2-proxy への参照を許可する ReferenceGrant |
+          | `environments/kind/generated-applications/app-${{ parameters.name }}/app.yaml` | Argo CD Application read by the Explore root and rendered through `charts/app-base` |
+          | `environments/kind/generated-applications/app-${{ parameters.name }}/referencegrant.yaml` | ReferenceGrant that allows the `/oauth2` route to reach oauth2-proxy |
 
-          マージ後、Argo CD が変更を検出して
-          `${{ parameters.name }}.127-0-0-1.sslip.io` にデプロイします。
+          After merge, Argo CD detects the change and deploys the application at
+          `https://${{ parameters.name }}.127-0-0-1.sslip.io`.
         sourcePath: .backstage
 
     # Keycloak accepts redirect URIs literally, so register the hostname that
@@ -153,24 +161,23 @@ spec:
 
   output:
     text:
-      - title: 🎉 Explore 内での作成が完了しました
+      - title: 🎉 The application is ready for platform review
         content: |
-          アプリケーションリポジトリ、Platform Config PR、カタログ登録を
-          すべて Explore クラスタ内で作成しました。
+          The generated source has passed its tests, and Gitea Actions has built
+          and pushed an immutable application image.
 
-          Gitea Actions がこのリポジトリ固有のソースをテストしてコンテナを
-          build し、commit SHA のタグを `deploy/values.yaml` に記録します。
-          Build が成功してから Platform Config PR をマージすると、Argo CD が
-          そのイメージをデプロイします。
+          You are the platform administrator for this walkthrough. Open the
+          `kensan-lab` repository in Gitea: a pull request is waiting for your
+          review. Merge it to let Argo CD deploy the application.
     links:
-      - title: 📦 アプリケーションリポジトリ
+      - title: 📦 Application repository
         url: ${{ steps.publish.output.remoteUrl }}
-      - title: 📋 Backstageカタログで開く
+      - title: 📋 Open in the Backstage catalog
         icon: catalog
         entityRef: ${{ steps.register.output.entityRef }}
-      - title: 🔀 Platform Config PR
+      - title: 🔀 Review the kensan-lab pull request
         url: ${{ steps['create-platform-pr'].output.remoteUrl }}
-      - title: 🏗️ Build status
-        url: ${{ steps.publish.output.remoteUrl + '/actions' }}
+      - title: 🏗️ Successful build
+        url: ${{ steps['wait-for-build'].output.buildUrl }}
       - title: 🚀 Argo CD
         url: https://argocd.127-0-0-1.sslip.io/applications/app-${{ parameters.name }}

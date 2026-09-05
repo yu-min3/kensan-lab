@@ -83,7 +83,7 @@ body=$(cat <<JSON
  "values":{"name":"${NAME}",
            "description":"created by explore-golden-path-check.sh",
            "owner":"group:default/platform-engineering",
-           "repoUrl":"gitea.127-0-0-1.sslip.io?owner=gitea-admin&repo=${NAME}",
+           "repoUrl":"gitea.127-0-0-1.sslip.io?owner=demo&repo=${NAME}",
            "theme":"night","message":"created without a token",
            "domain":"platform","system":"developer-portal"}}
 JSON
@@ -96,7 +96,7 @@ task="$("${C[@]}" -X POST "https://${HOST}/api/scaffolder/v2/tasks" \
 [ -n "$task" ] || { echo "the scaffolder refused the request" >&2; exit 1; }
 echo "  scaffolder task ${task}"
 
-for _ in $(seq 1 60); do
+for _ in $(seq 1 180); do
   status="$("${C[@]}" "https://${HOST}/api/scaffolder/v2/tasks/${task}" \
     -H "Authorization: Bearer ${token}" \
     | grep -oE '"status":"[^"]+' | cut -d'"' -f4 | head -1 || true)"
@@ -115,20 +115,19 @@ done
 # What it was supposed to leave behind, checked where a person would look.
 code="$(curl -sk -o /dev/null -w '%{http_code}' --max-time 15 \
   --resolve "gitea.127-0-0-1.sslip.io:443:127.0.0.1" \
-  "https://gitea.127-0-0-1.sslip.io/gitea-admin/${NAME}")"
+  "https://gitea.127-0-0-1.sslip.io/demo/${NAME}")"
 [ "$code" = 200 ] || { echo "the service repository is not on the git server (HTTP ${code})" >&2; exit 1; }
 echo "  the repository exists on the git server"
 
 pr="$(curl -sk --max-time 15 --resolve "gitea.127-0-0-1.sslip.io:443:127.0.0.1" \
-  "https://gitea.127-0-0-1.sslip.io/api/v1/repos/gitea-admin/kensan-lab/pulls?state=open" \
+  "https://gitea.127-0-0-1.sslip.io/api/v1/repos/demo/kensan-lab/pulls?state=open" \
   | grep -c "add-app-${NAME}" || true)"
 [ "$pr" -gt 0 ] || { echo "no pull request was opened against the platform repository" >&2; exit 1; }
 echo "  the platform pull request is open"
 
-# A completed scaffolder task is not a built application. Wait for the generated
-# repository's own workflow to test the source, push a commit-SHA image, and
-# record that immutable tag in deploy/values.yaml before allowing the platform
-# pull request to be merged.
+# The scaffolder now waits for the generated repository's workflow before it
+# opens the platform pull request. Read back the immutable tag and registry
+# manifest as an independent end-to-end assertion of that contract.
 gitea_user="$(kubectl -n backstage get secret backstage-explore-gitea \
   -o go-template='{{index .data "username" | base64decode}}')"
 gitea_password="$(kubectl -n backstage get secret backstage-explore-gitea \
@@ -137,7 +136,7 @@ gitea_api="https://gitea.127-0-0-1.sslip.io/api/v1"
 
 image_tag() {
   curl -sk --max-time 15 -u "${gitea_user}:${gitea_password}" \
-    "${gitea_api}/repos/gitea-admin/${NAME}/contents/deploy/values.yaml?ref=main" \
+    "${gitea_api}/repos/demo/${NAME}/contents/deploy/values.yaml?ref=main" \
     | python3 -c '
 import base64, json, re, sys
 try:
@@ -157,7 +156,7 @@ while [[ -z "${first_image_tag}" ]]; do
   if (( $(date +%s) >= deadline )); then
     echo "the generated repository did not produce an immutable image tag" >&2
     curl -sk --max-time 15 -u "${gitea_user}:${gitea_password}" \
-      "${gitea_api}/repos/gitea-admin/${NAME}/actions/tasks" | tail -c 2000 >&2 || true
+      "${gitea_api}/repos/demo/${NAME}/actions/tasks" | tail -c 2000 >&2 || true
     exit 1
   fi
   [[ -n "${first_image_tag}" ]] || sleep 5
@@ -170,7 +169,7 @@ for _ in $(seq 1 30); do
   sleep 1
 done
 curl -sf --max-time 10 \
-  "http://127.0.0.1:15000/v2/gitea-admin/${NAME}/manifests/${first_image_tag}" \
+  "http://127.0.0.1:15000/v2/demo/${NAME}/manifests/${first_image_tag}" \
   -o /dev/null \
   || { echo "the workflow recorded an image that is absent from the registry" >&2; exit 1; }
 echo "  Gitea Actions built ${NAME}:${first_image_tag:0:12} from its own source"
@@ -184,7 +183,7 @@ fi
 # than treating a completed build as a deployed application.
 
 pulls="$(curl -sk --max-time 15 -u "${gitea_user}:${gitea_password}" \
-  "${gitea_api}/repos/gitea-admin/kensan-lab/pulls?state=open")"
+  "${gitea_api}/repos/demo/kensan-lab/pulls?state=open")"
 pr_number="$(printf '%s' "$pulls" | python3 -c '
 import json, sys
 branch = sys.argv[1]
@@ -205,7 +204,7 @@ for _ in $(seq 1 30); do
   merge_code="$(curl -sk -o /dev/null -w '%{http_code}' --max-time 30 \
     -u "${gitea_user}:${gitea_password}" -H 'Content-Type: application/json' \
     -X POST -d '{"Do":"merge"}' \
-    "${gitea_api}/repos/gitea-admin/kensan-lab/pulls/${pr_number}/merge")"
+    "${gitea_api}/repos/demo/kensan-lab/pulls/${pr_number}/merge")"
   [[ "$merge_code" == 200 ]] && break
   [[ "$merge_code" == 405 ]] || break
   sleep 2
@@ -239,7 +238,7 @@ echo "  app-${NAME} is Synced/Healthy"
 deployed_image="$(kubectl -n "app-${NAME}" get deployment "${NAME}" \
   -o jsonpath='{.spec.template.spec.containers[0].image}')"
 case "${deployed_image}" in
-  "10.96.0.50:5000/gitea-admin/${NAME}:${first_image_tag}") ;;
+  "10.96.0.50:5000/demo/${NAME}:${first_image_tag}") ;;
   *) echo "the deployment does not use its repository image: ${deployed_image}" >&2; exit 1 ;;
 esac
 first_pod_uid="$(kubectl -n "app-${NAME}" get pod \
@@ -271,7 +270,7 @@ login="$($(dirname "$0")/explore-login-check.sh \
 # the generated Python source through Gitea, then require a second image, a new
 # pod and the new endpoint. A shared or mutable image can pass none of these.
 source_file="$(curl -sk --max-time 15 -u "${gitea_user}:${gitea_password}" \
-  "${gitea_api}/repos/gitea-admin/${NAME}/contents/app/main.py?ref=main")"
+  "${gitea_api}/repos/demo/${NAME}/contents/app/main.py?ref=main")"
 update_body="$(printf '%s' "${source_file}" | python3 -c '
 import base64, json, sys
 item = json.load(sys.stdin)
@@ -287,7 +286,7 @@ print(json.dumps({
 update_code="$(curl -sk -o /dev/null -w '%{http_code}' --max-time 30 \
   -u "${gitea_user}:${gitea_password}" -H 'Content-Type: application/json' \
   -X PUT -d "${update_body}" \
-  "${gitea_api}/repos/gitea-admin/${NAME}/contents/app/main.py")"
+  "${gitea_api}/repos/demo/${NAME}/contents/app/main.py")"
 [[ "${update_code}" == 200 || "${update_code}" == 201 ]] || {
   echo "could not commit the source change to the generated repository (HTTP ${update_code})" >&2
   exit 1
@@ -305,7 +304,7 @@ while [[ -z "${second_image_tag}" || "${second_image_tag}" == "${first_image_tag
 done
 
 curl -sf --max-time 10 \
-  "http://127.0.0.1:15000/v2/gitea-admin/${NAME}/manifests/${second_image_tag}" \
+  "http://127.0.0.1:15000/v2/demo/${NAME}/manifests/${second_image_tag}" \
   -o /dev/null \
   || { echo "the rebuilt image is absent from the registry" >&2; exit 1; }
 
@@ -317,7 +316,7 @@ while :; do
     -o jsonpath='{.spec.template.spec.containers[0].image}' 2>/dev/null || true)"
   state="$(kubectl -n argocd get application "app-${NAME}" \
     -o jsonpath='{.status.sync.status}/{.status.health.status}' 2>/dev/null || true)"
-  [[ "${deployed_image}" == "10.96.0.50:5000/gitea-admin/${NAME}:${second_image_tag}" \
+  [[ "${deployed_image}" == "10.96.0.50:5000/demo/${NAME}:${second_image_tag}" \
     && "${state}" == "Synced/Healthy" ]] && break
   if (( $(date +%s) >= deadline )); then
     echo "the rebuilt image did not roll out (image=${deployed_image}, state=${state})" >&2
@@ -350,7 +349,7 @@ echo "  source edit produced ${NAME}:${second_image_tag:0:12} and a new pod"
 # failure, wait for Actions to reject it, then restore the good source with a
 # skip marker so the disposable repository is not left broken.
 good_source_file="$(curl -sk --max-time 15 -u "${gitea_user}:${gitea_password}" \
-  "${gitea_api}/repos/gitea-admin/${NAME}/contents/app/main.py?ref=main")"
+  "${gitea_api}/repos/demo/${NAME}/contents/app/main.py?ref=main")"
 bad_update_body="$(printf '%s' "${good_source_file}" | python3 -c '
 import base64, json, sys
 item = json.load(sys.stdin)
@@ -364,7 +363,7 @@ print(json.dumps({
 ')"
 bad_update="$(curl -sk --max-time 30 -u "${gitea_user}:${gitea_password}" \
   -H 'Content-Type: application/json' -X PUT -d "${bad_update_body}" \
-  "${gitea_api}/repos/gitea-admin/${NAME}/contents/app/main.py")"
+  "${gitea_api}/repos/demo/${NAME}/contents/app/main.py")"
 bad_commit="$(printf '%s' "${bad_update}" \
   | python3 -c 'import json,sys; print(json.load(sys.stdin).get("commit",{}).get("sha",""))')"
 [[ -n "${bad_commit}" ]] || { echo "could not create the failed-build fixture" >&2; exit 1; }
@@ -373,7 +372,7 @@ bad_status=""
 deadline=$(( $(date +%s) + 300 ))
 while [[ "${bad_status}" != "failure" ]]; do
   bad_status="$(curl -sk --max-time 15 -u "${gitea_user}:${gitea_password}" \
-    "${gitea_api}/repos/gitea-admin/${NAME}/actions/tasks" \
+    "${gitea_api}/repos/demo/${NAME}/actions/tasks" \
     | python3 -c '
 import json, sys
 sha = sys.argv[1]
@@ -400,7 +399,7 @@ current_pod_uid="$(kubectl -n "app-${NAME}" get pod \
   || { echo "a failed build replaced the last good pod" >&2; exit 1; }
 
 bad_source_file="$(curl -sk --max-time 15 -u "${gitea_user}:${gitea_password}" \
-  "${gitea_api}/repos/gitea-admin/${NAME}/contents/app/main.py?ref=main")"
+  "${gitea_api}/repos/demo/${NAME}/contents/app/main.py?ref=main")"
 restore_body="$(python3 -c '
 import json, sys
 good = json.loads(sys.argv[1])
@@ -415,7 +414,7 @@ print(json.dumps({
 restore_code="$(curl -sk -o /dev/null -w '%{http_code}' --max-time 30 \
   -u "${gitea_user}:${gitea_password}" -H 'Content-Type: application/json' \
   -X PUT -d "${restore_body}" \
-  "${gitea_api}/repos/gitea-admin/${NAME}/contents/app/main.py")"
+  "${gitea_api}/repos/demo/${NAME}/contents/app/main.py")"
 [[ "${restore_code}" == 200 || "${restore_code}" == 201 ]] \
   || { echo "could not restore the failed-build fixture" >&2; exit 1; }
 echo "  failed source was rejected; the last good image and pod stayed running"

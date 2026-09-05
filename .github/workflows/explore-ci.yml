@@ -18,6 +18,8 @@ on:
       - "charts/**"
       - "environments/**"
       - "backstage/templates/**"
+      - "backstage/packages/backend/**"
+      - "backstage/.dockerignore"
       - "scripts/explore-up.sh"
       - "scripts/explore-down.sh"
       # The smoke checks are part of what this job proves. A change that breaks
@@ -33,6 +35,8 @@ on:
       - "charts/**"
       - "environments/**"
       - "backstage/templates/**"
+      - "backstage/packages/backend/**"
+      - "backstage/.dockerignore"
       - "scripts/explore-up.sh"
       - "scripts/explore-down.sh"
       # The smoke checks are part of what this job proves. A change that breaks
