@@ -190,7 +190,6 @@ nav:
           - architecture/auth.md
           - Gateway OIDC (Path A): auth/gateway-oidc.md
           - oauth2-proxy: auth/oauth2-proxy.md
-          - Backstage SSO design: auth/backstage-sso-design.md
           - ArgoCD ↔ Keycloak (Path B): auth/argocd-keycloak-integration.md
       - Secrets (Vault):
           - architecture/secrets.md
@@ -266,3 +265,4 @@ nav:
       - Articles: articles.md
       - Archive:
           - Storage (local-path → Longhorn) — done: roadmap/storage-longhorn.md
+          - Backstage SSO via oauth2-proxy — superseded by ADR-022: auth/backstage-sso-design.md

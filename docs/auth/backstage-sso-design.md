@@ -5,34 +5,43 @@
 > with Backstage native OIDC after production validation exposed unnecessary
 > coupling between Gateway identity headers and Backstage application tokens.
 
-## 結論
+## Decision
 
-Backstage 専用の OIDC client は作らず、既存の **Istio Gateway + oauth2-proxy + Keycloak** を認証入口として再利用し、Backstage の `oauth2Proxy` auth provider へ検証済み identity header を渡す。
+No Backstage-specific OIDC client is created. The existing **Istio Gateway +
+oauth2-proxy + Keycloak** path is reused as the authentication entry point, and
+the verified identity headers it produces are handed to Backstage's
+`oauth2Proxy` auth provider.
 
-今回の実装ゴールは「Backstage が `guest` ではなく `user:default/yu` として利用者を識別できること」と「production の危険な auth bypass を廃止すること」。Permission Framework による操作別 RBAC は identity 導入後の別フェーズとし、今回同時には有効化しない。
+The goal of this implementation is that Backstage identifies its user as
+`user:default/yu` rather than `guest`, and that the dangerous auth bypass in
+production is removed. Per-operation RBAC through the Permission Framework is a
+later phase; it is deliberately not enabled at the same time.
 
-| 判定 | 方式 | 理由 |
+| Verdict | Approach | Reasoning |
 |---|---|---|
-| **採用** | oauth2-proxy header trust + Backstage proxy provider | 既存 SSO session を再利用でき、新しい client secret が不要。ADR-002 / ADR-010 と現行 Gateway 設計に一致する |
-| **却下** | Backstage 専用 Keycloak OIDC client | 二重の OAuth callback・session・secret 運用を増やし、Gateway 集中認証の判断を覆す |
-| **却下** | guest を維持し Gateway 認証だけ使う | 到達制御はできても Backstage 内の user identity、監査、将来の権限制御が成立しない |
-| **後続** | Permission Framework + group-based RBAC | identity 導入と認可変更を同時に行うと障害時の切り分けが難しい。SSO 安定後に別変更で行う |
+| **Adopted** | oauth2-proxy header trust + Backstage proxy provider | Reuses the existing SSO session and needs no new client secret. Consistent with ADR-002 / ADR-010 and the current Gateway design |
+| **Rejected** | A dedicated Keycloak OIDC client for Backstage | Adds a second OAuth callback, session, and secret to operate, and reverses the decision to centralise authentication at the Gateway |
+| **Rejected** | Keep `guest` and rely on Gateway authentication alone | Controls reachability, but leaves Backstage with no user identity, no audit trail, and no basis for future authorisation |
+| **Deferred** | Permission Framework + group-based RBAC | Introducing identity and changing authorisation together makes an incident hard to bisect. It follows once SSO is stable |
 
-## 現状と問題
+## Current state and problems
 
-Gateway ではすでに Backstage の LAN / external 両 host に oauth2-proxy を強制し、Keycloak の `platform-admin` または `platform-dev` group のみ通している。認証成功時には `X-Auth-Request-User`、`X-Auth-Request-Email`、`X-Auth-Request-Groups` が upstream に渡る。
+The Gateway already enforces oauth2-proxy on both the LAN and external Backstage
+hosts, admitting only Keycloak's `platform-admin` or `platform-dev` groups. On
+success it passes `X-Auth-Request-User`, `X-Auth-Request-Email`, and
+`X-Auth-Request-Groups` upstream.
 
-一方、Backstage 内部は次の暫定状態にある。
+Inside Backstage, however, the following interim state applies.
 
-| 重要度 | 問題 | 根拠 | 影響 |
+| Severity | Problem | Evidence | Impact |
 |---|---|---|---|
-| 🔴 **Critical** | production で guest provider を許可 | `backstage/app/app-config.kubernetes.yaml` | 全利用者が同一 identity になり監査・個別認可ができない |
-| 🔴 **Critical** | default backend auth policy を全体で無効化 | 同ファイルの `dangerouslyDisableDefaultAuthPolicy` | Gateway 到達制御と Backstage plugin API の認証境界が分離していない |
-| 🟠 **High** | frontend が guest provider 固定 | `backstage/app/packages/app/src/App.tsx` | oauth2-proxy の identity を Backstage session に変換できない |
-| 🟠 **High** | Catalog に実利用者がいない | `backstage/app/catalog/organizations/teams.yaml` | email resolver が `user:default/yu` を解決できない |
-| 🟡 **Medium** | Permission Framework 無効 | production config | identity 導入後も操作別 RBAC は全員同一。今回の非目標として明示する |
+| 🔴 **Critical** | The guest provider is permitted in production | `backstage/app/app-config.kubernetes.yaml` | Every user shares one identity, so nothing can be audited or authorised individually |
+| 🔴 **Critical** | The default backend auth policy is disabled globally | `dangerouslyDisableDefaultAuthPolicy` in the same file | Gateway reachability control and the Backstage plugin API's own auth boundary are not separated |
+| 🟠 **High** | The frontend is pinned to the guest provider | `backstage/app/packages/app/src/App.tsx` | The oauth2-proxy identity cannot be converted into a Backstage session |
+| 🟠 **High** | No real user exists in the catalog | `backstage/app/catalog/organizations/teams.yaml` | The email resolver cannot resolve `user:default/yu` |
+| 🟡 **Medium** | The Permission Framework is disabled | Production config | Even after identity lands, every user has the same rights. Stated here as an explicit non-goal |
 
-## 目標アーキテクチャ
+## Target architecture
 
 ```text
 Browser
@@ -54,140 +63,180 @@ Catalog User: user:default/yu
 Backstage token / plugin API identity
 ```
 
-信頼境界は二層に分ける。
+The trust boundary is split in two.
 
-1. Gateway は「この利用者が Backstage へ到達してよいか」を Keycloak group で判定する。
-2. Backstage は検証済み email header を Catalog User に解決し、「誰が操作しているか」を表現する。
+1. The Gateway decides, from the Keycloak group, whether this user may reach
+   Backstage at all.
+2. Backstage resolves the verified email header to a catalog user, and thereby
+   expresses who is performing an operation.
 
-`X-Auth-Request-*` は署名付き credential ではないため、Backstage Service を直接公開しないこと、Gateway 以外から任意 header を注入できないことが前提になる。現在の ClusterIP、Gateway route、NetworkPolicy、Istio sidecar を境界として維持し、受入試験で直接到達経路がないことを確認する。
+`X-Auth-Request-*` headers are not signed credentials. The design therefore
+assumes the Backstage Service is never exposed directly and that arbitrary
+headers cannot be injected from anywhere but the Gateway. The existing
+ClusterIP, Gateway route, NetworkPolicy, and Istio sidecar are kept as that
+boundary, and acceptance testing confirms there is no direct path in.
 
 ## Identity mapping
 
-初期実装は email を安定キーとする。
+The initial implementation uses email as the stable key.
 
-| Source | 値 | Backstage |
+| Source | Value | In Backstage |
 |---|---|---|
-| Keycloak `email` claim | `ymisaki00@gmail.com` | `spec.profile.email` と照合 |
-| Keycloak username | `yu` | 表示・診断用。解決キーには使わない |
-| Keycloak group | `platform-admin` / `platform-dev` | Gateway 到達制御に使用。今回 Backstage group へ自動同期しない |
-| Catalog User | `user:default/yu` | Backstage identity の主体 |
+| Keycloak `email` claim | `ymisaki00@gmail.com` | Matched against `spec.profile.email` |
+| Keycloak username | `yu` | Display and diagnostics only; never the resolution key |
+| Keycloak group | `platform-admin` / `platform-dev` | Used for Gateway admission. Not synchronised into Backstage groups by this change |
+| Catalog user | `user:default/yu` | The subject of Backstage identity |
 
-`emailMatchingUserEntityProfileEmail` resolver を使い、Catalog に email が一致する実 User entity を静的に追加する。demo User 群は別変更で整理できるが、SSO cutover の必須条件ではない。
+The `emailMatchingUserEntityProfileEmail` resolver is used, with a real user
+entity carrying a matching email added statically to the catalog. Tidying up the
+demo users can be a separate change; it is not a prerequisite for the SSO
+cutover.
 
-固定 user 名を header から直接発行する resolver や「Catalog entity がなくても sign-in を許す」方式は採用しない。Catalog が identity inventory の SoT となり、誤った email や未登録利用者は fail closed で sign-in 失敗になる。
+Resolvers that mint a fixed user name straight from a header, or that allow
+sign-in without a matching catalog entity, are not used. The catalog is the
+source of truth for the identity inventory, so a wrong email or an unregistered
+user fails closed at sign-in.
 
-## 変更設計
+## Change design
 
 ### Backstage application
 
-| 対象 | 変更 |
+| Target | Change |
 |---|---|
-| `packages/backend/package.json` | `@backstage/plugin-auth-backend-module-oauth2-proxy-provider` を同一 Backstage release line で追加。guest module は local development 専用として残す |
-| `packages/backend/src/index.ts` | oauth2-proxy provider を登録。Istio ext_authz の `X-Auth-Request-*` を読む profile transform を追加 |
-| `packages/app/src/App.tsx` | `guest` の自動 sign-in を `oauth2Proxy` に置換。Gateway login 済みなら追加 UI なしで Backstage session を確立 |
-| `app-config.kubernetes.yaml` | `auth.providers.oauth2Proxy` と email resolver を設定し、production guest を削除 |
-| `app-config.kubernetes.yaml` | `dangerouslyDisableDefaultAuthPolicy` を削除し、Backstage の既定 plugin auth policy を復元 |
-| `catalog/organizations/teams.yaml` | `user:default/yu` を実 email と `platform-engineering` membership で追加 |
+| `packages/backend/package.json` | Add `@backstage/plugin-auth-backend-module-oauth2-proxy-provider` on the same Backstage release line. The guest module stays, scoped to local development |
+| `packages/backend/src/index.ts` | Register the oauth2-proxy provider and add a profile transform that reads Istio ext_authz's `X-Auth-Request-*` headers |
+| `packages/app/src/App.tsx` | Replace automatic `guest` sign-in with `oauth2Proxy`. A user already signed in at the Gateway gets a Backstage session with no extra UI |
+| `app-config.kubernetes.yaml` | Configure `auth.providers.oauth2Proxy` and the email resolver; remove the production guest provider |
+| `app-config.kubernetes.yaml` | Remove `dangerouslyDisableDefaultAuthPolicy` and restore Backstage's default plugin auth policy |
+| `catalog/organizations/teams.yaml` | Add `user:default/yu` with the real email and `platform-engineering` membership |
 
-local development は Gateway header が存在しないため、`app-config.development.yaml` だけで guest provider を構成する。production image はこの config を読み込まず、frontend も production host では `ProxiedSignInPage` を使う。したがって guest module のコードが bundle に含まれても production の guest provider endpoint は作られない。
+Local development has no Gateway headers, so the guest provider is configured
+only in `app-config.development.yaml`. The production image does not load that
+config, and the frontend uses `ProxiedSignInPage` on production hosts. The guest
+module's code may therefore ship in the bundle without a guest provider endpoint
+existing in production.
 
-oauth2-proxy を Istio ext_authz の `/oauth2/auth` として使う場合、認証結果は `X-Auth-Request-Email` 等の**レスポンス**headerで返る。Backstage公式providerの既定profile transformはreverse proxy方式の `X-Forwarded-Email` を読むため、kensan-labでは公式authenticatorを再利用しつつ、profile transformだけを `X-Auth-Request-*` 用に差し替える。
+When oauth2-proxy is used as Istio's ext_authz at `/oauth2/auth`, the
+authentication result comes back in **response** headers such as
+`X-Auth-Request-Email`. Backstage's official provider ships a default profile
+transform that reads the reverse-proxy style `X-Forwarded-Email`, so kensan-lab
+reuses the official authenticator but substitutes a profile transform for the
+`X-Auth-Request-*` shape.
 
 ### Platform manifests
 
-Backstage の plugin API は sign-in 後に Backstage 自身が発行した Bearer token を使う。
-共通 ext_authz provider が Keycloak token を `Authorization` に設定すると、この token を
-上書きしてしまう。そのためKeycloak tokenは専用headerでGateway検証し、`Authorization`は
-全hostで元のapplication tokenを保持する。
+After sign-in, the Backstage plugin API uses a bearer token Backstage issued
+itself. If the shared ext_authz provider sets a Keycloak token in
+`Authorization`, it overwrites that token. The Keycloak token is therefore
+verified at the Gateway through a dedicated header, and `Authorization` keeps
+the original application token on every host.
 
-| 対象 | 判断 |
+| Target | Decision |
 |---|---|
-| oauth2-proxy Keycloak client / Secret | **変更なし**。既存 `istio-gateway-platform` client を共有 |
-| Istio `headersToUpstreamOnAllow` | **identity headerのみ転送**。`Authorization`は元のapplication tokenを保持 |
-| Istio `includeRequestHeadersInCheck` | **cookieでsession検証**。application `Authorization`はoauth2-proxyへ渡さない |
-| Gateway JWT検証 | `X-Auth-Request-Access-Token` をJWKS検証し、既存のgroups許可を維持 |
-| Backstage利用者 | Gatewayのadmin/dev許可に加え、Catalog User resolverでもallowlist |
-| workload `RequestAuthentication` | **削除**。Keycloak tokenはGateway専用headerで検証し、workloadではBackstage tokenをbackendへ渡す |
-| Backstage ExternalSecret | **変更なし**。専用 client secret は不要 |
-| Backstage image | application build 後に新 tag へ更新。`latest` は使わない |
+| oauth2-proxy Keycloak client / secret | **Unchanged.** The existing `istio-gateway-platform` client is shared |
+| Istio `headersToUpstreamOnAllow` | **Identity headers only.** `Authorization` keeps the original application token |
+| Istio `includeRequestHeadersInCheck` | **Session verified by cookie.** The application `Authorization` header is not passed to oauth2-proxy |
+| Gateway JWT verification | `X-Auth-Request-Access-Token` is verified against JWKS, preserving the existing group allowlist |
+| Backstage users | Allowlisted twice: by the Gateway's admin/dev rule, and again by the catalog user resolver |
+| Workload `RequestAuthentication` | **Removed.** The Keycloak token is verified at the Gateway through its dedicated header, and the workload forwards the Backstage token to the backend |
+| Backstage ExternalSecret | **Unchanged.** No dedicated client secret is needed |
+| Backstage image | Retagged after the application build. `latest` is not used |
 
-## リクエストフロー
+## Request flow
 
-1. Browser が Backstage を開く。
-2. Istio が oauth2-proxy の `/oauth2/auth` へ ext_authz check を行う。
-3. session がなければ oauth2-proxy が Keycloak へ redirect し、認証後に共有 cookie を設定する。
-4. 共通 ext_authz providerがsessionを検証し、identity headerを上書きする。
-5. Gatewayがaccess-token headerのgroupsを検証し、browserの`Authorization`は上書きしない。
-6. Backstage oauth2Proxy provider が email header を Catalog User に照合し、Backstage token を発行する。
-7. frontend と backend plugin は Backstage token で user identity を共有する。
+1. The browser opens Backstage.
+2. Istio performs an ext_authz check against oauth2-proxy's `/oauth2/auth`.
+3. With no session, oauth2-proxy redirects to Keycloak and sets the shared
+   cookie after authentication.
+4. The shared ext_authz provider verifies the session and overwrites the
+   identity headers.
+5. The Gateway verifies the groups in the access-token header, and leaves the
+   browser's `Authorization` header untouched.
+6. The Backstage oauth2Proxy provider matches the email header to a catalog user
+   and issues a Backstage token.
+7. Frontend and backend plugins share the user identity through that token.
 
-## 段階導入
+## Staged rollout
 
-| Phase | 変更 | Gate | Rollback |
+| Phase | Change | Gate | Rollback |
 |---|---|---|---|
-| 0 | Catalog に実 User entity を追加 | Catalog API で entity と email を確認 | entity 追加を revert |
-| 1 | proxy provider を追加、production guest を置換 | `/api/auth/oauth2Proxy/refresh` が identity を返す | 直前 image tag + guest config に revert |
-| 2 | default backend auth policy を復元 | Catalog / Search / Scaffolder / TechDocs の主要 API が成功 | 一時的に bypass 設定を戻すが、恒久運用しない |
-| 3 | E2E と運用確認後に旧 guest dependency を除去 | 24 時間の通常利用で auth error なし | Phase 1 image へ戻す |
+| 0 | Add the real user entity to the catalog | Entity and email visible through the catalog API | Revert the entity |
+| 1 | Add the proxy provider, replace the production guest provider | `/api/auth/oauth2Proxy/refresh` returns an identity | Revert to the previous image tag and guest config |
+| 2 | Restore the default backend auth policy | Catalog, Search, Scaffolder, and TechDocs APIs succeed | Temporarily restore the bypass — never as a steady state |
+| 3 | Remove the old guest dependency after E2E and operational checks | 24 hours of normal use with no auth errors | Return to the Phase 1 image |
 
-GitOps のため runtime 変更は Git commit と Argo CD sync を経由する。Application 名は変更せず、PostgreSQL/PVC に触れない。
+Because the platform is GitOps-managed, every runtime change goes through a Git
+commit and an Argo CD sync. Application names do not change, and PostgreSQL and
+its PVC are not touched.
 
-## 受入基準
+## Acceptance criteria
 
-### 機能
+### Functional
 
-- Keycloak session がある利用者は追加の login form なしで Backstage を開ける。
-- User Settings と Backstage identity API が `user:default/yu` を返す。
-- `ownershipEntityRefs` に `group:default/platform-engineering` が含まれる。
-- Catalog、Search、Scaffolder、TechDocs、Notifications の代表操作が成功する。
-- LAN host と Cloudflare Tunnel host の両方で同じ identity になる。
+- A user with a Keycloak session opens Backstage with no additional login form.
+- User Settings and the Backstage identity API return `user:default/yu`.
+- `ownershipEntityRefs` contains `group:default/platform-engineering`.
+- Representative operations in Catalog, Search, Scaffolder, TechDocs, and
+  Notifications succeed.
+- The LAN host and the Cloudflare Tunnel host resolve to the same identity.
 
-### セキュリティ
+### Security
 
-- 未認証 browser は Keycloak へ redirect される。
-- Catalog Userに登録されていないemailはBackstage sign-in resolverで拒否される。
-- production の guest endpoint で sign-in できない。
-- email header がない、または Catalog に一致しない場合は sign-in が fail closed になる。
-- 外部から `X-Auth-Request-Email` を偽装しても Gateway / oauth2-proxy が上書きまたは拒否し、別 user になれない。
-- `dangerouslyDisableDefaultAuthPolicy` が production config に残っていない。
-- Git に token、client secret、cookie secret を追加していない。
+- An unauthenticated browser is redirected to Keycloak.
+- An email not registered as a catalog user is rejected by the Backstage sign-in
+  resolver.
+- Sign-in through a production guest endpoint is not possible.
+- A missing email header, or one with no catalog match, fails sign-in closed.
+- Spoofing `X-Auth-Request-Email` from outside is overwritten or rejected by the
+  Gateway and oauth2-proxy; it cannot produce a different user.
+- `dangerouslyDisableDefaultAuthPolicy` is absent from the production config.
+- No token, client secret, or cookie secret has been added to Git.
 
-### 可用性・回帰
+### Availability and regression
 
-- oauth2-proxy outage 時は現在どおり fail closed で 503 になる。
-- Backstage の health probe と内部 plugin-to-plugin 呼び出しが default auth policy 復元後も成功する。
-- frontend の Backstage Bearer token が Gateway で上書きされず、plugin API に到達する。
-- workload sidecarがBackstage tokenを未知のissuerとして拒否しない。
-- restart と oauth2-proxy cookie refresh 後も Backstage session を再確立できる。
+- An oauth2-proxy outage still fails closed with a 503, as it does today.
+- Backstage health probes and internal plugin-to-plugin calls still succeed once
+  the default auth policy is restored.
+- The frontend's Backstage bearer token is not overwritten at the Gateway and
+  reaches the plugin API.
+- The workload sidecar does not reject the Backstage token as an unknown issuer.
+- A Backstage session can be re-established after a restart and after an
+  oauth2-proxy cookie refresh.
 
 ## Observability
 
-認証失敗を次の境界で切り分ける。
+Authentication failures are isolated at these boundaries.
 
-| 症状 | 境界 | 見るもの |
+| Symptom | Boundary | What to look at |
 |---|---|---|
-| 302 loop / 503 | Gateway → oauth2-proxy | oauth2-proxy log、ext_authz metrics、cookie domain |
-| 403 Gateway | Gateway AuthorizationPolicy | CUSTOM/ALLOW policy、host category |
-| sign-in resolver error | Backstage auth backend | email header の有無、Catalog User email |
-| plugin API 401 | Backstage backend auth | Backstage token、service-to-service auth、workload JWT policyの有無 |
+| 302 loop / 503 | Gateway → oauth2-proxy | oauth2-proxy logs, ext_authz metrics, cookie domain |
+| 403 at the Gateway | Gateway AuthorizationPolicy | The CUSTOM/ALLOW policy, host category |
+| Sign-in resolver error | Backstage auth backend | Presence of the email header, catalog user email |
+| Plugin API 401 | Backstage backend auth | Backstage token, service-to-service auth, presence of a workload JWT policy |
 
-認証 header の値や token 本文を通常ログへ出さない。診断時も email は最小限にし、access token / cookie / authorization header は記録しない。
+Authentication header values and token bodies are kept out of normal logs. Even
+when diagnosing, email is logged minimally, and access tokens, cookies, and
+authorization headers are never recorded.
 
-## 非目標
+## Non-goals
 
-- Keycloak group と Backstage Group entity の自動同期
-- Permission Framework の RBAC policy 実装
-- Backstage 専用 OIDC client / secret の新設
-- Keycloak realm session policy の変更
-- oauth2-proxy / Gateway 全体の認証方式変更
+- Automatic synchronisation of Keycloak groups into Backstage group entities
+- Implementing Permission Framework RBAC policy
+- Creating a dedicated Backstage OIDC client or secret
+- Changing the Keycloak realm session policy
+- Changing the authentication method of oauth2-proxy or the Gateway as a whole
 
-## Yu が決めるべき未決事項
+## Open questions
 
-現時点で実装を止める未決事項はない。初期 identity は既存 Keycloak user `yu` と email `ymisaki00@gmail.com` を `user:default/yu` に対応させる前提で進められる。
+Nothing here blocks implementation. The initial identity can proceed on the
+assumption that the existing Keycloak user `yu` and the email
+`ymisaki00@gmail.com` map to `user:default/yu`.
 
-後続 RBAC 着手時には、`platform-admin` / `platform-dev` を Backstage Catalog group に同期する方式（静的管理、Keycloak catalog provider、独自同期）の選択が必要になる。
+When RBAC is taken up later, a choice is needed for how `platform-admin` and
+`platform-dev` reach Backstage catalog groups: static management, the Keycloak
+catalog provider, or a bespoke synchronisation.
 
-## 参照
+## References
 
 - [Backstage: OAuth2 Proxy provider](https://backstage.io/docs/auth/oauth2-proxy/provider/)
 - [Backstage: Sign-in identities and resolvers](https://backstage.io/docs/auth/identity-resolver/)
