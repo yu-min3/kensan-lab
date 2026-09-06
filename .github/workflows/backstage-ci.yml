@@ -14,16 +14,22 @@
 ##            version is a decision, not a side effect of merging.
 name: Backstage CI
 
+## Documentation-only changes do not run this job — it installs, builds, and
+## boots the Backstage image, none of which reads Markdown. The scaffolder
+## template's own Markdown is validated by template-ci.yml, which keeps it.
+##
 on:
   pull_request:
     paths:
       - "backstage/**"
       - ".github/workflows/backstage-ci.yml"
+      - "!backstage/**/*.md"
   push:
     branches: [main]
     paths:
       - "backstage/**"
       - ".github/workflows/backstage-ci.yml"
+      - "!backstage/**/*.md"
   workflow_dispatch:
     inputs:
       tag:
