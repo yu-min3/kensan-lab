@@ -103,11 +103,12 @@ def sign_in(page: Page) -> None:
 
 def shot(page: Page, url: str, name: str, *, wait_for: str | None = None,
          settle: int = 2500, height: int | None = None,
-         before_shot=None) -> None:
+         width: int | None = None, before_shot=None) -> None:
     # A page that outgrew the default viewport gets photographed with its last
     # line sliced in half, which reads as a rendering bug rather than a crop.
-    if height:
-        page.set_viewport_size({"width": VIEWPORT["width"], "height": height})
+    if height or width:
+        page.set_viewport_size({"width": width or VIEWPORT["width"],
+                                "height": height or VIEWPORT["height"]})
     page.goto(url, wait_until="domcontentloaded")
     sign_in(page)
     # An OIDC round trip does not always come back to where it started: Argo CD
@@ -135,7 +136,7 @@ def shot(page: Page, url: str, name: str, *, wait_for: str | None = None,
 
     path = OUT / f"{name}.png"
     page.screenshot(path=str(path))
-    if height:
+    if height or width:
         page.set_viewport_size(VIEWPORT)
     print(f"  {path.relative_to(OUT.parent.parent.parent)}")
 
@@ -198,7 +199,7 @@ NAMES = (
     "backstage-create",
     "gitea-platform-pr",
     "grafana-app-runtime",
-    "grafana-replicas-3",
+    "argocd-app-scaled",
 )
 
 
@@ -212,7 +213,7 @@ def main(argv: list[str]) -> int:
             "  before Golden Path: argocd-tree demo-application backstage-create\n"
             "  with an open PR:    gitea-platform-pr\n"
             "  once it is running: grafana-app-runtime (EXPLORE_APP=<name>)\n"
-            "  after scaling to 3:  grafana-replicas-3 (EXPLORE_APP=<name>)",
+            "  after scaling to 3:  argocd-app-scaled (EXPLORE_APP=<name>)",
             file=sys.stderr,
         )
         return 2
@@ -296,21 +297,35 @@ def main(argv: list[str]) -> int:
                  "grafana-app-runtime", settle=6000, height=810,
                  before_shot=collapse_the_menu)
 
-        # Step 8's proof that a Git-driven change took. Argo CD cannot show it:
-        # the app-project AppProject does not whitelist Pod or ReplicaSet, so
-        # its resource tree stops at the Deployment. The Replicas panel is
-        # where the number is legible, and one panel is a better picture than
-        # a second copy of the whole dashboard.
-        if "grafana-replicas-3" in wanted:
-            page.goto("https://grafana.127-0-0-1.sslip.io/d/explore-app-runtime/"
-                      f"explore-app-runtime?var-namespace=app-{EXPLORE_APP}"
-                      f"&var-workload={EXPLORE_APP}&refresh=10s",
-                      wait_until="domcontentloaded")
+        # Step 8's proof that the Git-driven replica change took. The pods are
+        # in this tree only because app-project whitelists Pod and ReplicaSet;
+        # Argo CD does not draw child nodes for kinds a project cannot manage.
+        if "argocd-app-scaled" in wanted:
+            def expand_the_tree(page: Page) -> None:
+                page.get_by_title("Expand all child nodes of all parent nodes").click()
+                page.wait_for_timeout(2500)
+
+            # The tree itself, not the whole console: the page header carries
+            # the platform repository's latest commit message, which is noise
+            # from whoever last touched the cluster. Argo CD lays the tree out
+            # left to right, so it needs more width than the default.
+            page.set_viewport_size({"width": 1760, "height": 940})
+            page.goto("https://argocd.127-0-0-1.sslip.io/applications/argocd/"
+                      f"app-{EXPLORE_APP}", wait_until="domcontentloaded")
             sign_in(page)
-            page.wait_for_timeout(7000)
-            panel = page.locator("section").filter(has_text="Replicas").last
-            path = OUT / "grafana-replicas-3.png"
-            panel.screenshot(path=str(path))
+            page.goto("https://argocd.127-0-0-1.sslip.io/applications/argocd/"
+                      f"app-{EXPLORE_APP}", wait_until="domcontentloaded")
+            page.wait_for_timeout(9000)
+            expand_the_tree(page)
+            path = OUT / "argocd-app-scaled.png"
+            # The tree pane fills the viewport whatever the graph needs, so a
+            # plain element shot ends in a quarter-page of empty canvas.
+            box = page.locator(".application-resource-tree").bounding_box()
+            page.screenshot(path=str(path), clip={
+                "x": box["x"], "y": box["y"],
+                "width": box["width"], "height": min(box["height"], 640),
+            })
+            page.set_viewport_size(VIEWPORT)
             print(f"  {path.relative_to(OUT.parent.parent.parent)}")
 
         # Gitea intentionally has a separate local session. Capture the pull

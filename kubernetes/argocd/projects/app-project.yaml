@@ -28,6 +28,14 @@ spec:
   # Workloads
   - group: "apps"
     kind: Deployment
+  # ReplicaSet と Pod は app が Git から作るものではない（Deployment が作る）。
+  # 許可しているのは Argo CD の resource tree のため: whitelist に無い kind は
+  # 子ノードとして描画されないので、Deployment で枝が止まり Pod が見えない。
+  # スケールや rollout の結果を Argo CD の画面で確認できることを優先した。
+  - group: "apps"
+    kind: ReplicaSet
+  - group: ""
+    kind: Pod
   - group: "apps"
     kind: StatefulSet
   - group: "batch"

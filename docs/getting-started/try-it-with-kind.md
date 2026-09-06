@@ -289,10 +289,10 @@ shows the 3 at all: the cluster was only briefly wrong.
 
 Nothing pushes this one back. Argo CD polls Git every three minutes and a
 change can miss one tick, so give it up to five — or press **Refresh** on the
-`app-<name>` Application in Argo CD to skip the wait. The Replicas panel then
-climbs to 3.
+`app-<name>` Application in Argo CD to skip the wait. Argo CD then shows three
+pods under the Deployment, and the Replicas panel in Grafana climbs to 3.
 
-![The Replicas panel reading three desired and three available](assets/grafana-replicas-3.png)
+![Argo CD showing the Deployment with three running pods](assets/argocd-app-scaled.png)
 
 ```mermaid
 flowchart TD
