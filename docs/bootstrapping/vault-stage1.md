@@ -65,7 +65,13 @@ Once the Vault pods are up, run the following via bootstrap Terraform (`bootstra
 - Enable the auth methods (kubernetes / oidc)
 - Create the root policy
 
-See `bootstrap/vault/README.md` for details.
+Those steps, why a throwaway Terraform is needed at all (the chicken-and-egg
+problem between VCO and Vault's own auth methods), and the disaster-recovery
+path are documented next to the Terraform itself, in
+[`bootstrap/vault/README.md`](https://github.com/yu-min3/kensan-lab/blob/main/bootstrap/vault/README.md). That file is
+read on github.com rather than published here, because it is operated from a
+checkout with credentials in hand — see the rendering-target table in
+[Documentation layout](../reference/doc-layout.md).
 
 ## Troubleshooting
 

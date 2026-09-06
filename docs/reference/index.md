@@ -9,7 +9,7 @@ interfaces are written against.
 
 | Section | What it holds | How far to trust it |
 |---|---|---|
-| [Bare-metal bootstrap](../bootstrapping/index.md) | Prerequisites, configuration, and the staged build of the live cluster | **A record, not an installer.** The steps reflect the running system; the full sequence has not been exercised from a blank machine |
+| [Bare-metal bootstrap](../bootstrapping/index.md) | Prerequisites, configuration, and the staged build of the live cluster. The Terraform that establishes Vault's root of trust is documented beside the code in [`bootstrap/`](https://github.com/yu-min3/kensan-lab/blob/main/bootstrap/), not here | **A record, not an installer.** The steps reflect the running system; the full sequence has not been exercised from a blank machine |
 | [Operations](../runbooks/index.md) | Runbooks, recovery procedures, and incident write-ups | Procedures actually used on this cluster, written after the fact they describe |
 | [Documentation layout](doc-layout.md) | Which layer each fact belongs to, and why | The rule this repository is written to; enforced in review |
 | [Design system](../design/index.md) | Whetstone tokens, components, and adoption status | The contract every UI in the repository is built against |

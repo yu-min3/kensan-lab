@@ -1,23 +1,24 @@
 # vault
 
-Vault HA server (3 replica、AWS KMS auto-unseal、Raft storage)。KV / Database / Transit / OIDC の各 secret engine をホストする secret 管理の中核。
+The Vault HA server — three replicas, AWS KMS auto-unseal, Raft storage. It is
+the core of secret management, hosting the KV, database, Transit, and OIDC secret
+engines.
 
-## 構成
+## Layout
 
-- `values.yaml` — HashiCorp 公式 chart の override (HA、KMS auto-unseal、Raft retry_join、image pin)
+- `values.yaml` — overrides on HashiCorp's official chart (HA, KMS auto-unseal, Raft `retry_join`, a pinned image)
 - `resources/`
-  - `namespace.yaml` — `vault` ns
-  - `aws-kms-credentials-sealed.yaml` — KMS 用 IAM (SealedSecret、Vault 自身の起動に必要なので Vault 由来にできない)
-  - `httproute.yaml` — UI / API (`vault.platform.yu-min3.com`)
+  - `namespace.yaml` — the `vault` namespace
+  - `aws-kms-credentials-sealed.yaml` — the IAM credential for KMS, as a SealedSecret. It cannot come from Vault itself, because Vault needs it to start
+  - `httproute.yaml` — UI and API (`vault.platform.yu-min3.com`)
 
-## 注意点
+## Things to watch
 
-- **`spec.syncOptions: Prune=false`**: Application 削除で raft データの PV が蒸発するのを防ぐ (resources-finalizer も外している)
-- **image tag を明示 pin** (latest 不可): 理由は ADR-011
-- **TLS disabled**: cluster 内通信は Istio mTLS でカバー。Phase 2 以降で再検討
+- **`spec.syncOptions: Prune=false`** — stops the PV holding the Raft data from vanishing if the Application is deleted. The resources finalizer is removed as well
+- **The image tag is pinned explicitly**, never `latest`. The reasoning is in ADR-011
+- **TLS is disabled** — in-cluster traffic is covered by Istio mTLS. To be revisited in Phase 2 and beyond
 
-## 関連
+## Related
 
-- 4 方式の使い分けと運用詳細: [`docs/secret-management/index.md`](../../../docs/secret-management/index.md)
-- bootstrap (初回 unseal、root token): [`docs/bootstrapping/vault-stage1.md`](../../../docs/bootstrapping/vault-stage1.md)
-- ADR: [007 No Vault PKI](../../../docs/adr/007-no-vault-pki.md) / [011 Version Pinning](../../../docs/adr/011-vault-version-pinning.md)
+- The four methods and how they are operated: [`docs/secret-management/index.md`](../../../docs/secret-management/index.md)
+- Bootstrap (first unseal, the root token): [`docs/bootstrapping/vault-stage1.md`](../../../docs/bootstrapping/vault-stage1.md)
