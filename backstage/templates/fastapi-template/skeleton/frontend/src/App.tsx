@@ -14,6 +14,18 @@ type Config = {
   message: string
 }
 
+// /api/load is the one endpoint that exists for the walkthrough rather than for
+// the service: it occupies a core on request so that a Grafana panel has
+// something to draw. The backend refuses unless DEMO_LOAD_ENABLED is set, and
+// reports that in `enabled`, so this page simply does not offer the button when
+// it is not wanted.
+type LoadState = {
+  enabled: boolean
+  running: boolean
+  remaining: number
+  seconds: number
+}
+
 type WhoAmI = {
   authenticated: boolean
   user: string | null
@@ -25,6 +37,7 @@ type WhoAmI = {
 export default function App() {
   const [config, setConfig] = useState<Config | null>(null)
   const [who, setWho] = useState<WhoAmI | null>(null)
+  const [load, setLoad] = useState<LoadState | null>(null)
   const [failed, setFailed] = useState(false)
 
   useEffect(() => {
@@ -42,6 +55,22 @@ export default function App() {
   useEffect(() => {
     if (config) document.title = config.appName
   }, [config])
+
+  const readLoad = () => fetch('api/load').then((r) => r.json()).then(setLoad)
+
+  useEffect(() => {
+    readLoad().catch(() => setLoad(null))
+  }, [])
+
+  // Only while something is burning: one poll a second is what turns the button
+  // into a countdown, and there is nothing to count when it is idle.
+  useEffect(() => {
+    if (!load?.running) return
+    const id = setInterval(() => {
+      readLoad().catch(() => {})
+    }, 1000)
+    return () => clearInterval(id)
+  }, [load?.running])
 
   if (failed) {
     return (
@@ -128,6 +157,32 @@ export default function App() {
             </p>
           )}
         </div>
+
+        {load?.enabled && (
+          <div className="card">
+            <h2>Make it do some work</h2>
+            <p className="muted small">
+              This occupies one core for {load.seconds} seconds. Prometheus scrapes every
+              30 seconds, so the CPU panel in Grafana starts to climb after a scrape or
+              two — no second terminal, and no namespace to type.
+            </p>
+            <p className="load-row">
+              <button
+                className="load"
+                onClick={() =>
+                  fetch('api/load', { method: load.running ? 'DELETE' : 'POST' })
+                    .then((r) => r.json())
+                    .then(setLoad)
+                    .catch(() => {})
+                }
+              >
+                {load.running
+                  ? `Stop — ${load.remaining}s left`
+                  : `Generate load for ${load.seconds}s`}
+              </button>
+            </p>
+          </div>
+        )}
 
         <p className="trail">
           scaffolder form → <code>deploy/values.yaml</code> → pull request → Argo CD →

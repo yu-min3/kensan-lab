@@ -44,7 +44,7 @@ make try
 
 A few minutes later: [Argo CD](https://argocd.127-0-0-1.sslip.io), [Backstage](https://backstage.127-0-0-1.sslip.io), [Grafana](https://grafana.127-0-0-1.sslip.io), and a [demo app](https://demo.127-0-0-1.sslip.io) behind a real Istio Gateway. One `demo` / `demo` Keycloak account reaches all of them. `make explore-down` removes it.
 
-The concise **[walkthrough](https://yu-min3.github.io/kensan-lab/getting-started/try-it-with-kind/)** follows one story: inspect Argo CD, open the existing demo, create a visibly different app through Backstage, merge its local Gitea PR, and watch the new workload's CPU rise and fall in Grafana. The implementation details and optional platform exercises live separately in **[How the kind environment works](https://yu-min3.github.io/kensan-lab/getting-started/kind-explained/)**.
+The concise **[walkthrough](https://yu-min3.github.io/kensan-lab/getting-started/try-it-with-kind/)** follows one story: inspect Argo CD, open the existing demo, create a visibly different app through Backstage, merge its local Gitea PR, watch the new workload's CPU rise and fall in Grafana, and scale it twice — once from the cluster, which Argo CD undoes, and once from Git, which it keeps. The implementation details and optional platform exercises live separately in **[How the kind environment works](https://yu-min3.github.io/kensan-lab/getting-started/kind-explained/)**.
 
 It is a subset with substitutions, not a fork — no Cilium, Vault or Longhorn, and the L2 load balancer is stood in for. TLS is real but signed by a local CA, so the walkthrough explains both the browser bypass and the optional trust-store route. The Explore CI badge above is this cluster coming up from scratch on every pull request.
 

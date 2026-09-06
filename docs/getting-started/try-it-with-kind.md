@@ -2,25 +2,20 @@
 
 This is the shortest path through kensan-lab. In about ten minutes you will
 inspect a GitOps-managed cluster, open an SSO-protected demo, create a second
-application through Backstage, merge its pull request, and watch its CPU usage
-change in Grafana.
+application through Backstage, merge its pull request, watch its CPU usage
+change in Grafana, and scale it twice — once the way the platform accepts, once
+the way it undoes.
 
 Pull requests that touch the platform stand this same environment up on CI and
 sign in to it, so what follows is checked rather than merely written down.
 
-```mermaid
-flowchart LR
-    A[make try] --> B[Argo CD<br/>platform is healthy]
-    B --> C[Demo app<br/>sign in once]
-    C --> D[Backstage<br/>create app2]
-    D --> E[Gitea Actions<br/>test and build app2]
-    E --> F[Gitea<br/>merge platform PR]
-    F --> G[Argo CD<br/>deploys app2 image]
-    G --> H[Grafana<br/>watch CPU]
-```
-
-The bare-metal cluster is not required. This walkthrough runs a disposable,
-single-node kind cluster and binds its gateway only to `127.0.0.1`.
+The bare-metal cluster is not required, and that is why this page exists.
+kensan-lab runs on hardware at home, and the
+[bootstrapping guide](../bootstrapping/index.md) documents that cluster as a
+reference — it describes what is running, not a clean-room install, and standing
+one up from nothing is not automated yet. So the way in is a disposable,
+single-node kind cluster that runs the same manifests and binds its gateway only
+to `127.0.0.1`.
 
 ## 1. Start the platform
 
@@ -135,7 +130,8 @@ reuse the session from Argo CD, so no second password prompt appears.
 
 The app displays its name, theme, greeting, and the identity headers attached by
 the gateway. The application itself contains no login implementation: Istio
-asks oauth2-proxy to authenticate the request before it reaches the pod.
+asks oauth2-proxy to authenticate the request before it reaches the pod. The
+load button near the bottom belongs to step 7; leave it alone for now.
 
 ![The existing demo application after signing in](assets/demo-application.png)
 
@@ -158,38 +154,58 @@ Open [Backstage](https://backstage.127-0-0-1.sslip.io){ target="_blank" rel="noo
 Golden Path Application**. The Explore catalog has one owner, `demo-team`, so the
 walkthrough does not ask you to choose among production teams.
 
-Use these example values:
+![The Golden Path Application form in Backstage](assets/backstage-create.png)
+
+**The application name is yours.** One field decides what the platform builds,
+so the rest of this page writes it as `<name>` in the text and `$APP` in the
+commands. The screenshots were taken with `app2`.
 
 | Field | Value |
 |---|---|
-| Application Name | `app2` |
+| Application Name | `<name>` — anything you like |
 | Description | `Second walkthrough application` |
-| Repository | owner `demo`, repository `app2` |
+| Repository | owner `demo`, repository `<name>` |
 | Theme | `night` |
 | Greeting | `Hello from the golden path` |
+
+Everything the platform names after it:
+
+| Thing | Named | With `app2` |
+|---|---|---|
+| Argo CD Application, namespace | `app-<name>` | `app-app2` |
+| Deployment, Service | `<name>` | `app2` |
+| Hostname | `<name>.127-0-0-1.sslip.io` | `app2.127-0-0-1.sslip.io` |
+| Gitea repository | `demo/<name>` | `demo/app2` |
+
+Set the name once in the terminal you are going to use, and every command below
+works unchanged:
+
+```bash
+APP=app2   # whatever you typed in the form
+```
 
 Review the values and press **Create**. Backstage now:
 
 ```mermaid
 flowchart TD
-    A[Backstage form] --> B[Create app2 repository in local Gitea]
-    B --> F[Gitea Actions tests and builds app2]
+    A[Backstage form] --> B[Create NAME repository in local Gitea]
+    B --> F[Gitea Actions tests and builds NAME]
     F --> G[Push commit-SHA image]
     G --> H[Record image tag in deploy/values.yaml]
     H --> C[Open platform-config PR]
-    C --> D[Register app2 in the catalog]
+    C --> D[Register NAME in the catalog]
     C --> E[Register the new SSO callback]
     C --> I{You merge the PR}
     I --> J
-    J[Argo CD discovers app-app2]
-    J --> K[app2 is running]
+    J[Argo CD discovers app-NAME]
+    J --> K[NAME is running]
 ```
 
 The task stays open while Gitea Actions tests the generated source, builds an
-app2-specific image, pushes it, and writes its immutable commit SHA into
-`deploy/values.yaml`. A failed build fails the Backstage task and no platform
-pull request is created. A completed task means the pull request is safe to
-review and merge.
+image for that repository alone, pushes it, and writes its immutable commit SHA
+into `deploy/values.yaml`. A failed build fails the Backstage task and no
+platform pull request is created. A completed task means the pull request is
+safe to review and merge.
 
 ## 6. Merge the local pull request
 
@@ -200,7 +216,7 @@ credentials: sign in with `demo` / `demo`.
 
 You are the platform administrator for this part of the walkthrough. The new
 Platform Config PR should already be waiting in `demo/kensan-lab`. It adds two
-files under `environments/kind/generated-applications/app-app2/`; merge it.
+files under `environments/kind/generated-applications/app-<name>/`; merge it.
 
 ![Gitea showing the platform pull request ready for review](assets/gitea-platform-pr.png)
 
@@ -216,53 +232,92 @@ flowchart LR
     K --> B[5. Open<br/>NAME.127-0-0-1.sslip.io]
 ```
 
-The generated Argo CD Application and namespace are named `app-<application
-name>`. The Deployment and hostname keep the application name itself. For
-example, entering `demo-app2` produces Application/namespace `app-demo-app2`,
-Deployment `demo-app2`, and hostname `demo-app2.127-0-0-1.sslip.io`.
-
 Watch the new Argo CD Application appear:
 
 ```bash
-kubectl -n argocd get application app-app2 -w
+kubectl -n argocd get application app-$APP -w
 ```
 
-When it is `Synced` and `Healthy`, open the
-[new app2 application](https://app2.127-0-0-1.sslip.io){ target="_blank" rel="noopener" }. Compare it with the
-[original demo](https://demo.127-0-0-1.sslip.io){ target="_blank" rel="noopener" }. app2 now runs an image built
-from its own repository; its night theme and greeting came from Git-managed
-runtime values.
+When it is `Synced` and `Healthy`, open `https://<name>.127-0-0-1.sslip.io` and
+compare it with the [original demo](https://demo.127-0-0-1.sslip.io){ target="_blank" rel="noopener" }.
+Your service runs an image built from its own repository, and its night theme
+and greeting came from Git-managed runtime values rather than from that image.
 
-To prove source delivery continues after scaffolding, open
-`frontend/src/App.tsx` in the app2 repository, use Gitea's edit button to change
-one visible sentence, and commit to `main`. A second Actions run produces a new
-SHA tag. Argo CD then replaces the app2 pod; refresh the page to see the code
-change. A failed test or build never updates the tag, so the last good pod stays
-running.
+Editing the service's own source and watching a new image reach the cluster is
+the natural next question. It costs a build, so it lives in
+[Source change exercise](kind-explained.md#source-change-exercise) rather than
+here.
 
 ## 7. Watch CPU rise and fall in Grafana
 
-Open the [Explore App Runtime dashboard](https://grafana.127-0-0-1.sslip.io/d/explore-app-runtime/explore-app-runtime?var-namespace=app-app2&var-workload=app2&refresh=10s){ target="_blank" rel="noopener" }
-in Grafana. Choose **Sign in with Keycloak** if asked. The dashboard shows the
-selected Deployment's CPU, desired and available replicas, request rate, and
-request latency.
+Open the [Explore App Runtime dashboard](https://grafana.127-0-0-1.sslip.io/d/explore-app-runtime/explore-app-runtime?refresh=10s){ target="_blank" rel="noopener" }
+in Grafana. Choose **Sign in with Keycloak** if asked. It shows one Deployment's
+CPU, desired and available replicas, request rate, and request latency.
 
-In a second terminal, keep one app2 process busy for two minutes:
+It opens on the built-in `demo` application. **Set the Namespace picker to
+`app-<name>` and the Workload picker to `<name>` first.** Both pickers are
+filled from the cluster, so they list whatever you called your service — and the
+panels stay empty until they point at a workload that exists.
+
+Then open your application in another tab and press **Generate load for 90s**.
+It is the same button you saw on the demo app in step 4, and it belongs to the
+service you just deployed: it occupies one core inside the pod and counts down
+while it does.
+
+![The Explore App Runtime dashboard while the load button is running](assets/grafana-app-runtime.png)
+
+The line does not jump the moment you press: Grafana is reading the pod's real
+CPU through Prometheus, so it climbs over the next few samples, holds, and drops
+back once the ninety seconds are up.
+
+## 8. Scale it, and watch Git win
+
+The Replicas panel is where the GitOps contract becomes visible. Change the
+replica count twice — once from the cluster, once from Git — and watch which one
+survives.
+
+**From the cluster.** Argo CD puts this back within a second or two:
 
 ```bash
-kubectl -n app-app2 exec deploy/app2 -- python -c \
-    'import time; end=time.time()+120; exec("while time.time() < end: pass")'
+kubectl -n app-$APP scale deployment/$APP --replicas=3
+kubectl -n app-$APP get deployment/$APP -w
 ```
 
-Prometheus scrapes every 30 seconds. The CPU line rises after one or two scrapes,
-then falls again after the command exits. This uses kubelet/cAdvisor metrics;
-`metrics-server` and `kubectl top` are not required.
+Argo CD is faster than one scrape interval, so the Replicas panel usually never
+shows the 3 at all: the cluster was only briefly wrong.
 
-The replica panel also makes the earlier GitOps contract visible: a manual
-`kubectl scale` is quickly returned to the Git-declared replica count by Argo
-CD, often faster than one Prometheus scrape.
+**From Git.** In your service's repository in Gitea:
 
-## 8. Clean up
+1. open `deploy/values.yaml`
+2. change `replicas: 1` to `replicas: 3` with the edit button
+3. commit to `main`
+
+Nothing pushes this one back. Argo CD polls Git every three minutes and a
+change can miss one tick, so give it up to five — or press **Refresh** on the
+`app-<name>` Application in Argo CD to skip the wait. Argo CD then shows three
+pods under the Deployment, and the Replicas panel in Grafana climbs to 3.
+
+![Argo CD showing the Deployment with three running pods](assets/argocd-app-scaled.png)
+
+```mermaid
+flowchart TD
+    S["Deployment<br/>1 replica"]
+    S -->|"kubectl scale --replicas=3"| X["3 replicas,<br/>for a second or two"]
+    X -->|"Argo CD: Git still says 1"| S
+    S -->|"commit replicas: 3<br/>to deploy/values.yaml"| Y["Argo CD syncs<br/>Application shows 3/3 Healthy"]
+    Y --> Z["Deployment<br/>3 replicas"]
+```
+
+No image is built for that one. The workflow ignores `deploy/`, because what
+lives there is read at runtime rather than baked into the image:
+
+| What you change | Image rebuilt | What you see |
+|---|---|---|
+| `frontend/src/App.tsx` | yes | New SHA tag, Argo CD replaces the pod |
+| `deploy/values.yaml` | no | Argo CD applies the value on the next sync |
+| `kubectl scale` | — | Undone; Git never said 3 |
+
+## 9. Clean up
 
 If you imported the local CA, remove it from the trust store first. Then delete
 the entire disposable cluster:
@@ -277,6 +332,5 @@ Continue to [How the kind environment works](kind-explained.md) for the componen
 map, per-application build path, Gateway API and certificate design, optional
 Kyverno/storage/CNI exercises, limitations, and troubleshooting.
 
-The [bare-metal bootstrap guide](../bootstrapping/index.md) is a reference for
-the live homelab. Its end-to-end clean-room bootstrap is not yet verified;
-Ansible and Makefile automation is planned.
+For the hardware side, the [bare-metal bootstrap guide](../bootstrapping/index.md)
+is the reference described above; Ansible and Makefile automation is planned.

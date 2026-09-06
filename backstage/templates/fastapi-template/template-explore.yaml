@@ -84,6 +84,9 @@ spec:
           imageTag: pending
           ghcrPullSecretEnabled: false
           otelEnabled: false
+          # The walkthrough's "watch CPU move" step presses this. The cluster is
+          # disposable and bound to 127.0.0.1, which is what makes it fine here.
+          loadButtonEnabled: true
           gatewayName: gateway-explore
           gatewayNamespace: istio-system
           platformRepoUrl: http://gitea-http.gitea.svc.cluster.local:3000/demo/kensan-lab

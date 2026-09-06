@@ -156,6 +156,24 @@ body {
   font-weight: 600;
 }
 
+.load-row { margin: .2rem 0 0; }
+
+.load {
+  font: inherit;
+  font-weight: 600;
+  color: var(--ink);
+  background: var(--chip);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: .5rem 1.1rem;
+  cursor: pointer;
+  transition: transform 120ms ease, background 200ms ease;
+}
+
+.load:hover { background: var(--line); }
+.load:active { transform: translateY(1px); }
+.load:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
+
 .muted { color: var(--muted); }
 .small { font-size: .86rem; }
 

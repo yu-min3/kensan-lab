@@ -4,6 +4,15 @@ name: Build and deploy in Explore
 on:
   push:
     branches: [main]
+    # deploy/ is the delivery surface, not the build surface. What lives there
+    # is read at runtime (the env this chart hands the container) or applied by
+    # Argo CD (the manifests next to it), so a change needs a sync and not a
+    # new image. Without this, editing `replicas` rebuilds the service and
+    # replaces the pod, which is the opposite of what the file says it does.
+    # A commit that touches deploy/ *and* source still builds: paths-ignore
+    # skips a push only when every path in it matches.
+    paths-ignore:
+      - "deploy/**"
 
 permissions:
   contents: write

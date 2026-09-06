@@ -77,6 +77,25 @@ def test_whoami_reads_the_gateway_headers():
     assert data["groups"] == ["platform-admin", "developers"]
 
 
+def test_load_is_refused_by_default(monkeypatch):
+    """A service generated for the real platform must not hand out a CPU burner."""
+    monkeypatch.delenv("DEMO_LOAD_ENABLED", raising=False)
+    assert client.get("/api/load").json()["enabled"] is False
+    assert client.post("/api/load").status_code == 404
+
+
+def test_load_starts_and_stops(monkeypatch):
+    """Explore turns it on. The burn is bounded, and stopping it early works."""
+    monkeypatch.setenv("DEMO_LOAD_ENABLED", "true")
+    started = client.post("/api/load").json()
+    assert started["running"] is True
+    assert 0 < started["remaining"] <= started["seconds"]
+
+    stopped = client.delete("/api/load").json()
+    assert stopped["running"] is False
+    assert stopped["remaining"] == 0
+
+
 def test_example_endpoint():
     """Test example API endpoint."""
     response = client.get("/api/v1/example")

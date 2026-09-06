@@ -30,6 +30,11 @@ env:
     value: day
   - name: APP_MESSAGE
     value: This app was already here. Create yours in Backstage.
+  # Same image as a generated service, so the same switch. Explore is the one
+  # place /api/load is meant to exist; see the block above the handlers in
+  # backstage/templates/fastapi-template/skeleton/app/main.py.
+  - name: DEMO_LOAD_ENABLED
+    value: "true"
 
 # Not an explore-specific workaround — these are the two lines the template's
 # own deploy/values.yaml ships, and for the same reason. The skeleton's
