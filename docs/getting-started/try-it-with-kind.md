@@ -250,11 +250,10 @@ compare it with the [original demo](https://demo.127-0-0-1.sslip.io){ target="_b
 Your service runs an image built from its own repository, and its night theme
 and greeting came from Git-managed runtime values rather than from that image.
 
-To prove source delivery continues after scaffolding, open
-`frontend/src/App.tsx` in your repository, use Gitea's edit button to change one
-visible sentence, and commit to `main`. A second Actions run produces a new SHA
-tag. Argo CD then replaces the pod; refresh the page to see the code change. A
-failed test or build never updates the tag, so the last good pod stays running.
+Editing the service's own source and watching a new image reach the cluster is
+the natural next question. It costs a build, so it lives in
+[Source change exercise](kind-explained.md#source-change-exercise) rather than
+here.
 
 ## 7. Watch CPU rise and fall in Grafana
 
@@ -274,9 +273,10 @@ while it does.
 
 ![The Explore App Runtime dashboard while the load button is running](assets/grafana-app-runtime.png)
 
-Prometheus scrapes every 30 seconds, so the CPU line starts climbing after a
-scrape or two and falls back once the ninety seconds are up. This reads
-kubelet/cAdvisor metrics; `metrics-server` and `kubectl top` are not involved.
+The CPU panel reads kubelet/cAdvisor, which recomputes container statistics
+about every 15 seconds, so the line starts climbing a scrape or two after the
+press and falls back once the ninety seconds are up. `metrics-server` and
+`kubectl top` are not involved.
 
 The button is an Explore prop rather than a feature of the golden path. The same
 template generates it switched off (`DEMO_LOAD_ENABLED`) for the real platform,

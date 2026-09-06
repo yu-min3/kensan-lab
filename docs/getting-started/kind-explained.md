@@ -128,6 +128,22 @@ localhost-only demo, or export `explore-ca-tls` and deliberately add that CA to
 the browser or operating-system trust store. `make try` never changes trust on
 the host.
 
+## Source change exercise
+
+Scaffolding is not the only delivery path the platform owns; the ordinary one is
+a commit. In the repository the Golden Path created, open
+`frontend/src/App.tsx`, change one visible sentence with Gitea's edit button and
+commit to `main`.
+
+A second Actions run tests and builds the source, pushes an image tagged with
+the new commit SHA, and writes that tag into `deploy/values.yaml`. Argo CD sees
+the tag change and replaces the pod; refresh the page to read the new sentence.
+
+The interesting half is the failure. A commit that breaks the tests never
+reaches the image tag, so `deploy/values.yaml` keeps pointing at the last image
+that passed and the running pod is never disturbed. Nothing rolls back, because
+nothing rolled forward.
+
 ## GitOps self-healing exercise
 
 Scale the original demo by hand:
@@ -141,9 +157,9 @@ Argo CD returns it to the Git-declared single replica within roughly ten
 seconds. A direct cluster edit is only a temporary opinion when `selfHeal` is
 enabled.
 
-This change is usually too short for Prometheus's 30-second scrape interval, so
-the Grafana walkthrough uses a two-minute CPU load instead of pretending the
-replica jump will always be graphed.
+This is usually over before the next scrape, so the Grafana walkthrough drives
+CPU with the application's own load button instead of pretending the replica
+jump will always be graphed.
 
 ## Application metrics
 
@@ -155,8 +171,16 @@ The **Explore App Runtime** dashboard combines:
 - p95 latency from `http_request_duration_seconds`.
 
 The built-in demo and generated applications each have a `ServiceMonitor` for
-`/metrics`. `metrics-server` is not installed, so `kubectl top` is unavailable;
-that does not affect Prometheus or Grafana.
+`/metrics`, scraped every 15 seconds. `metrics-server` is not installed, so
+`kubectl top` is unavailable; that does not affect Prometheus or Grafana.
+
+The CPU panel's resolution is not the Prometheus scrape interval, which is a
+thing worth knowing before tuning the wrong knob. The kubelet's cAdvisor
+endpoint is scraped every 10 seconds, but cAdvisor timestamps its own samples
+and only recomputes per-container statistics about every 15 seconds, so the
+series advances at that rate however often Prometheus asks. Measured on a
+running Explore cluster: `up` for that endpoint records 6 samples a minute,
+`container_cpu_usage_seconds_total` records 4.
 
 ## Policy exercise
 

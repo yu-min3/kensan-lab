@@ -12,5 +12,8 @@ spec:
   endpoints:
     - port: http
       path: /metrics
-      interval: 30s
+      # The runtime dashboard rates this over a minute. At 30s that window
+      # holds the two samples a rate needs and nothing to spare, so a single
+      # missed scrape empties the panel.
+      interval: 15s
       scrapeTimeout: 10s
