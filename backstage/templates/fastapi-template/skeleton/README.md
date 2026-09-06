@@ -70,10 +70,15 @@ Argo CD then syncs the app namespace.
 
 ## Endpoints
 
-- `GET /` — root
+- `GET /` — the page
 - `GET /health` — health check
 - `GET /metrics` — Prometheus metrics (scraped via ServiceMonitor)
+- `GET /api/config` — the name, theme and greeting, read from the environment
+- `GET /api/whoami` — the caller, as the gateway reported it
 - `GET /api/v1/example` — example
+- `GET|POST|DELETE /api/load` — occupy a core on purpose, for a demonstration.
+  Refused unless `DEMO_LOAD_ENABLED` is set, which only the disposable kind
+  environment does
 
 ## Links
 
