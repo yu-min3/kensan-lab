@@ -198,6 +198,7 @@ NAMES = (
     "backstage-create",
     "gitea-platform-pr",
     "grafana-app-runtime",
+    "grafana-replicas-3",
 )
 
 
@@ -210,7 +211,8 @@ def main(argv: list[str]) -> int:
             "name the screenshot phase explicitly:\n"
             "  before Golden Path: argocd-tree demo-application backstage-create\n"
             "  with an open PR:    gitea-platform-pr\n"
-            "  once it is running: grafana-app-runtime (EXPLORE_APP=<name>)",
+            "  once it is running: grafana-app-runtime (EXPLORE_APP=<name>)\n"
+            "  after scaling to 3:  grafana-replicas-3 (EXPLORE_APP=<name>)",
             file=sys.stderr,
         )
         return 2
@@ -293,6 +295,23 @@ def main(argv: list[str]) -> int:
                  f"&var-workload={EXPLORE_APP}&refresh=10s",
                  "grafana-app-runtime", settle=6000, height=810,
                  before_shot=collapse_the_menu)
+
+        # Step 8's proof that a Git-driven change took. Argo CD cannot show it:
+        # the app-project AppProject does not whitelist Pod or ReplicaSet, so
+        # its resource tree stops at the Deployment. The Replicas panel is
+        # where the number is legible, and one panel is a better picture than
+        # a second copy of the whole dashboard.
+        if "grafana-replicas-3" in wanted:
+            page.goto("https://grafana.127-0-0-1.sslip.io/d/explore-app-runtime/"
+                      f"explore-app-runtime?var-namespace=app-{EXPLORE_APP}"
+                      f"&var-workload={EXPLORE_APP}&refresh=10s",
+                      wait_until="domcontentloaded")
+            sign_in(page)
+            page.wait_for_timeout(7000)
+            panel = page.locator("section").filter(has_text="Replicas").last
+            path = OUT / "grafana-replicas-3.png"
+            panel.screenshot(path=str(path))
+            print(f"  {path.relative_to(OUT.parent.parent.parent)}")
 
         # Gitea intentionally has a separate local session. Capture the pull
         # request itself rather than the list, so the screenshot shows what the

@@ -9,18 +9,6 @@ the way it undoes.
 Pull requests that touch the platform stand this same environment up on CI and
 sign in to it, so what follows is checked rather than merely written down.
 
-```mermaid
-flowchart LR
-    A[make try] --> B[Argo CD<br/>platform is healthy]
-    B --> C[Demo app<br/>sign in once]
-    C --> D[Backstage<br/>create app2]
-    D --> E[Gitea Actions<br/>test and build app2]
-    E --> F[Gitea<br/>merge platform PR]
-    F --> G[Argo CD<br/>deploys app2 image]
-    G --> H[Grafana<br/>watch CPU]
-    H --> I[Scale app2<br/>Git vs kubectl]
-```
-
 The bare-metal cluster is not required. This walkthrough runs a disposable,
 single-node kind cluster and binds its gateway only to `127.0.0.1`.
 
@@ -303,6 +291,17 @@ Nothing pushes this one back. Argo CD polls Git every three minutes and a
 change can miss one tick, so give it up to five — or press **Refresh** on the
 `app-<name>` Application in Argo CD to skip the wait. The Replicas panel then
 climbs to 3.
+
+![The Replicas panel reading three desired and three available](assets/grafana-replicas-3.png)
+
+```mermaid
+flowchart TD
+    S["Deployment<br/>1 replica"]
+    S -->|"kubectl scale --replicas=3"| X["3 replicas,<br/>for a second or two"]
+    X -->|"Argo CD: Git still says 1"| S
+    S -->|"commit replicas: 3<br/>to deploy/values.yaml"| Y["Argo CD syncs<br/>Application shows 3/3 Healthy"]
+    Y --> Z["Deployment<br/>3 replicas"]
+```
 
 No image is built for that one. The workflow ignores `deploy/`, because what
 lives there is read at runtime rather than baked into the image:
