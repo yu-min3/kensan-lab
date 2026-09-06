@@ -1,23 +1,26 @@
-# Argo CD Application マニフェスト（apps カテゴリ）
+# Argo CD Application manifests (apps category)
 
-このディレクトリには、プラットフォーム上で動く **application** の Argo CD `Application` CR を置く。
-各アプリは専用サブディレクトリを持ち、その中の `app.yaml` が単一の `Application` を定義する。
+Argo CD `Application` CRs for the **applications** running on the platform. Each
+app has its own subdirectory, and the `app.yaml` inside it defines a single
+`Application`.
 
-## ディレクトリ構造
+## Directory structure
 
 ```
 apps/
 ├── app-kensan/
-│   └── app.yaml    # 現行 kensan（in-repo chart + per-app ns、3-source）
+│   └── app.yaml    # the current kensan (in-repo chart + per-app ns, 3 sources)
 └── README.md
 ```
 
-> ⚠️ ファイル名は `app.yaml`（過去ドキュメントの `argocd-apps.yaml` は実体と異なる）。
+> ⚠️ The filename is `app.yaml`. Older documents referring to `argocd-apps.yaml`
+> do not match what is here.
 
-## 実在パターン: in-repo app（app-kensan）
+## The pattern in use: an in-repo app (app-kensan)
 
-現行の app は外部 repo を持たず、この monorepo 内で完結する。`app-kensan/app.yaml` は
-PE 提供の汎用 chart `charts/app-base` を **multi-source** で参照する 3-source 構成:
+The current app has no external repository; it is self-contained in this
+monorepo. `app-kensan/app.yaml` references the PE-provided generic chart
+`charts/app-base` as a **multi-source** Application with three sources:
 
 ```yaml
 apiVersion: argoproj.io/v1alpha1
@@ -26,11 +29,11 @@ metadata:
   name: app-kensan
   namespace: argocd
   annotations:
-    argocd.argoproj.io/sync-options: Prune=false   # Application CR の prune 防止
+    argocd.argoproj.io/sync-options: Prune=false   # protects the Application CR from prune
 spec:
   project: app-project
   sources:
-    # 1. PE 所有の汎用 chart
+    # 1. the generic chart owned by PE
     - repoURL: https://github.com/yu-min3/kensan-lab
       targetRevision: main
       path: charts/app-base
@@ -38,11 +41,11 @@ spec:
         releaseName: app-kensan
         valueFiles:
           - $values/kubernetes/apps/app-kensan/values.yaml
-    # 2. values 参照用 ref
+    # 2. a ref source so the values file can be addressed
     - repoURL: https://github.com/yu-min3/kensan-lab
       targetRevision: main
       ref: values
-    # 3. 生マニフェスト（namespace, PVC, syncthing 等）
+    # 3. raw manifests (namespace, PVC, syncthing, ...)
     - repoURL: https://github.com/yu-min3/kensan-lab
       targetRevision: main
       path: kubernetes/apps/app-kensan/resources
@@ -50,22 +53,26 @@ spec:
         recurse: true
   destination:
     server: https://kubernetes.default.svc
-    namespace: app-kensan           # per-app ns（ADR-006）
+    namespace: app-kensan           # per-app namespace (ADR-006)
   syncPolicy:
     automated: { prune: true, selfHeal: true }
     syncOptions:
-      - CreateNamespace=false       # namespace.yaml（labels 付き）で管理
+      - CreateNamespace=false       # managed by namespace.yaml, which carries the labels
       - ServerSideApply=true
 ```
 
-`charts/app-base` の利用方法は [charts/app-base/README.md](../../../../charts/app-base/README.md) を参照。
-app 固有の値は `kubernetes/apps/app-<name>/values.yaml` に置く。
+How to use `charts/app-base` is documented in
+[charts/app-base/README.md](../../../../charts/app-base/README.md). App-specific
+values go in `kubernetes/apps/app-<name>/values.yaml`.
 
-旧 kensan の `kensan/app.yaml` は Phase 7 cutover（PR #394）で撤去済み。ソースは tag `kensan-legacy-final` にアーカイブ（ADR-017）。
+The old kensan's `kensan/app.yaml` was removed in the Phase 7 cutover (PR #394).
+Its source is archived at the tag `kensan-legacy-final` (ADR-017).
 
-## 将来フロー（予定）: Backstage scaffolded app
+## The planned flow: Backstage-scaffolded apps
 
-外部 app repo を Backstage Software Template で量産する将来フローでは、テンプレートが
-app repo（命名規則 `kensan-lab-apps-<name>`）と、この repo への PR（`Application` CR を含む）を生成し、
-PE がレビュー & マージ → Argo CD が自動 sync、という流れを想定している。
-この自動化はまだ実装段階であり、現状で稼働しているのは上記の in-repo パターンのみ。
+In the future flow, external app repositories are mass-produced from a Backstage
+Software Template. The template creates the app repository (named
+`kensan-lab-apps-<name>`) and a pull request against this repository containing
+the `Application` CR; a platform engineer reviews and merges it, and Argo CD
+syncs automatically. That automation is still being built — the only pattern
+running today is the in-repo one above.

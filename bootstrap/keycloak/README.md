@@ -1,96 +1,103 @@
 # Keycloak Bootstrap (Stage 1)
 
-Vault Stage 1 を起こすために Keycloak 側で必要な OIDC client + user + groups を一括作成するスクリプト。
+A script that creates, in one pass, the OIDC client, user, and groups Keycloak
+needs before Vault Stage 1 can come up.
 
-## なぜ Bootstrap?
+## Why bootstrap at all
 
-Keycloak 自体は GitOps (ArgoCD) で稼働中だが、**realm/groups/user/OIDC client** は GitOps で宣言してない。
+Keycloak itself runs under GitOps (Argo CD), but its **realm, groups, user, and
+OIDC client** are not declared in Git.
 
-選択肢:
-- **A**: 全部 GUI で手動 → 再現性ゼロ
-- **B**: kcadm.sh をスクリプト化（このアプローチ） → 単一ファイル、再現性 OK、依存なし
-- **C**: keycloak-config-cli or Terraform Provider → 宣言的だが依存物多い、Stage 1 にはオーバースペック
+The options were:
 
-Stage 1 の用途（Vault 立ち上げ用 OIDC 1つだけ）には B で十分。
-将来 OIDC client が増えてきたら C に移行検討。
+- **A**: do it all through the GUI — no reproducibility
+- **B**: script `kcadm.sh` (this approach) — one file, reproducible, no dependencies
+- **C**: keycloak-config-cli or the Terraform provider — declarative, but a lot of machinery for Stage 1
 
-## やること
+For what Stage 1 needs — a single OIDC client so Vault can start — B is enough.
+Once there are more OIDC clients, C is worth revisiting.
 
-1. realm `kensan` 作成
-2. groups `platform-admin`, `platform-dev` 作成
-3. user `yu` (email: ymisaki00@gmail.com) を作成 → `platform-admin` に assign
-4. OIDC client `vault` を作成（Vault Stage 1 Bootstrap TF が使う）
-5. client_secret + user password を Bitwarden に保存（既存アイテムは現在値で更新。旧値は password history に残る）
+## What it does
 
-## 前提
+1. Creates the realm `kensan`
+2. Creates the groups `platform-admin` and `platform-dev`
+3. Creates the user `yu` (email: ymisaki00@gmail.com) and assigns it to `platform-admin`
+4. Creates the OIDC client `vault`, used by the Vault Stage 1 bootstrap Terraform
+5. Stores the client secret and user password in Bitwarden (existing items are updated to the current value; the old value stays in the password history)
 
-- kubectl context が kensan-lab cluster
-- Keycloak が `platform-auth-prod` namespace で稼働中
-- Bitwarden CLI (`bw`) install + login + unlock 済み
+## Prerequisites
+
+- `kubectl` context pointing at the kensan-lab cluster
+- Keycloak running in the `platform-auth-prod` namespace
+- Bitwarden CLI (`bw`) installed, logged in, and unlocked
   ```bash
   export BW_SESSION=$(bw unlock --raw)
   ```
-- `jq`, `openssl` install 済み
+- `jq` and `openssl` installed
 
-## 実行
+## Running it
 
 ```bash
 chmod +x bootstrap/keycloak/setup.sh
 ./bootstrap/keycloak/setup.sh
 ```
 
-冪等。Keycloak の既存リソースは skip する（既存 user のパスワードは触らない）。
-**client secret 系の Bitwarden アイテムは常に Keycloak の現在値に同期される**ので、再実行は secret drift（disaster recovery で realm を作り直した後など）の修復手段としても使える。
+It is idempotent: existing Keycloak resources are skipped, and an existing user's
+password is left alone. **The client-secret items in Bitwarden are always synced
+to Keycloak's current value**, so re-running it also repairs secret drift — after
+rebuilding the realm during a disaster recovery, for instance.
 
-> **例外**: `user-yu` のパスワードは既存 user に対しては同期されない（script が勝手に
-> reset しないため）。手動で reset した場合は Bitwarden の `kensan-lab/keycloak/user-yu`
-> も**手動で**更新すること。
+> **Exception**: the password for `user-yu` is not synced for an existing user,
+> because the script does not reset it on its own. If you reset it by hand, update
+> `kensan-lab/keycloak/user-yu` in Bitwarden **by hand** as well.
 
-> **注意**: client `vault` の secret が再生成された場合、Vault の `auth/oidc/config` への反映は別途必要。
-> bootstrap TF の state は廃棄済みのため `vault write auth/oidc/config ...` で直接更新する
-> （手順は script 実行時に表示される。実例: 2026-06-06 の Vault OIDC ログイン不能インシデント）。
+> **Note**: if the `vault` client's secret is regenerated, Vault's
+> `auth/oidc/config` has to be updated separately. The bootstrap Terraform state
+> has been discarded, so update it directly with `vault write auth/oidc/config ...`
+> — the script prints the exact steps when it runs. (This happened for real: the
+> Vault OIDC login outage of 2026-06-06.)
 
-## 出力されるもの
+## What it produces
 
-| 場所 | 内容 |
+| Where | What |
 |------|------|
-| Bitwarden `kensan-lab/keycloak/oidc-client-vault` | client_id (`vault`) + client_secret |
-| Bitwarden `kensan-lab/keycloak/user-yu` | username (`yu`) + password |
-| Keycloak realm `kensan` | groups, user, OIDC client が揃った状態 |
+| Bitwarden `kensan-lab/keycloak/oidc-client-vault` | client_id (`vault`) and client_secret |
+| Bitwarden `kensan-lab/keycloak/user-yu` | username (`yu`) and password |
+| Keycloak realm `kensan` | the groups, user, and OIDC client, all in place |
 
-## 次のステップ
+## Next step
 
-このスクリプトの後、Vault Stage 1 を立ち上げる:
+After this script, bring up Vault Stage 1:
 
 ```bash
-# 1. Vault が ArgoCD でデプロイ済み・Pod が Running なことを確認
+# 1. confirm Vault has been deployed by Argo CD and its pod is Running
 kubectl -n vault get pod
 
-# 2. Vault 初期化（一度だけ）
+# 2. initialise Vault (once only)
 kubectl -n vault exec -it vault-0 -- vault operator init \
   -recovery-shares=5 -recovery-threshold=3
-# → root token と Recovery Keys が表示される
-# → Bitwarden に保存:
+# → prints the root token and the recovery keys
+# → store them in Bitwarden:
 #     kensan-lab/vault/root-token
 #     kensan-lab/vault/recovery-keys
 
-# 3. Bootstrap TF
+# 3. bootstrap Terraform
 cd bootstrap/vault
-cp terraform.tfvars.example terraform.tfvars  # 値を埋める
+cp terraform.tfvars.example terraform.tfvars  # fill in the values
 terraform init
 terraform apply
 
-# 4. State 廃棄（Pattern A'：bootstrap 後は VCO が引き継ぐ）
+# 4. discard the state (Pattern A': VCO takes over after bootstrap)
 rm -f terraform.tfstate*
 ```
 
-詳細は `bootstrap/vault/README.md` 参照。
+See `bootstrap/vault/README.md` for the details.
 
-## 削除（やり直したいとき）
+## Starting over
 
 ```bash
-# realm を消して setup.sh を再実行すれば、Bitwarden は新しい値に自動更新される
-# (旧値は password history に残る。item の手動削除は不要)
+# delete the realm and re-run setup.sh; Bitwarden is updated to the new values
+# (the old values remain in the password history — no need to delete items by hand)
 kubectl -n platform-auth-prod exec -it deployment/keycloak -- \
   /opt/keycloak/bin/kcadm.sh delete realms/kensan
 ```

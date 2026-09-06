@@ -1,81 +1,90 @@
-## Vault Database Secret Engine
+# Vault Database Secret Engine
 
-Postgres instance に対する **動的 user (TTL 付き短命 cred)** 払い出し基盤。
-1 instance ぶんで **Vault 側 (config + role + auth role) と app 側 (SA + ExternalSecret + VaultDynamicSecret) の 6 リソース** を 1 chart で render する。
-app Pod は K8s Secret 経由で短命 cred を読み、ESO が TTL 切れ前に refresh して Secret を更新する。
+The platform for issuing **dynamic users — short-lived credentials with a TTL —**
+against a Postgres instance. One chart renders **six resources for a single
+instance: the Vault side (config + role + auth role) and the app side (SA +
+ExternalSecret + VaultDynamicSecret)**. The application pod reads the short-lived
+credential from a Kubernetes Secret, and ESO refreshes that Secret before the TTL
+expires.
 
-## 構成
+## Layout
 
 ```
 kubernetes/secrets/vault-database-engine/
-├── chart/                                # Helm chart (PE 管理、不動)
+├── chart/                                # Helm chart (PE-owned, does not move)
 │   ├── Chart.yaml
-│   ├── values.yaml                       # PE 規約のデフォルト値 (TTL / Vault path 規約 / ESO provider 等)
+│   ├── values.yaml                       # PE defaults (TTLs, Vault path convention, ESO provider, ...)
 │   └── templates/
-│       ├── _helpers.tpl                  # smart default + override の derive logic
-│       ├── connection.yaml               # DatabaseSecretEngineConfig    (Vault-side, vault ns)
-│       ├── role.yaml                     # DatabaseSecretEngineRole      (Vault-side, vault ns)
-│       ├── vault-auth-role.yaml          # KubernetesAuthEngineRole      (Vault-side, vault ns)
+│       ├── _helpers.tpl                  # the smart-default / override derivation logic
+│       ├── connection.yaml               # DatabaseSecretEngineConfig    (Vault side, vault ns)
+│       ├── role.yaml                     # DatabaseSecretEngineRole      (Vault side, vault ns)
+│       ├── vault-auth-role.yaml          # KubernetesAuthEngineRole      (Vault side, vault ns)
 │       ├── eso-sa.yaml                   # ServiceAccount vault-db-<basename>  (app ns)
 │       ├── eso-vault-dynamic-secret.yaml # VaultDynamicSecret (generator)      (app ns)
 │       └── eso-external-secret.yaml      # ExternalSecret                       (app ns)
-├── shared/                               # capability bootstrap (1 度だけ)
+├── shared/                               # capability bootstrap, applied once
 │   ├── mount.yaml                        # SecretEngineMount (database/)
-│   ├── policy-eso-read.yaml              # ESO 用 Vault policy (database/creds/* read)
-│   ├── ccnp-postgres-ingress.yaml        # CCNP: managed ns Postgres ← vault TCP/5432 (cluster-wide)
-│   └── cnp-vault-egress.yaml             # CNP: vault → managed ns Postgres TCP/5432 (vault ns)
+│   ├── policy-eso-read.yaml              # Vault policy for ESO (read on database/creds/*)
+│   ├── ccnp-postgres-ingress.yaml        # CCNP: managed-ns Postgres ← vault, TCP/5432 (cluster-wide)
+│   └── cnp-vault-egress.yaml             # CNP: vault → managed-ns Postgres, TCP/5432 (vault ns)
 └── platform-values/
-    └── vault-database/                   # capability convention dir — instance 1 つにつき 1 ファイル
-        └── (現在 instance なし)           # 例: kensan-dagster.yaml (kensan-legacy 撤去 #403 で削除。ADR-019 で keycloak も revert)
+    └── vault-database/                   # capability convention dir — one file per instance
+        └── (no instances at present)      # e.g. kensan-dagster.yaml, removed with kensan-legacy in #403; keycloak reverted in ADR-019
 ```
 
-ArgoCD 側:
-- `applications/secrets/vault-database-engine/app-shared.yaml` — single Application、`shared/` を sync (mount + policy 1 度だけ)
-- `applications/secrets/vault-database-engine/applicationset-instances.yaml` — ApplicationSet、values file を recursive glob (`**/platform-values/vault-database/*.yaml`) で discover、per-instance ArgoCD app を auto 生成
+On the Argo CD side:
 
-## 適用範囲
+- `applications/secrets/vault-database-engine/app-shared.yaml` — a single Application syncing `shared/` (the mount and policy, once)
+- `applications/secrets/vault-database-engine/applicationset-instances.yaml` — an ApplicationSet that discovers values files by recursive glob (`**/platform-values/vault-database/*.yaml`) and generates one Argo CD app per instance
 
-この chart は **dynamic credential を K8s Secret に同期し、consumer Pod が env / secretKeyRef で読む** 方式を採る。
-Secret 更新を実行中プロセスへ反映するには Reloader による rolling restart か、アプリ側の明示的な credential reload が必要。
+## Where this applies
 
-そのため Keycloak / Backstage / Polaris のような長寿命 service、schema owner を持つ service、restart が user session や catalog availability に直結する service には使わない。
-現行の使用対象は Dagster system DB のみ。
+This chart syncs the dynamic credential into a Kubernetes Secret, which the
+consumer pod reads through `env` or `secretKeyRef`. Getting an updated Secret
+into a running process needs either a rolling restart via Reloader or an explicit
+credential reload in the application.
 
-## 設計の核: smart default + override
+For that reason it is not used for long-lived services such as Keycloak,
+Backstage, or Polaris, for services that own a schema, or for any service where a
+restart directly costs user sessions or catalog availability. The only current
+target is the Dagster system database.
 
-PE が chart の `values.yaml` で **convention based デフォルト** を埋め、AD は **必須項目のみ** 書く。
-追加要素が convention と異なる場合だけ override する。
+## The core idea: smart defaults plus overrides
 
-### AD が書く項目 (デフォルトと違う場合)
+PE fills in **convention-based defaults** in the chart's `values.yaml`, and an app
+developer writes **only the required fields**, overriding only where something
+differs from the convention.
 
-| キー | 必須? | デフォルト | 補足 |
+### What an app developer writes (when it differs from the default)
+
+| Key | Required? | Default | Notes |
 |---|---|---|---|
-| `ns` | ✅ 必須 | なし | deploy 先 K8s namespace。`host` を直接指定しない場合は必須 |
-| `rootOwner` | 任意 | filename basename | Bitnami `auth.username` と一致する想定。違う場合のみ override |
-| `dbName` | 任意 | `rootOwner` 流用 | Bitnami `auth.database` (default = auth.username) と整合 |
-| `host` | 任意 | `<releaseName>.<ns>.svc.cluster.local` | FQDN を直接指定したい場合 |
-| `releaseName` | 任意 | `postgresql` | Bitnami release 名が標準と異なる場合 |
-| `name` | 任意 | `postgres-<filename-basename>` (AppSet 自動 inject) | 通常書かない |
-| `ttl` / `maxTtl` | 任意 | `24h` / `72h` | 短命化したい instance のみ |
-| `targetSecretName` | 任意 | `<name>-cred` | app Pod 既存 env が読んでる Secret 名と揃えたい時のみ |
-| `keyMapping.user` / `.password` | 任意 | `POSTGRES_USER` / `POSTGRES_PASSWORD` | app Pod env が別 key 名を期待する場合 |
-| `esoRefreshInterval` | 任意 | `12h` | TTL 24h の半分。短くしたい instance のみ |
+| `ns` | ✅ required | none | The Kubernetes namespace to deploy into. Required unless `host` is given directly |
+| `rootOwner` | optional | the filename basename | Expected to match Bitnami's `auth.username`. Override only when it does not |
+| `dbName` | optional | reuses `rootOwner` | Consistent with Bitnami's `auth.database` (which defaults to `auth.username`) |
+| `host` | optional | `<releaseName>.<ns>.svc.cluster.local` | To give an FQDN directly |
+| `releaseName` | optional | `postgresql` | When the Bitnami release name is non-standard |
+| `name` | optional | `postgres-<filename-basename>`, injected by the AppSet | Normally left unset |
+| `ttl` / `maxTtl` | optional | `24h` / `72h` | Only for instances that need a shorter life |
+| `targetSecretName` | optional | `<name>-cred` | Only to match a Secret name the app pod's existing env already reads |
+| `keyMapping.user` / `.password` | optional | `POSTGRES_USER` / `POSTGRES_PASSWORD` | When the app pod's env expects different key names |
+| `esoRefreshInterval` | optional | `12h` | Half of the 24 h TTL. Only for instances that need it shorter |
 
-### PE 側の convention (chart 内に閉じる)
+### The PE-side conventions (contained in the chart)
 
-| 項目 | 値 |
+| Item | Value |
 |---|---|
-| Vault role 命名 | `postgres-<filename-basename>` (filename → AppSet が inject) |
-| Vault KV admin path | `secret/data/db-admin/<name>` (完全自動、AD には見えない) |
-| KV キー名 | `username` / `password` (固定) |
+| Vault role naming | `postgres-<filename-basename>`, injected by the AppSet from the filename |
+| Vault KV admin path | `secret/data/db-admin/<name>` — fully automatic, invisible to the app developer |
+| KV key names | `username` / `password`, fixed |
 | Postgres host pattern | `<releaseName>.<ns>.svc.cluster.local` |
-| ESO Vault provider | `external-secrets` SA (operator central) で kubernetes auth |
-| 生成 Secret default 名 | `<name>-cred` (e.g., `postgres-backstage-cred`) |
-| Secret default key 名 | `POSTGRES_USER` / `POSTGRES_PASSWORD` (Bitnami 標準) |
+| ESO Vault provider | Kubernetes auth as the `external-secrets` SA (the operator's central SA) |
+| Default generated Secret name | `<name>-cred` (e.g. `postgres-backstage-cred`) |
+| Default Secret key names | `POSTGRES_USER` / `POSTGRES_PASSWORD`, the Bitnami standard |
 
-## 1 instance 追加方法 (AD 視点)
+## Adding one instance (from the app developer's side)
 
-(1) values file を 1 個書く + (2) deploy 先 ns に label を 1 個付ける、の 2 ステップ。
+Two steps: (1) write one values file, (2) add one label to the target namespace.
 
 ```yaml
 # (1) <owner-dir>/platform-values/vault-database/<instance>.yaml
@@ -83,100 +92,133 @@ ns: my-app
 ```
 
 ```yaml
-# (2) app 側 namespace.yaml (per-app-ns 移行後は app の repo 配下)
+# (2) the app's namespace.yaml (under the app's own repo once per-app namespaces land)
 apiVersion: v1
 kind: Namespace
 metadata:
   name: my-app
   labels:
-    kensan-lab.platform/vault-managed-postgres: "true"  # ← Vault → Postgres TCP/5432 を許可
+    kensan-lab.platform/vault-managed-postgres: "true"  # permits Vault → Postgres on TCP/5432
 ```
 
-ns label は cluster-wide CCNP/CNP (`shared/`) が opt-in で拾うため必須。これを付けないと VCO は Postgres に接続できず動的 user 払い出しが fail する。
+The namespace label is required, because the cluster-wide CCNP and CNP in
+`shared/` pick namespaces up on an opt-in basis. Without it VCO cannot reach
+Postgres and dynamic user issuance fails.
 
-これだけで以下が自動的に成立:
-- Vault role 名 = `postgres-<instance>` (filename から)
-- Postgres host = `postgresql.my-app.svc.cluster.local`
-- DB 名 / owner = `<instance>` (filename basename)
-- Vault KV admin path = `secret/data/db-admin/postgres-<instance>` (PE convention)
-- `my-app` ns に K8s Secret `postgres-<instance>-cred` (key: `POSTGRES_USER` / `POSTGRES_PASSWORD`) が生成される
-- ESO が 12h ごとに動的 user を更新
+That alone establishes:
 
-異常系を override する場合のみ追加で書く:
+- Vault role name `postgres-<instance>`, taken from the filename
+- Postgres host `postgresql.my-app.svc.cluster.local`
+- Database name and owner `<instance>` (the filename basename)
+- Vault KV admin path `secret/data/db-admin/postgres-<instance>` (the PE convention)
+- A Kubernetes Secret `postgres-<instance>-cred` in the `my-app` namespace, with the keys `POSTGRES_USER` and `POSTGRES_PASSWORD`
+- ESO refreshing the dynamic user every 12 h
+
+Write more only to override an unusual case:
+
 ```yaml
 ns: my-app
-releaseName: my-postgres-release  # Bitnami 以外
-rootOwner: my_app_db_user         # auth.username が default と異なる
-dbName: my_app_db                 # auth.database が異なる
-host: my-postgres.example.com     # FQDN 直接指定
-keyMapping:                       # app Pod env が別 key 名を期待する場合
+releaseName: my-postgres-release  # something other than Bitnami
+rootOwner: my_app_db_user         # auth.username differs from the default
+dbName: my_app_db                 # auth.database differs
+host: my-postgres.example.com     # an FQDN given directly
+keyMapping:                       # the app pod's env expects different key names
   user: MY_APP_DB_USER
   password: MY_APP_DB_PASSWORD
-targetSecretName: my-app-postgres-cred  # 旧 static Secret 名と揃えたい場合
+targetSecretName: my-app-postgres-cred  # to match the old static Secret name
 ```
 
-### app Pod の Secret 切り替え (Phase 5c で別 PR)
+### Switching the app pod's Secret (a separate PR, Phase 5c)
 
-新しい Secret (`<name>-cred`) と旧 static Secret は **別物**。app Pod の `envFrom.secretRef.name` (もしくは Pod env の各 key 参照) を新 Secret 名に向ける PR が必要。
-key 名は default で Bitnami 標準 (`POSTGRES_USER` / `POSTGRES_PASSWORD`) なので、Pod 側 env 名はそのままで OK。ただし dagster のように既存 env 名が `DAGSTER_PG_USER` / `DAGSTER_PG_PASSWORD` の場合は values で `keyMapping` を override しておく (この場合も Pod 側コードは不変)。
+The new Secret (`<name>-cred`) and the old static Secret are **different objects**.
+A PR is needed to point the app pod's `envFrom.secretRef.name` — or its individual
+key references — at the new Secret. The key names default to the Bitnami standard
+(`POSTGRES_USER` / `POSTGRES_PASSWORD`), so pod-side env names usually stay as
+they are. Where they do not — Dagster, for instance, expects `DAGSTER_PG_USER` and
+`DAGSTER_PG_PASSWORD` — override `keyMapping` in the values file; the pod's code
+still does not change.
 
-## relocate (per-app ns 移行後)
+## Relocating (after the move to per-app namespaces)
 
-values file を `git mv` するだけ:
+Just `git mv` the values file:
+
 ```bash
 git mv kubernetes/secrets/vault-database-engine/platform-values/vault-database/<name>.yaml \
        apps/<app>/platform-values/vault-database/<name>.yaml
 ```
-AppSet の `**/platform-values/vault-database/*.yaml` glob が auto 追従。
 
-## 設計メモ
+The AppSet's `**/platform-values/vault-database/*.yaml` glob follows automatically.
 
-### root user は既存 Bitnami app user を流用
+## Design notes
 
-Bitnami PostgreSQL chart `auth.enablePostgresUser: false` (default) では `POSTGRES_USER` (= app user) に Superuser + CREATEROLE 等の全特権が付く。`postgres` role 自体は存在しない。
-追加セットアップ不要で既存 user をそのまま root として使える。
+### The root user reuses the existing Bitnami app user
 
-将来 app 側を動的 user に切替終わった段階で、これら app user の SUPERUSER 権限剥奪 (= app は短命の制限付き user で接続、人間 admin のみ super) に再設計する余地あり。
+With the Bitnami PostgreSQL chart's default `auth.enablePostgresUser: false`, the
+`POSTGRES_USER` (the app user) receives every privilege including Superuser and
+CREATEROLE, and no `postgres` role exists at all. That user can therefore serve as
+the root user with no extra setup.
 
-### Vault KV admin cred の convention path
+Once applications have finished moving to dynamic users, there is room to redesign
+this — stripping SUPERUSER from those app users, so applications connect as
+short-lived restricted users and only human administrators are superusers.
 
-新 convention path: `secret/data/db-admin/<name>` (keys: `username` / `password`)。
-本 PR の merge 前に、旧 path (Stage 3/3.5 で投入された static admin cred) からこの path に admin cred を複製する一度きりの migration を実施済み (script は実行後に削除、git 履歴参照)。
-旧 path は app の既存 ExternalSecret consumer がまだ読んでいるため残置。Pod env 切り替え (Phase 5c) 完了後に旧 path も削除する。
+### The convention path for the Vault KV admin credential
 
-### ESO consumer-side の auth model (per-instance SA)
+The convention path is `secret/data/db-admin/<name>`, with the keys `username`
+and `password`. Before this work merged, a one-off migration copied the admin
+credential from the old path — the static admin credential loaded in Stage 3/3.5 —
+into it; the script was deleted after running and is in the git history. The old
+path is left in place because existing ExternalSecret consumers still read it, and
+is removed once the pod env switch (Phase 5c) is complete.
 
-VaultDynamicSecret は **namespace-scoped CR** で `serviceAccountRef.namespace` フィールドが無視される (CRD spec: "Ignored if referent is not cluster-scoped")。
-そのため ESO operator central SA (`external-secrets/external-secrets`) は app ns から流用できない。
+### The consumer-side ESO auth model (a per-instance SA)
 
-代わりに per-instance で SA + Vault auth role を作る:
+`VaultDynamicSecret` is a **namespace-scoped CR**, and its
+`serviceAccountRef.namespace` field is ignored — the CRD spec says "Ignored if
+referent is not cluster-scoped". The operator's central SA
+(`external-secrets/external-secrets`) therefore cannot be borrowed from the app
+namespace.
 
-| リソース | 場所 | 名前 | 役割 |
+Instead, an SA and a Vault auth role are created per instance:
+
+| Resource | Where | Name | Role |
 |---|---|---|---|
-| ServiceAccount | app ns | `vault-db-<basename>` | VaultDynamicSecret の auth |
-| KubernetesAuthEngineRole | vault ns | `vault-db-<basename>` | 上記 SA を bind、policy `eso-read` を付与 |
+| ServiceAccount | app ns | `vault-db-<basename>` | Authentication subject for VaultDynamicSecret |
+| KubernetesAuthEngineRole | vault ns | `vault-db-<basename>` | Binds that SA and grants the `eso-read` policy |
 
-policy 自体は共有 `eso-read` (本 chart `shared/policy-eso-read.yaml`) を流用。`database/creds/*` 全体に read 権があるので、必要なら将来 per-instance policy に絞る余地あり。
+The policy itself is the shared `eso-read` (`shared/policy-eso-read.yaml` in this
+chart). It grants read across all of `database/creds/*`, so there is room to narrow
+it to a per-instance policy later if needed.
 
-これらは chart が自動 render するので、AD values file は変更不要 (1 instance 増やすたびに SA/Vault role が同名規約で生成される)。
+The chart renders all of this, so the app developer's values file does not change:
+adding an instance generates the SA and Vault role under the same naming
+convention.
 
-### `eso-read` policy の管理場所
+### Where the `eso-read` policy is managed
 
-bootstrap chain (TF) で必要な policy は admin / vco-admin の 2 つだけ。それ以外 (eso-read 等) は VCO 起動後に CR で作る方針に統一。本 chart の `shared/policy-eso-read.yaml` が SoT。`bootstrap/vault/policies.tf` からは `vault_policy "eso_read"` resource を削除済み。
+The bootstrap chain (Terraform) needs only two policies, admin and vco-admin.
+Everything else — `eso-read` among them — is created as a CR once VCO is running.
+`shared/policy-eso-read.yaml` in this chart is the source of truth; the
+`vault_policy "eso_read"` resource has been removed from `bootstrap/vault/policies.tf`.
 
-### 共通 convention: `<owner-dir>/platform-values/<capability>/<instance>.yaml`
+### The shared convention: `<owner-dir>/platform-values/<capability>/<instance>.yaml`
 
-本 capability (vault-database) で確立した convention は、将来の他 platform 機能 (vault-pki / monitoring rules / network-policy 等) でも同様に使い回す前提。各 capability ごとに ApplicationSet を 1 個立て、glob `**/platform-values/<capability>/*.yaml` で discover する。
+The convention established by this capability (vault-database) is meant to carry
+over to future platform capabilities — vault-pki, monitoring rules, network
+policy, and so on. Each capability gets one ApplicationSet, discovering instances
+through the glob `**/platform-values/<capability>/*.yaml`.
 
-### 別 repo 対応 (将来)
+### Supporting separate repositories (future)
 
-別 repo の app を扱いたくなったら ApplicationSet generator に `scmProvider` を `merge` で追加:
+To handle apps in other repositories, add an `scmProvider` generator to the
+ApplicationSet with `merge`:
+
 ```yaml
 generators:
   - merge:
       mergeKeys: [name]
       generators:
-        - git: { ... }                                          # 今
+        - git: { ... }                                          # today
         - scmProvider:
             github: { organization: yu-min3 }
             filters:
@@ -184,29 +226,29 @@ generators:
               - repositoryMatch: "^app-.*"
 ```
 
-## 動作確認方法
+## How to verify it works
 
 ```bash
-# 1. 全 ArgoCD app が Healthy
+# 1. every Argo CD app is Healthy
 kubectl get app -n argocd | grep vault-db
 
-# 2. Vault に mount + connection + role が入っている
-kubectl exec -n vault vault-0 -c vault -- vault secrets list  # database/ あり
+# 2. the mount, connection, and role are present in Vault
+kubectl exec -n vault vault-0 -c vault -- vault secrets list  # database/ is listed
 kubectl exec -n vault vault-0 -c vault -- vault list database/config
 kubectl exec -n vault vault-0 -c vault -- vault list database/roles
 
-# 3. 動的 cred 払い出しテスト (Vault 直。<basename> は instance 名)
+# 3. issue a dynamic credential directly from Vault (<basename> is the instance name)
 kubectl exec -n vault vault-0 -c vault -- vault read database/creds/postgres-<basename>
-# → username + password が払い出される
-# Postgres 側で \du すると一時 user が見える、TTL 切れで DROP USER される
+# → returns a username and password
+# \du in Postgres shows the temporary user; it is dropped when the TTL expires
 
-# 4. ESO 経由で K8s Secret が生成されている
+# 4. the Kubernetes Secret has been created through ESO
 kubectl get secret -n <app-ns> postgres-<basename>-cred
 
-# 5. ExternalSecret status (各 app ns で SecretSynced=True)
+# 5. ExternalSecret status (SecretSynced=True in each app namespace)
 kubectl get externalsecret -A | grep postgres-
 
-# 6. 中身確認 (user/password が動的 user 名になっている)
-kubectl get secret -n <app-ns> postgres-<basename>-cred -o jsonpath='{.data.POSTGRES_USER}' | base64 -d
-# → v-kubernet-postgres-... のような Vault 動的 user 名
+# 6. confirm the synced user is a Vault dynamic user
+kubectl describe secret -n <app-ns> postgres-<basename>-cred
+# → the key names are listed; the issued username has the form v-kubernet-postgres-...
 ```

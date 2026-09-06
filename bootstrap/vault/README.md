@@ -1,151 +1,164 @@
 # bootstrap/vault — Vault Bootstrap (Pattern A')
 
-このディレクトリは **Vault HA cluster の信頼ルート設定**を Terraform で行う。
-secrets-phase1-design.md の **Pattern A'（TF 使い捨て）**の実体。
+This directory configures the **root of trust for the Vault HA cluster** with
+Terraform. It is the implementation of **Pattern A' — throwaway Terraform**.
 
-## 位置付け
+## Where it sits
 
-| 役割 | 担当 |
+| Role | Owner |
 |---|---|
-| **一回限り**: auth methods enable, OIDC config, root admin policy, K8s auth roles, KV mount, audit device enable | **このディレクトリ (Terraform)** |
-| **永続的**: per-app policy, per-app KV path, DB role 等 | vault-config-operator (CRD) via ArgoCD |
+| **Once only**: enabling auth methods, OIDC config, the root admin policy, Kubernetes auth roles, the KV mount, enabling the audit device | **This directory (Terraform)** |
+| **Ongoing**: per-app policies, per-app KV paths, database roles, and so on | vault-config-operator (CRDs) through Argo CD |
 
-apply 完了後 **state は破棄する**。再実行は新規 cluster 構築 / DR 復旧時のみ。
+**The state is discarded after apply.** It is run again only when building a new
+cluster or recovering from disaster.
 
-## なぜ Bootstrap TF が必要か (鶏卵問題の解)
+## Why a bootstrap Terraform is needed (the chicken-and-egg problem)
 
-ArgoCD + Helm だけで Vault を運用したいところだが、**鶏卵問題が 2 つ**ある。
+Running Vault under Argo CD and Helm alone would be preferable, but there are
+**two chicken-and-egg problems**.
 
-### 鶏卵その 1: VCO bootstrap (これが本命)
+### Problem 1: bootstrapping VCO (the real one)
 
-`vault-config-operator (VCO)` は Vault 設定を CRD で管理する operator。
-だが VCO 自身が Vault に認証するためには K8s auth method + role が要る。
-そして K8s auth method の enable と role 作成こそが「Vault 設定を変える」操作。
+`vault-config-operator` (VCO) manages Vault configuration through CRDs. But for
+VCO itself to authenticate to Vault, a Kubernetes auth method and role must
+exist — and enabling that auth method and creating that role *is* an operation
+that changes Vault configuration.
 
 ```
-VCO が Vault 設定を変える → "auth method を有効化したい"
+VCO wants to change Vault config → "enable an auth method"
    ↓
-VCO は Vault に認証要求 → "kubernetes auth method 使う"
+VCO authenticates to Vault      → "using the kubernetes auth method"
    ↓
-"kubernetes auth method はまだ有効化されてない"  ← 詰む
+"the kubernetes auth method is not enabled yet"   ← deadlock
 ```
 
-→ **誰かが先に外から** auth method を enable + VCO role を作る必要がある。
-   それが Bootstrap TF。一回これをやれば、以降は VCO が永続管理を引き継ぐ。
+**Someone has to enable the auth method and create the VCO role from outside**
+first. That is the bootstrap Terraform. Do it once, and VCO takes over ongoing
+management from there.
 
-### 鶏卵その 2: Keycloak ↔ Vault (#4 で別解決済み)
+### Problem 2: Keycloak ↔ Vault (resolved separately)
 
-- Vault は Keycloak で人間 OIDC 認証する (Vault → Keycloak 依存)
-- もし Keycloak の DB 認証を Vault dynamic creds にすると逆方向の依存も発生 = 循環
+- Vault authenticates humans through Keycloak (Vault depends on Keycloak)
+- If Keycloak's database credentials came from Vault dynamic credentials, the dependency would also run the other way — a cycle
 
-→ secrets-phase1-design.md #4 で、**Keycloak の DB 認証は Sealed Secrets で永続静的管理** することに確定。
-   これで Keycloak は Vault に依存しない (片道のみ)、循環解消。
+The resolution is that **Keycloak's database credentials stay statically managed
+through Sealed Secrets**. Keycloak therefore does not depend on Vault, the
+dependency is one-way, and the cycle is gone. See
+[ADR-019](../../docs/adr/019-keycloak-db-credentials-revert-to-static.md) for how
+that decision was reached, revisited, and reverted.
 
-### なぜ ArgoCD + Helm だけで bootstrap できないか
+### Why Argo CD and Helm cannot do this bootstrap
 
-ArgoCD/Helm が触れる範囲は **K8s manifest (Pod, Service, PVC 等) だけ**。
-Vault の auth methods / policies / secret engines / OIDC config は **Vault 内部の状態**で、
-Vault API (HTTP / CLI) でしか操作できない。ArgoCD は Vault API call の能力なし。
+Argo CD and Helm reach **Kubernetes manifests only** — pods, services, PVCs.
+Vault's auth methods, policies, secret engines, and OIDC config are **state inside
+Vault**, reachable only through the Vault API (HTTP or CLI). Argo CD cannot make
+Vault API calls.
 
 ```
-┌─ ArgoCD/Helm が触れる範囲 ─┐
-│  K8s manifest                │ ← ここまではフル GitOps
-│  - Vault server pod          │
-│  - VCO pod, ESO pod          │
+┌─ what Argo CD / Helm reach ──┐
+│  Kubernetes manifests        │ ← fully GitOps up to here
+│  - the Vault server pod      │
+│  - the VCO pod, the ESO pod  │
 └──────────────────────────────┘
               ↓
-┌─ ここから Vault の "中身" ────────┐
-│  auth methods, policies,        │ ← K8s manifest じゃない、
-│  secret engines, OIDC config    │   Vault API でしか触れない
-└──────────────────────────────────┘
+┌─ from here down: Vault's own contents ─┐
+│  auth methods, policies,               │ ← not Kubernetes manifests;
+│  secret engines, OIDC config           │   only reachable via the Vault API
+└────────────────────────────────────────┘
               ↑
         ┌─────┴─────┐
         │           │
-   [Bootstrap TF]  [VCO (CRD via ArgoCD)]
-   一回限り        永続管理
+   [bootstrap TF]  [VCO (CRDs via Argo CD)]
+   once only       ongoing management
 ```
 
-### Pattern A vs A' (なぜ TF を選んだか)
+### Pattern A vs A' (why Terraform)
 
-| | Pattern A (純 GitOps) | Pattern A' (採用) |
+| | Pattern A (pure GitOps) | Pattern A' (adopted) |
 |---|---|---|
-| Bootstrap | Helm chart の post-install Job で bash + vault CLI | Terraform 1 回 apply、state 破棄 |
-| GitOps 純度 | ◎ | ◯ (TF は外で 1 回だけ) |
-| 読みやすさ | △ bash は脆い、root token 扱いが汚い | ◎ HCL で宣言的 |
-| 冪等性 | 自前 | TF が面倒見る |
-| 再現性 | scripts/ 配下に置けば OK | このディレクトリそのもの |
+| Bootstrap | bash plus the vault CLI in a Helm post-install Job | One `terraform apply`, then discard the state |
+| GitOps purity | ◎ | ◯ (Terraform runs outside, once) |
+| Readability | △ bash is brittle, and root-token handling gets ugly | ◎ declarative HCL |
+| Idempotence | hand-rolled | Terraform handles it |
+| Reproducibility | fine if kept under `scripts/` | this directory itself |
 
-Pattern A' は「bash の脆さを TF で代替、ただし state は持たない」が要旨。
-state を持たないので **永続的な Vault 設定**は VCO + ArgoCD に任せられる (思想を保てる)。
+Pattern A' amounts to "replace the brittleness of bash with Terraform, but hold no
+state". Holding no state is what lets **ongoing Vault configuration** stay with
+VCO and Argo CD, keeping the original intent intact.
 
-詳細な設計判断の経緯は `docs/bootstrapping/vault-stage1.md`（Stage 1 完了後に作成予定）に集約する。
+The manual steps that precede this, and the SealedSecret for KMS auto-unseal, are
+documented in [`docs/bootstrapping/vault-stage1.md`](../../docs/bootstrapping/vault-stage1.md).
 
-## Stage 1 全体フロー
+## The whole Stage 1 flow
 
 ```mermaid
 flowchart TB
-    A["ArgoCD wave -3〜2:<br/>Cilium / Istio / cert-manager /<br/>Sealed Secrets / Keycloak<br/>(既存)"]
-    B["ArgoCD wave 5:<br/>Vault HA Helm chart<br/>(kubernetes/secrets/vault/)"]
-    C["ArgoCD wave 6:<br/>External Secrets Operator<br/>(kubernetes/secrets/external-secrets/)"]
-    D["ArgoCD wave 7:<br/>Vault Config Operator<br/>(kubernetes/secrets/vault-config-operator/)"]
-    E["**手動: vault operator init**<br/>Recovery Keys を 1Password へ<br/>root token 控える"]
-    F["**手動: terraform apply**<br/>(このディレクトリ)<br/>auth methods + OIDC + roles +<br/>policies + KV mount + audit"]
-    G["**手動: state 破棄 + root token revoke**"]
-    H["✓ Stage 1 完了<br/>VCO/ESO が自動認証開始<br/>Stage 2 で Grafana admin pw 移行へ"]
+    A["Argo CD waves -3 to 2:<br/>Cilium / Istio / cert-manager /<br/>Sealed Secrets / Keycloak<br/>(already in place)"]
+    B["Argo CD wave 5:<br/>Vault HA Helm chart<br/>(kubernetes/secrets/vault/)"]
+    C["Argo CD wave 6:<br/>External Secrets Operator<br/>(kubernetes/secrets/external-secrets/)"]
+    D["Argo CD wave 7:<br/>Vault Config Operator<br/>(kubernetes/secrets/vault-config-operator/)"]
+    E["<b>Manual: vault operator init</b><br/>recovery keys into Bitwarden,<br/>note the root token"]
+    F["<b>Manual: terraform apply</b><br/>(this directory)<br/>auth methods + OIDC + roles +<br/>policies + KV mount + audit"]
+    G["<b>Manual: discard state, revoke root token</b>"]
+    H["✓ Stage 1 complete<br/>VCO and ESO authenticate on their own<br/>Stage 2 moves the Grafana admin password"]
 
     A --> B --> C --> D --> E --> F --> G --> H
 
-    style B fill:#ffe8b3,stroke:#d97706
-    style C fill:#ffe8b3,stroke:#d97706
-    style D fill:#ffe8b3,stroke:#d97706
-    style E fill:#ffd0d0,stroke:#dc2626
-    style F fill:#ffd0d0,stroke:#dc2626
-    style G fill:#ffd0d0,stroke:#dc2626
-    style H fill:#d0f0d0,stroke:#16a34a
+    style B fill:#ffe8b3,stroke:#d97706,color:#000
+    style C fill:#ffe8b3,stroke:#d97706,color:#000
+    style D fill:#ffe8b3,stroke:#d97706,color:#000
+    style E fill:#ffd0d0,stroke:#dc2626,color:#000
+    style F fill:#ffd0d0,stroke:#dc2626,color:#000
+    style G fill:#ffd0d0,stroke:#dc2626,color:#000
+    style H fill:#d0f0d0,stroke:#16a34a,color:#000
 ```
 
-オレンジ = ArgoCD 自動 sync、赤 = 人間が 1 回だけ手動実行。
+Orange is Argo CD syncing automatically; red is a human running something once.
 
-ArgoCD は **deploy 順序を保証**するが、Vault の **内部状態 (auth methods / policies 等)** までは触れない。
-そのため wave 7 までの sync 完了後、手動で `vault operator init` と `terraform apply` を実行する必要がある (鶏卵問題への解、上記参照)。
+Argo CD **guarantees the deployment order** but never touches **Vault's internal
+state** — auth methods, policies, and the rest. So once the sync through wave 7 is
+complete, `vault operator init` and `terraform apply` still have to be run by
+hand. That is the answer to the chicken-and-egg problem above.
 
-## 前提条件 (順番に確認)
+## Prerequisites (check in order)
 
-1. **Vault HA cluster up**: `kubernetes/secrets/vault/` が ArgoCD で sync 済み、3 pod が `Running`
-2. **Vault initialized**: `kubectl exec -n vault vault-0 -- vault operator init` 実行済み
-   - Recovery Keys (Shamir 5/3) を **1Password に保存**
-   - Initial root token を控える (このあと TF で使う)
-3. **AWS KMS auto-unseal が動作**: `vault status` で `Sealed: false` 確認
-4. **Keycloak realm `kensan` 構築済み**:
-   - groups: `platform-admin` (Yu in it), `platform-dev`
-   - OIDC client `vault` 作成、Valid Redirect URIs 設定:
+1. **The Vault HA cluster is up**: `kubernetes/secrets/vault/` has synced through Argo CD and three pods are `Running`
+2. **Vault is initialised**: `kubectl exec -n vault vault-0 -- vault operator init` has been run
+   - The recovery keys (Shamir 5/3) are **stored in Bitwarden**
+   - The initial root token is noted down — Terraform uses it next
+3. **AWS KMS auto-unseal works**: `vault status` reports `Sealed: false`
+4. **The Keycloak realm `kensan` exists**:
+   - Groups `platform-admin` (with Yu in it) and `platform-dev`
+   - The OIDC client `vault` exists, with valid redirect URIs:
      - `https://vault.platform.yu-min3.com/ui/vault/auth/oidc/oidc/callback`
-     - `http://localhost:8250/oidc/callback` (CLI 用)
-   - Client Authentication: Client secret 取得
-5. **Vault に到達できる経路を確保**:
-   - 一番楽: `kubectl port-forward -n vault svc/vault 8200:8200` でローカル `localhost:8200` に出す
-   - or `https://vault.platform.yu-min3.com` 経由 (Keycloak SSO 通る前なので少し面倒)
+     - `http://localhost:8250/oidc/callback` (for the CLI)
+   - Client authentication is on, and the client secret has been retrieved
+5. **There is a route to Vault**:
+   - Easiest: `kubectl port-forward -n vault svc/vault 8200:8200` to reach it at `localhost:8200`
+   - Or through `https://vault.platform.yu-min3.com`, which is more awkward before Keycloak SSO is in place
 
-## 実行手順
+## Procedure
 
-### 1. terraform.tfvars を作成
+### 1. Create terraform.tfvars
 
 ```bash
 cp /dev/null terraform.tfvars
 $EDITOR terraform.tfvars
 ```
 
-中身:
+Contents:
+
 ```hcl
-vault_address               = "http://localhost:8200"  # port-forward 経由
+vault_address               = "http://localhost:8200"  # through the port-forward
 vault_token                 = "<initial root token>"
 keycloak_realm_url          = "https://auth.yu-mins.com/realms/kensan"
 keycloak_oidc_client_id     = "vault"
-keycloak_oidc_client_secret = "<from Keycloak admin UI>"
-emergency_admin_password    = "<generated, store in 1Password>"
+keycloak_oidc_client_secret = "<from the Keycloak admin UI>"
+emergency_admin_password    = "<generated, stored in Bitwarden>"
 ```
 
-### 2. apply
+### 2. Apply
 
 ```bash
 terraform init
@@ -153,71 +166,75 @@ terraform plan
 terraform apply
 ```
 
-### 3. 動作確認
+### 3. Verify
 
 ```bash
-# OIDC ログイン (Keycloak 経由)
+# OIDC login, through Keycloak
 vault login -method=oidc role=platform-admin
 
-# K8s auth role 確認
+# the Kubernetes auth roles
 vault read auth/kubernetes/role/vault-config-operator
 vault read auth/kubernetes/role/external-secrets
 
-# KV mount 確認
+# the KV mount
 vault secrets list
 
-# audit device 確認
+# the audit device
 vault audit list
 
-# Pod 側からの認証確認 (vault-config-operator namespace で)
+# authentication from inside a pod, in the vault-config-operator namespace
 kubectl run -it --rm test --image=curlimages/curl --restart=Never \
   --serviceaccount=default --namespace=vault-config-operator -- \
   curl -X POST http://vault.vault.svc:8200/v1/auth/kubernetes/login \
     -d "{\"role\":\"vault-config-operator\",\"jwt\":\"$(cat /var/run/secrets/kubernetes.io/serviceaccount/token)\"}"
 ```
 
-### 4. クリーンアップ (Pattern A' の核)
+### 4. Clean up (the heart of Pattern A')
 
 ```bash
-# state を破棄 (絶対 commit しない)
+# discard the state — never commit it
 rm -rf .terraform/ .terraform.lock.hcl terraform.tfstate*
 
-# tfvars も破棄 (機密含むので gitignore でも履歴に入らないよう注意)
+# discard tfvars too; it holds secrets, so keep it out of history as well as gitignored
 rm terraform.tfvars
 
-# Vault root token を revoke (root token は使い捨て)
+# revoke the Vault root token — it is single-use
 vault token revoke <initial root token>
 ```
 
-これ以降の Vault 操作は **OIDC ログイン (人間)** か **K8s auth (operator)** で行う。
+From here on, Vault is operated through **OIDC login** for humans and
+**Kubernetes auth** for operators.
 
-## DR シナリオ (Vault 全損)
+## Disaster recovery (total loss of Vault)
 
-新規 cluster で同じ手順をやり直す:
+Repeat the same procedure on a new cluster:
 
-1. Vault HA を再 deploy
-2. `vault operator init` で新規 root token + Recovery Keys
-3. (※ 旧 Recovery Keys + snapshot から restore する経路もあるが、その場合は `vault operator raft snapshot restore` で別ルート)
-4. このディレクトリで `terraform apply` 再実行
-5. 終わったら state 破棄
+1. Redeploy Vault HA
+2. `vault operator init` for a new root token and recovery keys
+3. (There is also a path that restores from the old recovery keys and a snapshot, using `vault operator raft snapshot restore` — a different route)
+4. Run `terraform apply` again from this directory
+5. Discard the state when it finishes
 
-state 破棄前提なので、実行のたびに「全部新規作成」される。Vault 側に既に同名 resource があるとエラーになるので、その時は `terraform import` で取り込むか、Vault 側を手動で reset する。
+Because the state is always discarded, every run creates everything from scratch.
+If a resource of the same name already exists in Vault the apply errors; either
+`terraform import` it or reset it in Vault by hand.
 
 ## Files
 
-| File | 内容 |
+| File | Contents |
 |---|---|
 | `versions.tf` | Terraform 1.6+, hashicorp/vault provider ~> 5.0 |
-| `variables.tf` | 入力変数 (vault_token, keycloak_*, emergency_admin_password) |
-| `main.tf` | Provider 設定 |
-| `auth.tf` | auth methods enable + OIDC + K8s roles + userpass |
-| `policies.tf` | admin / vco-admin / eso-read / platform-dev policy |
-| `engines.tf` | KV v2 mount (`secret/`) + audit devices x2 |
-| `.gitignore` | state / tfvars / lock 全部除外 |
+| `variables.tf` | Input variables (vault_token, keycloak_*, emergency_admin_password) |
+| `main.tf` | Provider configuration |
+| `auth.tf` | Enabling auth methods, plus OIDC, Kubernetes roles, and userpass |
+| `policies.tf` | The admin, vco-admin, and platform-dev policies |
+| `engines.tf` | The KV v2 mount (`secret/`) and two audit devices |
+| `.gitignore` | Excludes state, tfvars, and lock files |
 
-## 関連ドキュメント
+## Related
 
-- `docs/bootstrapping/vault-stage1.md` — Stage 1 設計判断と運用手順 (Stage 1 完了後に作成予定)
-- `docs/bootstrapping/index.md` — Cluster bootstrap 全体の Index
-- `docs/secret-management/index.md` — Sealed Secrets 含む secret 管理の方針
-- `docs/adr/` — 関連 ADR (起票予定: Vault PKI 不採用、Keycloak DB Vault 不寄せ等)
+- [`docs/bootstrapping/vault-stage1.md`](../../docs/bootstrapping/vault-stage1.md) — the manual KMS SealedSecret step that precedes this
+- [`docs/bootstrapping/index.md`](../../docs/bootstrapping/index.md) — the index for the whole cluster bootstrap
+- [`docs/secret-management/index.md`](../../docs/secret-management/index.md) — the secret-management approach, Sealed Secrets included
+- [ADR-007](../../docs/adr/007-no-vault-pki.md) — why Vault PKI was not adopted
+- [ADR-019](../../docs/adr/019-keycloak-db-credentials-revert-to-static.md) — why Keycloak's database credentials are not held in Vault

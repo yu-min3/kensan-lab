@@ -1,14 +1,14 @@
-# Personal Daily Briefing 運用
+# Operating the personal daily briefing
 
-`feed` CronJobは毎朝07:15（Asia/Tokyo）に1回だけ起動し、Google Driveの
-Markdown importと全ProjectのGitHub Stars更新を同じprocessで実行する。
-kensan DeploymentにはGoogle/GitHub credentialを渡さない。
+The `feed` CronJob fires once each morning at 07:15 (Asia/Tokyo) and, in the same
+process, imports Markdown from Google Drive and refreshes GitHub stars for every
+project. The kensan Deployment is never given Google or GitHub credentials.
 
-## 初回Secret登録
+## Registering the secret the first time
 
-Google Service Account JSONはVault KV v2へ登録し、External Secrets Operatorで
-`app-kensan/feed-google-drive`からKubernetes Secretへ同期する。
-Kubernetes Secretを手動作成しない。
+The Google service account JSON goes into Vault KV v2 and is synced into a
+Kubernetes Secret by External Secrets Operator from
+`app-kensan/feed-google-drive`. Do not create the Kubernetes Secret by hand.
 
 ```bash
 vault kv put secret/app-kensan/feed-google-drive \
@@ -16,37 +16,38 @@ vault kv put secret/app-kensan/feed-google-drive \
   output-folder-id='<drive-folder-id>'
 ```
 
-`feed-google-drive-external-secret.yaml`をArgo CDで同期すると、ESOが
-`feed-google-drive` Secretを作成する。対象SecretはCronJobだけがread-only
-mountする。Service AccountにはDrive output folderのViewer権限だけを付与する。
+Once Argo CD syncs `feed-google-drive-external-secret.yaml`, ESO creates the
+`feed-google-drive` Secret. Only the CronJob mounts it, read-only. Grant the
+service account nothing beyond Viewer on the Drive output folder.
 
-Drive output folder ID自体はcredentialではないが、公開repoへ識別子を露出させず
-一つの受け渡し契約にまとめるため、同じVault pathで管理する。
+The Drive output folder ID is not itself a credential, but it is kept in the same
+Vault path so that no identifier is exposed in a public repository and the whole
+handover is one contract.
 
-同期確認:
+Check the sync:
 
 ```bash
 kubectl -n app-kensan get externalsecret feed-google-drive
 kubectl -n app-kensan get secret feed-google-drive
 ```
 
-## 手動実行
+## Running it by hand
 
-通常の再実行:
+An ordinary re-run:
 
 ```bash
 kubectl -n app-kensan create job --from=cronjob/feed feed-manual-YYYYMMDD-HHMM
 kubectl -n app-kensan logs -f job/feed-manual-YYYYMMDD-HHMM
 ```
 
-対象日を指定する場合:
+To target a specific date:
 
 ```bash
 kubectl -n app-kensan create job --from=cronjob/feed feed-retry-YYYYMMDD \
   --dry-run=client -o yaml > /tmp/feed-retry.yaml
-# /tmp/feed-retry.yaml の args を ["run", "--date", "YYYY-MM-DD"] に変更
+# edit args in /tmp/feed-retry.yaml to ["run", "--date", "YYYY-MM-DD"]
 kubectl apply -f /tmp/feed-retry.yaml
 ```
 
-Jobが失敗しても既存の`feeds/`と`projects/*/metrics.ndjson`は残る。
-確認後、不要な手動Jobは個別に削除する。
+A failed job leaves the existing `feeds/` and `projects/*/metrics.ndjson` intact.
+Delete manual jobs individually once you have checked the result.

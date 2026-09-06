@@ -38,7 +38,7 @@ variable "vault_redirect_uris" {
   ]
 }
 
-# Break-glass 用 (1Password に保管)
+# Break-glass credential (stored in Bitwarden)
 variable "emergency_admin_password" {
   description = "userpass auth method の emergency-admin user の password"
   type        = string

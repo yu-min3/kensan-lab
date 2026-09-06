@@ -1,67 +1,74 @@
 # vault-transit-engine
 
-Vault Transit secret engine の cluster-wide capability。
-Postgres カラム等の **アプリ層暗号化** (Vault が鍵を保持、Pod / DB に鍵を降ろさない envelope encryption) を、consumer ごとに最小権限で払い出す。
+The Vault Transit secret engine as a cluster-wide capability. It hands out
+**application-layer encryption** for things like Postgres columns — envelope
+encryption where Vault holds the key and it is never delivered to the pod or the
+database — scoped to least privilege per consumer.
 
-## 構成
+## Layout
 
 ```
 kubernetes/secrets/vault-transit-engine/
-├── README.md                                # 本ファイル
-├── chart/                                   # Helm chart (PE 管理、不動)
+├── README.md                                # this file
+├── chart/                                   # Helm chart (PE-owned, does not move)
 │   ├── Chart.yaml
-│   ├── values.yaml                          # PE 規約のデフォルト値 (TTL / 命名規約 / imagePullSecrets)
+│   ├── values.yaml                          # PE defaults (TTLs, naming convention, imagePullSecrets)
 │   └── templates/
-│       ├── _helpers.tpl                     # name / basename / vcoAuth helper
-│       ├── policy.yaml                      # Vault Policy (key 単位、encrypt/decrypt/hmac/rewrap)
+│       ├── _helpers.tpl                     # name / basename / vcoAuth helpers
+│       ├── policy.yaml                      # Vault policy, per key (encrypt/decrypt/hmac/rewrap)
 │       ├── vault-auth-role.yaml             # Vault KubernetesAuthEngineRole
-│       ├── serviceaccount.yaml              # consumer ns 側 SA (Vault auth 主体 = Pod の SA)
-│       └── configmap.yaml                   # consumer ns 側 ConfigMap (VAULT_ADDR / VAULT_AUTH_ROLE / VAULT_TRANSIT_KEY)
-├── shared/                                  # capability bootstrap (1 度だけ)
+│       ├── serviceaccount.yaml              # SA in the consumer namespace (the pod's SA is the Vault auth subject)
+│       └── configmap.yaml                   # ConfigMap in the consumer namespace (VAULT_ADDR / VAULT_AUTH_ROLE / VAULT_TRANSIT_KEY)
+├── shared/                                  # capability bootstrap, applied once
 │   └── mount.yaml                           # SecretEngineMount (transit/)
 ├── platform-values/
-│   └── vault-transit/                       # capability convention dir — consumer 1 つにつき 1 ファイル
-│       └── (現在 consumer なし)              # 例: kensan-users.yaml (kensan-legacy 撤去 #404 で削除)
+│   └── vault-transit/                       # capability convention dir — one file per consumer
+│       └── (no consumers at present)         # e.g. kensan-users.yaml, removed with kensan-legacy in #404
 └── bootstrap/
-    └── setup-transit-keys.sh                # 1 度きり: transit/keys/<name> 作成 (VCO 未対応)
+    └── setup-transit-keys.sh                # one-off: creates transit/keys/<name> (not covered by VCO)
 ```
 
-ArgoCD 側:
-- `applications/secrets/vault-transit-engine/app-shared.yaml` — single Application、`shared/` を sync (mount だけ)
-- `applications/secrets/vault-transit-engine/applicationset-instances.yaml` — ApplicationSet、`**/platform-values/vault-transit/*.yaml` を glob で discover、per-consumer ArgoCD app を auto 生成
+On the Argo CD side:
 
-## 設計の核: smart default + override (vault-database-engine と同パターン)
+- `applications/secrets/vault-transit-engine/app-shared.yaml` — a single Application syncing `shared/` (the mount only)
+- `applications/secrets/vault-transit-engine/applicationset-instances.yaml` — an ApplicationSet that discovers `**/platform-values/vault-transit/*.yaml` by glob and generates one Argo CD app per consumer
 
-PE が `chart/values.yaml` で convention based デフォルトを埋め、AD は **必須項目のみ** 書く。
-chart は **Vault 側 (Policy + KubernetesAuthEngineRole) と consumer ns 側 (SA + ConfigMap) の両方** を render する。
-consumer Deployment は `serviceAccountName` + `envFrom: configMapRef` で chart の output を参照、Reloader で rotation 連動。
+## The core idea: smart defaults plus overrides (the same pattern as vault-database-engine)
 
-### AD が書く項目
+PE fills in convention-based defaults in `chart/values.yaml`, and an app
+developer writes **only the required fields**. The chart renders **both the Vault
+side (policy + KubernetesAuthEngineRole) and the consumer-namespace side (SA +
+ConfigMap)**. The consumer deployment picks up the chart's output through
+`serviceAccountName` and `envFrom: configMapRef`, with Reloader tying rotation to
+a rollout.
 
-| キー | 必須? | デフォルト | 補足 |
+### What an app developer writes
+
+| Key | Required? | Default | Notes |
 |---|---|---|---|
-| `ns` | ✅ 必須 | なし | consumer Pod が動く K8s namespace |
-| `keyName` | ✅ 必須 | なし | Transit key 名 (encrypt/decrypt 対象) |
-| `extraKeyNames` | 任意 | `[]` | 同一 consumer に複数 key を許可したい場合 |
-| `tokenTTL` / `tokenMaxTTL` | 任意 | `1800` / `3600` | Vault k8s auth token lease (秒) |
-| `imagePullSecrets` | 任意 | `[{name: ghcr-pull-secret}]` | consumer SA に付与する image pull secret |
-| `vaultProvider.server` | 任意 | `http://vault.vault.svc.cluster.local:8200` | consumer Pod が叩く Vault address (ConfigMap に展開) |
-| `name` | 任意 | AppSet inject `transit-<filename>` | 通常書かない |
+| `ns` | ✅ required | none | The Kubernetes namespace the consumer pod runs in |
+| `keyName` | ✅ required | none | The Transit key name to encrypt and decrypt with |
+| `extraKeyNames` | optional | `[]` | For a consumer that needs more than one key |
+| `tokenTTL` / `tokenMaxTTL` | optional | `1800` / `3600` | Vault Kubernetes-auth token lease, in seconds |
+| `imagePullSecrets` | optional | `[{name: ghcr-pull-secret}]` | Image pull secret attached to the consumer SA |
+| `vaultProvider.server` | optional | `http://vault.vault.svc.cluster.local:8200` | The Vault address the consumer pod uses (rendered into the ConfigMap) |
+| `name` | optional | injected by the AppSet as `transit-<filename>` | Normally left unset |
 
-### PE 側の convention (chart 内に閉じる)
+### The PE-side conventions (contained in the chart)
 
-| 項目 | 値 |
+| Item | Value |
 |---|---|
-| Vault role / policy / consumer SA / ConfigMap 命名 | すべて `transit-<filename-basename>` で統一 (vault-database-engine の `postgres-<base>` と対称) |
-| Token TTL / maxTTL | 30 min / 1 h (default 12h+ 防止、renew loop 強制) |
-| 許可 endpoint | `transit/{encrypt,decrypt,hmac,rewrap}/<keyName>` + `keys/<keyName>` read + `auth/token/{renew,lookup}-self` |
-| ConfigMap key 名 | `VAULT_ADDR` / `VAULT_AUTH_ROLE` / `VAULT_TRANSIT_KEY` (consumer Pod の envFrom で読む) |
+| Naming of the Vault role, policy, consumer SA, and ConfigMap | All `transit-<filename-basename>`, mirroring vault-database-engine's `postgres-<base>` |
+| Token TTL / max TTL | 30 min / 1 h, to avoid the 12 h+ default and force a renew loop |
+| Permitted endpoints | `transit/{encrypt,decrypt,hmac,rewrap}/<keyName>`, read on `keys/<keyName>`, and `auth/token/{renew,lookup}-self` |
+| ConfigMap key names | `VAULT_ADDR` / `VAULT_AUTH_ROLE` / `VAULT_TRANSIT_KEY`, read by the consumer pod through `envFrom` |
 
-## 1 consumer 追加方法
+## Adding one consumer
 
-(1) values file を 1 個書く + (2) consumer Deployment に SA + envFrom を指定する、の 2 ステップ。
+Two steps: (1) write one values file, (2) point the consumer deployment at the SA
+and ConfigMap.
 
-### (1) values file
+### (1) The values file
 
 ```yaml
 # <owner-dir>/platform-values/vault-transit/<consumer>.yaml
@@ -69,21 +76,22 @@ ns: my-app
 keyName: my-pii-column
 ```
 
-これで以下が成立:
-- Vault role / policy = `transit-<consumer>` (filename から)
-- `my-app` ns に SA `transit-<consumer>` + ConfigMap `transit-<consumer>-config` を生成
-- `transit/{encrypt,decrypt,hmac,rewrap}/my-pii-column` のみ最小権限で許可
+That produces:
 
-### (2) consumer Deployment 側
+- A Vault role and policy named `transit-<consumer>`, taken from the filename
+- An SA `transit-<consumer>` and a ConfigMap `transit-<consumer>-config` in the `my-app` namespace
+- Least-privilege access to `transit/{encrypt,decrypt,hmac,rewrap}/my-pii-column` and nothing else
+
+### (2) The consumer deployment
 
 ```yaml
 metadata:
   annotations:
-    reloader.stakater.com/auto: "true"  # chart の ConfigMap / Secret 更新で auto rollout
+    reloader.stakater.com/auto: "true"  # roll out automatically when the chart's ConfigMap or Secret changes
 spec:
   template:
     spec:
-      serviceAccountName: transit-<consumer>  # chart が同 ns に作る SA
+      serviceAccountName: transit-<consumer>  # the SA the chart creates in the same namespace
       containers:
       - name: app
         envFrom:
@@ -91,40 +99,45 @@ spec:
             name: transit-<consumer>-config   # VAULT_ADDR / VAULT_AUTH_ROLE / VAULT_TRANSIT_KEY
 ```
 
-key (`transit/keys/my-pii-column`) は **1 度きり手動作成**。`bootstrap/setup-transit-keys.sh` を参考に新 key 名で実行する (VCO 未対応のため。後述「設計判断」参照)。
+The key itself (`transit/keys/my-pii-column`) is **created by hand, once**. Use
+`bootstrap/setup-transit-keys.sh` as the model and run it with the new key name.
+Why it is manual is explained below.
 
-## 設計判断: なぜ key 作成だけ手動か
+## Design decision: why key creation alone is manual
 
-redhat-cop/vault-config-operator は **TransitSecretEngine 系 CR を持たない** (2026-05 時点)。
-利用可能な CRD は `SecretEngineMount` / `Policy` / `KubernetesAuthEngineRole` のみ。
+redhat-cop/vault-config-operator **has no Transit secret engine CRs** (as of
+2026-05). The CRDs available are `SecretEngineMount`, `Policy`, and
+`KubernetesAuthEngineRole`.
 
-選択肢:
-
-| 案 | pros | cons | 採否 |
+| Option | Pros | Cons | Verdict |
 |---|---|---|---|
-| 1. mount + policy + auth role を GitOps、key は手動 | 単純、追加 operator 不要 | key 作成が手作業 (ただし 1 度きり) | ✅ **採用** |
-| 2. 別 operator (hashicorp/vault-secrets-operator 等) を導入 | key も declarative | operator 増、Transit のためだけは過剰 | ✕ |
-| 3. VCO を fork して TransitSecretEngine CR を追加 | declarative + 純正 VCO 1 本 | fork 維持コスト | ✕ |
-| 4. CronJob で `vault write -f transit/keys/<name>` を冪等実行 | GitOps 寄り | "delete されないこと" だけ保証、操作は依然非 declarative | ✕ |
+| 1. GitOps the mount, policy, and auth role; create the key by hand | Simple, no extra operator | Key creation is manual — though only once | ✅ **Adopted** |
+| 2. Add a second operator (hashicorp/vault-secrets-operator or similar) | The key becomes declarative too | Another operator to run, excessive for Transit alone | ✕ |
+| 3. Fork VCO and add a TransitSecretEngine CR | Declarative, and still one operator | The cost of maintaining a fork | ✕ |
+| 4. Run `vault write -f transit/keys/<name>` idempotently from a CronJob | Closer to GitOps | Only guarantees "not deleted"; the operation is still not declarative | ✕ |
 
-→ key 作成は 1 度きりかつ手動 rotate 運用なので、案 1 でコスト最小。VCO 全体のカバレッジと例外整理は [`docs/secret-management/index.md`](../../../docs/secret-management/index.md) の「VCO カバレッジと例外」を参照。
+Key creation happens once and rotation is a manual operation anyway, so option 1
+costs the least. VCO's overall coverage and its exceptions are catalogued under
+"VCO coverage and exceptions" in
+[`docs/secret-management/index.md`](../../../docs/secret-management/index.md).
 
-## Key Rotation 運用
+## Key rotation
 
 ```bash
-# 旧 ciphertext は復号可、新規 encrypt は最新 version
+# old ciphertext stays decryptable; new encryptions use the latest version
 kubectl exec -n vault vault-0 -c vault -- vault write -f transit/keys/<keyName>/rotate
 
-# ※ 全行 rewrap したい場合: app 側 (Repository 層) で transit/rewrap/<keyName> を呼ぶ
+# to rewrap every row, call transit/rewrap/<keyName> from the app's repository layer
 ```
 
 ## Audit
 
-Vault audit device は bootstrap TF で enable 済み (`/vault/audit/audit.log`)。
-`transit/encrypt/<keyName>` / `transit/decrypt/<keyName>` が per-call ログされる。
+The Vault audit device is enabled by the bootstrap Terraform
+(`/vault/audit/audit.log`). Every `transit/encrypt/<keyName>` and
+`transit/decrypt/<keyName>` call is logged.
 
-## 関連
+## Related
 
-- 全体方針: [docs/secret-management/index.md](../../../docs/secret-management/index.md)
-- 同パターンの先行例: [vault-database-engine/README.md](../vault-database-engine/README.md)
-- 実装サンプル (Go shared/vault): `apps/kensan-legacy/backend/shared/vault/`（削除済み — tag `kensan-legacy-final` で参照）
+- Overall approach: [docs/secret-management/index.md](../../../docs/secret-management/index.md)
+- The earlier example of the same pattern: [vault-database-engine/README.md](../vault-database-engine/README.md)
+- Reference implementation (Go, shared/vault): `apps/kensan-legacy/backend/shared/vault/` — removed; see the tag `kensan-legacy-final`
