@@ -1,15 +1,16 @@
 # OpenTelemetry Collector
 
-## 概要
+## Overview
 
-OpenTelemetry Collector は、アプリケーションからのテレメトリデータ（メトリクス/トレース/ログ）を収集・処理・転送する中央集約型のデータパイプラインです。
+The OpenTelemetry Collector is the central data pipeline that receives, processes,
+and forwards telemetry — metrics, traces, and logs — from applications.
 
-## アーキテクチャ
+## Architecture
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
 │                    Application Pods                              │
-│              (app-{name} namespaces — 例: app-kensan)             │
+│           (app-{name} namespaces — app-kensan, for example)      │
 │                                                                   │
 │  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐          │
 │  │   FastAPI    │  │   FastAPI    │  │   FastAPI    │          │
@@ -38,10 +39,10 @@ OpenTelemetry Collector は、アプリケーションからのテレメトリ�
           │                 │                            │
           │  ┌──────────────▼─────────────────────────┐ │
           │  │         Processors                     │ │
-          │  │  1. memory_limiter (OOM防止)          │ │
-          │  │  2. batch (バッチ処理)                │ │
-          │  │  3. resource (メタデータ付加)         │ │
-          │  │  4. attributes (機密情報削除)         │ │
+          │  │  1. memory_limiter (prevents OOM)      │ │
+          │  │  2. batch (batching)                   │ │
+          │  │  3. resource (adds metadata)           │ │
+          │  │  4. attributes (strips secrets)        │ │
           │  └──────────────┬─────────────────────────┘ │
           │                 │                            │
           │  ┌──────────────▼─────────────────────────┐ │
@@ -52,8 +53,8 @@ OpenTelemetry Collector は、アプリケーションからのテレメトリ�
           │  └──────────────┬─────────────────────────┘ │
           │                 │                            │
           │  ┌──────────────▼─────────────────────────┐ │
-          │  │    Self-Metrics (port 8888)            │ │
-          │  │    - Prometheus scraping               │ │
+          │  │    Self-metrics (port 8888)            │ │
+          │  │    - scraped by Prometheus             │ │
           │  └────────────────────────────────────────┘ │
           └──────────────────┬───────────────────────────┘
                              │
@@ -66,50 +67,52 @@ OpenTelemetry Collector は、アプリケーションからのテレメトリ�
     └─────────┘      └──────────┘           └──────────┘
 ```
 
-## データフロー
+## Data flow
 
-### 1. Metrics Pipeline
+### 1. Metrics pipeline
+
 ```
 App (OTel SDK)
-  → OTLP Receiver (4317)
+  → OTLP receiver (4317)
   → [memory_limiter → batch → resource]
   → Prometheus Remote Write
   → Prometheus
 ```
 
-### 2. Traces Pipeline
+### 2. Traces pipeline
+
 ```
 App (OTel SDK)
-  → OTLP Receiver (4317)
+  → OTLP receiver (4317)
   → [memory_limiter → batch → resource → attributes]
-  → OTLP Exporter
+  → OTLP exporter
   → Tempo
 ```
 
-### 3. Logs Pipeline
+### 3. Logs pipeline
+
 ```
 App (OTel SDK)
-  → OTLP Receiver (4317)
+  → OTLP receiver (4317)
   → [memory_limiter → batch → resource]
-  → Loki Exporter
+  → Loki exporter
   → Loki
 ```
 
-## values.yaml 設計意図
+## The intent behind values.yaml
 
-### Deployment Mode
+### Deployment mode
 
 ```yaml
 mode: deployment
 replicaCount: 1
 ```
 
-**設計意図:**
-- **deployment モード**: 現時点では単一インスタンスで十分なトラフィック量
-- **将来の拡張性**: 必要に応じて `replicaCount` を増やしてスケールアウト可能
-- **代替案**: daemonset モード（各ノードで実行）は、現在のクラスタ規模では不要
+- **deployment mode**: at current traffic volumes a single instance is enough
+- **Room to grow**: raise `replicaCount` to scale out when it is needed
+- **Alternative**: daemonset mode, running on every node, is unnecessary at this cluster's size
 
-### Receivers設計
+### Receivers
 
 ```yaml
 receivers:
@@ -121,14 +124,13 @@ receivers:
         endpoint: 0.0.0.0:4318
 ```
 
-**設計意図:**
-- **OTLP gRPC (4317)**: 主要プロトコル。効率的でパフォーマンスが高い
-- **OTLP HTTP (4318)**: フォールバック用。ネットワーク制約がある環境向け
-- **Jaeger/Zipkin**: デフォルトで有効だが、現時点では使用しない（将来の互換性のため残す）
+- **OTLP gRPC (4317)**: the primary protocol — efficient and fast
+- **OTLP HTTP (4318)**: a fallback, for environments with network constraints
+- **Jaeger / Zipkin**: enabled by default but unused; left in place for future compatibility
 
-### Processors設計
+### Processors
 
-#### 1. memory_limiter（最優先）
+#### 1. memory_limiter (highest priority)
 
 ```yaml
 memory_limiter:
@@ -136,13 +138,12 @@ memory_limiter:
   limit_mib: 512
 ```
 
-**設計意図:**
-- **目的**: OOMキラーを防ぐ
-- **配置順序**: 必ず最初に配置（他のprocessorより前）
-- **制限値**: コンテナのメモリ制限（1Gi）の50%を設定
-- **動作**: メモリ使用量が512MiBを超えるとデータをドロップ
+- **Purpose**: keep the OOM killer away
+- **Position**: always first, ahead of every other processor
+- **Limit**: 50% of the container's memory limit (1Gi)
+- **Behaviour**: drops data once memory use passes 512 MiB
 
-#### 2. batch（パフォーマンス最適化）
+#### 2. batch (throughput)
 
 ```yaml
 batch:
@@ -150,12 +151,11 @@ batch:
   send_batch_size: 1000
 ```
 
-**設計意図:**
-- **目的**: バックエンドへの送信回数を削減してパフォーマンス向上
-- **timeout**: 10秒ごとにバッチを送信（レイテンシとスループットのバランス）
-- **send_batch_size**: 1000件に達したら即座に送信
+- **Purpose**: fewer sends to the backend, better throughput
+- **timeout**: flush every 10 seconds, balancing latency against throughput
+- **send_batch_size**: send immediately once 1000 items accumulate
 
-#### 3. resource（メタデータ付加）
+#### 3. resource (metadata)
 
 ```yaml
 resource:
@@ -168,12 +168,11 @@ resource:
       action: upsert
 ```
 
-**設計意図:**
-- **cluster.name**: マルチクラスタ環境での識別用（将来的な拡張を見据えて）
-- **deployment.environment**: namespace名から環境を自動判定（歴史的経緯。現在は per-app ns で prod 単一環境）
-- **upsert**: 既存の属性がある場合は上書き、ない場合は追加
+- **cluster.name**: identifies the cluster if there is ever more than one
+- **deployment.environment**: derived from the namespace name. Historical — with per-app namespaces there is now a single prod environment
+- **upsert**: overwrite an existing attribute, add it when absent
 
-#### 4. attributes（セキュリティ）
+#### 4. attributes (security)
 
 ```yaml
 attributes:
@@ -182,12 +181,11 @@ attributes:
       action: delete
 ```
 
-**設計意図:**
-- **目的**: 機密情報の漏洩防止
-- **削除対象**: Authorization ヘッダー（Bearer トークン、API キーなど）
-- **配置**: traces パイプラインのみに適用（HTTPトレースが対象）
+- **Purpose**: stop secrets leaking into telemetry
+- **What is removed**: the Authorization header — bearer tokens, API keys, and the like
+- **Where it applies**: the traces pipeline only, since HTTP traces are what carry it
 
-### Exporters設計
+### Exporters
 
 #### 1. Prometheus Remote Write
 
@@ -198,10 +196,9 @@ prometheusremotewrite:
     insecure: true
 ```
 
-**設計意図:**
-- **プロトコル**: Remote Write API（効率的なメトリクス転送）
-- **TLS無効**: クラスタ内通信のため不要（パフォーマンス優先）
-- **エンドポイント**: Prometheus Operatorがデプロイしたサービス名
+- **Protocol**: the Remote Write API, an efficient way to ship metrics
+- **TLS off**: unnecessary for in-cluster traffic, and performance comes first
+- **Endpoint**: the service name the Prometheus Operator deploys
 
 #### 2. OTLP/Tempo
 
@@ -212,10 +209,9 @@ otlp/tempo:
     insecure: true
 ```
 
-**設計意図:**
-- **プロトコル**: OTLP gRPC（Tempo のネイティブプロトコル）
-- **TLS無効**: クラスタ内通信のため不要
-- **命名**: `otlp/tempo` で Tempo 専用エクスポーターであることを明示
+- **Protocol**: OTLP gRPC, Tempo's native protocol
+- **TLS off**: unnecessary for in-cluster traffic
+- **Naming**: `otlp/tempo` makes it explicit that this exporter is for Tempo
 
 #### 3. Loki
 
@@ -224,11 +220,10 @@ loki:
   endpoint: http://loki.monitoring.svc:3100/loki/api/v1/push
 ```
 
-**設計意図:**
-- **プロトコル**: Loki Push API
-- **エンドポイント**: Loki の標準ポート（3100）
+- **Protocol**: the Loki push API
+- **Endpoint**: Loki's standard port, 3100
 
-### Service & Ports設計
+### Service and ports
 
 ```yaml
 ports:
@@ -250,12 +245,11 @@ ports:
     servicePort: 13133
 ```
 
-**設計意図:**
-- **otlp-grpc/http**: アプリケーションからのデータ受信用
-- **metrics (8888)**: Collectorの自己監視メトリクス（Prometheusでスクレイピング）
-- **health (13133)**: liveness/readiness probe用のヘルスチェックエンドポイント
+- **otlp-grpc / otlp-http**: where applications send their data
+- **metrics (8888)**: the collector's own metrics, scraped by Prometheus
+- **health (13133)**: the endpoint the liveness and readiness probes use
 
-### Health Checks設計
+### Health checks
 
 ```yaml
 livenessProbe:
@@ -273,12 +267,11 @@ readinessProbe:
   periodSeconds: 5
 ```
 
-**設計意図:**
-- **liveness**: 30秒待機後、10秒ごとにチェック（起動時間を考慮）
-- **readiness**: 10秒待機後、5秒ごとにチェック（早期の準備完了検出）
-- **エンドポイント**: health_check extension が提供する `/` パス
+- **liveness**: wait 30 s, then check every 10 s, allowing for start-up time
+- **readiness**: wait 10 s, then check every 5 s, so readiness is noticed early
+- **Endpoint**: the `/` path served by the health_check extension
 
-### Resources設計
+### Resources
 
 ```yaml
 resources:
@@ -290,13 +283,12 @@ resources:
     memory: 1Gi
 ```
 
-**設計意図:**
-- **requests**: 保証リソース（スケジューリング時の最小要件）
-- **limits**: 上限（バースト時の最大使用量）
-- **CPU**: 200m〜500m（通常は低負荷、スパイク時に対応）
-- **Memory**: 512Mi〜1Gi（memory_limiter は512MiB = limits の50%）
+- **requests**: the guaranteed floor, used for scheduling
+- **limits**: the ceiling during a burst
+- **CPU**: 200m–500m — usually light, with headroom for spikes
+- **Memory**: 512Mi–1Gi, with memory_limiter at 512 MiB, half the limit
 
-### ServiceMonitor設計
+### ServiceMonitor
 
 ```yaml
 serviceMonitor:
@@ -309,55 +301,54 @@ serviceMonitor:
     release: prometheus
 ```
 
-**設計意図:**
-- **enabled: true**: Prometheus Operatorによる自動検出を有効化
-- **interval: 30s**: Collectorの自己監視メトリクスのスクレイピング間隔
-- **extraLabels**: Prometheus Operatorが ServiceMonitor を検出するためのラベル
+- **enabled: true**: lets the Prometheus Operator discover the collector
+- **interval: 30s**: how often the collector's own metrics are scraped
+- **extraLabels**: the label the Prometheus Operator matches on to find this ServiceMonitor
 
-## Pipeline設計の原則
+## Pipeline design principles
 
-### 1. Processor の順序が重要
+### 1. Processor order matters
 
 ```yaml
 processors: [memory_limiter, batch, resource, attributes]
 ```
 
-**理由:**
-1. **memory_limiter**: 最優先。メモリ不足を早期検出
-2. **batch**: バッチ処理でデータをまとめる
-3. **resource**: バッチ後にメタデータを付加（効率的）
-4. **attributes**: 最後に機密情報を削除（確実に削除）
+1. **memory_limiter** first, so memory pressure is caught early
+2. **batch** groups the data
+3. **resource** adds metadata after batching, which is cheaper
+4. **attributes** strips secrets last, so nothing slips past it
 
-### 2. Pipeline ごとの最適化
+### 2. Per-pipeline tuning
 
-- **metrics**: `attributes` processor 不要（HTTPヘッダーが含まれない）
-- **traces**: `attributes` processor 必要（HTTPトレースに機密情報が含まれる可能性）
-- **logs**: `attributes` processor 不要（現時点では構造化ログのみ）
+- **metrics**: no `attributes` processor — there are no HTTP headers to strip
+- **traces**: `attributes` processor required, because HTTP traces can carry secrets
+- **logs**: no `attributes` processor — structured logs only, for now
 
-## セキュリティ考慮事項
+## Security considerations
 
-### 1. 機密情報の削除
+### 1. Stripping secrets
 
-- Authorization ヘッダーを自動削除
-- 将来的には他の機密情報も追加（例: Cookie, API keys）
+- The Authorization header is removed automatically
+- More can be added later, cookies and API keys among them
 
-### 2. クラスタ内通信のみ
+### 2. In-cluster traffic only
 
-- TLS無効化（クラスタ内通信はネットワークポリシーで保護）
-- 外部からの直接アクセスは不可
+- TLS is off, because in-cluster traffic is protected by network policy
+- There is no direct access from outside
 
-### 3. Resource Limits
+### 3. Resource limits
 
-- OOM を防ぐための memory_limiter
-- CPU/Memory の上限設定
+- memory_limiter keeps the collector out of OOM
+- CPU and memory ceilings are set
 
-## 運用考慮事項
+## Operational considerations
 
-### 1. スケーラビリティ
+### 1. Scalability
 
-現在は `replicaCount: 1` だが、必要に応じて以下の対応が可能：
+`replicaCount: 1` today, with two ways to grow.
 
-**垂直スケーリング:**
+**Vertically:**
+
 ```yaml
 resources:
   requests:
@@ -368,23 +359,24 @@ resources:
     memory: 2Gi
 ```
 
-**水平スケーリング:**
+**Horizontally:**
+
 ```yaml
 replicaCount: 3
 ```
 
-### 2. 監視
+### 2. Monitoring the collector
 
-Collector 自体を監視するために：
-- ServiceMonitor で自己メトリクスを Prometheus に送信
-- 重要なメトリクス:
-  - `otelcol_receiver_accepted_spans`: 受信したスパン数
-  - `otelcol_exporter_sent_spans`: 送信したスパン数
-  - `otelcol_processor_dropped_spans`: ドロップされたスパン数
+- The ServiceMonitor ships the collector's own metrics to Prometheus
+- The ones worth watching:
+  - `otelcol_receiver_accepted_spans` — spans received
+  - `otelcol_exporter_sent_spans` — spans sent on
+  - `otelcol_processor_dropped_spans` — spans dropped
 
-### 3. トラブルシューティング
+### 3. Troubleshooting
 
-**ログレベルの変更:**
+**Raising the log level:**
+
 ```yaml
 config:
   service:
@@ -393,23 +385,24 @@ config:
         level: debug  # info, warn, error, debug
 ```
 
-**Debug Exporter の有効化:**
+**Enabling the debug exporter:**
+
 ```yaml
 exporters:
   debug:
     verbosity: detailed
 ```
 
-## 今後の拡張予定
+## Planned extensions
 
-1. **Sampling の導入**: 大量のトレースデータを効率的に処理
-2. **Tail Sampling**: エラーを含むトレースのみを保存
-3. **K8s Attributes Processor**: Pod/Node メタデータの自動付加
-4. **複数バックエンド対応**: 複数の Prometheus/Tempo インスタンスへの送信
+1. **Sampling**, to handle large trace volumes efficiently
+2. **Tail sampling**, keeping only traces that contain an error
+3. **The k8sattributes processor**, adding pod and node metadata automatically
+4. **Multiple backends**, sending to more than one Prometheus or Tempo instance
 
-## 参考リンク
+## References
 
-- [OpenTelemetry Collector 公式ドキュメント](https://opentelemetry.io/docs/collector/)
-- [Processor 設定リファレンス](https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/processor)
-- [Exporter 設定リファレンス](https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/exporter)
-- [Helm Chart Values](https://github.com/open-telemetry/opentelemetry-helm-charts/tree/main/charts/opentelemetry-collector)
+- [OpenTelemetry Collector documentation](https://opentelemetry.io/docs/collector/)
+- [Processor configuration reference](https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/processor)
+- [Exporter configuration reference](https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/exporter)
+- [Helm chart values](https://github.com/open-telemetry/opentelemetry-helm-charts/tree/main/charts/opentelemetry-collector)

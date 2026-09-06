@@ -1,10 +1,11 @@
 # Grafana Tempo
 
-## 概要
+## Overview
 
-Grafana Tempo は、分散トレーシングのデータストア（Trace TSDB）として、OpenTelemetry Collector から送信されるトレースデータを保存し、TraceID ベースのクエリ API を提供します。
+Grafana Tempo is the trace store — a trace TSDB. It holds the trace data the
+OpenTelemetry Collector sends it and serves a query API keyed on trace ID.
 
-## アーキテクチャ
+## Architecture
 
 ```
 ┌──────────────────────────────────┐
@@ -59,53 +60,56 @@ Grafana Tempo は、分散トレーシングのデータストア（Trace TSDB�
         └──────────────┘
 ```
 
-## データフロー
+## Data flow
 
-### 1. トレース受信（Distributor）
+### 1. Receiving traces (distributor)
+
 ```
 OTel Collector
   → OTLP gRPC (4317)
-  → Tempo Distributor
-  → トレーススパンを受信
+  → Tempo distributor
+  → trace spans received
 ```
 
-### 2. トレース保存（Ingester）
+### 2. Storing traces (ingester)
+
 ```
 Distributor
-  → Ingester
-  → WAL書き込み (/var/tempo/wal)
-  → Block作成 (/var/tempo/traces)
+  → ingester
+  → write to the WAL (/var/tempo/wal)
+  → create blocks (/var/tempo/traces)
 ```
 
-### 3. トレース圧縮（Compactor）
+### 3. Compacting traces (compactor)
+
 ```
-定期的に実行
-  → 古いブロックを圧縮
-  → 7日以上経過したブロックを削除
+Runs periodically
+  → compacts older blocks
+  → deletes blocks older than 7 days
 ```
 
-### 4. トレースクエリ（Query Frontend）
+### 4. Querying traces (query frontend)
+
 ```
 Grafana
   → HTTP API (3100)
-  → TraceID指定でクエリ
-  → トレーススパンを返却
+  → query by trace ID
+  → trace spans returned
 ```
 
-## values.yaml 設計意図
+## The intent behind values.yaml
 
-### Deployment Mode
+### Deployment mode
 
 ```yaml
 replicas: 1
 ```
 
-**設計意図:**
-- **Single Binary Mode**: Tempo を単一プロセスで実行（開発/小規模環境向け）
-- **シンプルな運用**: Distributor/Ingester/Compactor/Query が1つのPodで動作
-- **将来の拡張性**: トラフィック増加時は `tempo-distributed` chart に移行可能
+- **Single-binary mode**: Tempo runs as one process, which suits a development or small-scale environment
+- **Simple to operate**: distributor, ingester, compactor, and query all live in one pod
+- **Room to grow**: move to the `tempo-distributed` chart when traffic demands it
 
-### Image Configuration
+### Image
 
 ```yaml
 tempo:
@@ -113,24 +117,22 @@ tempo:
   tag: "2.3.1"
 ```
 
-**設計意図:**
-- **安定版**: 2.3.1 は production-ready なバージョン
-- **明示的なタグ指定**: latest を避けて再現性を確保
+- **A stable release**: 2.3.1 is production-ready
+- **An explicit tag**: avoids `latest`, so builds stay reproducible
 
-### Tempo Configuration
+### Tempo configuration
 
-#### Server設定
+#### Server
 
 ```yaml
 server:
   http_listen_port: 3100
 ```
 
-**設計意図:**
-- **ポート3100**: Grafana Loki と同じポート体系（統一感）
-- **HTTP API**: Grafana からのクエリ、ヘルスチェックに使用
+- **Port 3100**: the same port Grafana Loki uses, keeping the scheme consistent
+- **HTTP API**: used by Grafana queries and by health checks
 
-#### Distributor（OTLP Receiver）
+#### Distributor (the OTLP receiver)
 
 ```yaml
 distributor:
@@ -143,12 +145,11 @@ distributor:
           endpoint: 0.0.0.0:4318
 ```
 
-**設計意図:**
-- **OTLP gRPC (4317)**: メインプロトコル（OpenTelemetry Collector からの送信）
-- **OTLP HTTP (4318)**: フォールバック用
-- **0.0.0.0バインド**: Pod内の全インターフェースで受信
+- **OTLP gRPC (4317)**: the main protocol, used by the OpenTelemetry Collector
+- **OTLP HTTP (4318)**: a fallback
+- **Binding 0.0.0.0**: receive on every interface inside the pod
 
-#### Ingester（トレース保存）
+#### Ingester (storing traces)
 
 ```yaml
 ingester:
@@ -157,15 +158,12 @@ ingester:
   max_block_duration: 5m
 ```
 
-**設計意図:**
-- **trace_idle_period: 10s**: トレースが完了してから10秒後にフラッシュ
-  - トレードオフ: 短いと頻繁なフラッシュ、長いとメモリ使用量増加
-- **max_block_bytes: 1MB**: ブロックサイズの上限
-  - 小さいブロックで早めにディスクに書き込み
-- **max_block_duration: 5m**: 最長5分でブロックを作成
-  - 定期的なフラッシュでメモリ使用量を抑制
+- **trace_idle_period: 10s**: flush ten seconds after a trace goes quiet.
+  The trade-off: shorter means flushing more often, longer means holding more in memory
+- **max_block_bytes: 1MB**: the block size ceiling — small blocks reach disk sooner
+- **max_block_duration: 5m**: cut a block at five minutes at the latest, so memory use stays bounded
 
-#### Compactor（データ圧縮）
+#### Compactor
 
 ```yaml
 compactor:
@@ -173,13 +171,10 @@ compactor:
     block_retention: 168h  # 7 days
 ```
 
-**設計意図:**
-- **168h = 7日間**: トレースデータの保持期間
-  - 直近のトラブルシューティングには十分
-  - ストレージコストを抑制
-- **自動削除**: 7日以上経過したブロックは自動的に削除
+- **168h — seven days**: how long trace data is kept. Enough for recent troubleshooting, and it keeps storage down
+- **Automatic deletion**: blocks older than seven days are removed
 
-#### Storage（ストレージバックエンド）
+#### Storage backend
 
 ```yaml
 storage:
@@ -194,19 +189,14 @@ storage:
       queue_depth: 10000
 ```
 
-**設計意図:**
-- **backend: local**: ローカルファイルシステムを使用
-  - シンプルで運用が楽
-  - PVCで永続化
-  - 本番環境では S3/GCS/Azure Blob に変更可能
-- **traces path**: 圧縮済みブロックの保存先
-- **wal path**: Write-Ahead Log（WAL）の保存先
-  - クラッシュ時のデータ復旧に使用
-- **pool設定**:
-  - max_workers: 100 - 同時書き込みワーカー数
-  - queue_depth: 10000 - 書き込みキューの深さ
+- **backend: local**: the local filesystem — simple to run, persisted by a PVC, and switchable to S3, GCS, or Azure Blob in a larger environment
+- **traces path**: where compacted blocks live
+- **wal path**: the write-ahead log, used to recover data after a crash
+- **pool**:
+  - `max_workers: 100` — concurrent write workers
+  - `queue_depth: 10000` — how deep the write queue goes
 
-### Persistence Configuration
+### Persistence
 
 ```yaml
 persistence:
@@ -218,18 +208,13 @@ persistence:
   enableStatefulSetAutoDeletePVC: false
 ```
 
-**設計意図:**
-- **enabled: true**: 永続化を有効化（トレースデータを保持）
-- **ReadWriteOnce**: StatefulSet の単一 Pod で使用
-- **size: 10Gi**: 7日間のトレースデータを保存
-  - 推定: 1日あたり約1.4GBのストレージ使用
-  - 余裕を持たせた容量設定
-- **storageClassName: longhorn**: レプリケート block storage (default SC)
-  - Bare-metal環境で動的PVプロビジョニング
-- **enableStatefulSetAutoDeletePVC: false**: StatefulSet削除時もPVCを保持
-  - データ保護のため、手動削除を強制
+- **enabled: true**: keep trace data across restarts
+- **ReadWriteOnce**: a single StatefulSet pod uses it
+- **size: 10Gi**: seven days of traces, at roughly 1.4 GB a day, with headroom
+- **storageClassName: longhorn**: replicated block storage, the default storage class, giving dynamic PV provisioning on bare metal
+- **enableStatefulSetAutoDeletePVC: false**: keep the PVC even if the StatefulSet is deleted, forcing deletion to be a deliberate act
 
-### Service Configuration
+### Service
 
 ```yaml
 service:
@@ -237,15 +222,12 @@ service:
   port: 3100
 ```
 
-**設計意図:**
-- **ClusterIP**: クラスタ内通信のみ
-  - OpenTelemetry Collector からの OTLP 送信
-  - Grafana からのクエリ
-- **port: 3100**: HTTP API のメインポート
-  - `/ready`: ヘルスチェック
-  - `/api/traces/{traceID}`: トレースクエリ
+- **ClusterIP**: in-cluster traffic only — OTLP from the OpenTelemetry Collector, and queries from Grafana
+- **port: 3100**: the main HTTP API port
+  - `/ready` — health check
+  - `/api/traces/{traceID}` — trace query
 
-### Resources Configuration
+### Resources
 
 ```yaml
 resources:
@@ -257,53 +239,46 @@ resources:
     memory: 1Gi
 ```
 
-**設計意図:**
-- **requests**: 保証リソース
-  - cpu: 200m - 通常の負荷で十分
-  - memory: 512Mi - WAL + ブロックバッファ用
-- **limits**: 上限
-  - cpu: 500m - スパイク時の対応
-  - memory: 1Gi - OOM防止
-- **メモリ計算**:
-  - Ingester バッファ: ~300MB
-  - WAL: ~100MB
-  - その他（Compactor等）: ~100MB
-  - 合計: ~500MB（余裕を持って512Mi）
+- **requests** — the guaranteed floor: 200m CPU is enough at normal load, and 512Mi covers the WAL and block buffers
+- **limits** — the ceiling: 500m CPU for spikes, 1Gi memory to keep OOM away
+- **How the memory number was reached**:
+  - Ingester buffers: ~300 MB
+  - WAL: ~100 MB
+  - Everything else, the compactor included: ~100 MB
+  - Around 500 MB in total, rounded up to 512Mi
 
-## アーキテクチャ設計の原則
+## Architectural principles
 
-### 1. Single Binary Mode の採用理由
+### 1. Why single-binary mode
 
-**現在のトラフィック規模:**
-- アプリケーション数: 少数（開発環境）
-- トレース量: 1日あたり数千〜数万スパン
-- クエリ頻度: 低頻度（トラブルシューティング時のみ）
+**Traffic today:**
 
-**Single Binary Mode のメリット:**
-- シンプルな運用（1つのPodのみ）
-- リソース効率が良い（プロセス間通信が不要）
-- デプロイが簡単
+- A small number of applications
+- Thousands to tens of thousands of spans a day
+- Queries are infrequent — only while troubleshooting
 
-**Distributed Mode への移行タイミング:**
-- トレース量が1日あたり100万スパンを超える
-- クエリレイテンシが問題になる
-- 高可用性が必要になる
+**What single-binary mode buys:**
 
-### 2. ローカルストレージの使用
+- One pod to operate
+- Efficient use of resources, with no inter-process traffic
+- A simple deployment
 
-**現在の選択:**
-- `backend: local` + PVC
+**When to move to distributed mode:**
 
-**メリット:**
-- シンプルな設定
-- 追加のクラウドサービス不要
-- コスト削減
+- Trace volume passes a million spans a day
+- Query latency becomes a problem
+- High availability becomes a requirement
 
-**デメリット:**
-- スケーラビリティに限界
-- バックアップが手動
+### 2. Why local storage
 
-**本番環境への移行:**
+The current choice is `backend: local` plus a PVC.
+
+**In its favour:** simple configuration, no additional cloud service, lower cost.
+
+**Against it:** limited scalability, and backups are manual.
+
+**Moving to an object store:**
+
 ```yaml
 storage:
   trace:
@@ -313,148 +288,155 @@ storage:
       endpoint: s3.amazonaws.com
 ```
 
-### 3. 7日間の保持期間
+### 3. Why seven days of retention
 
-**選定理由:**
-- **トラブルシューティング**: 直近のトレースで十分
-- **ストレージコスト**: 長期保存は不要
-- **コンプライアンス**: 特に規制要件なし
+- **Troubleshooting**: recent traces are what get looked at
+- **Storage cost**: long-term retention buys nothing here
+- **Compliance**: no regulatory requirement applies
 
-**変更方法:**
+**To change it:**
+
 ```yaml
 compactor:
   compaction:
     block_retention: 336h  # 14 days
 ```
 
-## セキュリティ考慮事項
+## Security considerations
 
-### 1. クラスタ内通信のみ
+### 1. In-cluster traffic only
 
-- Service type: ClusterIP（外部公開なし）
-- OpenTelemetry Collector と Grafana のみアクセス可能
+- `type: ClusterIP` — nothing is exposed outside the cluster
+- Only the OpenTelemetry Collector and Grafana can reach it
 
-### 2. PVC の保護
+### 2. Protecting the PVC
 
-- `enableStatefulSetAutoDeletePVC: false`: 誤削除防止
-- 手動でのPVC削除を強制
+- `enableStatefulSetAutoDeletePVC: false` guards against accidental deletion
+- Removing the PVC has to be done deliberately
 
-### 3. リソース制限
+### 3. Resource limits
 
-- メモリ制限（1Gi）でOOMを防止
-- CPU制限（500m）でノードリソースを保護
+- The memory limit (1Gi) keeps the pod out of OOM
+- The CPU limit (500m) protects the node's resources
 
-## 運用考慮事項
+## Operational considerations
 
-### 1. ストレージ監視
+### 1. Watching storage
 
-重要なメトリクス:
-- PVC使用率: `kubelet_volume_stats_used_bytes / kubelet_volume_stats_capacity_bytes`
-- 残り容量が20%を切ったらアラート
+The metric that matters is PVC utilisation:
+`kubelet_volume_stats_used_bytes / kubelet_volume_stats_capacity_bytes`.
+Alert when free space drops below 20%.
 
-### 2. ブロックサイズ監視
+### 2. Watching block count
 
 ```bash
-# Tempo Pod内でブロック数を確認
+# count the blocks inside the Tempo pod
 kubectl exec -n monitoring tempo-0 -- ls -lh /var/tempo/traces
 ```
 
-### 3. クエリパフォーマンス
+### 3. Query performance
 
-- TraceID クエリのレイテンシ監視
-- P95が1秒を超えたらアラート
+- Watch the latency of trace-ID lookups
+- Alert when p95 passes one second
 
-### 4. バックアップ戦略
+### 4. Backup strategy
 
-**現状:**
-- PVC のスナップショット機能（CSIドライバー依存）
+**Today:** PVC snapshots, which depend on the CSI driver.
 
-**推奨:**
+**Suggested:**
+
 ```bash
-# 定期的なバックアップ
+# a periodic backup
 kubectl exec -n monitoring tempo-0 -- tar czf /tmp/tempo-backup.tar.gz /var/tempo/traces
 kubectl cp monitoring/tempo-0:/tmp/tempo-backup.tar.gz ./tempo-backup-$(date +%Y%m%d).tar.gz
 ```
 
-## トラブルシューティング
+## Troubleshooting
 
-### Problem 1: Pod が Pending
+### Problem 1: the pod stays Pending
 
-**症状:**
+**Symptom:**
+
 ```bash
 kubectl get pods -n monitoring
 # NAME      READY   STATUS    RESTARTS   AGE
 # tempo-0   0/1     Pending   0          5m
 ```
 
-**原因と対処:**
+**Causes and what to do:**
 
-1. **PVC がバインドされない**
+1. **The PVC is not bound**
+
    ```bash
    kubectl get pvc -n monitoring
    kubectl describe pvc tempo-storage-tempo-0 -n monitoring
 
-   # Longhorn volume の確認
+   # check the Longhorn volume
    kubectl get volumes.longhorn.io -n longhorn-system | grep tempo
    ```
 
-2. **ノードのリソース不足**
+2. **The node is out of resources**
+
    ```bash
    kubectl describe node
-   # Check: Allocated resources
+   # look at: Allocated resources
    ```
 
-### Problem 2: OTLP受信が失敗
+### Problem 2: OTLP ingestion fails
 
-**症状:**
+**Symptom:**
+
 ```bash
 kubectl logs -n monitoring -l app.kubernetes.io/name=otel-collector | grep tempo
 # Error: connection refused
 ```
 
-**対処:**
+**What to do:**
 
-1. **Service確認**
+1. **Check the Service**
+
    ```bash
    kubectl get svc tempo -n monitoring
    kubectl get endpoints tempo -n monitoring
    ```
 
-2. **Pod確認**
+2. **Check the pod**
+
    ```bash
    kubectl logs -n monitoring tempo-0 | grep -i otlp
-   # "OTLP gRPC receiver started on :4317" が表示されるべき
+   # "OTLP gRPC receiver started on :4317" should appear
    ```
 
-### Problem 3: クエリが遅い
+### Problem 3: queries are slow
 
-**症状:**
-Grafana でのトレース検索に時間がかかる
+**Symptom:** searching for traces in Grafana takes a long time.
 
-**対処:**
+**What to do:**
 
-1. **ブロック数確認**
+1. **Count the blocks**
+
    ```bash
    kubectl exec -n monitoring tempo-0 -- find /var/tempo/traces -name "*.tar.gz" | wc -l
-   # ブロック数が多すぎる場合はcompaction設定を見直し
+   # too many blocks means the compaction settings need revisiting
    ```
 
-2. **メモリ使用量確認**
+2. **Check memory use**
+
    ```bash
    kubectl top pod tempo-0 -n monitoring
-   # メモリが限界に近い場合はlimitsを増やす
+   # close to the limit means the limit should go up
    ```
 
-## 今後の拡張予定
+## Planned extensions
 
-1. **Distributed Mode への移行**: トラフィック増加時
-2. **S3バックエンド**: 長期保存・スケーラビリティ向上
-3. **TraceQL サポート**: 高度なクエリ機能
-4. **Grafana Datasource 自動設定**: Terraform/Helm で自動化
+1. **Distributed mode**, once traffic grows
+2. **An S3 backend**, for long-term retention and scalability
+3. **TraceQL support**, for richer queries
+4. **Automatic Grafana datasource configuration**, through Terraform or Helm
 
-## 参考リンク
+## References
 
-- [Grafana Tempo 公式ドキュメント](https://grafana.com/docs/tempo/latest/)
-- [Tempo Helm Chart](https://github.com/grafana/helm-charts/tree/main/charts/tempo)
-- [OTLP Ingestion](https://grafana.com/docs/tempo/latest/configuration/network/otlp/)
-- [Storage Configuration](https://grafana.com/docs/tempo/latest/configuration/storage/)
+- [Grafana Tempo documentation](https://grafana.com/docs/tempo/latest/)
+- [Tempo Helm chart](https://github.com/grafana/helm-charts/tree/main/charts/tempo)
+- [OTLP ingestion](https://grafana.com/docs/tempo/latest/configuration/network/otlp/)
+- [Storage configuration](https://grafana.com/docs/tempo/latest/configuration/storage/)
