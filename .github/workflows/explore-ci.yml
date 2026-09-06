@@ -11,6 +11,12 @@
 ## See environments/kind/README.md#maintenance.
 name: Explore CI
 
+## Documentation-only changes do not run this job. A README under kubernetes/,
+## charts/ or environments/ cannot change what Argo CD renders, and Markdown has
+## its own workflow (markdown-render.yml). backstage/templates/** is deliberately
+## NOT excluded: the skeleton's Markdown carries ${{ values.* }} placeholders, so
+## a broken one is a real scaffold failure this job is meant to catch (#483).
+##
 on:
   pull_request:
     paths:
@@ -26,6 +32,9 @@ on:
       - "scripts/explore-backstage-login-check.sh"
       - "scripts/explore-golden-path-check.sh"
       - ".github/workflows/explore-ci.yml"
+      - "!kubernetes/**/*.md"
+      - "!charts/**/*.md"
+      - "!environments/**/*.md"
   push:
     branches: [main]
     paths:
@@ -41,6 +50,9 @@ on:
       - "scripts/explore-backstage-login-check.sh"
       - "scripts/explore-golden-path-check.sh"
       - ".github/workflows/explore-ci.yml"
+      - "!kubernetes/**/*.md"
+      - "!charts/**/*.md"
+      - "!environments/**/*.md"
 
 # A second run of the same branch replaces the first: two kind clusters pulling
 # the same images gains nothing and the job is the slowest one in the repo.

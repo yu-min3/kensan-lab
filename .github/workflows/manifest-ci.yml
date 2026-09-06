@@ -1,5 +1,9 @@
 name: Manifest CI
 
+## Documentation-only changes do not run this job — it validates YAML, Helm
+## output and Argo CD Applications, none of which a README affects. Markdown has
+## its own workflow (markdown-render.yml).
+##
 on:
   pull_request:
     paths:
@@ -9,6 +13,9 @@ on:
       - ".yamllint"
       - "scripts/validate_argocd_apps.py"
       - ".github/workflows/manifest-ci.yml"
+      - "!kubernetes/**/*.md"
+      - "!charts/**/*.md"
+      - "!environments/**/*.md"
   push:
     branches: [main]
     paths:
@@ -18,6 +25,9 @@ on:
       - ".yamllint"
       - "scripts/validate_argocd_apps.py"
       - ".github/workflows/manifest-ci.yml"
+      - "!kubernetes/**/*.md"
+      - "!charts/**/*.md"
+      - "!environments/**/*.md"
 
 jobs:
   yamllint:
