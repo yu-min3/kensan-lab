@@ -68,8 +68,9 @@ Is it "the reason behind a decision"?
 
 `kubernetes/<cat>/README.md` and `kubernetes/<cat>/<comp>/README.md` should satisfy the following.
 
-- **Length**: roughly 5–30 lines. Growing past that is a signal to push the content out to `docs/`
-    - **Exception — architecture-category READMEs** (the `kubernetes/<cat>/README.md` files that are the transclude source for `docs/architecture/<cat>.md`): since these double as the site's architecture-page source of truth, **up to ~150 lines plus a mermaid diagram is acceptable**. Use `network` as the template (Design thesis → Components → diagram → Design rationale → Related)
+- **Length**: aim for **25–50 lines**, and treat **80 as the ceiling**. Past that, the content is not a co-located note any more — push it to `docs/`, or link to the annotated `values.yaml` instead of restating it
+    - **Exception — architecture-category READMEs** (the `kubernetes/<cat>/README.md` files that are the transclude source for `docs/architecture/<cat>/index.md`): since these double as the site's architecture-page source of truth, **up to ~150 lines plus a mermaid diagram is acceptable**. Use `network` as the template (Design thesis → Components → diagram → Design rationale → Related)
+    - The number moved from "5–30" to this in 2026-09, after measuring. Every README that reached the site sat at 63–149 lines and none exceeded its budget; the six that had grown past theirs were all files the site never published — `tempo` at 442 lines and `otel-collector` at 408 among them, mostly restating the domain README and the integration runbook. **The rule was never what kept them short; being published was.** So the number now matches the grain the published ones actually hold, and the second source system was folded into the first so nothing sits outside that pressure again
 - **Required sections**:
   - A one-line summary (what this directory / component is)
   - A description of the subdirectories / key files it contains
@@ -77,6 +78,8 @@ Is it "the reason behind a decision"?
 - **Forbidden**:
   - An empty template with only TODOs
   - Detail tables that duplicate content living elsewhere (link to it instead)
+  - A walkthrough of the component's own `values.yaml`. The file is annotated; link to it
+  - Restating what the upstream project documents. Link to upstream instead
   - "Why" explanations (those belong in an ADR)
 
 ### Minimal component README template
