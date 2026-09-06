@@ -30,6 +30,14 @@ The definitive answer to "where is this information documented." When adding new
 | Cluster topology (nodes, labels, scheduling) | `.claude/rules/kubernetes-cluster.md` | `kubernetes/README.md` |
 | Tech stack | Top `README.md` | `docs/index.md` |
 
+## Nav mechanics worth knowing
+
+Two Material behaviours have already cost time here, so they are written down
+rather than rediscovered.
+
+- **`navigation.indexes` only folds a section's overview into the section name when the first child is a real `index.md` file.** A first child named anything else stays a separate row, showing its own `h1` — which for a transcluded domain README is a full thesis sentence that wraps. This is why every domain overview lives at `architecture/<domain>/index.md`. With `use_directory_urls` (the default), `foo.md` and `foo/index.md` produce the same `/foo/` URL, so moving a page into that shape costs nothing
+- **`content.action.view` builds its link from `edit_uri`**, replacing `edit` with `raw`. Removing `edit_uri` removes the button too, and there is no setting that points it at GitHub's `blob` view
+
 ## Language
 
 Prose and code are written in different languages here, and the split is
