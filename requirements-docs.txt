@@ -3,5 +3,8 @@ mkdocs-material==9.7.6
 mkdocs-git-revision-date-localized-plugin==1.3.0
 mkdocs-llmstxt==0.5.0
 mkdocs-glightbox==0.4.0
+# Keeps the pre-restructure URLs alive: docs/ directories were renamed to match
+# the nav sections, and the old paths are linked from Zenn / dev.to articles.
+mkdocs-redirects==1.2.3
 pymdown-extensions==10.21.2
 Pygments==2.20.0

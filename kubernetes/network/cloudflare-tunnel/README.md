@@ -48,7 +48,7 @@ Point the URL at the **in-cluster Istio Gateway service** (not directly at an ap
 
 **Token handling (GitOps-friendly):** the token lives in Vault at `secret/cloudflare-tunnel/token`; ESO syncs it into the `cloudflare-tunnel-token` Secret (`refreshInterval: 1h`), which the Deployment consumes as `TUNNEL_TOKEN`. Rotating the tunnel = update Vault → ESO resyncs.
 
-**NetworkPolicy:** the `cloudflare-tunnel` ns is not istio-injected, so it uses a per-ns NetworkPolicy (`kubernetes/network/network-policy/cloudflare-tunnel.yaml`, see the [network-policy guide](https://github.com/yu-min3/kensan-lab/blob/main/docs/concepts/network-policy-guide.md)). `cloudflared` needs egress for: DNS (53), Cloudflare edge over **QUIC (UDP 7844)** with TCP 443 fallback, and the Istio Gateway service.
+**NetworkPolicy:** the `cloudflare-tunnel` ns is not istio-injected, so it uses a per-ns NetworkPolicy (`kubernetes/network/network-policy/cloudflare-tunnel.yaml`, see the [network-policy guide](https://github.com/yu-min3/kensan-lab/blob/main/docs/architecture/network-policy-guide.md)). `cloudflared` needs egress for: DNS (53), Cloudflare edge over **QUIC (UDP 7844)** with TCP 443 fallback, and the Istio Gateway service.
 
 ## Access configuration (dashboard)
 

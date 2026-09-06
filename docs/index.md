@@ -40,14 +40,14 @@ Each domain has an architecture page — design thesis, component map, diagrams,
 | Domain | One-liner |
 |---|---|
 | [Argo CD](architecture/argocd.md) | One root App-of-Apps, Git as the only actor; ApplicationSet only where structure is uniform |
-| [Network](architecture/network.md) · [Cloudflare Tunnel](architecture/cloudflare-tunnel.md) | Cilium CNI + L2 LB, Istio mesh, Gateway API edge; Zero Trust internet exposure |
-| [Auth](architecture/auth.md) | Keycloak OIDC, enforced once at the Gateway (oauth2-proxy ext_authz) |
-| [Secrets](architecture/secrets.md) | Vault at the core, four delivery methods, SealedSecret bootstrap lane |
-| [Observability](architecture/observability.md) | Three pillars through one OTel pipe; the monitoring is itself monitored |
+| [Network](architecture/network/index.md) · [Cloudflare Tunnel](architecture/cloudflare-tunnel.md) | Cilium CNI + L2 LB, Istio mesh, Gateway API edge; Zero Trust internet exposure |
+| [Auth](architecture/auth/index.md) | Keycloak OIDC, enforced once at the Gateway (oauth2-proxy ext_authz) |
+| [Secrets](architecture/secrets/index.md) | Vault at the core, four delivery methods, SealedSecret bootstrap lane |
+| [Observability](architecture/observability/index.md) | Three pillars through one OTel pipe; the monitoring is itself monitored |
 | [Storage](architecture/storage.md) | Longhorn only; Retain + Prune=false + off-cluster R2 backups |
-| [Backstage](architecture/backstage.md) | IDP front door — golden path templates, catalog, TechDocs |
+| [Backstage](architecture/backstage/index.md) | IDP front door — golden path templates, catalog, TechDocs |
 
-Cross-cutting overviews: [Infrastructure](architecture/infrastructure.md) and [Cluster health monitoring](architecture/cluster-health-monitoring.md).
+Cross-cutting overviews: [Infrastructure](architecture/index.md) and [Cluster health monitoring](architecture/cluster-health-monitoring.md).
 
 ## Showcase
 

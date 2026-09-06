@@ -75,6 +75,6 @@ Concrete choices:
 ## Related
 
 - Health-monitoring design (3 layers, phased rollout): [`docs/architecture/cluster-health-monitoring.md`](https://github.com/yu-min3/kensan-lab/blob/main/docs/architecture/cluster-health-monitoring.md)
-- App integration, health checks, troubleshooting, tuning: [`docs/guides/observability-integration.md`](https://github.com/yu-min3/kensan-lab/blob/main/docs/guides/observability-integration.md)
+- App integration, health checks, troubleshooting, tuning: [`docs/runbooks/observability-integration.md`](https://github.com/yu-min3/kensan-lab/blob/main/docs/runbooks/observability-integration.md)
 - Alert rules: [`prometheus/resources/apiserver-etcd-alerts.yaml`](https://github.com/yu-min3/kensan-lab/blob/main/kubernetes/observability/prometheus/resources/apiserver-etcd-alerts.yaml) / [`blackbox-exporter/resources/blackbox-alerts.yaml`](https://github.com/yu-min3/kensan-lab/blob/main/kubernetes/observability/blackbox-exporter/resources/blackbox-alerts.yaml)
 - Component-specific config: per-directory READMEs (`otel-collector/`, `tempo/`)

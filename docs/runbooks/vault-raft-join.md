@@ -39,5 +39,5 @@ Write a `retry_join` entry for all 3 pods. Each pod also attempts to join itself
 
 ## Related
 
-- [Stage 1 Bootstrap](../bootstrapping/12-vault-stage1.md)
+- [Stage 1 Bootstrap](../bootstrapping/vault-stage1.md)
 - PR #228: added `retry_join`

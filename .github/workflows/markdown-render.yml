@@ -17,6 +17,8 @@ on:
       - "requirements-lint.txt"
       - "scripts/check-github-render.py"
       - "tests/test_check_github_render.py"
+      - "scripts/check-llms-coverage.py"
+      - "tests/test_check_llms_coverage.py"
       - ".github/workflows/markdown-render.yml"
   push:
     branches:
@@ -27,6 +29,8 @@ on:
       - "requirements-lint.txt"
       - "scripts/check-github-render.py"
       - "tests/test_check_github_render.py"
+      - "scripts/check-llms-coverage.py"
+      - "tests/test_check_llms_coverage.py"
       - ".github/workflows/markdown-render.yml"
   workflow_dispatch:
 
@@ -53,3 +57,13 @@ jobs:
 
       - name: Test GitHub rendering check
         run: python -m unittest tests/test_check_github_render.py
+
+      # nav and the llmstxt sections are two hand-written descriptions of the
+      # same docs/ tree. A page missing from the second one still builds, still
+      # appears on the site, and is simply absent from /llms.txt — mkdocs
+      # --strict has nothing to say about it.
+      - name: Verify llms.txt coverage
+        run: python scripts/check-llms-coverage.py
+
+      - name: Test llms.txt coverage check
+        run: python -m unittest tests/test_check_llms_coverage.py

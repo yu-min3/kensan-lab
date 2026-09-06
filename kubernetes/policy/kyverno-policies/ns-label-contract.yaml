@@ -1,5 +1,5 @@
 ## Namespace Label Contract — label の貼り方そのものを Kyverno が強制する
-## (v2 統一設計の土台 — ADR-012 改訂、SoT: docs/concepts/namespace-label-design.md + ADR-014)
+## (v2 統一設計の土台 — ADR-012 改訂、SoT: docs/architecture/namespace-label-design.md + ADR-014)
 ##
 ## 「label を読む側」(pss-baseline の除外 / pss-restricted の opt-in /
 ##  app-tier policy の selector) の前提を本 policy が保証する。
@@ -52,7 +52,7 @@ spec:
         message: >-
           全 namespace に kensan-lab.platform/environment と
           kensan-lab.platform/tier (platform | application) が必要です
-          (docs/concepts/namespace-label-design.md)
+          (docs/architecture/namespace-label-design.md)
         anyPattern:
           - metadata:
               labels:

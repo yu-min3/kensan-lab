@@ -159,7 +159,7 @@ Script to fetch OTel dashboards from Grafana.com:
 ./scripts/13-generate-grafana-dashboards.sh
 ```
 
-See [Grafana Independent Deployment](./11-grafana-independent.md) for details.
+See [Grafana Independent Deployment](./grafana-independent.md) for details.
 
 ---
 

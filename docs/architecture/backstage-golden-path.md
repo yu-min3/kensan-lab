@@ -58,7 +58,7 @@ Argo CD syncs the app repo's `manifests/` into the app namespace. The generated 
 
 - **Ingress + SSO** — HTTPRoute attaches to the shared Gateway; OIDC is enforced at the edge (oauth2-proxy ext_authz), so the app trusts authenticated headers and implements no login.
 - **Zero-trust defaults** — the namespace baseline (default-deny NetworkPolicy, PSA, Istio mTLS) applies without app-side configuration; the skeleton ships the explicit `AuthorizationPolicy` it needs.
-- **Observability** — a ServiceMonitor is included; telemetry goes to the central OTel Collector ([integration guide](observability-integration.md)).
+- **Observability** — a ServiceMonitor is included; telemetry goes to the central OTel Collector ([integration guide](../runbooks/observability-integration.md)).
 
 ### 5. Iterate
 

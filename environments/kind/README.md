@@ -3,7 +3,7 @@
 A subset of this platform that stands up on a kind cluster in about ten minutes,
 so that someone can look at how it is composed without owning the hardware.
 User-facing instructions are in
-[docs/getting-started/try-it-with-kind.md](../../docs/getting-started/try-it-with-kind.md);
+[docs/getting-started/try-it-with-kind.md](https://github.com/yu-min3/kensan-lab/blob/main/docs/getting-started/try-it-with-kind.md);
 this file is for whoever has to keep it working.
 
 ## What is here

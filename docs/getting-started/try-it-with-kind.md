@@ -1,9 +1,12 @@
-# Try kensan-lab with kind
+# Try it in one command
 
 This is the shortest path through kensan-lab. In about ten minutes you will
 inspect a GitOps-managed cluster, open an SSO-protected demo, create a second
 application through Backstage, merge its pull request, and watch its CPU usage
 change in Grafana.
+
+Pull requests that touch the platform stand this same environment up on CI and
+sign in to it, so what follows is checked rather than merely written down.
 
 ```mermaid
 flowchart LR

@@ -23,12 +23,36 @@ The definitive answer to "where is this information documented." When adding new
 |---|---|---|
 | Per-domain architecture (argocd / auth / network / secrets / storage / observability / backstage) | `kubernetes/<cat>/README.md` (**Model A**: `docs/architecture/<cat>.md` transcludes it. `storage` includes R2 backups, RecurringJobs, and StorageClasses) | The corresponding topic under `.claude/rules/` |
 | Secret management (the matrix of the 4 methods, inventory, operational procedures) | `docs/secret-management/index.md` (architecture and design rationale live in `kubernetes/secrets/README.md` — a deliberate split of responsibilities) | `.claude/rules/security-secrets.md` |
-| Backstage Golden Path (procedures for App Developers) | `docs/guides/backstage-golden-path.md` | `kubernetes/backstage/README.md`, `.claude/rules/environment-separation.md` |
+| Backstage Golden Path (procedures for App Developers) | `docs/architecture/backstage-golden-path.md` | `kubernetes/backstage/README.md`, `.claude/rules/environment-separation.md` |
 | Namespace naming | `docs/adr/006-namespace-naming.md` (why) + `.claude/rules/environment-separation.md` (how) | `kubernetes/namespaces/README.md` |
 | Helm multi-source layout convention | `kubernetes/README.md` (Pattern A/B) | `.claude/rules/helm-multisource.md` |
 | GitOps workflow | `.claude/rules/gitops-workflow.md` | `CLAUDE.md` Mandatory Constraints |
 | Cluster topology (nodes, labels, scheduling) | `.claude/rules/kubernetes-cluster.md` | `kubernetes/README.md` |
 | Tech stack | Top `README.md` | `docs/index.md` |
+
+## Nav mechanics worth knowing
+
+Two Material behaviours have already cost time here, so they are written down
+rather than rediscovered.
+
+- **`navigation.indexes` only folds a section's overview into the section name when the first child is a real `index.md` file.** A first child named anything else stays a separate row, showing its own `h1` — which for a transcluded domain README is a full thesis sentence that wraps. This is why every domain overview lives at `architecture/<domain>/index.md`. With `use_directory_urls` (the default), `foo.md` and `foo/index.md` produce the same `/foo/` URL, so moving a page into that shape costs nothing
+- **`content.action.view` builds its link from `edit_uri`**, replacing `edit` with `raw`. Removing `edit_uri` removes the button too, and there is no setting that points it at GitHub's `blob` view
+
+## Language
+
+Prose and code are written in different languages here, and the split is
+deliberate rather than accidental. Measured across the repository in 2026-09:
+
+| What | Language | Measured |
+|---|---|---|
+| `docs/**` and the READMEs the site transcludes | **English** | 2% and 6% of files contain any Japanese, and what remains is Zenn article titles and the brand's own word, 研鑽 |
+| Comments inside code — `values.yaml`, `.tf`, `.go`, `.tsx`, `.sh` | **Japanese** | 64% of YAML, 100% of Terraform, 87% of Go, 77% of TSX, 52% of shell |
+| `CLAUDE.md`, `AGENTS.md`, `.claude/rules/`, `.claude/skills/` | **Japanese** | 70% of files — these are read by agents and by the author, not by visitors |
+
+So a README may point a reader at an annotated `values.yaml` and that file will be
+commented in Japanese. That is the convention, not an oversight. If a component's
+configuration needs to be explained to a visitor, the explanation belongs in the
+README or in `docs/`, in English — not in a translation of the comments.
 
 ## Rendering target
 
@@ -37,10 +61,14 @@ Every layer above is Markdown, but not every file is read in the same place. **E
 | Files | Read on | May use |
 |---|---|---|
 | `docs/**/*.md` | The docs site only — the top README links to `https://yu-min3.github.io/kensan-lab/…`, never to `./docs/*.md` | Everything MkDocs Material offers: admonitions, content tabs, `attr_list`, `<figure markdown>` |
-| Every file transcluded by `docs/**` — today the nine per-domain `kubernetes/**/README.md` | **Both** github.com and the docs site | Only what both engines agree on: CommonMark, plain HTML, tables, Mermaid |
-| Everything else — the top `README.md`, `apps/**`, `.claude/`, `bootstrap/`, sample data, scaffold templates | github.com only, or not read as prose at all | Whatever renders on GitHub; no site constraint applies |
+| Every file transcluded by `docs/**` — the per-domain `kubernetes/**/README.md`, plus `bootstrap/**` and `environments/kind/README.md` | **Both** github.com and the docs site | Only what both engines agree on: CommonMark, plain HTML, tables, Mermaid. Cross-references must be **absolute github.com URLs**: a relative path cannot resolve from both the file's own directory and `docs/` |
+| Everything else — the top `README.md`, `apps/**`, `.claude/`, sample data, scaffold templates | github.com only, or not read as prose at all | Whatever renders on GitHub; no site constraint applies |
 
 The second row is the constrained one, and it is constrained for a reason: Material's extensions are not errors on GitHub, they are **passed through as literal text**. A page keeps building while displaying its own source. `docs/showcase.md` shipped that way for 17 days before anyone opened it on GitHub (PR #468).
+
+Prose that operators read — the bootstrap Terraform and the explore layer — used to sit in the
+third row, reachable only on github.com. It has been moved into the second: written once beside
+the code it describes, and transcluded onto the site. There are now two source systems, not three.
 
 In practice the constraint costs nothing — domain READMEs are written with diagrams, tables, and prose, all of which render identically on both. `scripts/check-github-render.py` enforces it in CI, deriving the file list from the `--8<--` lines under `docs/` so a tenth architecture page is covered without anyone updating a list.
 
@@ -64,8 +92,9 @@ Is it "the reason behind a decision"?
 
 `kubernetes/<cat>/README.md` and `kubernetes/<cat>/<comp>/README.md` should satisfy the following.
 
-- **Length**: roughly 5–30 lines. Growing past that is a signal to push the content out to `docs/`
-    - **Exception — architecture-category READMEs** (the `kubernetes/<cat>/README.md` files that are the transclude source for `docs/architecture/<cat>.md`): since these double as the site's architecture-page source of truth, **up to ~150 lines plus a mermaid diagram is acceptable**. Use `network` as the template (Design thesis → Components → diagram → Design rationale → Related)
+- **Length**: aim for **25–50 lines**, and treat **80 as the ceiling**. Past that, the content is not a co-located note any more — push it to `docs/`, or link to the annotated `values.yaml` instead of restating it
+    - **Exception — architecture-category READMEs** (the `kubernetes/<cat>/README.md` files that are the transclude source for `docs/architecture/<cat>/index.md`): since these double as the site's architecture-page source of truth, **up to ~150 lines plus a mermaid diagram is acceptable**. Use `network` as the template (Design thesis → Components → diagram → Design rationale → Related)
+    - The number moved from "5–30" to this in 2026-09, after measuring. Every README that reached the site sat at 63–149 lines and none exceeded its budget; the six that had grown past theirs were all files the site never published — `tempo` at 442 lines and `otel-collector` at 408 among them, mostly restating the domain README and the integration runbook. **The rule was never what kept them short; being published was.** So the number now matches the grain the published ones actually hold, and the second source system was folded into the first so nothing sits outside that pressure again
 - **Required sections**:
   - A one-line summary (what this directory / component is)
   - A description of the subdirectories / key files it contains
@@ -73,6 +102,8 @@ Is it "the reason behind a decision"?
 - **Forbidden**:
   - An empty template with only TODOs
   - Detail tables that duplicate content living elsewhere (link to it instead)
+  - A walkthrough of the component's own `values.yaml`. The file is annotated; link to it
+  - Restating what the upstream project documents. Link to upstream instead
   - "Why" explanations (those belong in an ADR)
 
 ### Minimal component README template

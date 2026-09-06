@@ -2,3 +2,8 @@
 # Kept separate from requirements-docs.txt so the Markdown check does not pull
 # in the whole MkDocs stack (it does not build the site).
 markdown-it-py==3.0.0
+
+# scripts/check-llms-coverage.py — reads mkdocs.yml to compare the site's page
+# set against the llmstxt section globs. Also stays out of requirements-docs.txt
+# so the check runs without building the site.
+PyYAML==6.0.2

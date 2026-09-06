@@ -1,0 +1,1 @@
+---8<--- "environments/kind/README.md"

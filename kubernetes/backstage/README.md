@@ -44,7 +44,7 @@ flowchart LR
 
 One form submission produces three artifacts: a complete app repository the developer owns, a reviewable PR that registers the app with GitOps, and a catalog entry with TechDocs. The developer never touches `kubernetes/` — the `app-project` AppProject caps what their Application may deploy ([`kubernetes/argocd/README.md`](https://github.com/yu-min3/kensan-lab/blob/main/kubernetes/argocd/README.md)).
 
-Step-by-step walkthrough: [Golden Path guide](https://github.com/yu-min3/kensan-lab/blob/main/docs/guides/backstage-golden-path.md).
+Step-by-step walkthrough: [Golden Path guide](https://github.com/yu-min3/kensan-lab/blob/main/docs/architecture/backstage-golden-path.md).
 
 ## Design rationale
 
@@ -63,7 +63,7 @@ Concrete choices:
 
 ## Related
 
-- Golden Path walkthrough (AD perspective): [`docs/guides/backstage-golden-path.md`](https://github.com/yu-min3/kensan-lab/blob/main/docs/guides/backstage-golden-path.md)
+- Golden Path walkthrough (AD perspective): [`docs/architecture/backstage-golden-path.md`](https://github.com/yu-min3/kensan-lab/blob/main/docs/architecture/backstage-golden-path.md)
 - Manifest placement decision: [ADR-018](https://github.com/yu-min3/kensan-lab/blob/main/docs/adr/018-backstage-manifests-placement.md) · Gateway auth model: [ADR-002](https://github.com/yu-min3/kensan-lab/blob/main/docs/adr/002-authentication-authorization-architecture.md) / [ADR-010](https://github.com/yu-min3/kensan-lab/blob/main/docs/adr/010-istio-native-oauth2-absent.md)
 - App source, local dev, image build: [`backstage/README.md`](https://github.com/yu-min3/kensan-lab/blob/main/backstage/README.md)
 - Roles and namespace model (PE / AD split): [`.claude/rules/environment-separation.md`](https://github.com/yu-min3/kensan-lab/blob/main/.claude/rules/environment-separation.md)

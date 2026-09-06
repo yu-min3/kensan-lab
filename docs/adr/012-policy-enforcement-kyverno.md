@@ -121,13 +121,13 @@ The original design kept PSA as an "in-process backstop for while Kyverno (1 rep
 
 ## Errata (2026-06-07)
 
-- §4's enumeration of privileged-by-design namespaces ("currently `kube-system` / `istio-system` / `longhorn-system`") **omits `local-path-storage`** (as of this writing, 4 namespaces carry `pss-level: privileged` — the enumeration in `docs/concepts/policy-enforcement.md` is authoritative). As designed ("avoid a hardcoded name list"), this has no effect on the policy itself.
+- §4's enumeration of privileged-by-design namespaces ("currently `kube-system` / `istio-system` / `longhorn-system`") **omits `local-path-storage`** (as of this writing, 4 namespaces carry `pss-level: privileged` — the enumeration in `docs/architecture/policy-enforcement.md` is authoritative). As designed ("avoid a hardcoded name list"), this has no effect on the policy itself.
 - The label contract's grading was formalized in [ADR-014](014-namespace-naming-label-contract-v2.md) (every namespace requires `environment` + `tier`; every `app-*` namespace additionally requires `team` + `app`; `component` is a platform convention — this resolves the conflict with ADR-006's original 3-axis definition).
 
 ## References
 
 - [ADR-006](006-namespace-naming.md): Namespace Naming (3-axis labels)
 - [ADR-011](011-vault-version-pinning.md): the Vault `:latest` silent-upgrade incident
-- [`docs/concepts/policy-enforcement.md`](../concepts/policy-enforcement.md): the policy inventory / operational procedures (source of truth)
+- [`docs/architecture/policy-enforcement.md`](../architecture/policy-enforcement.md): the policy inventory / operational procedures (source of truth)
 - [CNCF: GitOps and mutating policies — the tale of two loops](https://www.cncf.io/blog/2024/01/18/gitops-and-mutating-policies-the-tale-of-two-loops/)
 - [Argo CD Diff Strategies (Server-Side Diff)](https://argo-cd.readthedocs.io/en/stable/user-guide/diff-strategies/)

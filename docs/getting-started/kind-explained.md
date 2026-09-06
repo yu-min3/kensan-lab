@@ -208,7 +208,7 @@ attempt to emulate Cilium L2 announcements on Docker's bridge network.
 | Hardware telemetry | temperature, Wi-Fi, disk, and router probes do not exist inside the Docker node |
 | Production image supply chain | Explore has a local runner and registry, but not GHCR credentials, release retention, signing, or multi-architecture builds |
 
-The bare-metal [architecture pages](../architecture/infrastructure.md) describe
+The bare-metal [architecture pages](../architecture/index.md) describe
 these capabilities. The [bootstrap guide](../bootstrapping/index.md) is a
 reference for the live cluster, not a clean-room-tested installer; automation is
 planned.

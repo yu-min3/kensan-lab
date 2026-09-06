@@ -40,5 +40,5 @@ Why `longhorn-single`: Vault raft and Keycloak already replicate at the app laye
 
 ## Related
 
-- [Stage 1 Bootstrap](../bootstrapping/12-vault-stage1.md): the current state where Vault runs on `local-path`
+- [Stage 1 Bootstrap](../bootstrapping/vault-stage1.md): the current state where Vault runs on `local-path`
 - [Longhorn restore test](../runbooks/longhorn-restore-test.md): the existing Longhorn restore runbook
