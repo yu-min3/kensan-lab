@@ -47,6 +47,16 @@ OUT = pathlib.Path(__file__).resolve().parent.parent / "docs" / "getting-started
 DEMO_USER = "demo"
 DEMO_PASSWORD = os.environ.get("DEMO_PASSWORD", "")
 
+# `grafana-app-runtime` photographs one application's panels, and which one is
+# the reader's choice rather than ours. The built-in demo is the fallback
+# because it exists before the Golden Path has run; set this to the name typed
+# into the scaffolder form to photograph a generated service instead.
+EXPLORE_APP = os.environ.get("EXPLORE_APP", "demo")
+
+# What the scaffolder form is photographed with. The guide says the screenshots
+# were taken with this name, so the two have to agree.
+EXAMPLE_APP = "app2"
+
 # Wide enough that Argo CD's tree and Grafana's panels are not squeezed into a
 # mobile layout, and short enough that the result is readable inline in a
 # Markdown page rather than a wall the reader has to scroll past.
@@ -92,7 +102,12 @@ def sign_in(page: Page) -> None:
 
 
 def shot(page: Page, url: str, name: str, *, wait_for: str | None = None,
-         settle: int = 2500) -> None:
+         settle: int = 2500, height: int | None = None,
+         before_shot=None) -> None:
+    # A page that outgrew the default viewport gets photographed with its last
+    # line sliced in half, which reads as a rendering bug rather than a crop.
+    if height:
+        page.set_viewport_size({"width": VIEWPORT["width"], "height": height})
     page.goto(url, wait_until="domcontentloaded")
     sign_in(page)
     # An OIDC round trip does not always come back to where it started: Argo CD
@@ -115,8 +130,13 @@ def shot(page: Page, url: str, name: str, *, wait_for: str | None = None,
                 f"  url: {page.url}"
             )
 
+    if before_shot:
+        before_shot(page)
+
     path = OUT / f"{name}.png"
     page.screenshot(path=str(path))
+    if height:
+        page.set_viewport_size(VIEWPORT)
     print(f"  {path.relative_to(OUT.parent.parent.parent)}")
 
 
@@ -175,7 +195,9 @@ def sign_in_to_gitea(page: Page) -> str:
 NAMES = (
     "demo-application",
     "argocd-tree",
+    "backstage-create",
     "gitea-platform-pr",
+    "grafana-app-runtime",
 )
 
 
@@ -186,8 +208,9 @@ def main(argv: list[str]) -> int:
     if not argv:
         print(
             "name the screenshot phase explicitly:\n"
-            "  before Golden Path: argocd-tree demo-application\n"
-            "  with an open PR:    gitea-platform-pr",
+            "  before Golden Path: argocd-tree demo-application backstage-create\n"
+            "  with an open PR:    gitea-platform-pr\n"
+            "  once it is running: grafana-app-runtime (EXPLORE_APP=<name>)",
             file=sys.stderr,
         )
         return 2
@@ -218,7 +241,7 @@ def main(argv: list[str]) -> int:
 
         if "demo-application" in wanted:
             shot(page, "https://demo.127-0-0-1.sslip.io/",
-                 "demo-application", settle=4000)
+                 "demo-application", settle=4000, height=1010)
 
         # No selector waits below: these UIs render their content into
         # containers whose text a locator does not always see, and a screenshot
@@ -227,6 +250,49 @@ def main(argv: list[str]) -> int:
         if "argocd-tree" in wanted:
             shot(page, "https://argocd.127-0-0-1.sslip.io/applications/argocd/explore-root",
                  "argocd-tree", settle=7000)
+
+        # The form is the picture of step 5, and it is the same form whatever
+        # the reader ends up naming their service.
+        if "backstage-create" in wanted:
+            def fill_the_form(page: Page) -> None:
+                page.get_by_label("Application Name").fill(EXAMPLE_APP)
+                page.get_by_label("Description").fill("Second walkthrough application")
+                page.wait_for_timeout(800)
+
+            shot(page,
+                 "https://backstage.127-0-0-1.sslip.io/create/templates/default/"
+                 "fastapi-app-template",
+                 "backstage-create", settle=5000, before_shot=fill_the_form)
+
+        # A dashboard photographed at rest shows four flat lines, which is a
+        # picture of nothing. Press the button the guide asks the reader to
+        # press, give Prometheus two scrape intervals to notice, and photograph
+        # the climb — the screenshot then shows what step 7 promises.
+        if "grafana-app-runtime" in wanted:
+            page.goto(f"https://{EXPLORE_APP}.127-0-0-1.sslip.io/",
+                      wait_until="domcontentloaded")
+            sign_in(page)
+            page.wait_for_timeout(2000)
+            page.get_by_role("button", name="Generate load").click()
+            print(f"  ... {EXPLORE_APP} is busy; waiting 75s for two scrapes")
+            page.wait_for_timeout(75000)
+            def collapse_the_menu(page: Page) -> None:
+                # Grafana's docked navigation costs a fifth of the width and
+                # says nothing about this dashboard. Closing it is what a
+                # reader does anyway; not finding the control is not a reason
+                # to lose the screenshot.
+                try:
+                    page.get_by_role("button", name="Close menu").click(timeout=3000)
+                    page.wait_for_timeout(1200)
+                except PlaywrightTimeout:
+                    pass
+
+            shot(page,
+                 "https://grafana.127-0-0-1.sslip.io/d/explore-app-runtime/"
+                 f"explore-app-runtime?var-namespace=app-{EXPLORE_APP}"
+                 f"&var-workload={EXPLORE_APP}&refresh=10s",
+                 "grafana-app-runtime", settle=6000, height=810,
+                 before_shot=collapse_the_menu)
 
         # Gitea intentionally has a separate local session. Capture the pull
         # request itself rather than the list, so the screenshot shows what the

@@ -137,7 +137,8 @@ reuse the session from Argo CD, so no second password prompt appears.
 
 The app displays its name, theme, greeting, and the identity headers attached by
 the gateway. The application itself contains no login implementation: Istio
-asks oauth2-proxy to authenticate the request before it reaches the pod.
+asks oauth2-proxy to authenticate the request before it reaches the pod. The
+load button near the bottom belongs to step 7; leave it alone for now.
 
 ![The existing demo application after signing in](assets/demo-application.png)
 
@@ -160,41 +161,58 @@ Open [Backstage](https://backstage.127-0-0-1.sslip.io){ target="_blank" rel="noo
 Golden Path Application**. The Explore catalog has one owner, `demo-team`, so the
 walkthrough does not ask you to choose among production teams.
 
-Use these example values:
+![The Golden Path Application form in Backstage](assets/backstage-create.png)
+
+**The application name is yours.** One field decides what the platform builds,
+so the rest of this page writes it as `<name>` in the text and `$APP` in the
+commands. The screenshots were taken with `app2`.
 
 | Field | Value |
 |---|---|
-| Application Name | `app2` |
+| Application Name | `<name>` — anything you like |
 | Description | `Second walkthrough application` |
-| Repository | owner `demo`, repository `app2` |
+| Repository | owner `demo`, repository `<name>` |
 | Theme | `night` |
 | Greeting | `Hello from the golden path` |
 
-The name is yours to choose. The rest of this page writes it as `app2`; if you
-enter something else, substitute it wherever `app2` appears below.
+Everything the platform names after it:
+
+| Thing | Named | With `app2` |
+|---|---|---|
+| Argo CD Application, namespace | `app-<name>` | `app-app2` |
+| Deployment, Service | `<name>` | `app2` |
+| Hostname | `<name>.127-0-0-1.sslip.io` | `app2.127-0-0-1.sslip.io` |
+| Gitea repository | `demo/<name>` | `demo/app2` |
+
+Set the name once in the terminal you are going to use, and every command below
+works unchanged:
+
+```bash
+APP=app2   # whatever you typed in the form
+```
 
 Review the values and press **Create**. Backstage now:
 
 ```mermaid
 flowchart TD
-    A[Backstage form] --> B[Create app2 repository in local Gitea]
-    B --> F[Gitea Actions tests and builds app2]
+    A[Backstage form] --> B[Create NAME repository in local Gitea]
+    B --> F[Gitea Actions tests and builds NAME]
     F --> G[Push commit-SHA image]
     G --> H[Record image tag in deploy/values.yaml]
     H --> C[Open platform-config PR]
-    C --> D[Register app2 in the catalog]
+    C --> D[Register NAME in the catalog]
     C --> E[Register the new SSO callback]
     C --> I{You merge the PR}
     I --> J
-    J[Argo CD discovers app-app2]
-    J --> K[app2 is running]
+    J[Argo CD discovers app-NAME]
+    J --> K[NAME is running]
 ```
 
 The task stays open while Gitea Actions tests the generated source, builds an
-app2-specific image, pushes it, and writes its immutable commit SHA into
-`deploy/values.yaml`. A failed build fails the Backstage task and no platform
-pull request is created. A completed task means the pull request is safe to
-review and merge.
+image for that repository alone, pushes it, and writes its immutable commit SHA
+into `deploy/values.yaml`. A failed build fails the Backstage task and no
+platform pull request is created. A completed task means the pull request is
+safe to review and merge.
 
 ## 6. Merge the local pull request
 
@@ -205,7 +223,7 @@ credentials: sign in with `demo` / `demo`.
 
 You are the platform administrator for this part of the walkthrough. The new
 Platform Config PR should already be waiting in `demo/kensan-lab`. It adds two
-files under `environments/kind/generated-applications/app-app2/`; merge it.
+files under `environments/kind/generated-applications/app-<name>/`; merge it.
 
 ![Gitea showing the platform pull request ready for review](assets/gitea-platform-pr.png)
 
@@ -221,85 +239,77 @@ flowchart LR
     K --> B[5. Open<br/>NAME.127-0-0-1.sslip.io]
 ```
 
-The generated Argo CD Application and namespace are named `app-<application
-name>`; the Deployment and hostname keep the application name itself. With
-`app2` from step 5 that is Application and namespace `app-app2`, Deployment
-`app2`, and hostname `app2.127-0-0-1.sslip.io`.
-
 Watch the new Argo CD Application appear:
 
 ```bash
-kubectl -n argocd get application app-app2 -w
+kubectl -n argocd get application app-$APP -w
 ```
 
-When it is `Synced` and `Healthy`, open the
-[new app2 application](https://app2.127-0-0-1.sslip.io){ target="_blank" rel="noopener" }. Compare it with the
-[original demo](https://demo.127-0-0-1.sslip.io){ target="_blank" rel="noopener" }. app2 now runs an image built
-from its own repository; its night theme and greeting came from Git-managed
-runtime values.
+When it is `Synced` and `Healthy`, open `https://<name>.127-0-0-1.sslip.io` and
+compare it with the [original demo](https://demo.127-0-0-1.sslip.io){ target="_blank" rel="noopener" }.
+Your service runs an image built from its own repository, and its night theme
+and greeting came from Git-managed runtime values rather than from that image.
 
 To prove source delivery continues after scaffolding, open
-`frontend/src/App.tsx` in the app2 repository, use Gitea's edit button to change
-one visible sentence, and commit to `main`. A second Actions run produces a new
-SHA tag. Argo CD then replaces the app2 pod; refresh the page to see the code
-change. A failed test or build never updates the tag, so the last good pod stays
-running.
+`frontend/src/App.tsx` in your repository, use Gitea's edit button to change one
+visible sentence, and commit to `main`. A second Actions run produces a new SHA
+tag. Argo CD then replaces the pod; refresh the page to see the code change. A
+failed test or build never updates the tag, so the last good pod stays running.
 
 ## 7. Watch CPU rise and fall in Grafana
 
 Open the [Explore App Runtime dashboard](https://grafana.127-0-0-1.sslip.io/d/explore-app-runtime/explore-app-runtime?refresh=10s){ target="_blank" rel="noopener" }
-in Grafana. Choose **Sign in with Keycloak** if asked. The dashboard shows one
-Deployment's CPU, desired and available replicas, request rate, and request
-latency.
+in Grafana. Choose **Sign in with Keycloak** if asked. It shows one Deployment's
+CPU, desired and available replicas, request rate, and request latency.
 
 It opens on the built-in `demo` application. **Set the Namespace picker to
-`app-app2` and the Workload picker to `app2` before going on.** Both pickers are
-filled from the cluster, so they offer whatever name you chose in step 5 — but
-the panels stay empty until they point at a workload that exists.
+`app-<name>` and the Workload picker to `<name>` first.** Both pickers are
+filled from the cluster, so they list whatever you called your service — and the
+panels stay empty until they point at a workload that exists.
 
-Now open app2 in another tab and press **Generate load for 90s**. The button is
-part of the generated service: it occupies one core inside the pod and counts
-down while it does.
+Then open your application in another tab and press **Generate load for 90s**.
+It is the same button you saw on the demo app in step 4, and it belongs to the
+service you just deployed: it occupies one core inside the pod and counts down
+while it does.
+
+![The Explore App Runtime dashboard while the load button is running](assets/grafana-app-runtime.png)
 
 Prometheus scrapes every 30 seconds, so the CPU line starts climbing after a
 scrape or two and falls back once the ninety seconds are up. This reads
 kubelet/cAdvisor metrics; `metrics-server` and `kubectl top` are not involved.
 
-That button is an Explore prop, not a feature of the golden path. The same
-service generated for a real platform ships the handler switched off
-(`DEMO_LOAD_ENABLED`), because an endpoint that burns a core on request is a
-denial-of-service tool once anyone else can reach it. From a terminal it is the
-same picture without the button:
+The button is an Explore prop rather than a feature of the golden path. The same
+template generates it switched off (`DEMO_LOAD_ENABLED`) for the real platform,
+because an endpoint that burns a core on request is a denial-of-service tool
+once anyone else can reach it.
 
-```bash
-kubectl -n app-app2 exec deploy/app2 -- python -c \
-    'import time; end=time.time()+120; exec("while time.time() < end: pass")'
-```
-
-## 8. Scale it two ways
+## 8. Scale it, and watch Git win
 
 The Replicas panel is where the GitOps contract becomes visible. Change the
-replica count twice — once from the cluster, once from Git — and watch which
-one survives.
+replica count twice — once from the cluster, once from Git — and watch which one
+survives.
 
-Out of band, with `kubectl`:
+**From the cluster.** Argo CD puts this back within a second or two:
 
 ```bash
-kubectl -n app-app2 scale deployment/app2 --replicas=3
-kubectl -n app-app2 get deployment/app2 -w
+kubectl -n app-$APP scale deployment/$APP --replicas=3
+kubectl -n app-$APP get deployment/$APP -w
 ```
 
-Argo CD puts it back within a second or two. Prometheus scrapes every 30
-seconds, so the Replicas panel usually never shows the 3 at all — the cluster
-was only briefly wrong.
+Argo CD is faster than one scrape interval, so the Replicas panel usually never
+shows the 3 at all: the cluster was only briefly wrong.
 
-Through Git, in the `app2` repository: open `deploy/values.yaml` in Gitea,
-change `replicas: 1` to `replicas: 3`, and commit to `main`. Nothing pushes this
-one back. Argo CD applies it on its next poll — three minutes at most, or press
-**Refresh** on the `app-app2` Application to skip the wait — and the Replicas
-panel climbs to 3.
+**From Git.** In your service's repository in Gitea:
 
-No image is built for this one. The workflow ignores `deploy/`, because what
+1. open `deploy/values.yaml`
+2. change `replicas: 1` to `replicas: 3` with the edit button
+3. commit to `main`
+
+Nothing pushes this one back. Argo CD applies it on its next poll — three
+minutes at most, or press **Refresh** on the `app-<name>` Application in Argo CD
+to skip the wait — and the Replicas panel climbs to 3.
+
+No image is built for that one. The workflow ignores `deploy/`, because what
 lives there is read at runtime rather than baked into the image:
 
 | What you change | Image rebuilt | What you see |

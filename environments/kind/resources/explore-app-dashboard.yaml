@@ -31,7 +31,7 @@ data:
           "id": 1,
           "options": {"legend": {"calcs": ["lastNotNull"], "displayMode": "list", "placement": "bottom"}, "tooltip": {"mode": "single", "sort": "none"}},
           "targets": [{"expr": "sum(rate(container_cpu_usage_seconds_total{namespace=\"$namespace\",pod=~\"$workload-.*\",container=\"app\"}[1m])) * 100", "legendFormat": "$workload CPU", "refId": "A"}],
-          "title": "CPU usage — run the walkthrough load command",
+          "title": "CPU usage — press the load button on the app",
           "type": "timeseries"
         },
         {
