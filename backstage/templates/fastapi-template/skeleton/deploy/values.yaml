@@ -14,6 +14,12 @@ image:
   repository: ${{ values.imageRepository }}
   tag: ${{ values.imageTag }}
 
+# How many pods Argo CD keeps running. This number is the whole scaling path:
+# edit it, commit, and the next sync applies it — no image is built, because
+# the workflow ignores deploy/. Running `kubectl scale` instead changes the
+# cluster without changing this file, so Argo CD puts it back.
+replicas: 1
+
 ports:
   http: 8000
 

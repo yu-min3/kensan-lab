@@ -2,8 +2,9 @@
 
 This is the shortest path through kensan-lab. In about ten minutes you will
 inspect a GitOps-managed cluster, open an SSO-protected demo, create a second
-application through Backstage, merge its pull request, and watch its CPU usage
-change in Grafana.
+application through Backstage, merge its pull request, watch its CPU usage
+change in Grafana, and scale it twice — once the way the platform accepts, once
+the way it undoes.
 
 Pull requests that touch the platform stand this same environment up on CI and
 sign in to it, so what follows is checked rather than merely written down.
@@ -17,6 +18,7 @@ flowchart LR
     E --> F[Gitea<br/>merge platform PR]
     F --> G[Argo CD<br/>deploys app2 image]
     G --> H[Grafana<br/>watch CPU]
+    H --> I[Scale app2<br/>Git vs kubectl]
 ```
 
 The bare-metal cluster is not required. This walkthrough runs a disposable,
@@ -266,11 +268,39 @@ Prometheus scrapes every 30 seconds. The CPU line rises after one or two scrapes
 then falls again after the command exits. This uses kubelet/cAdvisor metrics;
 `metrics-server` and `kubectl top` are not required.
 
-The replica panel also makes the earlier GitOps contract visible: a manual
-`kubectl scale` is quickly returned to the Git-declared replica count by Argo
-CD, often faster than one Prometheus scrape.
+## 8. Scale it two ways
 
-## 8. Clean up
+The Replicas panel is where the GitOps contract becomes visible. Change the
+replica count twice — once from the cluster, once from Git — and watch which
+one survives.
+
+Out of band, with `kubectl`:
+
+```bash
+kubectl -n app-app2 scale deployment/app2 --replicas=3
+kubectl -n app-app2 get deployment/app2 -w
+```
+
+Argo CD puts it back within a second or two. Prometheus scrapes every 30
+seconds, so the Replicas panel usually never shows the 3 at all — the cluster
+was only briefly wrong.
+
+Through Git, in the `app2` repository: open `deploy/values.yaml` in Gitea,
+change `replicas: 1` to `replicas: 3`, and commit to `main`. Nothing pushes this
+one back. Argo CD applies it on its next poll — three minutes at most, or press
+**Refresh** on the `app-app2` Application to skip the wait — and the Replicas
+panel climbs to 3.
+
+No image is built for this one. The workflow ignores `deploy/`, because what
+lives there is read at runtime rather than baked into the image:
+
+| What you change | Image rebuilt | What you see |
+|---|---|---|
+| `frontend/src/App.tsx` | yes | New SHA tag, Argo CD replaces the pod |
+| `deploy/values.yaml` | no | Argo CD applies the value on the next sync |
+| `kubectl scale` | — | Undone; Git never said 3 |
+
+## 9. Clean up
 
 If you imported the local CA, remove it from the trust store first. Then delete
 the entire disposable cluster:
