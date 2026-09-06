@@ -142,14 +142,14 @@ data:
       # this URL, so Create and the local image build consume the same files.
       locations:
         - type: url
-          target: http://gitea-http.gitea.svc.cluster.local:3000/gitea-admin/kensan-lab/src/branch/main/backstage/templates/fastapi-template/template-explore.yaml
+          target: http://gitea-http.gitea.svc.cluster.local:3000/demo/kensan-lab/src/branch/main/backstage/templates/fastapi-template/template-explore.yaml
           rules:
             - allow: [Template]
         # The published Backstage image predates this checkout, so an Explore
         # catalog added here cannot be read from its filesystem. Read the same
         # checkout as the template, through the Gitea URL reader.
         - type: url
-          target: http://gitea-http.gitea.svc.cluster.local:3000/gitea-admin/kensan-lab/src/branch/main/backstage/catalog/explore/demo.yaml
+          target: http://gitea-http.gitea.svc.cluster.local:3000/demo/kensan-lab/src/branch/main/backstage/catalog/explore/demo.yaml
           rules:
             - allow: [Domain, System, Group, User]
       providers:

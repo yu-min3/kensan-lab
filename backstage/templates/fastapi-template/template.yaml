@@ -166,6 +166,8 @@ spec:
           message: ${{ parameters.message }}
           hostname: ${{ parameters.name + ".app.yu-min3.com" }}
           imageRepository: ${{ "ghcr.io/" + (parameters.repoUrl | parseRepoUrl).owner + "/" + (parameters.repoUrl | parseRepoUrl).repo }}
+          applicationUrl: ${{ "https://" + parameters.name + ".app.yu-min3.com/docs" }}
+          argocdUrl: ${{ "https://argocd.platform.yu-min3.com/applications/app-" + parameters.name }}
           imageTag: v0.1.0
           ghcrPullSecretEnabled: true
           otelEnabled: true

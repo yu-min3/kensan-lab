@@ -126,18 +126,19 @@ login (with MFA) under option B, recovering a second factor without the OTP doub
 - A stolen, unlocked device on the LAN that is *actively used* stays signed in up to 30 days
   (`SSO Session Max`); one left *unused* dies in 3 days (`SSO Session Idle`). Acceptable for a
   homelab; the levers are `cookie_expire` + Keycloak `SSO Session Max` / `Idle`.
-- **Keycloak realm session settings are imperative (admin console), not GitOps** — they will drift
-  unless the realm is managed as code. Tracked as a follow-up.
+- **Keycloak realm session settings are reconciled by `bootstrap/keycloak/setup.sh`**, rather than
+  by Argo CD. Re-run the bootstrap after restoring or recreating the realm.
 - The external double-prompt persists while option **A (OTP)** stays in place; that is the accepted
   interim cost of leaving the gate decision open.
 
 ## Follow-ups
 
-- [x] **Keycloak** `kensan` realm: `SSO Session Max = 30d`, `SSO Session Idle = 3d` (admin console —
-  activates the 720h cookie; idle-strict / active-tolerant). _Applied 2026-06-30._
+- [x] **Keycloak** `kensan` realm: `SSO Session Max = 30d`, `SSO Session Idle = 3d`
+  (`bootstrap/keycloak/setup.sh` reconciles both values; kind applies the same policy in
+  `scripts/explore-up.sh`).
 - [ ] **Decide the external-gate model** (A / B / C above). Until decided, CF Access OTP stays
   (already configured, safe).
-- [ ] (Stretch) Manage the Keycloak realm as code to remove the session-setting drift surface.
+- [x] Manage the Keycloak realm session policy as code to remove the Admin Console drift surface.
 
 > Note: creating a CF Access application is **not** a follow-up — Access is already configured (OTP).
 

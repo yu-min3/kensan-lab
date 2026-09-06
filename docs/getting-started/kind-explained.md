@@ -50,17 +50,25 @@ flowchart TD
     T --> B[Build repository source]
     B --> I[Push commit-SHA image<br/>to disposable registry]
     I --> V[Commit SHA tag to deploy/values.yaml]
-    V --> A[Argo CD sync]
-    P[Platform PR merged] --> A
+    V --> P[Backstage opens platform PR]
+    P --> M[Platform administrator merges PR]
+    M --> A[Argo CD sync]
     A --> Pod[New application pod]
 ```
 
-`make try` still builds and loads the fixed `app-demo` image so the platform has
-something to show immediately. It also starts an Explore-only Gitea Actions
-runner and registry. Every repository created afterward runs tests, builds its
-own Python and React source, pushes an image tagged with the source commit SHA,
-and commits that tag to `deploy/values.yaml`. The tag commit contains
-`[skip ci]`, preventing an identical recursive build.
+`make try` builds and loads the fixed `app-demo` image so the platform has
+something to show immediately. It also builds Backstage from the current
+checkout, then starts an Explore-only Gitea Actions runner and registry. Every
+repository created afterward runs tests, builds its own Python and React source,
+pushes an image tagged with the source commit SHA, and commits that tag to
+`deploy/values.yaml`. The tag commit contains `[skip ci]`, preventing an
+identical recursive build.
+
+The seeded copy of this repository is the one exception. Its workflows are
+written for GitHub's hosted runners, and Gitea reads `.github/workflows` too, so
+`make try` turns Actions off for that repository alone. Left on, the platform
+pull request you are asked to merge would arrive showing failed checks that
+nothing in this cluster could ever satisfy.
 
 Changing source on `main` repeats that path and changes the Deployment pod
 template, so Kubernetes replaces the pod. Changing only the theme or greeting
@@ -78,24 +86,27 @@ Explore image contains only the host architecture.
 |---|---|---|
 | Demo and generated apps | Gateway `ext_authz` → oauth2-proxy | The application contains no authentication code |
 | Argo CD, Backstage, Grafana | Native OIDC client → Keycloak | Each product has its own user and role model |
-| Gitea | Local `gitea-admin` account | The PR merge is a separate administrative action |
+| Gitea | Local `demo` / `demo` account | The PR merge is a separate platform-administration action; this is not SSO |
 
 The Gateway admits an application route only from a namespace with the expected
 environment label. Check one route:
 
-```console
-$ kubectl -n app-demo get httproute demo \
+```bash
+kubectl -n app-demo get httproute demo \
     -o jsonpath='{.status.parents[0].conditions[*].type}'
-Accepted ResolvedRefs
 ```
+
+Expected result: `Accepted ResolvedRefs`.
 
 Without a browser session, the same route redirects to Keycloak:
 
-```console
-$ curl -sk -o /dev/null -w '%{http_code} -> %{redirect_url}\n' \
+```bash
+curl -sk -o /dev/null -w '%{http_code} -> %{redirect_url}\n' \
     https://demo.127-0-0-1.sslip.io
-302 -> https://auth.127-0-0-1.sslip.io/realms/kensan/...
 ```
+
+Expected result: a `302` redirect to
+`https://auth.127-0-0-1.sslip.io/realms/kensan/...`.
 
 ## Why the certificate warning is accurate
 
@@ -121,9 +132,9 @@ the host.
 
 Scale the original demo by hand:
 
-```console
-$ kubectl -n app-demo scale deploy demo --replicas=3
-$ kubectl -n app-demo get deploy demo -w
+```bash
+kubectl -n app-demo scale deploy demo --replicas=3
+kubectl -n app-demo get deploy demo -w
 ```
 
 Argo CD returns it to the Git-declared single replica within roughly ten
@@ -153,12 +164,12 @@ All production `ClusterPolicy` objects run in Audit mode. The generated apps
 pass because the platform chart supplies security context and resource requests.
 Create a deliberately non-compliant pod:
 
-```console
-$ kubectl -n app-demo run oops --image=nginx:latest --restart=Never
-$ sleep 70
-$ kubectl -n app-demo get policyreport -o json \
+```bash
+kubectl -n app-demo run oops --image=nginx:latest --restart=Never
+sleep 70
+kubectl -n app-demo get policyreport -o json \
     | jq -r '.items[].results[] | select(.result=="fail") | "\(.policy): \(.message)"'
-$ kubectl -n app-demo delete pod oops
+kubectl -n app-demo delete pod oops
 ```
 
 You should see the mutable `:latest` tag and missing resource requests reported.
@@ -172,12 +183,12 @@ Production workloads request `storageClassName: longhorn`. Explore provides the
 same class name through kind's local-path provisioner so manifests bind without
 being rewritten:
 
-```console
-$ kubectl get storageclass
-NAME                 PROVISIONER             VOLUMEBINDINGMODE
-longhorn (default)   rancher.io/local-path   WaitForFirstConsumer
-standard             rancher.io/local-path   WaitForFirstConsumer
+```bash
+kubectl get storageclass
 ```
+
+The output should show both `longhorn (default)` and `standard` using the
+`rancher.io/local-path` provisioner.
 
 This demonstrates the contract, not Longhorn's behavior. There is no replica
 rebuild, snapshot, backup, expansion, or node failover in a single-node cluster.
@@ -186,12 +197,13 @@ rebuild, snapshot, backup, expansion, or node failover in a single-node cluster.
 
 Istio CNI appends itself to kindnet rather than replacing the cluster network:
 
-```console
-$ docker exec kensan-lab-explore-control-plane \
+```bash
+docker exec kensan-lab-explore-control-plane \
     cat /etc/cni/net.d/10-kindnet.conflist \
     | jq -r '[.plugins[].type] | join(" ")'
-ptp portmap istio-cni
 ```
+
+Expected result: `ptp portmap istio-cni`.
 
 On bare metal, the same setting chains Istio onto Cilium. Explore does not
 attempt to emulate Cilium L2 announcements on Docker's bridge network.
@@ -226,8 +238,8 @@ A previous Explore cluster is the usual cause.
 
 ### An Argo CD Application does not become healthy
 
-```console
-$ kubectl -n argocd describe application <name>
+```bash
+kubectl -n argocd describe application <name>
 ```
 
 Sync waves order Application creation, not every dependency's readiness. Argo
@@ -240,15 +252,15 @@ to bypass it or trust the generated root explicitly.
 
 ### Gitea says you cannot merge the pull request
 
-That is usually the signed-out view. Sign in with `gitea-admin` and the generated
-password printed by `make try`. The account owns the repository and can merge.
+That is usually the signed-out view. Sign in with `demo` / `demo`. This local
+Gitea administrator owns the repository and can merge.
 
 ### Everything is healthy but a browser URL does not resolve
 
 Some corporate resolvers block wildcard DNS services:
 
-```console
-$ for h in argocd backstage grafana demo auth gitea app2; do \
+```bash
+for h in argocd backstage grafana demo auth gitea app2; do \
     echo "127.0.0.1 $h.127-0-0-1.sslip.io"; done | sudo tee -a /etc/hosts
 ```
 

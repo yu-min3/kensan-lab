@@ -29,39 +29,39 @@ You need Docker with at least 8 GiB of memory, plus `kind`, `kubectl`, `helm`,
 
 === "macOS"
 
-    Install [Docker Desktop](https://www.docker.com/products/docker-desktop/),
+    Install [Docker Desktop](https://www.docker.com/products/docker-desktop/){ target="_blank" rel="noopener" },
     set **Settings → Resources → Memory** to at least 8 GiB, then install the
     command-line tools:
 
-    ```console
-    $ brew install kind kubectl helm
+    ```bash
+    brew install kind kubectl helm
     ```
 
 === "Linux"
 
-    Install [Docker Engine](https://docs.docker.com/engine/install/) and the
-    [kind](https://kind.sigs.k8s.io/docs/user/quick-start/#installation),
-    [kubectl](https://kubernetes.io/docs/tasks/tools/install-kubectl-linux/),
-    and [Helm](https://helm.sh/docs/intro/install/) CLIs.
+    Install [Docker Engine](https://docs.docker.com/engine/install/){ target="_blank" rel="noopener" } and the
+    [kind](https://kind.sigs.k8s.io/docs/user/quick-start/#installation){ target="_blank" rel="noopener" },
+    [kubectl](https://kubernetes.io/docs/tasks/tools/install-kubectl-linux/){ target="_blank" rel="noopener" },
+    and [Helm](https://helm.sh/docs/intro/install/){ target="_blank" rel="noopener" } CLIs.
 
 Then clone and start the environment:
 
-```console
-$ git clone https://github.com/yu-min3/kensan-lab
-$ cd kensan-lab
-$ make try
+```bash
+git clone https://github.com/yu-min3/kensan-lab
+cd kensan-lab
+make try
 ```
 
-`make try` checks the prerequisites, builds the built-in demo image, creates the
-cluster, and waits until every Argo CD Application is healthy. It prints the
-random local-admin passwords at the end. Keep that terminal output open.
+`make try` checks the prerequisites, builds the demo and Backstage images from
+your checkout, creates the cluster, and waits until every Argo CD Application
+is healthy. The initial image build can take several minutes; later runs reuse
+Docker's layer cache.
 
 The account used across the platform is fixed for this disposable environment:
 
 | User | Password | Used for |
 |---|---|---|
-| `demo` | `demo` | Demo apps, Argo CD SSO, Backstage, Grafana SSO |
-| `gitea-admin` | printed by `make try` | Gitea and pull-request merge |
+| `demo` | `demo` | Demo apps, Argo CD SSO, Backstage, Grafana SSO, and Gitea |
 
 ## 2. Accept the local certificate
 
@@ -75,24 +75,24 @@ For a quick walkthrough, choose **Advanced** and then **Proceed to
 If you prefer to trust the generated root explicitly, export it before opening
 the sites:
 
-```console
-$ kubectl -n cert-manager get secret explore-ca-tls \
+```bash
+kubectl -n cert-manager get secret explore-ca-tls \
     -o jsonpath='{.data.ca\.crt}' | base64 --decode \
     > /tmp/kensan-lab-explore-ca.crt
 ```
 
 === "macOS system trust"
 
-    ```console
-    $ sudo security add-trusted-cert -d -r trustRoot \
+    ```bash
+    sudo security add-trusted-cert -d -r trustRoot \
         -k /Library/Keychains/System.keychain \
         /tmp/kensan-lab-explore-ca.crt
     ```
 
     Remove it when the walkthrough is finished:
 
-    ```console
-    $ sudo security delete-certificate -c "kensan-lab explore" \
+    ```bash
+    sudo security delete-certificate -c "kensan-lab explore" \
         /Library/Keychains/System.keychain
     ```
 
@@ -107,29 +107,37 @@ store automatically.
 
 ## 3. See GitOps in Argo CD
 
-Open [Argo CD](https://argocd.127-0-0-1.sslip.io) and choose **Log in via
+Open [Argo CD](https://argocd.127-0-0-1.sslip.io){ target="_blank" rel="noopener" } and choose **Log in via
 Keycloak**. Sign in with `demo` / `demo`.
 
 Open `explore-root`. It is the root Application that creates the platform's
 other Applications. `app-demo`, `backstage`, `grafana`, and the rest should be
 `Synced` and `Healthy`.
 
+Argo CD is the GitOps controller for this cluster. It continuously traces the
+`kensan-lab` repository in the in-cluster Gitea, renders the declared Helm and
+Kubernetes resources, and reconciles them into the cluster. A green
+`Synced / Healthy` application therefore means both that the live resources
+match Git and that their workloads are running successfully.
+
 ![Argo CD showing explore-root and the Applications it created](assets/argocd-tree.png)
 
 The same state is available from the terminal:
 
-```console
-$ make explore-status
+```bash
+make explore-status
 ```
 
 ## 4. Open the existing demo
 
-Open the [demo application](https://demo.127-0-0-1.sslip.io). Keycloak should
+Open the [demo application](https://demo.127-0-0-1.sslip.io){ target="_blank" rel="noopener" }. Keycloak should
 reuse the session from Argo CD, so no second password prompt appears.
 
 The app displays its name, theme, greeting, and the identity headers attached by
 the gateway. The application itself contains no login implementation: Istio
 asks oauth2-proxy to authenticate the request before it reaches the pod.
+
+![The existing demo application after signing in](assets/demo-application.png)
 
 ```mermaid
 sequenceDiagram
@@ -146,8 +154,8 @@ sequenceDiagram
 
 ## 5. Create a different app in Backstage
 
-Open [Backstage](https://backstage.127-0-0-1.sslip.io), then select **Create →
-FastAPI Application**. The Explore catalog has one owner, `demo-team`, so the
+Open [Backstage](https://backstage.127-0-0-1.sslip.io){ target="_blank" rel="noopener" }, then select **Create →
+Golden Path Application**. The Explore catalog has one owner, `demo-team`, so the
 walkthrough does not ask you to choose among production teams.
 
 Use these example values:
@@ -156,7 +164,7 @@ Use these example values:
 |---|---|
 | Application Name | `app2` |
 | Description | `Second walkthrough application` |
-| Repository | owner `gitea-admin`, repository `app2` |
+| Repository | owner `demo`, repository `app2` |
 | Theme | `night` |
 | Greeting | `Hello from the golden path` |
 
@@ -165,42 +173,63 @@ Review the values and press **Create**. Backstage now:
 ```mermaid
 flowchart TD
     A[Backstage form] --> B[Create app2 repository in local Gitea]
-    A --> C[Open platform-config PR]
-    A --> D[Register app2 in the catalog]
-    A --> E[Register the new SSO callback]
     B --> F[Gitea Actions tests and builds app2]
     F --> G[Push commit-SHA image]
     G --> H[Record image tag in deploy/values.yaml]
+    H --> C[Open platform-config PR]
+    C --> D[Register app2 in the catalog]
+    C --> E[Register the new SSO callback]
     C --> I{You merge the PR}
-    H --> J[Argo CD discovers app-app2]
     I --> J
+    J[Argo CD discovers app-app2]
     J --> K[app2 is running]
 ```
 
-Repository and PR creation finish quickly, but the application is not ready to
-merge yet. Follow **Build status** and wait for **Build and deploy in Explore**
-to turn green. That run tests the generated source, builds an app2-specific
-image and writes its immutable commit SHA into `deploy/values.yaml`.
+The task stays open while Gitea Actions tests the generated source, builds an
+app2-specific image, pushes it, and writes its immutable commit SHA into
+`deploy/values.yaml`. A failed build fails the Backstage task and no platform
+pull request is created. A completed task means the pull request is safe to
+review and merge.
 
 ## 6. Merge the local pull request
 
-Follow **Platform Config PR** from Backstage, or open
-[Gitea](https://gitea.127-0-0-1.sslip.io). Gitea has a separate local session,
-so sign in as `gitea-admin` with the password printed by `make try`.
+Follow **Review the kensan-lab pull request** from Backstage, or open
+[the `kensan-lab` pull requests in Gitea](https://gitea.127-0-0-1.sslip.io/demo/kensan-lab/pulls){ target="_blank" rel="noopener" }.
+Gitea does not share the Keycloak browser session, but it uses the same memorable
+credentials: sign in with `demo` / `demo`.
 
-After the application repository's build is green, return to the Platform
-Config PR. It adds two files under
-`environments/kind/generated-applications/app-app2/`; merge it.
+You are the platform administrator for this part of the walkthrough. The new
+Platform Config PR should already be waiting in `demo/kensan-lab`. It adds two
+files under `environments/kind/generated-applications/app-app2/`; merge it.
+
+![Gitea showing the platform pull request ready for review](assets/gitea-platform-pr.png)
+
+Merging does not deploy from Gitea directly. It updates the Git source of truth;
+Argo CD notices that change on its next poll, creates the child Application,
+and reconciles the workload. This can take about four minutes after the merge.
+
+```mermaid
+flowchart LR
+    M[1. Merge PR<br/>in Gitea] --> G[2. main changes<br/>in demo/kensan-lab]
+    G -->|Argo CD polls Git| A[3. Argo CD<br/>creates app-NAME]
+    A --> K[4. Kubernetes<br/>deploys the SHA image]
+    K --> B[5. Open<br/>NAME.127-0-0-1.sslip.io]
+```
+
+The generated Argo CD Application and namespace are named `app-<application
+name>`. The Deployment and hostname keep the application name itself. For
+example, entering `demo-app2` produces Application/namespace `app-demo-app2`,
+Deployment `demo-app2`, and hostname `demo-app2.127-0-0-1.sslip.io`.
 
 Watch the new Argo CD Application appear:
 
-```console
-$ kubectl -n argocd get application app-app2 -w
+```bash
+kubectl -n argocd get application app-app2 -w
 ```
 
 When it is `Synced` and `Healthy`, open the
-[new app2 application](https://app2.127-0-0-1.sslip.io). Compare it with the
-[original demo](https://demo.127-0-0-1.sslip.io). app2 now runs an image built
+[new app2 application](https://app2.127-0-0-1.sslip.io){ target="_blank" rel="noopener" }. Compare it with the
+[original demo](https://demo.127-0-0-1.sslip.io){ target="_blank" rel="noopener" }. app2 now runs an image built
 from its own repository; its night theme and greeting came from Git-managed
 runtime values.
 
@@ -213,15 +242,15 @@ running.
 
 ## 7. Watch CPU rise and fall in Grafana
 
-Open the [Explore App Runtime dashboard](https://grafana.127-0-0-1.sslip.io/d/explore-app-runtime/explore-app-runtime?var-namespace=app-app2&var-workload=app2&refresh=10s)
+Open the [Explore App Runtime dashboard](https://grafana.127-0-0-1.sslip.io/d/explore-app-runtime/explore-app-runtime?var-namespace=app-app2&var-workload=app2&refresh=10s){ target="_blank" rel="noopener" }
 in Grafana. Choose **Sign in with Keycloak** if asked. The dashboard shows the
 selected Deployment's CPU, desired and available replicas, request rate, and
 request latency.
 
 In a second terminal, keep one app2 process busy for two minutes:
 
-```console
-$ kubectl -n app-app2 exec deploy/app2 -- python -c \
+```bash
+kubectl -n app-app2 exec deploy/app2 -- python -c \
     'import time; end=time.time()+120; exec("while time.time() < end: pass")'
 ```
 
@@ -238,8 +267,8 @@ CD, often faster than one Prometheus scrape.
 If you imported the local CA, remove it from the trust store first. Then delete
 the entire disposable cluster:
 
-```console
-$ make explore-down
+```bash
+make explore-down
 ```
 
 ## Want the details?

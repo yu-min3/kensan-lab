@@ -26,6 +26,9 @@ configs:
       issuer: https://auth.yu-mins.com/realms/kensan
       clientID: argocd
       clientSecret: $argocd-oidc-secret:client-secret
+      # Keycloak access/ID tokens live for five minutes. Refresh early instead
+      # of making the browser repeat the OIDC flow when that token expires.
+      refreshTokenThreshold: 2m
       requestedScopes:
         - openid
         - profile

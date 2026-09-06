@@ -158,8 +158,12 @@ jobs:
           assert production_actions["create-platform-pr"] == "publish:github:pull-request"
           assert "register-redirect-uri" not in production_actions
           assert explore_actions["publish"] == "publish:gitea"
+          assert explore_actions["wait-for-build"] == "gitea:actions:wait"
           assert explore_actions["create-platform-pr"] == "gitea:pull-request"
           assert explore_actions["register-redirect-uri"] == "keycloak:redirect-uri:add"
+          explore_step_ids = [step["id"] for step in explore["spec"]["steps"]]
+          assert explore_step_ids.index("publish") < explore_step_ids.index("wait-for-build")
+          assert explore_step_ids.index("wait-for-build") < explore_step_ids.index("create-platform-pr")
 
           outer = yaml.safe_load(open(
               "environments/kind/resources/backstage/configmap-app-config.yaml"
@@ -186,7 +190,7 @@ jobs:
                                      if step["id"] == "fetch-base")["input"]["values"].items()
           }
           assert production_values["imageRepository"].startswith("${{")
-          assert "10.96.0.50:5000/gitea-admin/" in explore_values["imageRepository"]
+          assert "10.96.0.50:5000/demo/" in explore_values["imageRepository"]
           assert explore_values["imageTag"] == "pending"
           assert explore_values["ghcrPullSecretEnabled"] == "False"
           assert explore_values["gatewayName"] == "gateway-explore"

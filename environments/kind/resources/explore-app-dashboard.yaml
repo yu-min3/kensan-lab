@@ -7,6 +7,13 @@ metadata:
     grafana_dashboard: "1"
     grafana_folder: "Explore"
 data:
+  # The Namespace and Workload pickers below read kube_deployment_spec_replicas
+  # rather than the kube_deployment_labels a dashboard usually uses for this.
+  # kube-state-metrics stopped exporting the `_labels` series by default in 2.x
+  # — a label allowlist has to ask for it — so with 2.17 that query returns
+  # nothing and both pickers come up empty. Every deployment has a replica
+  # count, which is the same set of namespaces and workloads without asking the
+  # chart for anything.
   explore-app-runtime.json: |
     {
       "annotations": {"list": []},
@@ -66,8 +73,8 @@ data:
       "tags": ["explore", "kind", "application"],
       "templating": {
         "list": [
-          {"current": {"selected": true, "text": "app-demo", "value": "app-demo"}, "datasource": {"type": "prometheus", "uid": "prometheus"}, "definition": "label_values(kube_deployment_labels{namespace=~\"app-.+\"},namespace)", "hide": 0, "includeAll": false, "label": "Namespace", "name": "namespace", "options": [], "query": {"query": "label_values(kube_deployment_labels{namespace=~\"app-.+\"},namespace)", "refId": "StandardVariableQuery"}, "refresh": 1, "regex": "", "skipUrlSync": false, "sort": 1, "type": "query"},
-          {"current": {"selected": true, "text": "demo", "value": "demo"}, "datasource": {"type": "prometheus", "uid": "prometheus"}, "definition": "label_values(kube_deployment_labels{namespace=\"$namespace\"},deployment)", "hide": 0, "includeAll": false, "label": "Workload", "name": "workload", "options": [], "query": {"query": "label_values(kube_deployment_labels{namespace=\"$namespace\"},deployment)", "refId": "StandardVariableQuery"}, "refresh": 1, "regex": "", "skipUrlSync": false, "sort": 1, "type": "query"}
+          {"current": {"selected": true, "text": "app-demo", "value": "app-demo"}, "datasource": {"type": "prometheus", "uid": "prometheus"}, "definition": "label_values(kube_deployment_spec_replicas{namespace=~\"app-.+\"},namespace)", "hide": 0, "includeAll": false, "label": "Namespace", "name": "namespace", "options": [], "query": {"query": "label_values(kube_deployment_spec_replicas{namespace=~\"app-.+\"},namespace)", "refId": "StandardVariableQuery"}, "refresh": 1, "regex": "", "skipUrlSync": false, "sort": 1, "type": "query"},
+          {"current": {"selected": true, "text": "demo", "value": "demo"}, "datasource": {"type": "prometheus", "uid": "prometheus"}, "definition": "label_values(kube_deployment_spec_replicas{namespace=\"$namespace\"},deployment)", "hide": 0, "includeAll": false, "label": "Workload", "name": "workload", "options": [], "query": {"query": "label_values(kube_deployment_spec_replicas{namespace=\"$namespace\"},deployment)", "refId": "StandardVariableQuery"}, "refresh": 1, "regex": "", "skipUrlSync": false, "sort": 1, "type": "query"}
         ]
       },
       "time": {"from": "now-15m", "to": "now"},

@@ -19,9 +19,10 @@ configs:
     url: "https://argocd.platform.yu-min3.com"
     oidc.config: |
       name: Keycloak
-      issuer: https://auth.platform.yu-min3.com/realms/kensan
+      issuer: https://auth.yu-mins.com/realms/kensan
       clientID: argocd
       clientSecret: $argocd-oidc-secret:client-secret
+      refreshTokenThreshold: 2m
       requestedScopes:
         - openid
         - profile
@@ -41,6 +42,13 @@ configs:
 `requestedScopes` deliberately **does not include** `groups`. In Keycloak, `groups` is a claim name, not a scope — including it in scopes gets rejected with "Invalid scopes: groups".
 
 An `oidc-group-membership-mapper` attached directly to the `argocd` client (created by `bootstrap/keycloak/setup.sh`) puts the `groups` claim onto the id_token. Argo CD picks it up by declaring `requestedIDTokenClaims` with `groups: { essential: true }`.
+
+`refreshTokenThreshold: 2m` renews the token before Keycloak's five-minute
+access/ID token lifetime ends. It does not make the bearer token itself
+long-lived: the refresh token remains bounded by the realm's three-day idle and
+30-day maximum SSO session. Without the threshold, Argo CD logs
+`invalid session: token is expired` after the five-minute token expires and
+starts another OIDC round trip.
 
 ## RBAC mapping
 

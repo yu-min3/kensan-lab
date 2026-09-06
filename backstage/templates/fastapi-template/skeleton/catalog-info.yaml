@@ -11,10 +11,10 @@ metadata:
     - fastapi
     - python
   links:
-    - url: https://${{ values.name }}.app.yu-min3.com/docs
+    - url: ${{ values.applicationUrl }}
       title: API Docs
       icon: web
-    - url: https://argocd.platform.yu-min3.com/applications/app-${{ values.name }}
+    - url: ${{ values.argocdUrl }}
       title: Argo CD
       icon: kubernetes
 spec:

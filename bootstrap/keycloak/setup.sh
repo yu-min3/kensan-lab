@@ -38,6 +38,8 @@ ADMIN_GROUP="platform-admin"
 DEV_GROUP="platform-dev"
 CLIENT_ID="vault"
 VAULT_HOSTNAME="vault.platform.yu-min3.com"
+SSO_SESSION_IDLE_SECONDS=259200   # 3 days
+SSO_SESSION_MAX_SECONDS=2592000  # 30 days
 
 BW_CLIENT_ITEM="kensan-lab/keycloak/oidc-client-vault"
 BW_USER_ITEM="kensan-lab/keycloak/user-yu"
@@ -124,6 +126,15 @@ else
     -s registrationAllowed=false > /dev/null
   echo "    realm '$REALM' created"
 fi
+
+# ADR-016 defines the inner identity session as idle 3 days / max 30 days.
+# This used to be an imperative Admin Console setting, which meant a recreated
+# realm silently fell back to Keycloak's 30 minute / 10 hour defaults. Reconcile
+# it on every run so bare metal and kind intentionally share the same policy.
+kcadm update "realms/$REALM" \
+  -s "ssoSessionIdleTimeout=$SSO_SESSION_IDLE_SECONDS" \
+  -s "ssoSessionMaxLifespan=$SSO_SESSION_MAX_SECONDS" > /dev/null
+echo "    SSO session policy: idle=3d, max=30d"
 
 # === Groups 作成 ===
 ensure_group() {

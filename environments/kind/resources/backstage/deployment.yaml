@@ -48,15 +48,11 @@ spec:
     spec:
       containers:
         - name: backstage
-          ## Namespaced under the repository because that is the package CI
-          ## can push to — see .github/workflows/backstage-ci.yml. Bare metal
-          ## pulls from the same package, but the two tags move separately:
-          ## explore carries whatever the golden path needs, and production is
-          ## upgraded on its own occasions (it is on v0.0.14 as this is written).
-          ##
-          ## v0.0.18 contains both production and Explore template entrypoints.
-          ## The image is shared; app-config.explore.yaml selects the latter.
-          image: ghcr.io/yu-min3/kensan-lab/backstage:v0.0.19
+          ## scripts/explore-up.sh builds and kind-loads this image from the
+          ## active checkout. Custom scaffolder actions are executable code, so
+          ## pinning a published tag here would let `make try` silently run an
+          ## older Golden Path than the repository it seeded into Gitea.
+          image: kensan-lab/backstage-explore:local
           imagePullPolicy: IfNotPresent
           ## The two configs baked into the image, then the explore overrides.
           ## Order matters: later files win.

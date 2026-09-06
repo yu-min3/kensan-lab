@@ -54,11 +54,10 @@ service:
 
 gitea:
   admin:
-    username: gitea-admin
-    email: gitea-admin@example.com
-    # Replaced on the command line by explore-up.sh with a generated value.
-    # Never a committed credential, even though the Explore gateway is bound to
-    # localhost: the same value must not work in every clone of the repository.
+    username: demo
+    email: demo-admin@example.com
+    # Replaced on the command line by explore-up.sh. This deliberately mirrors
+    # the disposable walkthrough login; it is never used outside local kind.
     password: replaced-at-install-time
   config:
     database:
