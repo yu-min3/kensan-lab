@@ -277,9 +277,6 @@ The line does not jump the moment you press: Grafana is reading the pod's real
 CPU through Prometheus, so it climbs over the next few samples, holds, and drops
 back once the ninety seconds are up.
 
-The button exists only in Explore; the same template ships it switched off for
-the real platform.
-
 ## 8. Scale it, and watch Git win
 
 The Replicas panel is where the GitOps contract becomes visible. Change the
@@ -302,9 +299,10 @@ shows the 3 at all: the cluster was only briefly wrong.
 2. change `replicas: 1` to `replicas: 3` with the edit button
 3. commit to `main`
 
-Nothing pushes this one back. Argo CD applies it on its next poll — three
-minutes at most, or press **Refresh** on the `app-<name>` Application in Argo CD
-to skip the wait — and the Replicas panel climbs to 3.
+Nothing pushes this one back. Argo CD polls Git every three minutes and a
+change can miss one tick, so give it up to five — or press **Refresh** on the
+`app-<name>` Application in Argo CD to skip the wait. The Replicas panel then
+climbs to 3.
 
 No image is built for that one. The workflow ignores `deploy/`, because what
 lives there is read at runtime rather than baked into the image:
