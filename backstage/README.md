@@ -45,7 +45,7 @@ READ_GHCR_PAT=ghp_xxx    # read — runtime GITHUB_TOKEN (make dev/run) & image 
 
 `make` uses `WRITE_GHCR_PAT` for `login`/`push`, and exposes `READ_GHCR_PAT` as
 `GITHUB_TOKEN` for the GitHub integration (`app-config.local.yaml` references
-`${GITHUB_TOKEN}`). 旧 `GITHUB_GHCR_PAT` を設定していれば両方の fallback になる。
+`${GITHUB_TOKEN}`). An older `GITHUB_GHCR_PAT`, if set, acts as a fallback for both.
 
 ## Deployment
 

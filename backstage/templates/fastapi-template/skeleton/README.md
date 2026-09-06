@@ -53,16 +53,16 @@ Argo CD then syncs the app namespace.
 .
 ├── app/main.py                     # application source
 ├── deploy/
-│   ├── values.yaml              # charts/app-base の values（デプロイ設定はここだけ）
-│   └── resources/              # namespace / ServiceMonitor（このリポジトリが所有）
+│   ├── values.yaml              # values for charts/app-base — the only deploy configuration
+│   └── resources/              # namespace / ServiceMonitor — owned by this repository
 │   ├── deployment.yaml
 │   ├── service.yaml
 │   ├── httproute.yaml
 │   ├── authz-policy.yaml
 │   └── servicemonitor.yaml
 ├── docs/index.md                   # TechDocs source
-├── .backstage/                     # プラットフォーム repo へ PR される内容
-│   └── kubernetes/                 #   Application と ReferenceGrant
+├── .backstage/                     # what gets raised as a PR against the platform repo
+│   └── kubernetes/                 #   the Application and the ReferenceGrant
 ├── Dockerfile
 ├── requirements.txt
 └── catalog-info.yaml               # Backstage catalog entry

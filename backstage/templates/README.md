@@ -91,20 +91,20 @@ fastapi-template/
 └── skeleton/                  # Template files
     ├── app/                   # Application code
     ├── deploy/
-    │   ├── values.yaml        # charts/app-base の values（唯一の設定面）
-    │   └── resources/         # namespace / ServiceMonitor（app が所有）
+    │   ├── values.yaml        # values for charts/app-base — the only configuration surface
+    │   └── resources/         # namespace / ServiceMonitor — owned by the app
     ├── docs/                  # TechDocs
-    ├── .backstage/            # platform へ PR される内容
-    │   └── kubernetes/       #   Application + oauth2 の ReferenceGrant
+    ├── .backstage/            # what gets raised as a PR against the platform
+    │   └── kubernetes/       #   the Application and the oauth2 ReferenceGrant
     ├── .github/workflows/     # CI/CD
     ├── Dockerfile
     ├── pyproject.toml
     └── catalog-info.yaml
 ```
 
-**手書きの Deployment / Service / HTTPRoute はありません。** それらは
-`charts/app-base` が `deploy/values.yaml` から生成します。アプリが所有するのは
-「自分の namespace」と「自分が何を公開するか」だけです。
+**There is no hand-written Deployment, Service, or HTTPRoute.**
+`charts/app-base` generates them from `deploy/values.yaml`. What the app owns is
+its own namespace, and what it chooses to expose.
 
 ## Development Workflow
 
