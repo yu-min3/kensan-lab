@@ -41,6 +41,11 @@ env:
     value: "${{ values.theme }}"
   - name: APP_MESSAGE
     value: "${{ values.message }}"
+  # Off everywhere except the disposable kind environment. /api/load burns a
+  # core on request, which is a walkthrough prop in Explore and a
+  # denial-of-service tool anywhere a real user can reach it.
+  - name: DEMO_LOAD_ENABLED
+    value: "${{ values.loadButtonEnabled }}"
 
 # The image declares `USER appuser`, a name rather than a number. The chart
 # asks for runAsNonRoot, and the kubelet cannot resolve a name to a UID without

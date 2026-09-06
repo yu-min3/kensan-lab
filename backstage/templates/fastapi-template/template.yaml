@@ -171,6 +171,9 @@ spec:
           imageTag: v0.1.0
           ghcrPullSecretEnabled: true
           otelEnabled: true
+          # /api/load exists for the kind walkthrough. On the real platform it
+          # would be a CPU burner behind the front door, so it stays off.
+          loadButtonEnabled: false
           gatewayName: gateway-prod
           gatewayNamespace: istio-system
           platformRepoUrl: https://github.com/yu-min3/kensan-lab

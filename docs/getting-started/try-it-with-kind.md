@@ -257,16 +257,24 @@ It opens on the built-in `demo` application. **Set the Namespace picker to
 filled from the cluster, so they offer whatever name you chose in step 5 — but
 the panels stay empty until they point at a workload that exists.
 
-In a second terminal, keep one app2 process busy for two minutes:
+Now open app2 in another tab and press **Generate load for 90s**. The button is
+part of the generated service: it occupies one core inside the pod and counts
+down while it does.
+
+Prometheus scrapes every 30 seconds, so the CPU line starts climbing after a
+scrape or two and falls back once the ninety seconds are up. This reads
+kubelet/cAdvisor metrics; `metrics-server` and `kubectl top` are not involved.
+
+That button is an Explore prop, not a feature of the golden path. The same
+service generated for a real platform ships the handler switched off
+(`DEMO_LOAD_ENABLED`), because an endpoint that burns a core on request is a
+denial-of-service tool once anyone else can reach it. From a terminal it is the
+same picture without the button:
 
 ```bash
 kubectl -n app-app2 exec deploy/app2 -- python -c \
     'import time; end=time.time()+120; exec("while time.time() < end: pass")'
 ```
-
-Prometheus scrapes every 30 seconds. The CPU line rises after one or two scrapes,
-then falls again after the command exits. This uses kubelet/cAdvisor metrics;
-`metrics-server` and `kubectl top` are not required.
 
 ## 8. Scale it two ways
 
