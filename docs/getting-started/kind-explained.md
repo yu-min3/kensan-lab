@@ -71,9 +71,11 @@ pull request you are asked to merge would arrive showing failed checks that
 nothing in this cluster could ever satisfy.
 
 Changing source on `main` repeats that path and changes the Deployment pod
-template, so Kubernetes replaces the pod. Changing only the theme or greeting
-still needs no rebuild: those values remain runtime configuration managed by
-Argo CD.
+template, so Kubernetes replaces the pod. Changing `deploy/` does not: the
+workflow declares `paths-ignore: ["deploy/**"]`, because the theme, the
+greeting and the replica count are read at runtime or applied by Argo CD.
+Editing them is a sync, not a build. That file's own comment has always said so;
+the filter is what made it true.
 
 The runner uses privileged Docker-in-Docker. That is acceptable only because
 this cluster is single-user, bound to localhost and deleted as a unit. Bare
@@ -153,9 +155,9 @@ kubectl -n app-demo scale deploy demo --replicas=3
 kubectl -n app-demo get deploy demo -w
 ```
 
-Argo CD returns it to the Git-declared single replica within roughly ten
-seconds. A direct cluster edit is only a temporary opinion when `selfHeal` is
-enabled.
+Argo CD returns it to the Git-declared single replica within a second or two:
+the controller watches the cluster and does not wait for a Git poll to notice.
+A direct cluster edit is only a temporary opinion when `selfHeal` is enabled.
 
 This is usually over before the next scrape, so the Grafana walkthrough drives
 CPU with the application's own load button instead of pretending the replica

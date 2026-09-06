@@ -9,8 +9,13 @@ the way it undoes.
 Pull requests that touch the platform stand this same environment up on CI and
 sign in to it, so what follows is checked rather than merely written down.
 
-The bare-metal cluster is not required. This walkthrough runs a disposable,
-single-node kind cluster and binds its gateway only to `127.0.0.1`.
+The bare-metal cluster is not required, and that is why this page exists.
+kensan-lab runs on hardware at home, and the
+[bootstrapping guide](../bootstrapping/index.md) documents that cluster as a
+reference — it describes what is running, not a clean-room install, and standing
+one up from nothing is not automated yet. So the way in is a disposable,
+single-node kind cluster that runs the same manifests and binds its gateway only
+to `127.0.0.1`.
 
 ## 1. Start the platform
 
@@ -327,6 +332,5 @@ Continue to [How the kind environment works](kind-explained.md) for the componen
 map, per-application build path, Gateway API and certificate design, optional
 Kyverno/storage/CNI exercises, limitations, and troubleshooting.
 
-The [bare-metal bootstrap guide](../bootstrapping/index.md) is a reference for
-the live homelab. Its end-to-end clean-room bootstrap is not yet verified;
-Ansible and Makefile automation is planned.
+For the hardware side, the [bare-metal bootstrap guide](../bootstrapping/index.md)
+is the reference described above; Ansible and Makefile automation is planned.
