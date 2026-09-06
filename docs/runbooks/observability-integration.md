@@ -82,6 +82,46 @@ kubectl exec -n monitoring loki-0 -c loki -- du -sh /var/loki/chunks /var/loki/w
 - Loki `/ready` check (above)
 - Verify the LogQL label selector (e.g. `{namespace="kensan"}`)
 
+### A backend pod is stuck Pending
+
+Tempo and Loki are StatefulSets with a Longhorn PVC, so Pending is almost always
+storage or scheduling rather than the application.
+
+```bash
+kubectl describe pvc -n monitoring tempo-storage-tempo-0
+kubectl get volumes.longhorn.io -n longhorn-system | grep tempo
+kubectl describe node | grep -A6 "Allocated resources"
+```
+
+An unbound PVC points at Longhorn (replica placement, capacity); a bound PVC with
+a Pending pod points at the node's allocatable CPU or memory.
+
+### The collector cannot reach a backend
+
+`connection refused` in the collector log is a Service or endpoint problem, not a
+configuration one — the exporter endpoints are plain cluster DNS names.
+
+```bash
+kubectl get svc,endpoints -n monitoring tempo
+kubectl logs -n monitoring tempo-0 | grep -i otlp
+# "OTLP gRPC receiver started on :4317" should appear
+```
+
+An empty endpoint list means the backend pod is not Ready; the receiver line
+missing means the backend started without its OTLP listener.
+
+### Trace queries are slow
+
+```bash
+kubectl exec -n monitoring tempo-0 -- find /var/tempo/traces -name "*.tar.gz" | wc -l
+kubectl top pod tempo-0 -n monitoring
+```
+
+A large block count means compaction is not keeping up — see the compactor
+settings under Performance tuning. Memory sitting at the limit means the ingester
+is flushing under pressure, and the request and limit both need to rise (they are
+sized together; see [`kubernetes/observability/tempo/README.md`](https://github.com/yu-min3/kensan-lab/blob/main/kubernetes/observability/tempo/README.md)).
+
 ## Performance tuning
 
 ### OTel Collector

@@ -30,6 +30,22 @@ The definitive answer to "where is this information documented." When adding new
 | Cluster topology (nodes, labels, scheduling) | `.claude/rules/kubernetes-cluster.md` | `kubernetes/README.md` |
 | Tech stack | Top `README.md` | `docs/index.md` |
 
+## Language
+
+Prose and code are written in different languages here, and the split is
+deliberate rather than accidental. Measured across the repository in 2026-09:
+
+| What | Language | Measured |
+|---|---|---|
+| `docs/**` and the READMEs the site transcludes | **English** | 2% and 6% of files contain any Japanese, and what remains is Zenn article titles and the brand's own word, 研鑽 |
+| Comments inside code — `values.yaml`, `.tf`, `.go`, `.tsx`, `.sh` | **Japanese** | 64% of YAML, 100% of Terraform, 87% of Go, 77% of TSX, 52% of shell |
+| `CLAUDE.md`, `AGENTS.md`, `.claude/rules/`, `.claude/skills/` | **Japanese** | 70% of files — these are read by agents and by the author, not by visitors |
+
+So a README may point a reader at an annotated `values.yaml` and that file will be
+commented in Japanese. That is the convention, not an oversight. If a component's
+configuration needs to be explained to a visitor, the explanation belongs in the
+README or in `docs/`, in English — not in a translation of the comments.
+
 ## Rendering target
 
 Every layer above is Markdown, but not every file is read in the same place. **Each file has exactly one rendering target**, and that decides which Markdown you may write in it.
