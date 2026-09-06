@@ -277,10 +277,8 @@ The line does not jump the moment you press: Grafana is reading the pod's real
 CPU through Prometheus, so it climbs over the next few samples, holds, and drops
 back once the ninety seconds are up.
 
-The button is an Explore prop rather than a feature of the golden path. The same
-template generates it switched off (`DEMO_LOAD_ENABLED`) for the real platform,
-because an endpoint that burns a core on request is a denial-of-service tool
-once anyone else can reach it.
+The button exists only in Explore; the same template ships it switched off for
+the real platform.
 
 ## 8. Scale it, and watch Git win
 
