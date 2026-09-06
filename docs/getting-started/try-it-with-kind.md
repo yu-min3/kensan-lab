@@ -273,10 +273,9 @@ while it does.
 
 ![The Explore App Runtime dashboard while the load button is running](assets/grafana-app-runtime.png)
 
-The CPU panel reads kubelet/cAdvisor, which recomputes container statistics
-about every 15 seconds, so the line starts climbing a scrape or two after the
-press and falls back once the ninety seconds are up. `metrics-server` and
-`kubectl top` are not involved.
+The line does not jump the moment you press: Grafana is reading the pod's real
+CPU through Prometheus, so it climbs over the next few samples, holds, and drops
+back once the ninety seconds are up.
 
 The button is an Explore prop rather than a feature of the golden path. The same
 template generates it switched off (`DEMO_LOAD_ENABLED`) for the real platform,
