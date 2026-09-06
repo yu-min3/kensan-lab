@@ -58,6 +58,11 @@ WAIT_TIMEOUT=900
 # persistent environment. Keep the walkthrough memorable; callers may still
 # override it when exercising password handling itself.
 DEMO_PASSWORD="${DEMO_PASSWORD:-demo}"
+# Explore is a disposable, single-user environment. Keep the short-lived
+# bearer token, but let the browser SSO session survive a multi-day walkthrough.
+# These match the bare-metal realm policy recorded in ADR-016.
+KEYCLOAK_SSO_IDLE_SECONDS=259200   # 3 days
+KEYCLOAK_SSO_MAX_SECONDS=2592000  # 30 days
 
 usage() {
   cat <<'EOF'
@@ -735,6 +740,14 @@ else
     -s realm=kensan -s userId="${user_id}" -s groupId="${admin_group_id}" \
     -n >/dev/null
 fi
+
+# Realm defaults are only 30 minutes idle / 10 hours max in Keycloak 23. Apply
+# the Explore policy on every run, not only at realm creation, so an existing
+# cluster is repaired too and a Keycloak default change cannot alter the demo.
+kcadm update realms/kensan \
+  -s "ssoSessionIdleTimeout=${KEYCLOAK_SSO_IDLE_SECONDS}" \
+  -s "ssoSessionMaxLifespan=${KEYCLOAK_SSO_MAX_SECONDS}" \
+  >/dev/null
 
 # ---------------------------------------------------------------------------
 

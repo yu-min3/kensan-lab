@@ -26,6 +26,9 @@ configs:
       issuer: https://auth.127-0-0-1.sslip.io/realms/kensan
       clientID: argocd
       clientSecret: $argocd-oidc-secret:client-secret
+      # Refresh before Keycloak's five-minute ID token expires. Without this,
+      # the UI reaches `invalid session: token is expired` after five minutes.
+      refreshTokenThreshold: 2m
       requestedScopes:
         - openid
         - profile
