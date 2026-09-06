@@ -168,6 +168,9 @@ Use these example values:
 | Theme | `night` |
 | Greeting | `Hello from the golden path` |
 
+The name is yours to choose. The rest of this page writes it as `app2`; if you
+enter something else, substitute it wherever `app2` appears below.
+
 Review the values and press **Create**. Backstage now:
 
 ```mermaid
@@ -217,9 +220,9 @@ flowchart LR
 ```
 
 The generated Argo CD Application and namespace are named `app-<application
-name>`. The Deployment and hostname keep the application name itself. For
-example, entering `demo-app2` produces Application/namespace `app-demo-app2`,
-Deployment `demo-app2`, and hostname `demo-app2.127-0-0-1.sslip.io`.
+name>`; the Deployment and hostname keep the application name itself. With
+`app2` from step 5 that is Application and namespace `app-app2`, Deployment
+`app2`, and hostname `app2.127-0-0-1.sslip.io`.
 
 Watch the new Argo CD Application appear:
 
@@ -242,10 +245,15 @@ running.
 
 ## 7. Watch CPU rise and fall in Grafana
 
-Open the [Explore App Runtime dashboard](https://grafana.127-0-0-1.sslip.io/d/explore-app-runtime/explore-app-runtime?var-namespace=app-app2&var-workload=app2&refresh=10s){ target="_blank" rel="noopener" }
-in Grafana. Choose **Sign in with Keycloak** if asked. The dashboard shows the
-selected Deployment's CPU, desired and available replicas, request rate, and
-request latency.
+Open the [Explore App Runtime dashboard](https://grafana.127-0-0-1.sslip.io/d/explore-app-runtime/explore-app-runtime?refresh=10s){ target="_blank" rel="noopener" }
+in Grafana. Choose **Sign in with Keycloak** if asked. The dashboard shows one
+Deployment's CPU, desired and available replicas, request rate, and request
+latency.
+
+It opens on the built-in `demo` application. **Set the Namespace picker to
+`app-app2` and the Workload picker to `app2` before going on.** Both pickers are
+filled from the cluster, so they offer whatever name you chose in step 5 — but
+the panels stay empty until they point at a workload that exists.
 
 In a second terminal, keep one app2 process busy for two minutes:
 
