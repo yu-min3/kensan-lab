@@ -1,0 +1,1 @@
+---8<--- "bootstrap/vault/README.md"

@@ -117,6 +117,7 @@ plugins:
         Try it in one command:
           - getting-started/try-it-with-kind.md
           - getting-started/kind-explained.md
+          - getting-started/explore-layer.md
         Architecture:
           - architecture/*.md
         Auth & secrets:
@@ -183,6 +184,7 @@ nav:
   - Try it in one command:
       - getting-started/try-it-with-kind.md
       - How the kind environment works: getting-started/kind-explained.md
+      - How the explore layer is built: getting-started/explore-layer.md
   - Architecture:
       - architecture/index.md
       - Namespace & label contract: architecture/namespace-label-design.md
@@ -242,6 +244,8 @@ nav:
           - Stage 1 — Vault HA: bootstrapping/vault-stage1.md
           - Grafana independent setup: bootstrapping/grafana-independent.md
           - Add worker node (M4 Neo): bootstrapping/add-worker-node-m4neo.md
+          - Vault root of trust (Terraform): bootstrapping/vault-root-of-trust.md
+          - Keycloak bootstrap: bootstrapping/keycloak-bootstrap.md
       - Operations:
           - Runbooks:
               - runbooks/index.md

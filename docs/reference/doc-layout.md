@@ -37,10 +37,14 @@ Every layer above is Markdown, but not every file is read in the same place. **E
 | Files | Read on | May use |
 |---|---|---|
 | `docs/**/*.md` | The docs site only — the top README links to `https://yu-min3.github.io/kensan-lab/…`, never to `./docs/*.md` | Everything MkDocs Material offers: admonitions, content tabs, `attr_list`, `<figure markdown>` |
-| Every file transcluded by `docs/**` — today the nine per-domain `kubernetes/**/README.md` | **Both** github.com and the docs site | Only what both engines agree on: CommonMark, plain HTML, tables, Mermaid |
-| Everything else — the top `README.md`, `apps/**`, `.claude/`, `bootstrap/`, sample data, scaffold templates | github.com only, or not read as prose at all | Whatever renders on GitHub; no site constraint applies |
+| Every file transcluded by `docs/**` — the per-domain `kubernetes/**/README.md`, plus `bootstrap/**` and `environments/kind/README.md` | **Both** github.com and the docs site | Only what both engines agree on: CommonMark, plain HTML, tables, Mermaid. Cross-references must be **absolute github.com URLs**: a relative path cannot resolve from both the file's own directory and `docs/` |
+| Everything else — the top `README.md`, `apps/**`, `.claude/`, sample data, scaffold templates | github.com only, or not read as prose at all | Whatever renders on GitHub; no site constraint applies |
 
 The second row is the constrained one, and it is constrained for a reason: Material's extensions are not errors on GitHub, they are **passed through as literal text**. A page keeps building while displaying its own source. `docs/showcase.md` shipped that way for 17 days before anyone opened it on GitHub (PR #468).
+
+Prose that operators read — the bootstrap Terraform and the explore layer — used to sit in the
+third row, reachable only on github.com. It has been moved into the second: written once beside
+the code it describes, and transcluded onto the site. There are now two source systems, not three.
 
 In practice the constraint costs nothing — domain READMEs are written with diagrams, tables, and prose, all of which render identically on both. `scripts/check-github-render.py` enforces it in CI, deriving the file list from the `--8<--` lines under `docs/` so a tenth architecture page is covered without anyone updating a list.
 

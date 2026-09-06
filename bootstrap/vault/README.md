@@ -45,7 +45,7 @@ management from there.
 The resolution is that **Keycloak's database credentials stay statically managed
 through Sealed Secrets**. Keycloak therefore does not depend on Vault, the
 dependency is one-way, and the cycle is gone. See
-[ADR-019](../../docs/adr/019-keycloak-db-credentials-revert-to-static.md) for how
+[ADR-019](https://github.com/yu-min3/kensan-lab/blob/main/docs/adr/019-keycloak-db-credentials-revert-to-static.md) for how
 that decision was reached, revisited, and reverted.
 
 ### Why Argo CD and Helm cannot do this bootstrap
@@ -88,7 +88,7 @@ state". Holding no state is what lets **ongoing Vault configuration** stay with
 VCO and Argo CD, keeping the original intent intact.
 
 The manual steps that precede this, and the SealedSecret for KMS auto-unseal, are
-documented in [`docs/bootstrapping/vault-stage1.md`](../../docs/bootstrapping/vault-stage1.md).
+documented in [`docs/bootstrapping/vault-stage1.md`](https://github.com/yu-min3/kensan-lab/blob/main/docs/bootstrapping/vault-stage1.md).
 
 ## The whole Stage 1 flow
 
@@ -233,8 +233,8 @@ If a resource of the same name already exists in Vault the apply errors; either
 
 ## Related
 
-- [`docs/bootstrapping/vault-stage1.md`](../../docs/bootstrapping/vault-stage1.md) — the manual KMS SealedSecret step that precedes this
-- [`docs/bootstrapping/index.md`](../../docs/bootstrapping/index.md) — the index for the whole cluster bootstrap
-- [`docs/secret-management/index.md`](../../docs/secret-management/index.md) — the secret-management approach, Sealed Secrets included
-- [ADR-007](../../docs/adr/007-no-vault-pki.md) — why Vault PKI was not adopted
-- [ADR-019](../../docs/adr/019-keycloak-db-credentials-revert-to-static.md) — why Keycloak's database credentials are not held in Vault
+- [`docs/bootstrapping/vault-stage1.md`](https://github.com/yu-min3/kensan-lab/blob/main/docs/bootstrapping/vault-stage1.md) — the manual KMS SealedSecret step that precedes this
+- [`docs/bootstrapping/index.md`](https://github.com/yu-min3/kensan-lab/blob/main/docs/bootstrapping/index.md) — the index for the whole cluster bootstrap
+- [`docs/secret-management/index.md`](https://github.com/yu-min3/kensan-lab/blob/main/docs/secret-management/index.md) — the secret-management approach, Sealed Secrets included
+- [ADR-007](https://github.com/yu-min3/kensan-lab/blob/main/docs/adr/007-no-vault-pki.md) — why Vault PKI was not adopted
+- [ADR-019](https://github.com/yu-min3/kensan-lab/blob/main/docs/adr/019-keycloak-db-credentials-revert-to-static.md) — why Keycloak's database credentials are not held in Vault
