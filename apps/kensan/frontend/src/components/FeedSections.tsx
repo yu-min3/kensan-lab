@@ -1,9 +1,13 @@
 import { useState } from "react";
-import { Check, ChevronDown, ChevronUp, CircleCheckBig, Inbox, Newspaper, Radar, RotateCcw } from "lucide-react";
+import { Check, ChevronDown, ChevronUp, CircleCheckBig, Gauge, Inbox, Newspaper, Radar, RotateCcw } from "lucide-react";
 import { MarkdownView } from "./MarkdownView";
 import { Badge } from "./ui/badge";
 import { Button } from "./ui/button";
 import { Card, CardBody } from "./ui/card";
+
+// レポート冒頭の要約。読む順が意味を持つ唯一のzoneなので、既知zoneとして
+// 先頭に固定する。未知sectionと同じ`others`扱いだと末尾へ流れる。
+const SUMMARY_TITLE = "30秒サマリー";
 
 export interface FeedSection {
   title: string;
@@ -173,11 +177,12 @@ export function FeedSections({
 }) {
   const sections = splitFeedSections(content);
   const byTitle = new Map(sections.map((section) => [section.title, section]));
+  const summary = byTitle.get(SUMMARY_TITLE);
   const action = byTitle.get("要対応");
   const confirmation = byTitle.get("確認");
   const news = byTitle.get("今日のニュース");
   const watch = byTitle.get("リリース・定点観測");
-  const known = new Set(["要対応", "確認", "今日のニュース", "リリース・定点観測"]);
+  const known = new Set([SUMMARY_TITLE, "要対応", "確認", "今日のニュース", "リリース・定点観測"]);
   const others = sections.filter((section) => !known.has(section.title));
   const visibleCount = (section?: FeedSection) =>
     section ? splitFeedItems(section.content).filter((item) => acknowledgedVersions.get(item.key) !== item.version).length : 0;
@@ -186,6 +191,23 @@ export function FeedSections({
 
   return (
     <div className="space-y-5">
+      {summary?.content ? (
+        <Card className="min-w-0 overflow-hidden border-brand/30">
+          <div className="flex flex-wrap items-center justify-between gap-2 border-b border-brand/20 bg-brand-muted/20 px-5 py-4">
+            <div className="flex items-center gap-2">
+              <Gauge className="size-5 text-brand" />
+              <div>
+                <h3 className="h-serif text-lg font-bold">{SUMMARY_TITLE}</h3>
+                <p className="text-xs text-muted-foreground">今日の要点と判断</p>
+              </div>
+            </div>
+          </div>
+          <CardBody>
+            <MarkdownView content={summary.content} />
+          </CardBody>
+        </Card>
+      ) : null}
+
       <section aria-labelledby="feed-inbox-heading">
         <div className="mb-2 flex flex-wrap items-end justify-between gap-2">
           <div>
