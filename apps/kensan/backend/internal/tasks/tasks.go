@@ -42,12 +42,14 @@ var (
 	dueRe      = regexp.MustCompile(`@due\(([^)]+)\)`)
 	msRe       = regexp.MustCompile(`@ms\(([^)]+)\)`)
 	pRe        = regexp.MustCompile(`@p\((\d+)\)`)
+	idRe       = regexp.MustCompile(`@id\(([a-zA-Z0-9-]+)\)`)
 	multiSpace = regexp.MustCompile(`\s{2,}`)
 )
 
 // Task は 1 つのチェックボックス行。File + Line で SSoT 上の位置を一意に指す。
 // Text は行内タグ込みの生テキスト（move / state 照合に使う）。Display は表示用。
 type Task struct {
+	ID        string `json:"id,omitempty"`
 	Text      string `json:"text"`
 	Display   string `json:"display"`
 	State     string `json:"state"` // todo | done | skipped
@@ -108,6 +110,7 @@ func parseInline(text string) inlineTags {
 	d = dueRe.ReplaceAllString(d, "")
 	d = msRe.ReplaceAllString(d, "")
 	d = pRe.ReplaceAllString(d, "")
+	d = idRe.ReplaceAllString(d, "")
 	t.Display = strings.TrimSpace(multiSpace.ReplaceAllString(d, " "))
 	return t
 }
@@ -129,6 +132,7 @@ func ExtractLines(content string, file string) []Task {
 		raw := strings.TrimSpace(m[2])
 		tg := parseInline(raw)
 		out = append(out, Task{
+			ID:        taskID(raw),
 			Text:      raw,
 			Display:   tg.Display,
 			State:     stateOf(m[1]),
@@ -244,7 +248,18 @@ func Projects(root string) []string {
 
 // Collect は workspace ルートからかんばん Board を組み立てる。
 func Collect(root string) (Board, error) {
-	return collect(root, time.Now().Format("2006-01-02"))
+	return CollectAt(root, time.Now().In(time.FixedZone("JST", 9*60*60)))
+}
+
+func CollectAt(root string, now time.Time) (Board, error) {
+	return collect(root, now.Format("2006-01-02"))
+}
+
+func taskID(text string) string {
+	if m := idRe.FindStringSubmatch(text); m != nil {
+		return m[1]
+	}
+	return ""
 }
 
 // collect は today（YYYY-MM-DD）を注入できるテスト用の内部実装。

@@ -17,13 +17,15 @@ import (
 
 var (
 	headingRe   = regexp.MustCompile(`^(#{1,6})\s+(.+?)\s*$`)
-	focusItemRe = regexp.MustCompile(`^\s*\d+\.\s+(.+)$`)
+	focusItemRe = regexp.MustCompile(`^\s*(?:\d+\.|[-*])\s+(.+)$`)
+	projectRe   = regexp.MustCompile(`^(?:\*\*([a-z0-9][a-z0-9-]*)\*\*|\[\[projects/([a-z0-9][a-z0-9-]*)(?:/README)?(?:\|[^\]]+)?\]\])`)
 )
 
 // Focus は今期のフォーカス 1 項目。Title（太字部）と Detail（補足）に分ける。
 type Focus struct {
-	Title  string `json:"title"`
-	Detail string `json:"detail"`
+	Project string `json:"project,omitempty"`
+	Title   string `json:"title"`
+	Detail  string `json:"detail"`
 }
 
 // Goals はダッシュボード上部に出す目標サマリ。
@@ -84,7 +86,11 @@ func splitFocus(item string) Focus {
 		title = strings.TrimSpace(item[:sep])
 		detail = strings.TrimSpace(item[sep+sepLen:])
 	}
-	return Focus{Title: stripBold(title), Detail: detail}
+	f := Focus{Title: stripBold(title), Detail: detail}
+	if m := projectRe.FindStringSubmatch(item); m != nil {
+		f.Project = m[1] + m[2]
+	}
+	return f
 }
 
 func stripBold(s string) string {

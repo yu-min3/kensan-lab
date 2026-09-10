@@ -10,7 +10,7 @@ test("ダッシュボードが表示され、フィクスチャの North Star �
 
 test("かんばんページに遷移でき、今週バンドのタスクが見える", async ({ page }) => {
   await page.goto("/");
-  await page.getByRole("link", { name: "タスク" }).click();
+  await page.getByRole("link", { name: "タスク", exact: true }).click();
   await expect(page).toHaveURL(/\/tasks$/);
   await expect(page.getByText("今週のサンプルタスク")).toBeVisible();
 });

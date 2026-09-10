@@ -23,11 +23,12 @@ type State struct {
 
 // MetricBrief は一覧に出す主指標の要約。詳細は /metrics が返す。
 type MetricBrief struct {
-	Label   string   `json:"label"`
-	Unit    string   `json:"unit"`
-	Current *float64 `json:"current,omitempty"`
-	Target  *float64 `json:"target,omitempty"`
-	Display string   `json:"display"`
+	Direction string   `json:"direction"`
+	Label     string   `json:"label"`
+	Unit      string   `json:"unit"`
+	Current   *float64 `json:"current,omitempty"`
+	Target    *float64 `json:"target,omitempty"`
+	Display   string   `json:"display"`
 }
 
 var doneDateRe = regexp.MustCompile(`✅\s*(\d{4}-\d{2}-\d{2})`)
@@ -144,7 +145,7 @@ func briefOf(views []metrics.View) *MetricBrief {
 		return nil
 	}
 	v := views[0]
-	return &MetricBrief{Label: v.Label, Unit: v.Unit, Current: v.Current, Target: v.Target, Display: v.Display}
+	return &MetricBrief{Label: v.Label, Unit: v.Unit, Current: v.Current, Target: v.Target, Display: v.Display, Direction: v.Direction}
 }
 
 // FormatMetric は "4 / 100 stars" の形に整える（一覧のバッジ用）。

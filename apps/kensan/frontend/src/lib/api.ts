@@ -58,6 +58,7 @@ export interface FeedAcknowledgement {
 }
 
 export interface Task {
+  id?: string;
   text: string; // 行内タグ込みの生テキスト（state/today/archive の照合に使う）
   display: string; // タグを除いた表示用テキスト
   state: "todo" | "done" | "skipped";
@@ -85,6 +86,7 @@ export interface Board {
 }
 
 export interface Focus {
+  project?: string;
   title: string;
   detail: string;
 }
@@ -115,6 +117,7 @@ export interface ProjectState {
 }
 
 export interface MetricBrief {
+  direction?: string;
   label: string;
   unit: string;
   current?: number;
@@ -205,6 +208,19 @@ export class ApiError extends Error {
   }
 }
 
+export interface Routine {
+  id: string; project: string; text: string; schedule: string; unit: string;
+  target: number; file: string; line: number; supported: boolean;
+  doneToday: boolean; expectedToday: boolean; streak: number;
+  periods: { start: string; count: number; target: number; status: "met" | "pending" | "missed" | "unknown" }[];
+}
+export interface TodayView {
+  date: string; goals: Goals; projects: ProjectSummary[]; board: Board; routines: Routine[];
+  activity: { date: string; count: number }[]; recordedSince: string;
+  triage: Task | null; deferredToday: boolean; skipped: Task[];
+  forecasts: Record<string, string>; phases: Record<string, string>;
+}
+
 // W3C traceparent を生成して伝搬する（backend の otelhttp が拾う）
 function traceparent(): string {
   const hex = (n: number) =>
@@ -237,6 +253,16 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 }
 
 export const api = {
+  triageTask: (t: Task, action: "today" | "later" | "skip") => request<{ task: Task }>("/tasks/triage", {
+    method: "POST", body: JSON.stringify({ file: t.file, line: t.line, text: t.text, action }),
+  }),
+  today: () => request<TodayView>("/today"),
+  routineState: (r: Routine, date: string, done: boolean) => request<{ done: boolean }>("/routines/state", {
+    method: "PUT", body: JSON.stringify({ file: r.file, id: r.id, date, done }),
+  }),
+  deferTask: (t: Task) => request<{ task: Task }>("/tasks/defer", {
+    method: "POST", body: JSON.stringify({ file: t.file, line: t.line, text: t.text }),
+  }),
   feeds: () => request<{ feeds: FeedEntry[]; total: number }>("/feeds"),
 
   latestFeed: () => request<LatestFeed>("/feeds/latest"),

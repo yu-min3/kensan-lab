@@ -1,6 +1,8 @@
 package tasks
 
 import (
+	"crypto/rand"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"strconv"
@@ -82,7 +84,7 @@ func Move(ws *workspace.Workspace, file string, line int, expectText string, des
 			return nil, fmt.Errorf("%w: line %d out of range", ErrLineMismatch, line)
 		}
 		m := checkboxRe.FindStringSubmatch(lines[line-1])
-		if m == nil || strings.TrimSpace(m[2]) != strings.TrimSpace(expectText) {
+		if m == nil || !matchesExpected(m[2], expectText) {
 			return nil, fmt.Errorf("%w: %s:%d", ErrLineMismatch, file, line)
 		}
 		taskLine = "- [" + m[1] + "] " + strings.TrimSpace(m[2])
@@ -138,7 +140,7 @@ func SetToday(ws *workspace.Workspace, file string, line int, expectText string,
 			return nil, fmt.Errorf("%w: line %d out of range", ErrLineMismatch, line)
 		}
 		m := checkboxRe.FindStringSubmatch(lines[line-1])
-		if m == nil || strings.TrimSpace(m[2]) != strings.TrimSpace(expectText) {
+		if m == nil || !matchesExpected(m[2], expectText) {
 			return nil, fmt.Errorf("%w: %s:%d", ErrLineMismatch, file, line)
 		}
 		newText := toggleToday(strings.TrimSpace(m[2]), on)
@@ -165,7 +167,7 @@ func SetBand(ws *workspace.Workspace, file string, line int, expectText, band st
 			return nil, fmt.Errorf("%w: line %d out of range", ErrLineMismatch, line)
 		}
 		m := checkboxRe.FindStringSubmatch(lines[line-1])
-		if m == nil || strings.TrimSpace(m[2]) != strings.TrimSpace(expectText) {
+		if m == nil || !matchesExpected(m[2], expectText) {
 			return nil, fmt.Errorf("%w: %s:%d", ErrLineMismatch, file, line)
 		}
 		out = rewriteLine(lines, line, m[1], setBandTag(strings.TrimSpace(m[2]), band), file)
@@ -291,10 +293,10 @@ func EditTask(ws *workspace.Workspace, file string, line int, expectText, projec
 				return nil, fmt.Errorf("%w: line %d out of range", ErrLineMismatch, line)
 			}
 			m := checkboxRe.FindStringSubmatch(lines[line-1])
-			if m == nil || strings.TrimSpace(m[2]) != strings.TrimSpace(expectText) {
+			if m == nil || !matchesExpected(m[2], expectText) {
 				return nil, fmt.Errorf("%w: %s:%d", ErrLineMismatch, file, line)
 			}
-			body := buildBody(display, band, due, ms, pRe.FindString(strings.TrimSpace(m[2])))
+			body := preserveID(buildBody(display, band, due, ms, pRe.FindString(strings.TrimSpace(m[2]))), m[2])
 			out = rewriteLine(lines, line, m[1], body, file)
 			out.Project = project
 			return []byte(workspaceTouch(strings.Join(lines, "\n"))), nil
@@ -313,11 +315,11 @@ func EditTask(ws *workspace.Workspace, file string, line int, expectText, projec
 			return nil, fmt.Errorf("%w: line %d out of range", ErrLineMismatch, line)
 		}
 		m := checkboxRe.FindStringSubmatch(lines[line-1])
-		if m == nil || strings.TrimSpace(m[2]) != strings.TrimSpace(expectText) {
+		if m == nil || !matchesExpected(m[2], expectText) {
 			return nil, fmt.Errorf("%w: %s:%d", ErrLineMismatch, file, line)
 		}
 		mark = m[1]
-		body = buildBody(display, band, due, ms, pRe.FindString(strings.TrimSpace(m[2])))
+		body = preserveID(buildBody(display, band, due, ms, pRe.FindString(strings.TrimSpace(m[2]))), m[2])
 		out := append(lines[:line-1:line-1], lines[line:]...)
 		return []byte(workspaceTouch(strings.Join(out, "\n"))), nil
 	})
@@ -360,7 +362,7 @@ func SetText(ws *workspace.Workspace, file string, line int, expectText, newDisp
 			return nil, fmt.Errorf("%w: line %d out of range", ErrLineMismatch, line)
 		}
 		m := checkboxRe.FindStringSubmatch(lines[line-1])
-		if m == nil || strings.TrimSpace(m[2]) != strings.TrimSpace(expectText) {
+		if m == nil || !matchesExpected(m[2], expectText) {
 			return nil, fmt.Errorf("%w: %s:%d", ErrLineMismatch, file, line)
 		}
 		nd := strings.TrimSpace(newDisplay)
@@ -379,6 +381,9 @@ func SetText(ws *workspace.Workspace, file string, line int, expectText, newDisp
 // tagSuffix は行テキストに含まれる行内タグを固定順（band→due→ms→p）で 1 文字列にまとめる。
 func tagSuffix(raw string) string {
 	var parts []string
+	if id := idRe.FindString(raw); id != "" {
+		parts = append(parts, id)
+	}
 	if todayRe.MatchString(raw) {
 		parts = append(parts, "@today")
 	}
@@ -412,7 +417,7 @@ func SetDue(ws *workspace.Workspace, file string, line int, expectText, due stri
 			return nil, fmt.Errorf("%w: line %d out of range", ErrLineMismatch, line)
 		}
 		m := checkboxRe.FindStringSubmatch(lines[line-1])
-		if m == nil || strings.TrimSpace(m[2]) != strings.TrimSpace(expectText) {
+		if m == nil || !matchesExpected(m[2], expectText) {
 			return nil, fmt.Errorf("%w: %s:%d", ErrLineMismatch, file, line)
 		}
 		out = rewriteLine(lines, line, m[1], setDueTag(strings.TrimSpace(m[2]), due), file)
@@ -443,7 +448,7 @@ func SetPriority(ws *workspace.Workspace, file string, line int, expectText stri
 			return nil, fmt.Errorf("%w: line %d out of range", ErrLineMismatch, line)
 		}
 		m := checkboxRe.FindStringSubmatch(lines[line-1])
-		if m == nil || strings.TrimSpace(m[2]) != strings.TrimSpace(expectText) {
+		if m == nil || !matchesExpected(m[2], expectText) {
 			return nil, fmt.Errorf("%w: %s:%d", ErrLineMismatch, file, line)
 		}
 		out = rewriteLine(lines, line, m[1], setPriorityTag(strings.TrimSpace(m[2]), n), file)
@@ -500,7 +505,7 @@ func DeleteLine(ws *workspace.Workspace, file string, line int, expectText strin
 			return nil, fmt.Errorf("%w: line %d out of range", ErrLineMismatch, line)
 		}
 		m := checkboxRe.FindStringSubmatch(lines[line-1])
-		if m == nil || strings.TrimSpace(m[2]) != strings.TrimSpace(expectText) {
+		if m == nil || !matchesExpected(m[2], expectText) {
 			return nil, fmt.Errorf("%w: %s:%d", ErrLineMismatch, file, line)
 		}
 		// full slice expression で元 slice の clobber を防ぐ
@@ -511,34 +516,100 @@ func DeleteLine(ws *workspace.Workspace, file string, line int, expectText strin
 
 // SetState はチェックボックスの状態を書き換える（todo / done / skipped）。
 func SetState(ws *workspace.Workspace, file string, line int, expectText, state string) (Task, error) {
-	var mark string
-	switch state {
-	case "todo":
-		mark = " "
-	case "done":
-		mark = "x"
-	case "skipped":
-		mark = "-"
+	return observeTask(ws, file, line, expectText, state, "task.state", "")
+}
+
+func ReviewLater(ws *workspace.Workspace, file string, line int, text string) (Task, error) {
+	return Triage(ws, file, line, text, "later")
+}
+
+func Triage(ws *workspace.Workspace, file string, line int, text, action string) (Task, error) {
+	state := "todo"
+	switch action {
+	case "today", "later":
+	case "skip":
+		state = "skipped"
 	default:
+		return Task{}, fmt.Errorf("unknown triage action: %q", action)
+	}
+	return observeTask(ws, file, line, text, state, "task.triaged", action)
+}
+
+func preserveID(body, old string) string {
+	if id := idRe.FindString(old); id != "" {
+		return body + " " + id
+	}
+	return body
+}
+
+// Old clients may reuse the locator from before the first state operation.
+// Ignore only a newly assigned ID, never a changed title, band or deadline.
+func matchesExpected(actual, expected string) bool {
+	if taskID(expected) == "" {
+		actual = idRe.ReplaceAllString(actual, "")
+	}
+	return strings.TrimSpace(actual) == strings.TrimSpace(expected)
+}
+
+func observeTask(ws *workspace.Workspace, file string, line int, expectText, state, kind, action string) (Task, error) {
+	marks := map[string]string{"todo": " ", "done": "x", "skipped": "-"}
+	mark, ok := marks[state]
+	if !ok {
 		return Task{}, fmt.Errorf("unknown state: %q", state)
 	}
 	var out Task
-	err := ws.Mutate(file, func(content []byte, exists bool) ([]byte, error) {
-		if !exists {
-			return nil, fmt.Errorf("file not found: %s", file)
-		}
+	err := ws.MutateEvent(file, func(content []byte, events []workspace.Activity) ([]byte, *workspace.Activity, error) {
 		lines := strings.Split(string(content), "\n")
 		if line < 1 || line > len(lines) {
-			return nil, fmt.Errorf("%w: line %d out of range", ErrLineMismatch, line)
+			return nil, nil, fmt.Errorf("%w: line %d out of range", ErrLineMismatch, line)
 		}
 		m := checkboxRe.FindStringSubmatch(lines[line-1])
-		if m == nil || strings.TrimSpace(m[2]) != strings.TrimSpace(expectText) {
-			return nil, fmt.Errorf("%w: %s:%d", ErrLineMismatch, file, line)
+		if m == nil || !matchesExpected(m[2], expectText) {
+			return nil, nil, fmt.Errorf("%w: %s:%d", ErrLineMismatch, file, line)
 		}
-		indent := lines[line-1][:strings.Index(lines[line-1], "- [")]
-		lines[line-1] = indent + "- [" + mark + "] " + strings.TrimSpace(m[2])
-		out = Task{Text: strings.TrimSpace(m[2]), State: state, File: file, Line: line}
-		return []byte(workspaceTouch(strings.Join(lines, "\n"))), nil
+		for _, t := range ExtractLines(string(content), file) {
+			if t.Line == line {
+				out = t
+				break
+			}
+		}
+		if kind == "task.state" && m[1] == mark {
+			return nil, nil, nil
+		}
+		if kind == "task.triaged" {
+			date := time.Now().In(time.FixedZone("JST", 9*60*60)).Format("2006-01-02")
+			for _, e := range events {
+				if e.Kind == kind && e.ID == out.ID && e.Date == date && e.Action == action {
+					return nil, nil, nil
+				}
+			}
+			if out.State != "todo" {
+				return nil, nil, ErrLineMismatch
+			}
+		}
+		body := strings.TrimSpace(m[2])
+		id := taskID(body)
+		if id == "" {
+			buf := make([]byte, 16)
+			if _, err := rand.Read(buf); err != nil {
+				return nil, nil, err
+			}
+			id = hex.EncodeToString(buf)
+			body += " @id(" + id + ")"
+		}
+		section := out.Section
+		if action == "today" {
+			body = setBandTag(body, "today")
+		}
+		out = rewriteLine(lines, line, mark, body, file)
+		out.ID, out.Section = id, section
+		parts := strings.Split(file, "/")
+		if len(parts) == 3 && parts[0] == "projects" {
+			out.Project = parts[1]
+		}
+		now := time.Now().In(time.FixedZone("JST", 9*60*60))
+		e := &workspace.Activity{At: now, Kind: kind, ID: id, Project: out.Project, Text: out.Display, Date: now.Format("2006-01-02"), State: state, Action: action}
+		return []byte(workspaceTouch(strings.Join(lines, "\n"))), e, nil
 	})
 	return out, err
 }
