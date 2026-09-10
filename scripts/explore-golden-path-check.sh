@@ -37,6 +37,14 @@ cleanup() {
 trap cleanup EXIT
 C=(/usr/bin/curl -sk --cookie-jar "$JAR" --cookie "$JAR")
 
+# A completed rollout can still leave the terminating old Pod in the API list.
+# Select the Ready Pod running the expected image, never the first list item.
+ready_app_pod() {
+  python3 "$(dirname "${BASH_SOURCE[0]}")/explore-ready-pod.py" \
+    "app-${NAME}" "$NAME" "10.96.0.50:5000/demo/${NAME}:$1"
+}
+
+
 # The portal issues its own token after Keycloak verifies the person, and the
 # scaffolder API wants that token rather than the session cookie.
 start="https://${HOST}/api/auth/oidc/start?scope=openid%20profile%20email&origin=https%3A%2F%2F${HOST}&flow=popup&env=production"
@@ -259,10 +267,10 @@ case "${deployed_image}" in
   "10.96.0.50:5000/demo/${NAME}:${first_image_tag}") ;;
   *) echo "the deployment does not use its repository image: ${deployed_image}" >&2; exit 1 ;;
 esac
-first_pod_uid="$(kubectl -n "app-${NAME}" get pod \
-  -l "app.kubernetes.io/name=${NAME}" -o jsonpath='{.items[0].metadata.uid}')"
+first_pod="$(ready_app_pod "${first_image_tag}")"
+read -r first_pod_name first_pod_uid <<<"${first_pod}"
 
-kubectl -n "app-${NAME}" port-forward "svc/${NAME}" 18080:8000 >/dev/null 2>&1 &
+kubectl -n "app-${NAME}" port-forward "pod/${first_pod_name}" 18080:8000 >/dev/null 2>&1 &
 APP_PF_PID=$!
 for _ in $(seq 1 30); do
   curl -sf --max-time 2 http://127.0.0.1:18080/health >/dev/null 2>&1 && break
@@ -343,15 +351,15 @@ while :; do
   sleep 5
 done
 kubectl -n "app-${NAME}" rollout status deployment/"${NAME}" --timeout=3m >/dev/null
-second_pod_uid="$(kubectl -n "app-${NAME}" get pod \
-  -l "app.kubernetes.io/name=${NAME}" -o jsonpath='{.items[0].metadata.uid}')"
+second_pod="$(ready_app_pod "${second_image_tag}")"
+read -r second_pod_name second_pod_uid <<<"${second_pod}"
 [[ "${second_pod_uid}" != "${first_pod_uid}" ]] \
   || { echo "the image changed without replacing the application pod" >&2; exit 1; }
 
 kill "${APP_PF_PID}" 2>/dev/null || true
 wait "${APP_PF_PID}" 2>/dev/null || true
 APP_PF_PID=""
-kubectl -n "app-${NAME}" port-forward "svc/${NAME}" 18080:8000 >/dev/null 2>&1 &
+kubectl -n "app-${NAME}" port-forward "pod/${second_pod_name}" 18080:8000 >/dev/null 2>&1 &
 APP_PF_PID=$!
 for _ in $(seq 1 30); do
   proof="$(curl -sf --max-time 2 http://127.0.0.1:18080/build-proof 2>/dev/null || true)"
@@ -411,8 +419,8 @@ done
 
 [[ "$(image_tag)" == "${second_image_tag}" ]] \
   || { echo "a failed build changed the deploy image tag" >&2; exit 1; }
-current_pod_uid="$(kubectl -n "app-${NAME}" get pod \
-  -l "app.kubernetes.io/name=${NAME}" -o jsonpath='{.items[0].metadata.uid}')"
+current_pod="$(ready_app_pod "${second_image_tag}")"
+read -r current_pod_name current_pod_uid <<<"${current_pod}"
 [[ "${current_pod_uid}" == "${second_pod_uid}" ]] \
   || { echo "a failed build replaced the last good pod" >&2; exit 1; }
 

@@ -189,7 +189,7 @@ jobs:
               for key, value in next(step for step in explore["spec"]["steps"]
                                      if step["id"] == "fetch-base")["input"]["values"].items()
           }
-          assert production_values["imageRepository"].startswith("${{")
+          assert production_values["imageRepository"].startswith("$" + "{{")
           assert "10.96.0.50:5000/demo/" in explore_values["imageRepository"]
           assert explore_values["imageTag"] == "pending"
           assert explore_values["ghcrPullSecretEnabled"] == "False"
