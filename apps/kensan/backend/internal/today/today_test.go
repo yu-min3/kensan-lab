@@ -1,6 +1,8 @@
 package today
 
 import (
+	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -13,6 +15,74 @@ import (
 	"github.com/yu-min3/kensan-lab/apps/kensan/backend/internal/tasks"
 	"github.com/yu-min3/kensan-lab/apps/kensan/backend/internal/workspace"
 )
+
+func TestEmptyWorkspaceUsesArrayContract(t *testing.T) {
+	v, err := Load(workspace.New(t.TempDir()), time.Now())
+	if err != nil {
+		t.Fatal(err)
+	}
+	b, err := json.Marshal(v)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(b), `"projects":[]`) {
+		t.Fatalf("empty projects must be an array: %s", b)
+	}
+}
+
+func TestTriageReplayAndConflictingEdits(t *testing.T) {
+	for _, action := range []string{"today", "later", "skip"} {
+		t.Run(action, func(t *testing.T) {
+			ws := fixture(t, "## タスク\n- [ ] Item @p(1000)\n")
+			v, err := Load(ws, time.Now())
+			if err != nil {
+				t.Fatal(err)
+			}
+			a := *v.Triage
+			for i := 0; i < 2; i++ {
+				if _, err := tasks.Triage(ws, a.File, a.Line, a.Text, action); err != nil {
+					t.Fatalf("request %d: %v", i, err)
+				}
+			}
+			events, err := ws.Activities()
+			if err != nil || len(events) != 1 {
+				t.Fatalf("retry duplicated events: %v %v", events, err)
+			}
+			content, err := os.ReadFile(filepath.Join(ws.Root, a.File))
+			if err != nil {
+				t.Fatal(err)
+			}
+			if err := os.WriteFile(filepath.Join(ws.Root, a.File), []byte(strings.Replace(string(content), "Item", "Edited", 1)), 0644); err != nil {
+				t.Fatal(err)
+			}
+			if _, err := tasks.Triage(ws, a.File, a.Line, a.Text, action); !errors.Is(err, tasks.ErrLineMismatch) {
+				t.Fatalf("stale edit accepted: %v", err)
+			}
+		})
+	}
+}
+
+func TestTriageReplayRejectsChangedBand(t *testing.T) {
+	ws := fixture(t, "## タスク\n- [ ] Item\n")
+	v, err := Load(ws, time.Now())
+	if err != nil {
+		t.Fatal(err)
+	}
+	a := *v.Triage
+	updated, err := tasks.Triage(ws, a.File, a.Line, a.Text, "today")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if replay, err := tasks.Triage(ws, a.File, a.Line, a.Text, "today"); err != nil || replay.Project != "demo" || replay.ID != updated.ID {
+		t.Fatalf("replay lost identity: %+v %v", replay, err)
+	}
+	if _, err := tasks.SetBand(ws, updated.File, updated.Line, updated.Text, "later"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := tasks.Triage(ws, a.File, a.Line, a.Text, "today"); !errors.Is(err, tasks.ErrLineMismatch) {
+		t.Fatalf("replay accepted a changed band: %v", err)
+	}
+}
 
 func fixture(t *testing.T, body string) *workspace.Workspace {
 	t.Helper()
@@ -60,8 +130,10 @@ func TestCompletionRetryUndoAndRename(t *testing.T) {
 	if current.ID == "" {
 		t.Fatal("missing stable ID")
 	}
-	if _, err := tasks.SetText(ws, current.File, current.Line, current.Text, "Ship renamed"); err != nil {
+	if updated, err := tasks.SetText(ws, current.File, current.Line, current.Text, "Ship renamed"); err != nil {
 		t.Fatal(err)
+	} else if updated.ID != current.ID || updated.Project != "demo" {
+		t.Fatalf("mutation response lost identity: %+v", updated)
 	}
 	renamed := taskAt(t, ws)
 	if renamed.ID != current.ID {

@@ -34,7 +34,11 @@ type View struct {
 
 func Load(ws *workspace.Workspace, now time.Time) (View, error) {
 	now = now.In(JST)
-	v := View{Date: now.Format("2006-01-02"), Projects: projects.Summaries(ws.Root), Activity: []Day{}, Skipped: []tasks.Task{}}
+	snapshots := projects.Snapshots(ws.Root, now)
+	v := View{Date: now.Format("2006-01-02"), Projects: []projects.Summary{}, Activity: []Day{}, Skipped: []tasks.Task{}}
+	for _, snapshot := range snapshots {
+		v.Projects = append(v.Projects, snapshot.Summary)
+	}
 	v.Forecasts = map[string]string{}
 	v.Phases = map[string]string{}
 	var err error
@@ -89,19 +93,16 @@ func Load(ws *workspace.Workspace, now time.Time) (View, error) {
 	if !v.DeferredToday && len(candidates) > 0 {
 		v.Triage = &candidates[0]
 	}
-	for _, p := range v.Projects {
-		d, err := projects.Load(ws.Root, p.Name)
-		if err != nil {
-			return v, err
-		}
+	for _, d := range snapshots {
+		p := d.Summary
 		for _, m := range d.Milestones {
 			if m.State == "todo" {
 				v.Phases[p.Name] = m.Display
 				break
 			}
 		}
-		if r, err := metrics.Load(ws.Root, p.Name, now); err == nil && len(r.Metrics) > 0 {
-			v.Forecasts[p.Name] = Forecast(r.Metrics[0], now)
+		if len(d.Metrics) > 0 {
+			v.Forecasts[p.Name] = Forecast(d.Metrics[0], now)
 		}
 		for _, t := range d.Tasks {
 			if t.State == "skipped" {

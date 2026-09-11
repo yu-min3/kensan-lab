@@ -1,5 +1,6 @@
 import { useState } from "react";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useMutation } from "@tanstack/react-query";
+import { useWorkspaceRefresh } from "../hooks/useWorkspaceRefresh";
 import { useSearchParams } from "react-router-dom";
 import {
   FolderKanban,
@@ -38,7 +39,7 @@ const STATUSES = ["active", "paused", "completed", "cancelled"];
 export function ProjectsPage() {
   const [params, setParams] = useSearchParams();
   const selected = params.get("name");
-  const qc = useQueryClient();
+  const refresh = useWorkspaceRefresh();
   const projects = useQuery({ queryKey: ["projects"], queryFn: api.projects });
   const [creating, setCreating] = useState(false);
   const [newName, setNewName] = useState("");
@@ -48,7 +49,7 @@ export function ProjectsPage() {
     onSuccess: (res) => {
       setCreating(false);
       setNewName("");
-      qc.invalidateQueries({ queryKey: ["projects"] });
+      refresh();
       setParams({ name: res.name });
     },
   });
@@ -160,16 +161,11 @@ function ProjectRow({ project, active, onClick }: { project: ProjectSummary; act
 }
 
 function ProjectDetailView({ name }: { name: string }) {
-  const qc = useQueryClient();
+  const invalidate = useWorkspaceRefresh();
   const detail = useQuery({ queryKey: ["project", name], queryFn: () => api.projectDetail(name) });
   const taggedNotes = useQuery({ queryKey: ["files", "note", name], queryFn: () => api.files({ type: "note", tag: name }) });
   const metrics = useQuery({ queryKey: ["project-metrics", name], queryFn: () => api.projectMetrics(name) });
   const file = `projects/${name}/README.md`;
-  const invalidate = () => {
-    qc.invalidateQueries({ queryKey: ["project", name] });
-    qc.invalidateQueries({ queryKey: ["projects"] });
-    qc.invalidateQueries({ queryKey: ["board"] });
-  };
 
   const toggleMs = useMutation({ mutationFn: (m: Task) => api.setTaskState(m, m.state === "done" ? "todo" : "done"), onSettled: invalidate });
   const editMs = useMutation({ mutationFn: ({ m, text }: { m: Task; text: string }) => api.setText(m, text), onSettled: invalidate });

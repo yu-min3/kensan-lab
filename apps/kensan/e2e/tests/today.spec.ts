@@ -1,5 +1,52 @@
 import { expect, test } from "@playwright/test";
 
+test("目標カードから既存のプロジェクト詳細へ進める", async ({ page }) => {
+  await page.goto("/");
+  await page.getByRole("link", { name: "today-demo", exact: true }).first().click();
+  await expect(page).toHaveURL(/\/projects\?name=today-demo$/);
+  await expect(page.getByText("ページが見つかりません", { exact: true })).toHaveCount(0);
+  await expect(page.getByText("今日の一歩を確かめる", { exact: true }).first()).toBeVisible();
+});
+
+test("タスク画面での完了と取消は戻った今日画面にも反映する", async ({ page }) => {
+  await page.goto("/");
+  await page.getByRole("link", { name: "全タスクを開く →", exact: true }).first().click();
+  await page.getByRole("checkbox", { name: "履歴を残すテスト を完了にする", exact: true }).click();
+  await expect(page.getByRole("checkbox", { name: "履歴を残すテスト を完了にする", exact: true })).toHaveCount(0);
+  await page.getByRole("link", { name: "ダッシュボード", exact: true }).click();
+  const card = page.locator("section").filter({ has: page.getByRole("heading", { name: "今日の一歩を確かめる" }) }).last();
+  await card.locator("summary").filter({ hasText: "完了済み" }).click();
+  await expect(page.getByRole("checkbox", { name: "履歴を残すテスト", exact: true })).toBeChecked();
+  await page.getByRole("checkbox", { name: "履歴を残すテスト", exact: true }).click();
+  await expect(page.getByRole("checkbox", { name: "履歴を残すテスト", exact: true })).not.toBeChecked();
+});
+
+test("空のプロジェクト一覧でも次の操作を案内する", async ({ page }) => {
+  await page.route("**/api/v1/today", async route => {
+    const response = await route.fetch();
+    const view = await response.json();
+    await route.fulfill({ json: { ...view, projects: [], routines: [], board: { today: [], week: [], month: [], later: [], milestones: [] }, triage: null, skipped: [] } });
+  });
+  await page.goto("/");
+  await expect(page.getByText("目標をひとつ置いてみましょう", { exact: true })).toBeVisible();
+  await expect(page.getByRole("link", { name: "プロジェクトを作る", exact: true })).toHaveAttribute("href", "/projects");
+});
+
+test("モバイルの上部から日記を開き、日別実績もタッチで確認できる", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto("/");
+  const diary = page.getByRole("button", { name: "今日の日記を書く", exact: true });
+  await expect(diary).toBeInViewport();
+  expect((await diary.boundingBox())!.y).toBeLessThan(260);
+  expect((await page.locator("main header").first().boundingBox())!.height).toBeLessThan(250);
+  const date = (await (await page.request.get("/api/v1/today")).json()).date;
+  await page.getByLabel("日別の記録を確認").fill(date);
+  await expect(page.getByRole("status").filter({ hasText: date })).toBeVisible();
+  await diary.click();
+  await expect(page).toHaveURL(new RegExp(`/daily\\?date=${date}$`));
+  await expect(page.getByRole("button", { name: "日記を作成", exact: true })).toHaveCount(0);
+});
+
 test("目標内の完了・取消と習慣をAPIへ保存し、再読込後も保持する", async ({ page }) => {
   await page.goto("/");
   const task = page.getByRole("checkbox", { name: "履歴を残すテスト" });
@@ -39,7 +86,10 @@ for (const mode of ["light", "dark"] as const) {
     await page.setViewportSize({ width: 390, height: 844 });
     await page.emulateMedia({ colorScheme: mode });
     await page.goto("/");
+    // WhetstoneはOS設定ではなく.darkクラスで切り替わる。実際のトークンを検証する。
+    await page.evaluate(dark => document.documentElement.classList.toggle("dark", dark), mode === "dark");
     await expect(page.getByRole("heading", { name: "今日の一歩を確かめる" })).toBeVisible();
+    expect(await page.evaluate(() => document.documentElement.classList.contains("dark"))).toBe(mode === "dark");
     expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(390);
   });
 }

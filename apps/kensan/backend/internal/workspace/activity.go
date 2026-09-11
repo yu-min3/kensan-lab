@@ -84,7 +84,7 @@ func (w *Workspace) MutateEvent(rel string, fn func([]byte, []Activity) ([]byte,
 		if err != nil {
 			return err
 		}
-		f, err = os.OpenFile(filepath.Join(w.Root, ActivityFile), os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
+		f, err = os.OpenFile(filepath.Join(w.Root, ActivityFile), os.O_CREATE|os.O_RDWR|os.O_APPEND, 0644)
 		if err != nil {
 			return err
 		}
@@ -94,6 +94,17 @@ func (w *Workspace) MutateEvent(rel string, fn func([]byte, []Activity) ([]byte,
 			return err
 		}
 		offset = info.Size()
+		// 最終レコードが有効なら、外部編集で消えた末尾改行を補ってから追記する。
+		// 区切りも同じ書込に含め、失敗時には元の長さまで戻せるようにする。
+		if offset > 0 {
+			var last [1]byte
+			if _, err := f.ReadAt(last[:], offset-1); err != nil {
+				return err
+			}
+			if last[0] != '\n' {
+				line = append([]byte{'\n'}, line...)
+			}
+		}
 	}
 	if out != nil {
 		if err := os.WriteFile(abs, out, 0644); err != nil {
