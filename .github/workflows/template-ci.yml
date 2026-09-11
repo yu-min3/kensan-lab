@@ -70,6 +70,9 @@ jobs:
               "hostname": "widget-service.app.yu-min3.com",
               "imageRepository": "ghcr.io/yu-min3/app-widget-service",
               "imageTag": "v0.1.0",
+              "applicationUrl": "https://widget-service.app.yu-min3.com/docs",
+              "argocdUrl": "https://argocd.platform.yu-min3.com/applications/app-widget-service",
+              "loadButtonEnabled": "false",
               "ghcrPullSecretEnabled": "true",
               "otelEnabled": "true",
               "gatewayName": "gateway-prod",
@@ -189,7 +192,7 @@ jobs:
               for key, value in next(step for step in explore["spec"]["steps"]
                                      if step["id"] == "fetch-base")["input"]["values"].items()
           }
-          assert production_values["imageRepository"].startswith("${{")
+          assert production_values["imageRepository"].startswith("$" + "{{")
           assert "10.96.0.50:5000/demo/" in explore_values["imageRepository"]
           assert explore_values["imageTag"] == "pending"
           assert explore_values["ghcrPullSecretEnabled"] == "False"
