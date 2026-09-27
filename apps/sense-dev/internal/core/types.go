@@ -118,12 +118,19 @@ type ContextManifest struct {
 	CommonKnowledge ArtifactRef   `json:"common_knowledge"`
 	AgentMemo       *ArtifactRef  `json:"agent_memo,omitempty"`
 	Inbox           []ArtifactRef `json:"inbox"`
+	StageInputs     []StageInput  `json:"stage_inputs"`
 	MessageIDs      []string      `json:"message_ids"`
 	ContractVersion string        `json:"contract_version"`
 	BaseSHA         string        `json:"base_sha,omitempty"`
 	HeadSHA         string        `json:"head_sha,omitempty"`
 	AllowedScope    []string      `json:"allowed_scope"`
 	InputSHA256     string        `json:"input_sha256"`
+}
+
+type StageInput struct {
+	AgentID  string      `json:"agent_id"`
+	Role     string      `json:"role"`
+	Artifact ArtifactRef `json:"artifact"`
 }
 
 type Event struct {

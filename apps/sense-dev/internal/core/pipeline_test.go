@@ -17,7 +17,7 @@ func TestPlannedPipelineHasIndependentStages(t *testing.T) {
 		if a.Role != wantRoles[i] || a.Model != wantModels[i] || a.TaskID != platform.ID || a.SessionID != "" {
 			t.Fatalf("wrong stage %d: %+v", i, a)
 		}
-		if i > 0 && (len(a.DependsOn) != 1 || a.DependsOn[0] != stages[i-1].ID) {
+		if i > 0 && (len(a.DependsOn) != i || a.DependsOn[i-1] != stages[i-1].ID) {
 			t.Fatalf("stage %d is not dependency-bound", i)
 		}
 	}

@@ -51,7 +51,7 @@ func (s *Store) BuildManifest(agentID string, allowedScope []string) (ContextMan
 	if !hasProfile || !hasKnowledge || !hasCommon {
 		return ContextManifest{}, errors.New("team knowledge is not seeded")
 	}
-	m := ContextManifest{SchemaVersion: SchemaVersion, MissionID: t.MissionID, TaskID: t.ID, Team: a.Team, Role: a.Role, AgentID: a.ID, Provider: a.Provider, Model: a.Model, Generation: a.SessionGeneration, TeamProfile: artifactRef(profile), TeamKnowledge: artifactRef(knowledge), CommonKnowledge: artifactRef(common), Inbox: []ArtifactRef{}, MessageIDs: []string{}, ContractVersion: t.ContractVersion, BaseSHA: t.BaseSHA, HeadSHA: t.HeadSHA, AllowedScope: append([]string(nil), allowedScope...)}
+	m := ContextManifest{SchemaVersion: SchemaVersion, MissionID: t.MissionID, TaskID: t.ID, Team: a.Team, Role: a.Role, AgentID: a.ID, Provider: a.Provider, Model: a.Model, Generation: a.SessionGeneration, TeamProfile: artifactRef(profile), TeamKnowledge: artifactRef(knowledge), CommonKnowledge: artifactRef(common), Inbox: []ArtifactRef{}, StageInputs: []StageInput{}, MessageIDs: []string{}, ContractVersion: t.ContractVersion, BaseSHA: t.BaseSHA, HeadSHA: t.HeadSHA, AllowedScope: append([]string(nil), allowedScope...)}
 	if memo, ok := latest(st, a.ID, "memo"); ok {
 		ref := artifactRef(memo)
 		m.AgentMemo = &ref
@@ -69,9 +69,30 @@ func (s *Store) BuildManifest(agentID string, allowedScope []string) (ContextMan
 		m.MessageIDs = append(m.MessageIDs, id)
 		m.Inbox = append(m.Inbox, msg.ArtifactRefs...)
 	}
+	for _, depID := range a.DependsOn {
+		dep, ok := st.Agents[depID]
+		if !ok || dep.TaskID != t.ID || dep.Status != "completed" {
+			return ContextManifest{}, errors.New("stage dependency not completed in same task")
+		}
+		var result Attempt
+		for _, attempt := range st.Attempts {
+			if attempt.AgentID == depID && attempt.Status == "completed" && attempt.OutputRef != nil && (result.ID == "" || attempt.StartedAt.After(result.StartedAt)) {
+				result = attempt
+			}
+		}
+		if result.ID == "" || result.ContractVersion != t.ContractVersion || result.BaseSHA != t.BaseSHA || result.HeadSHA != t.HeadSHA {
+			return ContextManifest{}, errors.New("stage dependency result missing or stale")
+		}
+		m.StageInputs = append(m.StageInputs, StageInput{AgentID: dep.ID, Role: dep.Role, Artifact: *result.OutputRef})
+	}
 	for _, ref := range append([]ArtifactRef{m.TeamProfile, m.TeamKnowledge, m.CommonKnowledge}, m.Inbox...) {
 		if err := s.verifyRef(ref); err != nil {
 			return ContextManifest{}, fmt.Errorf("context artifact %s: %w", ref.ID, err)
+		}
+	}
+	for _, stage := range m.StageInputs {
+		if err := s.verifyRef(stage.Artifact); err != nil {
+			return ContextManifest{}, fmt.Errorf("stage result %s: %w", stage.AgentID, err)
 		}
 	}
 	if m.AgentMemo != nil {

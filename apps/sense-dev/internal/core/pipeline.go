@@ -58,7 +58,7 @@ func (s *Store) CreatePlannedTask(mission string, team Team, kind, title, contra
 	for i, stage := range stages {
 		a := Agent{ID: agentIDs[i], TaskID: id, Team: team, Role: stage.role, Provider: stage.provider, Model: stage.model, SessionGeneration: 1, Status: "ready", UpdatedAt: now.Add(time.Duration(i) * time.Nanosecond)}
 		if i > 0 {
-			a.DependsOn = []string{agentIDs[i-1]}
+			a.DependsOn = append([]string(nil), agentIDs[:i]...)
 		}
 		agents = append(agents, a)
 	}

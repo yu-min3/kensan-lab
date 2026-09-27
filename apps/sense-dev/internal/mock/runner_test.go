@@ -34,6 +34,15 @@ func TestPlannedTaskRunsToPublishWaitWithoutModel(t *testing.T) {
 	if len(st.Attempts) != 4 {
 		t.Fatalf("attempts=%d", len(st.Attempts))
 	}
+	manifest, err := store.BuildManifest(agents[3].ID, nil)
+	if err != nil || len(manifest.StageInputs) != 3 {
+		t.Fatalf("review did not receive prior stage artifacts: %v %+v", err, manifest.StageInputs)
+	}
+	for i, input := range manifest.StageInputs {
+		if input.AgentID != agents[i].ID || input.Artifact.SHA256 == "" {
+			t.Fatalf("wrong stage handoff %d: %+v", i, input)
+		}
+	}
 	for _, a := range st.Attempts {
 		if a.Status != "completed" || a.OutputRef == nil {
 			t.Fatalf("bad attempt %+v", a)

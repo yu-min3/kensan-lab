@@ -94,13 +94,10 @@ func TestPrivateWebLoginCSRFAndTask(t *testing.T) {
 	if len(store.Snapshot().Agents) != 4 {
 		t.Fatal("change task did not receive four independent stage agents")
 	}
-	var requirements, implementation core.Agent
+	var requirements core.Agent
 	for _, a := range store.Snapshot().Agents {
 		if a.Role == "requirements" {
 			requirements = a
-		}
-		if a.Role == "implementation" {
-			implementation = a
 		}
 	}
 	question, err := store.AskQuestion(requirements.ID, "対象の契約版は？")
@@ -136,7 +133,7 @@ func TestPrivateWebLoginCSRFAndTask(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, a := range []core.Agent{implementation, gate} {
+	for _, a := range []core.Agent{requirements, gate} {
 		m, err := store.BuildManifest(a.ID, nil)
 		if err != nil {
 			t.Fatal(err)
@@ -145,7 +142,7 @@ func TestPrivateWebLoginCSRFAndTask(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	source, err := store.PutArtifact(implementation.ID, "change", []byte("diff"))
+	source, err := store.PutArtifact(requirements.ID, "change", []byte("diff"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -153,7 +150,7 @@ func TestPrivateWebLoginCSRFAndTask(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	d, err := store.RecordReleaseDecision(core.ReleaseDecision{AuthorAgentID: implementation.ID, GateAgentID: gate.ID, Verdict: "needs_human", Reason: "公開済み app の変更", Operation: "merge", Repository: "yu-min3/kensan-lab", Ref: "refs/heads/feat/canary", HeadSHA: sha, TargetEnvironment: "private-canary", PolicyVersion: core.ReleasePolicyVersion, ArtifactRefs: []core.ArtifactRef{{ID: source.ID, Version: source.Version, SHA256: source.SHA256}}, EvidenceRefs: []core.ArtifactRef{{ID: evidence.ID, Version: evidence.Version, SHA256: evidence.SHA256}}, ExpiresAt: time.Now().Add(time.Hour)})
+	d, err := store.RecordReleaseDecision(core.ReleaseDecision{AuthorAgentID: requirements.ID, GateAgentID: gate.ID, Verdict: "needs_human", Reason: "公開済み app の変更", Operation: "merge", Repository: "yu-min3/kensan-lab", Ref: "refs/heads/feat/canary", HeadSHA: sha, TargetEnvironment: "private-canary", PolicyVersion: core.ReleasePolicyVersion, ArtifactRefs: []core.ArtifactRef{{ID: source.ID, Version: source.Version, SHA256: source.SHA256}}, EvidenceRefs: []core.ArtifactRef{{ID: evidence.ID, Version: evidence.Version, SHA256: evidence.SHA256}}, ExpiresAt: time.Now().Add(time.Hour)})
 	if err != nil {
 		t.Fatal(err)
 	}
