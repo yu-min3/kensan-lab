@@ -1,0 +1,78 @@
+{
+  "schema_version": 1,
+  "kind": "independent_release_gate_review",
+  "reviewed_at": "2026-09-27T14:46:53Z",
+  "reviewer": {
+    "agent_session": "/root/bootstrap_current_review",
+    "role": "independent_release_gate_reviewer",
+    "authored_implementation": false,
+    "independence_basis": "Separate Astra reviewer with no author conversation; inspected fixed source, goal, policy, manifest and artifact hashes, and rebuilt from git archive. No host operation."
+  },
+  "scope": {
+    "operation": "host_service_first_install",
+    "repo": "yu-min3/kensan-lab",
+    "ref": "feat/sense-autonomous-development",
+    "head_sha": "8c4101bd21d8ff03dd23b113b3436fb230529e53",
+    "source_commit": "8c4101bd21d8ff03dd23b113b3436fb230529e53",
+    "candidate_manifest_commit": "e105291f668f69c757112fe611154b0d796b4b04",
+    "candidate_manifest_path": "apps/sense-dev/docs/private-bootstrap-candidate-8c4101b.json",
+    "candidate_manifest_sha256": "4974c8bfdf8c304fbb23b2a88641481c8c0c76408ba3137cc18890038649f0c1",
+    "target_environment": "sense-private-host",
+    "policy_version": "private-bootstrap-v1",
+    "policy_sha256": "b6158fdc6b87bcf2636e80b77889bbb0e6bce367d7f323459106e79d81b43c66",
+    "expires_at": "2026-09-29T14:45:00Z",
+    "artifact_hashes": {
+      "linux_amd64_binary": "d2811130439fdbc3c1ba81a2cc9a9fe0cc19097d493ac130ecec88d75e0b1534",
+      "install_script": "d6cb3666464935dfdc520b6df794b63ad8aab5d1881099ecbcf4e8eeeb002371",
+      "systemd_unit": "6c8e4d444fd0b2262f2ed0895883fa6208ca103bca0c84b79e464fe11ae73017",
+      "tokens_css": "bda4b1d91adb4ccf048cc8e50c33621f970ae991a3c422712c3b9bd5f614c011"
+    }
+  },
+  "decisions": {
+    "code_candidate": "allow",
+    "host_install": "needs_human",
+    "transfer_authorized": false,
+    "execution_authorized": false
+  },
+  "code_candidate_evidence": [
+    "Manifest commit and SHA-256 match; only the candidate manifest was added after the fixed source commit. Policy, binary, script, unit and tokens hashes match the fixed candidate.",
+    "An independent git archive rebuild with Go 1.25.5, linux/amd64, CGO disabled and -buildvcs=false -trimpath produced the same binary SHA-256. go version -m confirmed build settings.",
+    "Independent go test ./... passed all packages; installer bash -n passed. No Linux host start or browser E2E was performed by the reviewer.",
+    "The unit fixes 127.0.0.1:8787 and mock-worker. Startup rejects non-numeric-loopback bind and simultaneous mock/isolated mode. HTTP cannot change worker mode; mock processing invokes no model, GitHub or deployment.",
+    "Store.Open rejects filesystem root, final symlink and group/other-accessible state directory before creating the lock. Installer uses a new dedicated identity and 0700 state, rejects occupied resources, verifies hashes after protected staging and installation, and checks effective systemd settings before start.",
+    "Daily report is a one-per-JST-day local outbox record after provisional 20:00, without a configured sender. UI uses html/template escaping and same-origin CSS; no external asset or send path was added.",
+    "Changes since prior reviewed source cover intermediate Git symlink/submodule detection, state-root protection, report time and artifact-exchange display/tests; no relaxation of initial mock/loopback boundary."
+  ],
+  "independent_rebuild": {
+    "result": "match",
+    "source_method": "git archive 8c4101bd21d8ff03dd23b113b3436fb230529e53",
+    "toolchain": "go1.25.5 darwin/arm64",
+    "goos": "linux",
+    "goarch": "amd64",
+    "cgo_enabled": false,
+    "flags": ["-buildvcs=false", "-trimpath"],
+    "package": "./cmd/sense-dev",
+    "sha256": "d2811130439fdbc3c1ba81a2cc9a9fe0cc19097d493ac130ecec88d75e0b1534"
+  },
+  "host_install_pending_reasons": [
+    "Owner and host-use coordination for concurrent k3s stop and libvirt installation are unanswered; policy allow condition 3 is unsatisfied.",
+    "Reviewer did not connect to sense. A fresh pre-install baseline for identity, paths, unit, port, workloads and recovery route is required after concurrent work.",
+    "Existing tunnel/proxy/Ingress, global IPv6, firewall and router reachability are unproven; AC-19 and private-ready remain pending."
+  ],
+  "execution_requirements": [
+    "After host coordination and fresh baseline, obtain a separate independent host_install allow decision.",
+    "Copy the installer to a root-managed location, verify that copy against the fixed install_script hash, then run only that copy.",
+    "Do not reuse the decision if source, artifact, policy, environment, operation or expiry changes.",
+    "After install, measure loopback/LAN/public refusal, event continuity and stop/recovery."
+  ],
+  "limitations": {
+    "private_ready": false,
+    "v0_complete": false,
+    "host_access_performed": false,
+    "host_mutations_performed": false,
+    "remote_mutations_performed": false,
+    "linux_host_execution_verified": false,
+    "rollback_runtime_verified": false,
+    "authorization_boundary": "code_candidate allow covers the fixed mock bootstrap code only; it does not authorize transfer, installation, real-model execution, notification sending, GitHub operations or public exposure."
+  }
+}
