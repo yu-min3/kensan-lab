@@ -1,0 +1,28 @@
+{
+  "schema_version": 1,
+  "kind": "release_gate_candidate",
+  "operation": "host_service_first_install",
+  "repo": "yu-min3/kensan-lab",
+  "ref": "feat/sense-autonomous-development",
+  "head_sha": "9c9ff46e49b74e46dc6182e1e07019a024236440",
+  "target_environment": "sense-private-host",
+  "policy_version": "private-bootstrap-v1",
+  "expires_at": "2026-09-28T13:23:00Z",
+  "artifact_hashes": {
+    "linux_amd64_binary": "c634683ec048574b8b41d33cb8b01600e1d332bec210b0a1073ef57c09b8389c",
+    "install_script": "d3c6c43041909db736bd326691f47c341aaaf63e065f87e8d2d536490ed57d50",
+    "systemd_unit": "6c8e4d444fd0b2262f2ed0895883fa6208ca103bca0c84b79e464fe11ae73017",
+    "tokens_css": "bda4b1d91adb4ccf048cc8e50c33621f970ae991a3c422712c3b9bd5f614c011"
+  },
+  "build_provenance": {
+    "source_commit": "9c9ff46e49b74e46dc6182e1e07019a024236440",
+    "source_worktree_clean_at_build": true,
+    "toolchain": "go1.25.5 darwin/arm64",
+    "command": "GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build -buildvcs=false -trimpath -o /tmp/sense-dev-linux-amd64 ./cmd/sense-dev",
+    "module": "github.com/yu-min3/kensan-lab/apps/sense-dev"
+  },
+  "impact": "Create a dedicated OS user and state directory, then start only a loopback mock controller service on sense. No k3s, GitHub, Cloudflare, or public route changes.",
+  "rollback": "Disable and stop only kensan-dev-controller.service; preserve state, token, binary, and unit.",
+  "human_coordination_required": "Confirm ownership and host impact of the concurrent k3s stop and libvirt installation before any transfer or install.",
+  "decision": "pending_independent_review"
+}
