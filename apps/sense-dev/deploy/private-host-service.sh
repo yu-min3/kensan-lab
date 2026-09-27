@@ -50,12 +50,14 @@ case ${1:-} in
     done
     [[ ! -e $unit && ! -L $unit ]] || { printf 'unit already exists; first-install only\n' >&2; exit 1; }
     [[ ! -e ${unit}.d && ! -L ${unit}.d ]] || { printf 'unit drop-in already exists; first-install only\n' >&2; exit 1; }
+    [[ $(systemctl show "$service" -p LoadState --value) == not-found ]] || { printf 'systemd already knows this service\n' >&2; exit 1; }
     if getent group kensan-dev >/dev/null || id -u kensan-dev >/dev/null 2>&1; then
       printf 'dedicated identity already exists; first-install only\n' >&2
       exit 1
     fi
     [[ $(uname -m) == x86_64 ]] || { printf 'expected x86_64 host\n' >&2; exit 1; }
-    if ss -H -ltn '( sport = :8787 )' | grep -q .; then
+    listeners=$(ss -H -ltn '( sport = :8787 )')
+    if [[ -n $listeners ]]; then
       printf 'port 8787 is occupied\n' >&2
       exit 1
     fi
@@ -85,6 +87,14 @@ case ${1:-} in
     chmod 0600 "$token_tmp"
     mv "$token_tmp" "$state/admin-token"
     systemctl daemon-reload
+    [[ $(systemctl show "$service" -p LoadState --value) == loaded ]] || { printf 'systemd did not load reviewed unit\n' >&2; exit 1; }
+    [[ $(systemctl show "$service" -p FragmentPath --value) == "$unit" ]] || { printf 'unexpected unit fragment\n' >&2; exit 1; }
+    [[ -z $(systemctl show "$service" -p DropInPaths --value) ]] || { printf 'unexpected unit drop-in\n' >&2; exit 1; }
+    [[ $(systemctl show "$service" -p User --value) == kensan-dev ]] || { printf 'unexpected unit user\n' >&2; exit 1; }
+    [[ $(systemctl show "$service" -p Group --value) == kensan-dev ]] || { printf 'unexpected unit group\n' >&2; exit 1; }
+    exec_start=$(systemctl show "$service" -p ExecStart --value)
+    [[ $exec_start == *'path=/opt/kensan-dev/bin/sense-dev'* && $exec_start == *'argv[]=/opt/kensan-dev/bin/sense-dev -listen 127.0.0.1:8787 '* && $exec_start == *'-mock-worker'* ]] || { printf 'unexpected effective ExecStart\n' >&2; exit 1; }
+    [[ -z $(systemctl show "$service" -p Environment --value) ]] || { printf 'unexpected unit environment\n' >&2; exit 1; }
     service_armed=1
     systemctl enable "$service"
     if ! systemctl start "$service" || ! systemctl is-active --quiet "$service"; then

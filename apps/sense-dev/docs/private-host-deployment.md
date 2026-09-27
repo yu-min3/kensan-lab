@@ -24,7 +24,7 @@ tags: [kensan-lab, sense, autonomous-development, operations]
 
 ## 初回操作の固定範囲
 
-`deploy/private-host-service.sh install` は `sense` 上でのみ実行できる。既存 unit・drop-in・user/group・専用 directory があれば拒否し、並行 install を lock で拒否する。SHA-256 を指定した Linux amd64 binary、`tokens.css`、loopback + `-mock-worker` unit を root 専用 staging に複製し、その複製を検証してから専用 OS user と `/opt/kensan-dev`・`/var/lib/kensan-dev` を作る。token はローカルで乱数生成し、値は表示しない。`systemctl enable/start` は `kensan-dev-controller.service` に限定する。失敗・中断では当該 service を停止・無効化し、既存 service には触れない。
+`deploy/private-host-service.sh install` は `sense` 上でのみ実行できる。既存 unit・drop-in・systemd ロード状態・user/group・専用 directory があれば拒否し、並行 install を lock で拒否する。port 調査の失敗も拒否する。SHA-256 を指定した Linux amd64 binary、`tokens.css`、loopback + `-mock-worker` unit を root 専用 staging に複製し、その複製を検証してから専用 OS user と `/opt/kensan-dev`・`/var/lib/kensan-dev` を作る。daemon-reload 後、enable 前に `FragmentPath/DropInPaths/User/Group/ExecStart/Environment` の実効値を照合する。token はローカルで乱数生成し、値は表示しない。`systemctl enable/start` は `kensan-dev-controller.service` に限定する。失敗・中断では当該 service を停止・無効化し、既存 service には触れない。
 
 | 操作 | 判定 | 理由 |
 |---|---|---|
