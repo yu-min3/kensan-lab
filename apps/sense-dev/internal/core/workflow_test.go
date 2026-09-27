@@ -142,16 +142,27 @@ func TestSessionOwnerAndReleaseGate(t *testing.T) {
 	if err := s.SetHeadSHA(task.ID, strings.Repeat("a", 40)); err != nil {
 		t.Fatal(err)
 	}
-	am, err := s.BuildManifest(author.ID, nil)
-	if err != nil {
+	if err := s.SetBaseSHA(task.ID, strings.Repeat("b", 40)); err != nil {
 		t.Fatal(err)
 	}
-	gm, err := s.BuildManifest(gate.ID, nil)
+	am, err := s.BuildManifest(author.ID, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if err := s.SetAgentSession(author.ID, author.Provider, author.Model, "thread-author", am.InputSHA256, 1); err != nil {
 		t.Fatal(err)
+	}
+	source, _ := s.PutArtifact(author.ID, "change_ready", []byte("diff"))
+	scanRef, err := s.recordReleaseScan(ReleaseScan{BaseSHA: strings.Repeat("b", 40), HeadSHA: strings.Repeat("a", 40), Repository: "yu-min3/kensan-lab", Ref: "refs/heads/feat/canary", Operation: "pr_create", PolicyVersion: ReleasePolicyVersion, Status: "candidate", CommitCount: 1, DiffSHA256: strings.Repeat("c", 64), ScannedAt: time.Now().UTC()})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := s.BindReleaseGateInputs(gate.ID, author.ID, []ArtifactRef{artifactRef(source)}, scanRef); err != nil {
+		t.Fatal(err)
+	}
+	gm, err := s.BuildManifest(gate.ID, nil)
+	if err != nil || len(gm.ReviewInputs) != 2 || gm.ReviewAuthorID != author.ID {
+		t.Fatalf("gate manifest missing evidence: %+v %v", gm, err)
 	}
 	if err := s.SetAgentSession(gate.ID, gate.Provider, gate.Model, "thread-gate", gm.InputSHA256, 1); err != nil {
 		t.Fatal(err)
@@ -169,9 +180,8 @@ func TestSessionOwnerAndReleaseGate(t *testing.T) {
 	if err := s.SetAgentSession(gate.ID, gate.Provider, gate.Model, "thread-gate-2", gm.InputSHA256, 2); err != nil {
 		t.Fatal(err)
 	}
-	source, _ := s.PutArtifact(author.ID, "change_ready", []byte("diff"))
 	evidence, _ := s.PutArtifact(gate.ID, "release_review", []byte("checked scope, secrets, exposure and rollback"))
-	d := ReleaseDecision{AuthorAgentID: author.ID, GateAgentID: gate.ID, Verdict: "allow", Reason: "private and reversible", Operation: "pr_create", Repository: "yu-min3/kensan-lab", Ref: "refs/heads/feat/canary", HeadSHA: strings.Repeat("a", 40), TargetEnvironment: "github", PolicyVersion: ReleasePolicyVersion, ArtifactRefs: []ArtifactRef{artifactRef(source)}, EvidenceRefs: []ArtifactRef{artifactRef(evidence)}, SecretFree: true, PrivateTarget: true, Reversible: true, ExpiresAt: time.Now().Add(time.Hour)}
+	d := ReleaseDecision{AuthorAgentID: author.ID, GateAgentID: gate.ID, Verdict: "allow", Reason: "private and reversible", Operation: "pr_create", Repository: "yu-min3/kensan-lab", Ref: "refs/heads/feat/canary", HeadSHA: strings.Repeat("a", 40), TargetEnvironment: "github", PolicyVersion: ReleasePolicyVersion, ArtifactRefs: []ArtifactRef{artifactRef(source)}, EvidenceRefs: []ArtifactRef{artifactRef(evidence)}, ScanRef: scanRef, SecretFree: true, PrivateTarget: true, Reversible: true, ExpiresAt: time.Now().Add(time.Hour)}
 	d.GateAgentID = author.ID
 	if _, err := s.RecordReleaseDecision(d); err == nil {
 		t.Fatal("author self approval accepted")
@@ -182,6 +192,17 @@ func TestSessionOwnerAndReleaseGate(t *testing.T) {
 		t.Fatal("public target accepted")
 	}
 	d.PrivateTarget = true
+	wrongSource, _ := s.PutArtifact(author.ID, "change_ready", []byte("different diff"))
+	d.ArtifactRefs = []ArtifactRef{artifactRef(wrongSource)}
+	if _, err := s.RecordReleaseDecision(d); err == nil {
+		t.Fatal("gate approved an artifact it did not receive")
+	}
+	d.ArtifactRefs = []ArtifactRef{artifactRef(source)}
+	d.Operation = "pr_update"
+	if _, err := s.RecordReleaseDecision(d); err == nil {
+		t.Fatal("scan reused for another operation")
+	}
+	d.Operation = "pr_create"
 	d, err = s.RecordReleaseDecision(d)
 	if err != nil {
 		t.Fatal(err)

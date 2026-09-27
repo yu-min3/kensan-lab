@@ -27,21 +27,23 @@ type Task struct {
 }
 
 type Agent struct {
-	ID                string     `json:"id"`
-	TaskID            string     `json:"task_id"`
-	Team              Team       `json:"team"`
-	Role              string     `json:"role"`
-	Provider          string     `json:"provider"`
-	Model             string     `json:"model"`
-	SessionID         string     `json:"session_id,omitempty"`
-	SessionGeneration int        `json:"session_generation"`
-	InputHash         string     `json:"input_hash,omitempty"`
-	MemoVersion       int        `json:"memo_version"`
-	Status            string     `json:"status"`
-	DependsOn         []string   `json:"depends_on,omitempty"`
-	AttemptCount      int        `json:"attempt_count"`
-	RetryAfter        *time.Time `json:"retry_after,omitempty"`
-	UpdatedAt         time.Time  `json:"updated_at"`
+	ID                string        `json:"id"`
+	TaskID            string        `json:"task_id"`
+	Team              Team          `json:"team"`
+	Role              string        `json:"role"`
+	Provider          string        `json:"provider"`
+	Model             string        `json:"model"`
+	SessionID         string        `json:"session_id,omitempty"`
+	SessionGeneration int           `json:"session_generation"`
+	InputHash         string        `json:"input_hash,omitempty"`
+	MemoVersion       int           `json:"memo_version"`
+	Status            string        `json:"status"`
+	DependsOn         []string      `json:"depends_on,omitempty"`
+	AttemptCount      int           `json:"attempt_count"`
+	RetryAfter        *time.Time    `json:"retry_after,omitempty"`
+	ReviewAuthorID    string        `json:"review_author_id,omitempty"`
+	ReviewInputs      []ArtifactRef `json:"review_inputs,omitempty"`
+	UpdatedAt         time.Time     `json:"updated_at"`
 }
 
 type Attempt struct {
@@ -119,6 +121,8 @@ type ContextManifest struct {
 	AgentMemo       *ArtifactRef  `json:"agent_memo,omitempty"`
 	Inbox           []ArtifactRef `json:"inbox"`
 	StageInputs     []StageInput  `json:"stage_inputs"`
+	ReviewInputs    []ArtifactRef `json:"review_inputs"`
+	ReviewAuthorID  string        `json:"review_author_id,omitempty"`
 	MessageIDs      []string      `json:"message_ids"`
 	ContractVersion string        `json:"contract_version"`
 	BaseSHA         string        `json:"base_sha,omitempty"`
@@ -155,12 +159,28 @@ type ReleaseDecision struct {
 	PolicyVersion     string        `json:"policy_version"`
 	ArtifactRefs      []ArtifactRef `json:"artifact_refs"`
 	EvidenceRefs      []ArtifactRef `json:"evidence_refs"`
+	ScanRef           ArtifactRef   `json:"scan_ref"`
 	SecretFree        bool          `json:"secret_free"`
 	PrivateTarget     bool          `json:"private_target"`
 	Reversible        bool          `json:"reversible"`
 	CIComplete        bool          `json:"ci_complete"`
 	CreatedAt         time.Time     `json:"created_at"`
 	ExpiresAt         time.Time     `json:"expires_at"`
+}
+
+type ReleaseScan struct {
+	BaseSHA       string    `json:"base_sha"`
+	HeadSHA       string    `json:"head_sha"`
+	Repository    string    `json:"repository"`
+	Ref           string    `json:"ref"`
+	Operation     string    `json:"operation"`
+	PolicyVersion string    `json:"policy_version"`
+	Status        string    `json:"status"`
+	CommitCount   int       `json:"commit_count"`
+	ChangedPaths  []string  `json:"changed_paths"`
+	Findings      []string  `json:"findings"`
+	DiffSHA256    string    `json:"diff_sha256"`
+	ScannedAt     time.Time `json:"scanned_at"`
 }
 
 type PublishIntent struct {

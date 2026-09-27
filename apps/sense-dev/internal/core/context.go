@@ -51,7 +51,7 @@ func (s *Store) BuildManifest(agentID string, allowedScope []string) (ContextMan
 	if !hasProfile || !hasKnowledge || !hasCommon {
 		return ContextManifest{}, errors.New("team knowledge is not seeded")
 	}
-	m := ContextManifest{SchemaVersion: SchemaVersion, MissionID: t.MissionID, TaskID: t.ID, Team: a.Team, Role: a.Role, AgentID: a.ID, Provider: a.Provider, Model: a.Model, Generation: a.SessionGeneration, TeamProfile: artifactRef(profile), TeamKnowledge: artifactRef(knowledge), CommonKnowledge: artifactRef(common), Inbox: []ArtifactRef{}, StageInputs: []StageInput{}, MessageIDs: []string{}, ContractVersion: t.ContractVersion, BaseSHA: t.BaseSHA, HeadSHA: t.HeadSHA, AllowedScope: append([]string(nil), allowedScope...)}
+	m := ContextManifest{SchemaVersion: SchemaVersion, MissionID: t.MissionID, TaskID: t.ID, Team: a.Team, Role: a.Role, AgentID: a.ID, Provider: a.Provider, Model: a.Model, Generation: a.SessionGeneration, TeamProfile: artifactRef(profile), TeamKnowledge: artifactRef(knowledge), CommonKnowledge: artifactRef(common), Inbox: []ArtifactRef{}, StageInputs: []StageInput{}, ReviewInputs: append([]ArtifactRef{}, a.ReviewInputs...), ReviewAuthorID: a.ReviewAuthorID, MessageIDs: []string{}, ContractVersion: t.ContractVersion, BaseSHA: t.BaseSHA, HeadSHA: t.HeadSHA, AllowedScope: append([]string(nil), allowedScope...)}
 	if memo, ok := latest(st, a.ID, "memo"); ok {
 		ref := artifactRef(memo)
 		m.AgentMemo = &ref
@@ -93,6 +93,11 @@ func (s *Store) BuildManifest(agentID string, allowedScope []string) (ContextMan
 	for _, stage := range m.StageInputs {
 		if err := s.verifyRef(stage.Artifact); err != nil {
 			return ContextManifest{}, fmt.Errorf("stage result %s: %w", stage.AgentID, err)
+		}
+	}
+	for _, ref := range m.ReviewInputs {
+		if err := s.verifyRef(ref); err != nil {
+			return ContextManifest{}, fmt.Errorf("review input %s: %w", ref.ID, err)
 		}
 	}
 	if m.AgentMemo != nil {

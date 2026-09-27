@@ -271,13 +271,8 @@ func (s *Store) ReceiveMessage(agentID, messageID string) error {
 }
 
 func (s *Store) SetHeadSHA(taskID, sha string) error {
-	if len(sha) != 40 && len(sha) != 64 {
-		return errors.New("full Git SHA required")
-	}
-	for _, r := range sha {
-		if !strings.ContainsRune("0123456789abcdef", r) {
-			return errors.New("invalid Git SHA")
-		}
+	if !fullSHA(sha) {
+		return errors.New("full lowercase Git SHA required")
 	}
 	return s.update(func(st *State) error {
 		t, ok := st.Tasks[taskID]
@@ -288,6 +283,26 @@ func (s *Store) SetHeadSHA(taskID, sha string) error {
 		t.UpdatedAt = time.Now().UTC()
 		st.Tasks[taskID] = t
 		st.Events = append(st.Events, event("head_updated", taskID, sha))
+		return nil
+	})
+}
+
+func (s *Store) SetBaseSHA(taskID, sha string) error {
+	if !fullSHA(sha) {
+		return errors.New("full lowercase Git SHA required")
+	}
+	return s.update(func(st *State) error {
+		t, ok := st.Tasks[taskID]
+		if !ok {
+			return errors.New("task not found")
+		}
+		if t.BaseSHA != "" && t.BaseSHA != sha {
+			return errors.New("task base SHA is immutable")
+		}
+		t.BaseSHA = sha
+		t.UpdatedAt = time.Now().UTC()
+		st.Tasks[taskID] = t
+		st.Events = append(st.Events, event("base_pinned", taskID, sha))
 		return nil
 	})
 }

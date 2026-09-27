@@ -1,10 +1,62 @@
 package core
 
 import (
+	"encoding/json"
 	"errors"
 	"strings"
 	"time"
 )
+
+// BindReleaseGateInputs fixes the exact author artifacts and scan that an
+// independent gate session must receive before it can be used for an allow.
+func (s *Store) BindReleaseGateInputs(gateID, authorID string, sourceRefs []ArtifactRef, scanRef ArtifactRef) error {
+	if len(sourceRefs) == 0 || scanRef.ID == "" {
+		return errors.New("release gate needs author artifacts and scan")
+	}
+	for _, ref := range append(append([]ArtifactRef{}, sourceRefs...), scanRef) {
+		if err := s.verifyRef(ref); err != nil {
+			return err
+		}
+	}
+	b, err := s.ReadArtifact(scanRef.ID)
+	if err != nil {
+		return err
+	}
+	var scan ReleaseScan
+	if err := json.Unmarshal(b, &scan); err != nil {
+		return errors.New("invalid release scan")
+	}
+	return s.update(func(st *State) error {
+		gate, okG := st.Agents[gateID]
+		author, okA := st.Agents[authorID]
+		if !okG || !okA || gate.ID == author.ID || gate.Role != "release_gate" || gate.SessionID != "" || gate.ReviewAuthorID != "" {
+			return errors.New("fresh independent release gate required")
+		}
+		gt, at := st.Tasks[gate.TaskID], st.Tasks[author.TaskID]
+		if gt.MissionID != at.MissionID || gt.ContractVersion != at.ContractVersion || !fullSHA(at.BaseSHA) || !fullSHA(at.HeadSHA) || scan.BaseSHA != at.BaseSHA || scan.HeadSHA != at.HeadSHA || scan.PolicyVersion != ReleasePolicyVersion {
+			return errors.New("release gate mission, contract or SHA mismatch")
+		}
+		if gt.BaseSHA != "" && gt.BaseSHA != at.BaseSHA || gt.HeadSHA != "" && gt.HeadSHA != at.HeadSHA {
+			return errors.New("gate task was pinned to another revision")
+		}
+		if a := st.Artifacts[scanRef.ID]; a.AgentID != "system" || a.Kind != "release_scan" {
+			return errors.New("controller-owned scan required")
+		}
+		for _, ref := range sourceRefs {
+			if a := st.Artifacts[ref.ID]; a.AgentID != authorID || a.TaskID != author.TaskID || a.Version != ref.Version || a.SHA256 != ref.SHA256 {
+				return errors.New("review input is not an author artifact")
+			}
+		}
+		gt.BaseSHA, gt.HeadSHA, gt.UpdatedAt = at.BaseSHA, at.HeadSHA, time.Now().UTC()
+		st.Tasks[gt.ID] = gt
+		gate.ReviewAuthorID = authorID
+		gate.ReviewInputs = append(append([]ArtifactRef{}, sourceRefs...), scanRef)
+		gate.UpdatedAt = time.Now().UTC()
+		st.Agents[gate.ID] = gate
+		st.Events = append(st.Events, event("release_gate_inputs_bound", gateID, authorID))
+		return nil
+	})
+}
 
 const ReleasePolicyVersion = "private-v1"
 
@@ -48,6 +100,22 @@ func (s *Store) RecordReleaseDecision(d ReleaseDecision) (ReleaseDecision, error
 	if d.Verdict == "allow" && (!d.SecretFree || !d.PrivateTarget || !d.Reversible || (d.Operation == "merge" || d.Operation == "deploy") && !d.CIComplete) {
 		return ReleaseDecision{}, errors.New("allow verdict lacks required checks")
 	}
+	var scan ReleaseScan
+	var gateManifest ContextManifest
+	if d.Verdict == "allow" {
+		if d.ScanRef.ID == "" {
+			return ReleaseDecision{}, errors.New("allow verdict requires controller release scan")
+		}
+		var err error
+		scan, err = s.checkReleaseScan(d.ScanRef, d)
+		if err != nil {
+			return ReleaseDecision{}, err
+		}
+		gateManifest, err = s.BuildManifest(d.GateAgentID, nil)
+		if err != nil || gateManifest.ReviewAuthorID != d.AuthorAgentID || len(gateManifest.ReviewInputs) != len(d.ArtifactRefs)+1 || !refsEqual(gateManifest.ReviewInputs[:len(d.ArtifactRefs)], d.ArtifactRefs) || gateManifest.ReviewInputs[len(d.ArtifactRefs)] != d.ScanRef {
+			return ReleaseDecision{}, errors.New("release gate manifest lacks exact author and scan inputs")
+		}
+	}
 	if d.ExpiresAt.IsZero() || d.ExpiresAt.After(time.Now().Add(24*time.Hour)) || !d.ExpiresAt.After(time.Now()) {
 		return ReleaseDecision{}, errors.New("decision must expire within 24 hours")
 	}
@@ -71,8 +139,14 @@ func (s *Store) RecordReleaseDecision(d ReleaseDecision) (ReleaseDecision, error
 		if d.Verdict == "allow" && (strings.HasPrefix(author.SessionID, "mock-") || strings.HasPrefix(gate.SessionID, "mock-")) {
 			return errors.New("simulation sessions cannot authorize release")
 		}
+		if d.Verdict == "allow" && (author.SessionID == "" || gate.InputHash != gateManifest.InputSHA256 || gate.ReviewAuthorID != author.ID || st.Tasks[gate.TaskID].BaseSHA != scan.BaseSHA || st.Tasks[gate.TaskID].HeadSHA != scan.HeadSHA) {
+			return errors.New("release gate did not review pinned inputs in an independent session")
+		}
 		if st.Tasks[author.TaskID].HeadSHA != d.HeadSHA {
 			return errors.New("decision head differs from current task")
+		}
+		if d.Verdict == "allow" && (st.Tasks[author.TaskID].BaseSHA == "" || st.Tasks[author.TaskID].BaseSHA != scan.BaseSHA) {
+			return errors.New("decision scan does not cover task base")
 		}
 		for _, ref := range d.ArtifactRefs {
 			a, ok := st.Artifacts[ref.ID]
@@ -106,6 +180,12 @@ func (s *Store) PreparePublish(decisionID, operation, repository, ref, sha strin
 	for _, artifact := range append(append([]ArtifactRef{}, d.ArtifactRefs...), d.EvidenceRefs...) {
 		if err := s.verifyRef(artifact); err != nil {
 			return PublishIntent{}, err
+		}
+	}
+	if d.Verdict == "allow" {
+		scan, err := s.checkReleaseScan(d.ScanRef, d)
+		if err != nil || st.Tasks[st.Agents[d.AuthorAgentID].TaskID].BaseSHA != scan.BaseSHA {
+			return PublishIntent{}, errors.New("release scan no longer matches decision")
 		}
 	}
 	id, err := newID()
