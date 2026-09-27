@@ -9,6 +9,8 @@ import (
 	"flag"
 	"io"
 	"os"
+	"os/exec"
+	"path/filepath"
 	"syscall"
 
 	"github.com/yu-min3/kensan-lab/apps/sense-dev/internal/provider"
@@ -23,11 +25,12 @@ func main() {
 	codex := flag.String("codex-bin", "/usr/local/bin/codex", "Codex CLI path inside sandbox")
 	maxUsage := flag.Float64("max-codex-usage", 80, "maximum accepted subscription usage percent")
 	preflight := flag.Bool("preflight", false, "verify worker mount boundary without running a model")
+	preflightTask := flag.Bool("preflight-task", false, "verify a task checkout inside the sandbox without running a model")
 	hiddenPath := flag.String("hidden-path", "", "controller state path that must be absent inside the sandbox")
 	preflightProvider := flag.String("provider", "", "provider binary to verify during preflight")
 	readOnlyWorktree := flag.Bool("read-only-worktree", false, "assert worktree cannot be written in this sandbox")
 	flag.Parse()
-	if *preflight {
+	if *preflight || *preflightTask {
 		binary := *codex
 		if *preflightProvider == "claude" {
 			binary = *claude
@@ -37,10 +40,17 @@ func main() {
 		if err := checkPreflight(workdir, authHome, *hiddenPath, binary, *readOnlyWorktree); err != nil {
 			os.Exit(1)
 		}
+		statusType := "preflight_ok"
+		if *preflightTask {
+			if err := checkTaskGit(workdir); err != nil {
+				os.Exit(1)
+			}
+			statusType = "task_git_ok"
+		}
 		_ = json.NewEncoder(os.Stdout).Encode(struct {
 			Version int    `json:"version"`
 			Type    string `json:"type"`
-		}{workerwire.Version, "preflight_ok"})
+		}{workerwire.Version, statusType})
 		return
 	}
 	if *maxUsage <= 0 || *maxUsage > 100 {
@@ -58,6 +68,35 @@ func main() {
 	if err := execute(context.Background(), request, input, os.Stdout, *claude, *codex, *maxUsage); err != nil {
 		os.Exit(1)
 	}
+}
+
+func checkTaskGit(worktree string) error {
+	metadata, err := os.Lstat(filepath.Join(worktree, ".git"))
+	if err != nil || !metadata.IsDir() || metadata.Mode()&os.ModeSymlink != 0 {
+		return errors.New("task Git metadata is not self-contained")
+	}
+	if _, err := os.Lstat(filepath.Join(worktree, ".git", "objects", "info", "alternates")); !errors.Is(err, os.ErrNotExist) {
+		return errors.New("task Git metadata shares external objects")
+	}
+	git := func(args ...string) (string, error) {
+		argv := append([]string{"-c", "core.hooksPath=/dev/null", "-C", worktree}, args...)
+		cmd := exec.Command("git", argv...)
+		cmd.Env = []string{"PATH=" + os.Getenv("PATH"), "HOME=" + os.Getenv("HOME"), "GIT_CONFIG_GLOBAL=/dev/null", "GIT_CONFIG_NOSYSTEM=1", "GIT_OPTIONAL_LOCKS=0", "GIT_TERMINAL_PROMPT=0"}
+		output, err := cmd.Output()
+		return string(bytes.TrimSpace(output)), err
+	}
+	top, err := git("rev-parse", "--show-toplevel")
+	if err != nil || top != worktree {
+		return errors.New("task Git checkout is not rooted at the mounted worktree")
+	}
+	remotes, err := git("remote")
+	if err != nil || remotes != "" {
+		return errors.New("task Git checkout has a remote")
+	}
+	if _, err := git("status", "--porcelain", "--untracked-files=no"); err != nil {
+		return errors.New("task Git status failed in worker sandbox")
+	}
+	return nil
 }
 
 func checkPreflight(worktree, auth, hidden, binary string, readOnlyWorktree bool) error {

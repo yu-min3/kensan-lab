@@ -47,6 +47,14 @@ func TestTaskWorktreesAreDistinctAndPinned(t *testing.T) {
 	if paths[0] == paths[1] {
 		t.Fatal("two tasks share a worktree")
 	}
+	for _, path := range paths {
+		if info, err := os.Lstat(filepath.Join(path, ".git")); err != nil || !info.IsDir() {
+			t.Fatal("task checkout has external Git metadata")
+		}
+		if remotes, err := git(context.Background(), path, "remote"); err != nil || remotes != "" {
+			t.Fatalf("task checkout retains a remote: %q %v", remotes, err)
+		}
+	}
 	if _, err := git(context.Background(), paths[0], "commit", "--allow-empty", "-m", "task A"); err != nil {
 		t.Fatal(err)
 	}
@@ -56,6 +64,14 @@ func TestTaskWorktreesAreDistinctAndPinned(t *testing.T) {
 	headB, err := git(context.Background(), paths[1], "rev-parse", "HEAD")
 	if err != nil || headB != sourceSHA {
 		t.Fatalf("task B observed task A commit: %s %v", headB, err)
+	}
+	hiddenSource := m.Source + "-hidden"
+	if err := os.Rename(m.Source, hiddenSource); err != nil {
+		t.Fatal(err)
+	}
+	defer os.Rename(hiddenSource, m.Source)
+	if _, err := git(context.Background(), paths[0], "status", "--porcelain"); err != nil {
+		t.Fatalf("task Git metadata depends on source repo: %v", err)
 	}
 }
 
@@ -95,5 +111,20 @@ func TestRejectsChangedTaskBranch(t *testing.T) {
 	}
 	if _, _, err := m.Ensure(context.Background(), id, sha); err == nil {
 		t.Fatal("task branch switch accepted")
+	}
+}
+
+func TestRejectsRemoteAddedToTaskCheckout(t *testing.T) {
+	m, sha := testManager(t)
+	id := strings.Repeat("e", 32)
+	path, _, err := m.Ensure(context.Background(), id, sha)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := git(context.Background(), path, "remote", "add", "origin", "https://example.invalid/repo.git"); err != nil {
+		t.Fatal(err)
+	}
+	if _, _, err := m.Ensure(context.Background(), id, sha); err == nil {
+		t.Fatal("task checkout with a remote was accepted")
 	}
 }

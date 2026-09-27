@@ -14,8 +14,10 @@ import (
 var taskIDPattern = regexp.MustCompile(`^[0-9a-f]{32}$`)
 var shaPattern = regexp.MustCompile(`^[0-9a-f]{40}$`)
 
-// Manager creates and reopens only task-scoped Git worktrees. The source repo
-// and root are operator-owned paths, never paths supplied by a model.
+// Manager creates and reopens only task-scoped Git working trees. Each task is
+// a self-contained local clone: a linked `git worktree` would point outside
+// the worker sandbox at the source repository's shared .git directory.
+// The source repo and root are operator-owned, never model-supplied paths.
 type Manager struct {
 	Source string
 	Root   string
@@ -42,11 +44,20 @@ func (m Manager) Ensure(ctx context.Context, taskID, baseSHA string) (string, st
 		if _, err := git(ctx, source, "cat-file", "-e", baseSHA+"^{commit}"); err != nil {
 			return "", "", errors.New("task base is not an existing commit")
 		}
-		if _, err := git(ctx, source, "show-ref", "--verify", "refs/heads/"+branch); err == nil {
-			return "", "", errors.New("task branch already exists without its worktree; inspect before recovery")
+		if _, err := git(ctx, source, "clone", "--no-local", "--no-checkout", "--no-tags", source, path); err != nil {
+			return "", "", errors.New("task checkout could not be cloned")
 		}
-		if _, err := git(ctx, source, "worktree", "add", "-b", branch, path, baseSHA); err != nil {
-			return "", "", errors.New("task worktree could not be created")
+		if _, err := git(ctx, path, "remote", "remove", "origin"); err != nil {
+			return "", "", errors.New("task checkout remote could not be removed")
+		}
+		if _, err := git(ctx, path, "switch", "-c", branch, baseSHA); err != nil {
+			return "", "", errors.New("task branch could not be created")
+		}
+		if _, err := git(ctx, path, "config", "user.email", "sense-dev@local.invalid"); err != nil {
+			return "", "", errors.New("task commit identity could not be set")
+		}
+		if _, err := git(ctx, path, "config", "user.name", "Sense Dev"); err != nil {
+			return "", "", errors.New("task commit identity could not be set")
 		}
 	} else if err != nil || !info.IsDir() || info.Mode()&os.ModeSymlink != 0 {
 		return "", "", errors.New("task worktree path is not a real directory")
@@ -58,6 +69,9 @@ func (m Manager) Ensure(ctx context.Context, taskID, baseSHA string) (string, st
 		baseSHA, err = git(ctx, path, "rev-parse", "HEAD")
 		if err != nil || !shaPattern.MatchString(baseSHA) {
 			return "", "", errors.New("task worktree HEAD is not a full Git commit SHA")
+		}
+		if _, err := git(ctx, source, "cat-file", "-e", baseSHA+"^{commit}"); err != nil {
+			return "", "", errors.New("unpinned task checkout HEAD is not from source repository")
 		}
 	}
 	return path, baseSHA, nil
@@ -88,6 +102,17 @@ func (m Manager) paths() (string, string, error) {
 }
 
 func validate(ctx context.Context, source, path, branch, baseSHA string) error {
+	metadata, err := os.Lstat(filepath.Join(path, ".git"))
+	if err != nil || !metadata.IsDir() || metadata.Mode()&os.ModeSymlink != 0 {
+		return errors.New("task checkout must have self-contained Git metadata")
+	}
+	if _, err := os.Lstat(filepath.Join(path, ".git", "objects", "info", "alternates")); !errors.Is(err, os.ErrNotExist) {
+		return errors.New("task checkout must not share Git objects")
+	}
+	remotes, err := git(ctx, path, "remote")
+	if err != nil || remotes != "" {
+		return errors.New("task checkout must not have a Git remote")
+	}
 	top, err := git(ctx, path, "rev-parse", "--show-toplevel")
 	if err != nil || top != path {
 		return errors.New("task path is not its own Git worktree")
@@ -96,31 +121,15 @@ func validate(ctx context.Context, source, path, branch, baseSHA string) error {
 	if err != nil || actualBranch != branch {
 		return errors.New("task worktree branch mismatch")
 	}
-	sourceCommon, err := commonDir(ctx, source)
-	if err != nil {
-		return err
-	}
-	taskCommon, err := commonDir(ctx, path)
-	if err != nil || sourceCommon != taskCommon {
-		return errors.New("task worktree belongs to another repository")
-	}
 	if baseSHA != "" {
+		if _, err := git(ctx, source, "cat-file", "-e", baseSHA+"^{commit}"); err != nil {
+			return errors.New("task base no longer exists in source repository")
+		}
 		if _, err := git(ctx, path, "merge-base", "--is-ancestor", baseSHA, "HEAD"); err != nil {
 			return errors.New("task base is not an ancestor of worktree HEAD")
 		}
 	}
 	return nil
-}
-
-func commonDir(ctx context.Context, repo string) (string, error) {
-	value, err := git(ctx, repo, "rev-parse", "--git-common-dir")
-	if err != nil {
-		return "", err
-	}
-	if !filepath.IsAbs(value) {
-		value = filepath.Join(repo, value)
-	}
-	return filepath.EvalSymlinks(value)
 }
 
 func nested(root, path string) bool {
@@ -129,9 +138,9 @@ func nested(root, path string) bool {
 }
 
 func git(ctx context.Context, repo string, args ...string) (string, error) {
-	argv := append([]string{"-C", repo}, args...)
+	argv := append([]string{"-c", "core.hooksPath=/dev/null", "-C", repo}, args...)
 	cmd := exec.CommandContext(ctx, "git", argv...)
-	cmd.Env = []string{"PATH=" + os.Getenv("PATH"), "HOME=" + os.Getenv("HOME"), "GIT_TERMINAL_PROMPT=0", "GIT_CONFIG_NOSYSTEM=1"}
+	cmd.Env = []string{"PATH=" + os.Getenv("PATH"), "HOME=" + os.Getenv("HOME"), "GIT_TERMINAL_PROMPT=0", "GIT_CONFIG_NOSYSTEM=1", "GIT_CONFIG_GLOBAL=/dev/null"}
 	output, err := cmd.Output()
 	if err != nil {
 		return "", fmt.Errorf("git %s failed: %w", args[0], err)

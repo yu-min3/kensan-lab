@@ -92,6 +92,9 @@ func (r Runner) Run(ctx context.Context, dispatch core.Dispatch) (core.RunResult
 	}
 	config.ReadOnlyWorktree = request.Model != "gpt-6-sol"
 	config.Worktree = taskWorktree
+	if err := r.preflightTask(ctx, config, request.Provider); err != nil {
+		return core.RunResult{}, err
+	}
 	turnCtx, cancel := context.WithTimeout(ctx, r.Timeout)
 	defer cancel()
 	cmd, err := config.Command(turnCtx, r.WorkerProgram)
@@ -106,6 +109,32 @@ func (r Runner) Run(ctx context.Context, dispatch core.Dispatch) (core.RunResult
 		return core.RunResult{}, core.RunError{Kind: "interrupted", Err: context.Canceled}
 	}
 	return result, err
+}
+
+func (r Runner) preflightTask(ctx context.Context, config isolation.Config, provider string) error {
+	statePath, err := filepath.EvalSymlinks(config.ControllerState)
+	if err != nil {
+		return err
+	}
+	checkCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
+	defer cancel()
+	cmd, err := config.Command(checkCtx, r.WorkerProgram, "-preflight-task", "-hidden-path", statePath, "-provider", provider, fmt.Sprintf("-read-only-worktree=%t", config.ReadOnlyWorktree))
+	if err != nil {
+		return err
+	}
+	cmd.Stderr = io.Discard
+	output, err := cmd.Output()
+	if err != nil || len(output) > 128 {
+		return errors.New("task sandbox preflight failed")
+	}
+	var status struct {
+		Version int    `json:"version"`
+		Type    string `json:"type"`
+	}
+	if json.Unmarshal(output, &status) != nil || status.Version != workerwire.Version || status.Type != "task_git_ok" {
+		return errors.New("task sandbox preflight returned invalid evidence")
+	}
+	return nil
 }
 
 func runProcess(cmd *exec.Cmd, request workerwire.Request, bindSession func(string) error) (core.RunResult, error) {
