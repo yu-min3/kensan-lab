@@ -119,15 +119,18 @@ func ScanGitRange(repoPath, baseSHA, headSHA, operation, ref string) (ReleaseSca
 		if len(strings.Fields(string(parents))) != 2 {
 			findings["merge or root commit needs manual review"] = true
 		}
-		changed, err := gitEvidence(ctx, root, "diff-tree", "--no-renames", "--no-commit-id", "--name-only", "-r", "-z", commit)
+		changed, err := gitEvidence(ctx, root, "diff-tree", "--no-renames", "--no-commit-id", "--raw", "-r", "-z", commit)
 		if err != nil {
 			return ReleaseScan{}, err
 		}
-		for _, raw := range bytes.Split(changed, []byte{0}) {
-			if len(raw) == 0 {
-				continue
-			}
-			path := string(raw)
+		changedPaths, indirectEntryChanged, err := parseChangedPaths(changed)
+		if err != nil {
+			return ReleaseScan{}, err
+		}
+		if indirectEntryChanged {
+			findings["symlink or submodule change needs manual review"] = true
+		}
+		for _, path := range changedPaths {
 			paths[path] = true
 			if sensitivePath(path) {
 				findings["sensitive path: "+path] = true
@@ -167,6 +170,44 @@ func ScanGitRange(repoPath, baseSHA, headSHA, operation, ref string) (ReleaseSca
 		report.Status = "needs_human"
 	}
 	return report, nil
+}
+
+// Git's -z raw diff-tree format alternates a metadata record and a pathname.
+// Inspect both modes so an indirect tree entry added and then removed in an
+// intermediate commit cannot disappear from the release scan's risk findings.
+func parseChangedPaths(raw []byte) ([]string, bool, error) {
+	if len(raw) == 0 {
+		return nil, false, nil
+	}
+	records := bytes.Split(raw, []byte{0})
+	if len(records)%2 != 1 || len(records[len(records)-1]) != 0 {
+		return nil, false, errors.New("malformed Git raw change records")
+	}
+	paths := make([]string, 0, (len(records)-1)/2)
+	indirectEntry := false
+	for i := 0; i+1 < len(records)-1; i += 2 {
+		header := strings.Fields(string(records[i]))
+		if len(header) != 5 || len(header[0]) != 7 || header[0][0] != ':' || !gitFileMode(header[0][1:]) || !gitFileMode(header[1]) || len(records[i+1]) == 0 {
+			return nil, false, errors.New("malformed Git raw change header")
+		}
+		if header[0] == ":120000" || header[1] == "120000" || header[0] == ":160000" || header[1] == "160000" {
+			indirectEntry = true
+		}
+		paths = append(paths, string(records[i+1]))
+	}
+	return paths, indirectEntry, nil
+}
+
+func gitFileMode(mode string) bool {
+	if len(mode) != 6 {
+		return false
+	}
+	for _, digit := range mode {
+		if digit < '0' || digit > '7' {
+			return false
+		}
+	}
+	return true
 }
 
 func (s *Store) ScanAndRecordRelease(repoPath, baseSHA, headSHA, operation, ref string) (ReleaseScan, ArtifactRef, error) {

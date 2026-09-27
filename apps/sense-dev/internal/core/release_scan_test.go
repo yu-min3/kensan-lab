@@ -74,3 +74,63 @@ func TestReleaseScanInspectsEveryProposedCommit(t *testing.T) {
 		t.Fatalf("public route missed: %+v %v", report, err)
 	}
 }
+
+func TestReleaseScanFlagsIntermediateSymlink(t *testing.T) {
+	dir := t.TempDir()
+	gitTest(t, dir, "init", "-q")
+	gitTest(t, dir, "config", "user.name", "Test")
+	gitTest(t, dir, "config", "user.email", "test@example.invalid")
+	base := commitTestFile(t, dir, "README.md", "base\n", "base")
+	link := filepath.Join(dir, "docs", "shared")
+	if err := os.MkdirAll(filepath.Dir(link), 0700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink("../../private/secret", link); err != nil {
+		t.Fatal(err)
+	}
+	gitTest(t, dir, "add", "--", "docs/shared")
+	gitTest(t, dir, "commit", "-qm", "symlink in intermediate commit")
+	if err := os.Remove(link); err != nil {
+		t.Fatal(err)
+	}
+	gitTest(t, dir, "add", "--", "docs/shared")
+	gitTest(t, dir, "commit", "-qm", "remove symlink")
+	head := gitTest(t, dir, "rev-parse", "HEAD")
+	report, err := ScanGitRange(dir, base, head, "pr_create", "refs/heads/feat/canary")
+	if err != nil || report.Status != "needs_human" || report.CommitCount != 2 {
+		t.Fatalf("intermediate symlink was not flagged: %+v %v", report, err)
+	}
+	if !containsFinding(report.Findings, "symlink or submodule change needs manual review") {
+		t.Fatalf("symlink finding missing: %v", report.Findings)
+	}
+}
+
+func TestParseChangedPathsFlagsSubmoduleMode(t *testing.T) {
+	raw := []byte(":000000 160000 before after A\x00modules/example\x00")
+	paths, risky, err := parseChangedPaths(raw)
+	if err != nil || !risky || len(paths) != 1 || paths[0] != "modules/example" {
+		t.Fatalf("submodule mode was not flagged: %v %t %v", paths, risky, err)
+	}
+}
+
+func TestParseChangedPathsRejectsMalformedRawRecords(t *testing.T) {
+	for _, raw := range [][]byte{
+		[]byte(":100644 120000 before after A\x00"),
+		[]byte(":100644 120000 before after A\x00path"),
+		[]byte("not a header\x00path\x00"),
+		[]byte(":badmod 100644 before after M\x00path\x00"),
+	} {
+		if _, _, err := parseChangedPaths(raw); err == nil {
+			t.Fatalf("accepted malformed raw change record %q", raw)
+		}
+	}
+}
+
+func containsFinding(findings []string, want string) bool {
+	for _, finding := range findings {
+		if finding == want {
+			return true
+		}
+	}
+	return false
+}
