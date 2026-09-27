@@ -12,7 +12,7 @@ tags: [kensan-lab, sense, autonomous-development, operations]
 
 **現在は実機変更を保留。** 13:16 UTC に別作業で `k3s` が停止・無効化され、libvirt 関連の導入が始まった。誰の作業かと今後の host 用途が確定するまで、この runbook を sense に適用しない。script・policy・固定 manifest の独立コード審査は `allow` だが、これは実機操作の許可ではない。実機の Release Gate は `needs_human` のまま。
 
-直近の固定候補は source `8c4101b`、manifest `private-bootstrap-candidate-8c4101b.json`（commit `e105291`）。独立 Astra reviewer は clean な source archive から Go 1.25.5 / linux-amd64 / CGO 無効 / `-buildvcs=false -trimpath` で再 build し、候補 binary と同じ SHA-256 `d2811130439fdbc3c1ba81a2cc9a9fe0cc19097d493ac130ecec88d75e0b1534` を確認した。判定は `private-bootstrap-review-8c4101b.json` に固定した。`code_candidate=allow`、`host_install=needs_human`、`execution_authorized=false`。この source より後のコード変更は候補に含まず、変更時には候補と独立レビューを更新する。旧候補のレビューを現在の source に転用しない。
+直近の審査済み固定候補は source `8c4101b`、manifest `private-bootstrap-candidate-8c4101b.json`（commit `e105291`）。独立 Astra reviewer は clean な source archive から Go 1.25.5 / linux-amd64 / CGO 無効 / `-buildvcs=false -trimpath` で再 build し、候補 binary と同じ SHA-256 `d2811130439fdbc3c1ba81a2cc9a9fe0cc19097d493ac130ecec88d75e0b1534` を確認した。判定は `private-bootstrap-review-8c4101b.json` に固定した。`code_candidate=allow`、`host_install=needs_human`、`execution_authorized=false`。後続の `ae148e8` でコードが変更されたため、**この候補は現行 HEAD の導入に使えない**。導入前に現行 source から候補と独立レビューを更新する。旧候補のレビューを現在の source に転用しない。
 
 ## 実測前提（2026-09-27）
 

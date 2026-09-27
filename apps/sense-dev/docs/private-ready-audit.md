@@ -10,7 +10,7 @@ tags: [kensan-lab, sense, autonomous-development, audit]
 
 **private-ready は未達。** `sense`（192.168.0.113）への SSH が復旧し、2026-09-27 に read-only 棚卸しを実施した。ただし 13:16 UTC にこの作業と別の操作で単一ノード k3s が停止・無効化され、libvirt の導入が始まった。導入対象の前提が変化したため、このスレッドからの sense 変更は保留する。専用 service は未導入で、IPv4/IPv6・既存公開経路の実測も未完了。`private-ready` や v0 完了を宣言しない。Cloudflare・既存公開経路は変更していない。
 
-直近の host 導入候補に固定した source SHA は `8c4101b`（専用 worktree `feat/sense-autonomous-development`）。manifest `private-bootstrap-candidate-8c4101b.json`（commit `e105291`）と独立 Astra 判定 `private-bootstrap-review-8c4101b.json` は、その SHA に限って再現 build と固定 hash を確認済み。`code_candidate=allow` だが、`host_install=needs_human`・`execution_authorized=false`。コード審査は host への転送・導入の許可ではない。実装と検証はローカル段階で継続中。
+直近の審査済み host 導入候補に固定した source SHA は `8c4101b`（専用 worktree `feat/sense-autonomous-development`）。manifest `private-bootstrap-candidate-8c4101b.json`（commit `e105291`）と独立 Astra 判定 `private-bootstrap-review-8c4101b.json` は、その SHA に限って再現 build と固定 hash を確認済み。`code_candidate=allow` だが、`host_install=needs_human`・`execution_authorized=false`。後続の `ae148e8` で Release Gate の検査範囲を強化したため、**現行 HEAD の導入候補ではない**。実機導入には新しい候補・hash・独立レビューが必要。コード審査は host への転送・導入の許可ではない。
 
 ## 今回の判断
 
@@ -29,7 +29,7 @@ tags: [kensan-lab, sense, autonomous-development, audit]
 |---|---|---|---|
 | ● 高: sense 稼働・非公開性（AC-01, 08, 19） | 部分 | SSH 復旧。Ubuntu 24.04.4、4 CPU / 15 GiB RAM、root 空き 146 GiB、`/data` 空き 870 GiB。k3s は 13:12 UTC に Ready、13:19 UTC に inactive/disabled。14:25 UTC の read-only 再確認でも k3s inactive、libvirtd active、controller inactive、8787 待受なし。専用 user/group・`/opt/kensan-dev`・`/var/lib/kensan-dev`・unit は未作成、systemd LoadState は `not-found`。global IPv6 あり。ローカル実 process の mock 配車→SIGTERM→再起動/台帳復元→再配車は race 検査込みで合格。状態ディレクトリの公開権限・symlink・`/` 拒否を試験。listener/実効 unit/MainPID/binary hash の sense smoke は独立コード審査済み、未実行 | 別作業との調整、独立 Gate 再審査、host service 導入、IPv4/IPv6・既存 tunnel/proxy/Ingress/CI の実測、reboot/復旧 E2E |
 | ● 高: 実モデル・費用（AC-04, 06, 07） | 未検証 | Claude/Codex の購読専用 adapter と fake CLI/App Server 試験。Mac/sense 同時利用は未試験 | sense で本人が公式ログイン。契約・モデル利用可能性・従量無効を確認後に4工程とMac優先を実走 |
-| ● 高: Release Gate（AC-09, 18） | 部分 | 全 commit の Git scan、途中 commit で追加後に削除した symlink と submodule mode の `needs_human` 判定、対象 SHA/操作に固定した scan artifact、独立 Gate 入力 manifest、mock転用・誤操作・別SHAの拒否試験。publish は intent の dry-run のみ | CI・PR本文/添付・repo可視性・render設定・公開到達経路の実照合、worker/publisher credential 分離、限定 publisher と reconcile |
+| ● 高: Release Gate（AC-09, 18） | 部分 | 全 commit の Git scan、途中 commit で追加後に削除した symlink と submodule mode、隔離/worker/verifier/認証境界変更の `needs_human` 判定、対象 SHA/操作に固定した scan artifact、独立 Gate 入力 manifest、mock転用・誤操作・別SHAの拒否試験。publish は intent の dry-run のみ | CI・PR本文/添付・repo可視性・render設定・公開到達経路の実照合、worker/publisher credential 分離、限定 publisher と reconcile |
 | ▲ 中: 独立 context と工程（AC-13〜16） | 部分 | App/Platform の別 profile/knowledge/memo/session、immutable artifact、manifest hash、前工程の成果物配送、依存配車・provider枠・Mac優先・restart試験。App不合格→Platform修正→同一シナリオ再試験をローカル試験で確認 | 実 worker のOS分離、review session の実運転、session消失後の再作成、実モデル/実 repo での再試験 |
 | ▲ 中: モバイル UI（AC-03, 17） | 部分 | Chrome Playwright 360/390/430px で依頼・Mac優先・停止・日報preview、模擬 App/Platform 交換4通の方向・返信元・taskリンク・成果物の種類/版/hash、質問回答と操作判断を確認。回答草稿は一時オフライン後の再読込でも復元。判断承認後も publish intent は0。詳細展開後も横はみ出しなし | 実機 Safari/Chrome、Access切断・再認証、送信失敗からの再送、実際の差し戻し→修正→再試験を通したブラウザ E2E。模擬交換を実運転証拠にしない |
 | ▲ 中: 日報（AC-11） | outbox のみ | 仮時刻20:00 JST以降の最初の稼働時に当日分を1件固定する timer と未配信原本・判断リンク。再起動時の送信不明と停止日の欠測を区別し、同日再実行では原本を変更しない。送信先は未設定 | Yu の宛先・時刻確定、実 sender、送信不明の外部照合、2日連続の到達確認 |
