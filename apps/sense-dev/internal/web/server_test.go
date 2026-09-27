@@ -33,7 +33,7 @@ func TestPrivateWebLoginCSRFAndTask(t *testing.T) {
 	if err := os.WriteFile(css, []byte(":root{--background:40 27% 94%}"), 0600); err != nil {
 		t.Fatal(err)
 	}
-	s, err := New(store, tokenFile, css)
+	s, err := New(store, tokenFile, css, false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -84,6 +84,9 @@ func TestPrivateWebLoginCSRFAndTask(t *testing.T) {
 	resp.Body.Close()
 	if len(store.Snapshot().Tasks) != 1 {
 		t.Fatal("valid task not persisted")
+	}
+	if len(store.Snapshot().Agents) != 4 {
+		t.Fatal("change task did not receive four independent stage agents")
 	}
 	resp, err = client.Get(server.URL + "/")
 	if err != nil {

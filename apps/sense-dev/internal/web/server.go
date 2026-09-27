@@ -27,6 +27,7 @@ type Server struct {
 	store     *core.Store
 	token     []byte
 	tokensCSS string
+	mockMode  bool
 	mu        sync.Mutex
 	sessions  map[string]session
 }
@@ -36,7 +37,7 @@ type session struct {
 	expires time.Time
 }
 
-func New(store *core.Store, tokenFile, tokensCSS string) (*Server, error) {
+func New(store *core.Store, tokenFile, tokensCSS string, mockMode bool) (*Server, error) {
 	info, err := os.Stat(tokenFile)
 	if err != nil {
 		return nil, err
@@ -55,7 +56,7 @@ func New(store *core.Store, tokenFile, tokensCSS string) (*Server, error) {
 	if info, err := os.Stat(tokensCSS); err != nil || !info.Mode().IsRegular() {
 		return nil, errors.New("design tokens CSS file is required")
 	}
-	return &Server{store: store, token: b, tokensCSS: tokensCSS, sessions: map[string]session{}}, nil
+	return &Server{store: store, token: b, tokensCSS: tokensCSS, mockMode: mockMode, sessions: map[string]session{}}, nil
 }
 
 func LoopbackOnly(addr string) error {
@@ -217,7 +218,8 @@ func (s *Server) home(w http.ResponseWriter, r *http.Request) {
 		Agents      []core.Agent
 		Stopped     bool
 		PausedUntil *time.Time
-	}{s.csrf(r), tasks, messages, agents, st.Stopped, st.PausedUntil})
+		MockMode    bool
+	}{s.csrf(r), tasks, messages, agents, st.Stopped, st.PausedUntil, s.mockMode})
 }
 
 func (s *Server) staticCSS(w http.ResponseWriter, r *http.Request) {
@@ -254,7 +256,11 @@ func (s *Server) createTask(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "invalid form", http.StatusBadRequest)
 		return
 	}
-	_, err := s.store.CreateTask(r.Form.Get("mission"), core.Team(r.Form.Get("team")), r.Form.Get("kind"), r.Form.Get("title"), r.Form.Get("contract"))
+	kind := r.Form.Get("kind")
+	if kind == "feedback" {
+		kind = "analysis"
+	}
+	_, _, err := s.store.CreatePlannedTask(r.Form.Get("mission"), core.Team(r.Form.Get("team")), kind, r.Form.Get("title"), r.Form.Get("contract"))
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
