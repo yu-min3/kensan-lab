@@ -4,7 +4,7 @@ set -euo pipefail
 # First-install bootstrap for sense only. It never stops k3s or changes routes.
 # Usage: sudo bash private-host-service.sh install <linux-amd64-binary> <tokens.css> <unit-file> <binary-sha256> <tokens-sha256> <unit-sha256>
 #        sudo bash private-host-service.sh status
-#        sudo bash private-host-service.sh rollback
+#        sudo bash private-host-service.sh rollback <unit-sha256> <binary-sha256>
 
 service=kensan-dev-controller.service
 unit=/etc/systemd/system/$service
@@ -28,7 +28,7 @@ trap 'exit 130' INT
 trap 'exit 143' TERM
 
 usage() {
-  printf 'usage: %s install <binary> <tokens.css> <unit-file> <binary-sha256> <tokens-sha256> <unit-sha256> | status | rollback\n' "$0" >&2
+  printf 'usage: %s install <binary> <tokens.css> <unit-file> <binary-sha256> <tokens-sha256> <unit-sha256> | status | rollback <unit-sha256> <binary-sha256>\n' "$0" >&2
   exit 2
 }
 
@@ -113,7 +113,17 @@ case ${1:-} in
     ss -H -ltn '( sport = :8787 )'
     ;;
   rollback)
-    [[ $# -eq 1 ]] || usage
+    [[ $# -eq 3 && $2 =~ ^[0-9a-f]{64}$ && $3 =~ ^[0-9a-f]{64}$ ]] || usage
+    installed_binary=$root/bin/sense-dev
+    [[ -f $unit && ! -L $unit && -f $installed_binary && ! -L $installed_binary ]] || { printf 'reviewed service files absent or indirect; no change made\n' >&2; exit 1; }
+    [[ $(sha256sum "$unit" | cut -d ' ' -f 1) == "$2" && $(sha256sum "$installed_binary" | cut -d ' ' -f 1) == "$3" ]] || { printf 'reviewed service hash mismatch; no change made\n' >&2; exit 1; }
+    [[ $(systemctl show "$service" -p FragmentPath --value) == "$unit" ]] || { printf 'unexpected unit fragment; no change made\n' >&2; exit 1; }
+    [[ -z $(systemctl show "$service" -p DropInPaths --value) ]] || { printf 'unexpected unit drop-in; no change made\n' >&2; exit 1; }
+    [[ $(systemctl show "$service" -p User --value) == kensan-dev && $(systemctl show "$service" -p Group --value) == kensan-dev ]] || { printf 'unexpected service identity; no change made\n' >&2; exit 1; }
+    [[ -z $(systemctl show "$service" -p Environment --value) ]] || { printf 'unexpected service environment; no change made\n' >&2; exit 1; }
+    exec_start=$(systemctl show "$service" -p ExecStart --value)
+    expected_argv="$installed_binary -listen 127.0.0.1:8787 -data $state -admin-token-file $state/admin-token -tokens-css $root/source/packages/design-tokens/tokens.css -mock-worker"
+    [[ $exec_start == *"path=$installed_binary ; argv[]=$expected_argv ; ignore_errors="* ]] || { printf 'unexpected effective ExecStart; no change made\n' >&2; exit 1; }
     systemctl disable --now "$service"
     printf 'service stopped and disabled; state, token, binary, and unit retained\n'
     ;;
