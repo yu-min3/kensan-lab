@@ -167,6 +167,36 @@ type PublishIntent struct {
 	CreatedAt  time.Time `json:"created_at"`
 }
 
+type Question struct {
+	ID              string     `json:"id"`
+	TaskID          string     `json:"task_id"`
+	AgentID         string     `json:"agent_id"`
+	Prompt          string     `json:"prompt"`
+	ContractVersion string     `json:"contract_version"`
+	HeadSHA         string     `json:"head_sha,omitempty"`
+	Status          string     `json:"status"`
+	Answer          string     `json:"answer,omitempty"`
+	ActionID        string     `json:"action_id,omitempty"`
+	CreatedAt       time.Time  `json:"created_at"`
+	AnsweredAt      *time.Time `json:"answered_at,omitempty"`
+}
+
+type ApprovalRequest struct {
+	ID          string     `json:"id"`
+	DecisionID  string     `json:"decision_id"`
+	Operation   string     `json:"operation"`
+	Repository  string     `json:"repository"`
+	Ref         string     `json:"ref"`
+	HeadSHA     string     `json:"head_sha"`
+	Environment string     `json:"environment"`
+	Reason      string     `json:"reason"`
+	Status      string     `json:"status"`
+	ActionID    string     `json:"action_id,omitempty"`
+	CreatedAt   time.Time  `json:"created_at"`
+	ExpiresAt   time.Time  `json:"expires_at"`
+	DecidedAt   *time.Time `json:"decided_at,omitempty"`
+}
+
 type State struct {
 	SchemaVersion int                        `json:"schema_version"`
 	Tasks         map[string]Task            `json:"tasks"`
@@ -176,11 +206,13 @@ type State struct {
 	Messages      map[string]Message         `json:"messages"`
 	Decisions     map[string]ReleaseDecision `json:"decisions"`
 	Intents       map[string]PublishIntent   `json:"intents"`
+	Questions     map[string]Question        `json:"questions"`
+	Approvals     map[string]ApprovalRequest `json:"approvals"`
 	Events        []Event                    `json:"events"`
 	PausedUntil   *time.Time                 `json:"paused_until,omitempty"`
 	Stopped       bool                       `json:"stopped"`
 }
 
 func NewState() State {
-	return State{SchemaVersion: SchemaVersion, Tasks: map[string]Task{}, Agents: map[string]Agent{}, Attempts: map[string]Attempt{}, Artifacts: map[string]Artifact{}, Messages: map[string]Message{}, Decisions: map[string]ReleaseDecision{}, Intents: map[string]PublishIntent{}, Events: []Event{}}
+	return State{SchemaVersion: SchemaVersion, Tasks: map[string]Task{}, Agents: map[string]Agent{}, Attempts: map[string]Attempt{}, Artifacts: map[string]Artifact{}, Messages: map[string]Message{}, Decisions: map[string]ReleaseDecision{}, Intents: map[string]PublishIntent{}, Questions: map[string]Question{}, Approvals: map[string]ApprovalRequest{}, Events: []Event{}}
 }

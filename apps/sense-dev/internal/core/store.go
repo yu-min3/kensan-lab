@@ -48,6 +48,12 @@ func Open(root string) (*Store, error) {
 			s.Close()
 			return nil, fmt.Errorf("invalid state or schema version: %v", err)
 		}
+		if s.data.Questions == nil {
+			s.data.Questions = map[string]Question{}
+		}
+		if s.data.Approvals == nil {
+			s.data.Approvals = map[string]ApprovalRequest{}
+		}
 	}
 	return s, nil
 }

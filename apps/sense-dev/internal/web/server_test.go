@@ -11,6 +11,7 @@ import (
 	"regexp"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/yu-min3/kensan-lab/apps/sense-dev/internal/core"
 )
@@ -54,6 +55,11 @@ func TestPrivateWebLoginCSRFAndTask(t *testing.T) {
 		t.Fatalf("public stylesheet unavailable: %v %v", resp, err)
 	}
 	resp.Body.Close()
+	resp, err = client.Get(server.URL + "/static/app.js")
+	if err != nil || resp.StatusCode != 200 || !strings.Contains(resp.Header.Get("Content-Security-Policy"), "script-src 'self'") {
+		t.Fatalf("draft script or CSP unavailable: %v %v", resp, err)
+	}
+	resp.Body.Close()
 	resp, err = client.PostForm(server.URL+"/login", url.Values{"token": {strings.Repeat("t", 64)}})
 	if err != nil {
 		t.Fatal(err)
@@ -88,13 +94,89 @@ func TestPrivateWebLoginCSRFAndTask(t *testing.T) {
 	if len(store.Snapshot().Agents) != 4 {
 		t.Fatal("change task did not receive four independent stage agents")
 	}
+	var requirements, implementation core.Agent
+	for _, a := range store.Snapshot().Agents {
+		if a.Role == "requirements" {
+			requirements = a
+		}
+		if a.Role == "implementation" {
+			implementation = a
+		}
+	}
+	question, err := store.AskQuestion(requirements.ID, "対象の契約版は？")
+	if err != nil {
+		t.Fatal(err)
+	}
+	answerForm := url.Values{"csrf": {string(csrfMatch[1])}, "action_id": {question.ID}, "answer": {"draft-v1"}}
+	resp, err = client.PostForm(server.URL+"/api/questions/"+question.ID+"/answer", answerForm)
+	if err != nil {
+		t.Fatal(err)
+	}
+	resp.Body.Close()
+	if store.Snapshot().Questions[question.ID].Answer != "draft-v1" {
+		t.Fatal("mobile answer not persisted")
+	}
+	resp, err = client.PostForm(server.URL+"/api/questions/"+question.ID+"/answer", answerForm)
+	if err != nil {
+		t.Fatal(err)
+	}
+	resp.Body.Close()
+	if resp.StatusCode != 200 {
+		t.Fatal("replayed answer was not idempotent")
+	}
+	sha := strings.Repeat("a", 40)
+	var task core.Task
+	for _, tsk := range store.Snapshot().Tasks {
+		task = tsk
+	}
+	if err := store.SetHeadSHA(task.ID, sha); err != nil {
+		t.Fatal(err)
+	}
+	gate, err := store.AddAgent(task.ID, "release_gate", "codex", "gpt-6-astra")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, a := range []core.Agent{implementation, gate} {
+		m, err := store.BuildManifest(a.ID, nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := store.SetAgentSession(a.ID, a.Provider, a.Model, "thread-"+a.ID, m.InputSHA256, 1); err != nil {
+			t.Fatal(err)
+		}
+	}
+	source, err := store.PutArtifact(implementation.ID, "change", []byte("diff"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	evidence, err := store.PutArtifact(gate.ID, "review", []byte("needs Yu decision"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	d, err := store.RecordReleaseDecision(core.ReleaseDecision{AuthorAgentID: implementation.ID, GateAgentID: gate.ID, Verdict: "needs_human", Reason: "公開済み app の変更", Operation: "merge", Repository: "yu-min3/kensan-lab", Ref: "refs/heads/feat/canary", HeadSHA: sha, TargetEnvironment: "private-canary", PolicyVersion: core.ReleasePolicyVersion, ArtifactRefs: []core.ArtifactRef{{ID: source.ID, Version: source.Version, SHA256: source.SHA256}}, EvidenceRefs: []core.ArtifactRef{{ID: evidence.ID, Version: evidence.Version, SHA256: evidence.SHA256}}, ExpiresAt: time.Now().Add(time.Hour)})
+	if err != nil {
+		t.Fatal(err)
+	}
+	approval, err := store.RequestApproval(d.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	approvalForm := url.Values{"csrf": {string(csrfMatch[1])}, "action_id": {approval.ID}, "operation": {"merge"}, "sha": {sha}, "verdict": {"approved"}}
+	resp, err = client.PostForm(server.URL+"/api/approvals/"+approval.ID+"/decide", approvalForm)
+	if err != nil {
+		t.Fatal(err)
+	}
+	resp.Body.Close()
+	if store.Snapshot().Approvals[approval.ID].Status != "approved" || len(store.Snapshot().Intents) != 0 {
+		t.Fatal("approval not recorded safely")
+	}
 	resp, err = client.Get(server.URL + "/")
 	if err != nil {
 		t.Fatal(err)
 	}
 	b, _ = io.ReadAll(resp.Body)
 	resp.Body.Close()
-	if !strings.Contains(string(b), "契約を確認する") || !strings.Contains(string(b), "Platform") {
+	if !strings.Contains(string(b), "契約を確認する") || !strings.Contains(string(b), "Platform") || !strings.Contains(string(b), "対象の契約版は？") || !strings.Contains(string(b), "承認を記録") && !strings.Contains(string(b), "approved") {
 		t.Fatal("task missing from UI")
 	}
 }

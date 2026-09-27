@@ -1,6 +1,6 @@
 # sense-dev
 
-sense 上で動く自動開発 controller の実装。現段階はファイル台帳、App/Platform の独立 context、版付き成果物配送、依存付きの fake worker 配車、独立 Release Gate の判定と publish intent、本人用の loopback 管理画面、公式 CLI アダプタまで。OS service に配車ループはまだ接続していない。GitHub 操作、日報、sense 実機導入も未完了。
+sense 上で動く自動開発 controller の実装。現段階はファイル台帳、App/Platform の独立 context、版付き成果物配送、依存付きの fake worker 配車、独立 Release Gate の判定と publish intent、本人用の loopback 管理画面、公式 CLI アダプタまで。service unit の配車は模擬運転のみ。実モデルの実行ループ、GitHub 操作、日報、sense 実機導入は未完了。
 
 ## 配置
 
@@ -32,12 +32,14 @@ sense-dev -listen 127.0.0.1:8787 -data /var/lib/kensan-dev -admin-token-file /va
 - 版・hash・契約・SHA・宛先を検査する配送と、message ID による重複防止。
 - 作者とは別 session の Release Gate。`allow` は委任操作、非公開、機密なし、可逆性、必要な CI を満たす場合だけ台帳に保存。外部操作前に intent を保存する。
 - UI の loopback bind、管理 token login、HttpOnly cookie、CSRF、停止・Mac優先。provider の自動推論はまだ起動しない。
+- UI から質問への回答と、Release Gate が `needs_human` とした操作の判断を記録。契約/SHA/操作/期限と再送IDを照合し、同じ送信は冪等、古いカードは拒否する。承認記録だけでは publisher は起動せず、独立 Gate の新しい `allow` が必要。
+- 回答草稿は同じブラウザタブの `sessionStorage` で再読込・再認証から復元。送信が確定した質問の草稿は削除する。保存できないブラウザでも通常フォームは利用可能。
 
 ## 未完了と再開点
 
 1. 実 worker の権限隔離、auth待機と中断照合・再開、verifier を実装する。現 service unit は fake runner 専用。Claude の書込系 tool は隔離 worker が完成するまで解放しない。
 2. Release Gate の証拠を実際の Git 差分/CI/公開経路に照らし、限定 publisher と外部操作の reconcile を実装する。現時点の `PublishIntent` は dry-run 台帳だけで、GitHub へは送らない。
-3. 管理画面に agent 割当、質問/回答、受入結果、SHA-bound 承認、日報を追加し、実機幅と切断復旧を検証する。
+3. 管理画面に受入結果の入力・配送、日報 preview、案件詳細を追加し、360/390/430 px と実機幅、切断復旧を検証する。質問/回答と SHA-bound 承認は HTTP テストまでで、実スマホ未検証。
 4. sense へ read-only 接続して CPU/RAM/ディスク、旧 k3s/cluster membership、待受・既存公開経路を実測する。現在 SSH がタイムアウトするため、private-ready は未判定。
 5. 本人の初回認証と subscription 費用経路を確認後、実モデルの4工程を接続する。Cloudflare は公開承認まで inactive。
 

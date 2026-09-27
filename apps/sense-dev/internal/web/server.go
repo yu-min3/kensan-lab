@@ -79,8 +79,11 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /", s.auth(s.home, false))
 	mux.HandleFunc("GET /static/app.css", s.staticCSS)
 	mux.HandleFunc("GET /static/tokens.css", s.tokens)
+	mux.HandleFunc("GET /static/app.js", s.staticJS)
 	mux.HandleFunc("GET /api/state", s.auth(s.state, false))
 	mux.HandleFunc("POST /api/tasks", s.auth(s.createTask, true))
+	mux.HandleFunc("POST /api/questions/{id}/answer", s.auth(s.answerQuestion, true))
+	mux.HandleFunc("POST /api/approvals/{id}/decide", s.auth(s.decideApproval, true))
 	mux.HandleFunc("POST /api/mac-priority", s.auth(s.macPriority, true))
 	mux.HandleFunc("POST /api/mac-priority/clear", s.auth(s.macPriorityClear, true))
 	mux.HandleFunc("POST /api/stop", s.auth(s.stop, true))
@@ -95,7 +98,7 @@ func securityHeaders(next http.Handler) http.Handler {
 			http.Error(w, "loopback host required", http.StatusForbidden)
 			return
 		}
-		w.Header().Set("Content-Security-Policy", "default-src 'none'; style-src 'self'; form-action 'self'; base-uri 'none'; frame-ancestors 'none'")
+		w.Header().Set("Content-Security-Policy", "default-src 'none'; style-src 'self'; script-src 'self'; form-action 'self'; base-uri 'none'; frame-ancestors 'none'")
 		w.Header().Set("X-Content-Type-Options", "nosniff")
 		w.Header().Set("Referrer-Policy", "no-referrer")
 		w.Header().Set("Cache-Control", "no-store")
@@ -210,21 +213,39 @@ func (s *Server) home(w http.ResponseWriter, r *http.Request) {
 		agents = append(agents, a)
 	}
 	sort.Slice(agents, func(i, j int) bool { return agents[i].ID < agents[j].ID })
+	questions := make([]core.Question, 0, len(st.Questions))
+	for _, q := range st.Questions {
+		questions = append(questions, q)
+	}
+	sort.Slice(questions, func(i, j int) bool { return questions[i].CreatedAt.After(questions[j].CreatedAt) })
+	approvals := make([]core.ApprovalRequest, 0, len(st.Approvals))
+	for _, a := range st.Approvals {
+		approvals = append(approvals, a)
+	}
+	sort.Slice(approvals, func(i, j int) bool { return approvals[i].CreatedAt.After(approvals[j].CreatedAt) })
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	_ = page.Execute(w, struct {
 		CSRF        string
 		Tasks       []core.Task
 		Messages    []core.Message
 		Agents      []core.Agent
+		Questions   []core.Question
+		Approvals   []core.ApprovalRequest
 		Stopped     bool
 		PausedUntil *time.Time
 		MockMode    bool
-	}{s.csrf(r), tasks, messages, agents, st.Stopped, st.PausedUntil, s.mockMode})
+	}{s.csrf(r), tasks, messages, agents, questions, approvals, st.Stopped, st.PausedUntil, s.mockMode})
 }
 
 func (s *Server) staticCSS(w http.ResponseWriter, r *http.Request) {
 	b, _ := static.ReadFile("static/app.css")
 	w.Header().Set("Content-Type", "text/css; charset=utf-8")
+	_, _ = w.Write(b)
+}
+
+func (s *Server) staticJS(w http.ResponseWriter, r *http.Request) {
+	b, _ := static.ReadFile("static/app.js")
+	w.Header().Set("Content-Type", "text/javascript; charset=utf-8")
 	_, _ = w.Write(b)
 }
 
@@ -266,6 +287,32 @@ func (s *Server) createTask(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	http.Redirect(w, r, "/", http.StatusSeeOther)
+}
+
+func (s *Server) answerQuestion(w http.ResponseWriter, r *http.Request) {
+	if err := r.ParseForm(); err != nil {
+		http.Error(w, "invalid form", http.StatusBadRequest)
+		return
+	}
+	_, err := s.store.AnswerQuestion(r.PathValue("id"), r.Form.Get("action_id"), r.Form.Get("answer"))
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusConflict)
+		return
+	}
+	http.Redirect(w, r, "/#question-"+r.PathValue("id"), http.StatusSeeOther)
+}
+
+func (s *Server) decideApproval(w http.ResponseWriter, r *http.Request) {
+	if err := r.ParseForm(); err != nil {
+		http.Error(w, "invalid form", http.StatusBadRequest)
+		return
+	}
+	_, err := s.store.DecideApproval(r.PathValue("id"), r.Form.Get("action_id"), r.Form.Get("operation"), r.Form.Get("sha"), r.Form.Get("verdict"))
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusConflict)
+		return
+	}
+	http.Redirect(w, r, "/#approval-"+r.PathValue("id"), http.StatusSeeOther)
 }
 
 func (s *Server) macPriority(w http.ResponseWriter, r *http.Request) {
