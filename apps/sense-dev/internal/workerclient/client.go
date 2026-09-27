@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io"
 	"os/exec"
+	"path/filepath"
 	"time"
 
 	"github.com/yu-min3/kensan-lab/apps/sense-dev/internal/core"
@@ -23,6 +24,44 @@ type Runner struct {
 	Codex         isolation.Config
 	WorkerProgram string
 	Timeout       time.Duration
+}
+
+// Preflight executes the trusted worker inside both sandboxes before the
+// controller enables automatic dispatch. It proves only this host's current
+// mount/namespace setup, not subscription authentication or egress policy.
+func (r Runner) Preflight(ctx context.Context) error {
+	if r.WorkerProgram == "" || r.Timeout <= 0 {
+		return errors.New("isolated worker configuration incomplete")
+	}
+	for _, item := range []struct {
+		name   string
+		config isolation.Config
+	}{{"claude", r.Claude}, {"codex", r.Codex}} {
+		statePath, err := filepath.EvalSymlinks(item.config.ControllerState)
+		if err != nil {
+			return fmt.Errorf("%s state path unavailable: %w", item.name, err)
+		}
+		checkCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
+		cmd, err := item.config.Command(checkCtx, r.WorkerProgram, "-preflight", "-hidden-path", statePath, "-provider", item.name)
+		if err != nil {
+			cancel()
+			return fmt.Errorf("%s isolation configuration rejected: %w", item.name, err)
+		}
+		cmd.Stderr = io.Discard
+		output, err := cmd.Output()
+		cancel()
+		if err != nil || len(output) > 128 {
+			return fmt.Errorf("%s sandbox preflight failed", item.name)
+		}
+		var status struct {
+			Version int    `json:"version"`
+			Type    string `json:"type"`
+		}
+		if json.Unmarshal(output, &status) != nil || status.Version != workerwire.Version || status.Type != "preflight_ok" {
+			return fmt.Errorf("%s sandbox preflight returned invalid evidence", item.name)
+		}
+	}
+	return nil
 }
 
 func (r Runner) Run(ctx context.Context, dispatch core.Dispatch) (core.RunResult, error) {

@@ -1,6 +1,6 @@
 # sense-dev
 
-sense 上で動く自動開発 controller の実装。現段階はファイル台帳、App/Platform の独立 context、版付き成果物配送、依存付きの fake worker 配車、独立 Release Gate の判定と publish intent、本人用の loopback 管理画面、公式 CLI アダプタまで。service unit の配車は模擬運転のみ。実モデルの実行ループ、GitHub 操作、日報、sense 実機導入は未完了。
+sense 上で動く自動開発 controller の実装。現段階はファイル台帳、App/Platform の独立 context、版付き成果物配送、依存付きの fake worker 配車、独立 Release Gate の判定と publish intent、本人用の loopback 管理画面、公式 CLI アダプタまで。隔離 worker の明示的 opt-in 配線はあるが、service unit は模擬運転のみ。sense の rootfs/namespace/認証を検証した実モデル運転、GitHub 操作、日報送信、実機導入は未完了。
 
 ## 配置
 
@@ -22,7 +22,7 @@ sense 上で動く自動開発 controller の実装。現段階はファイル�
 sense-dev -listen 127.0.0.1:8787 -data /var/lib/kensan-dev -admin-token-file /var/lib/kensan-dev/admin-token -tokens-css /opt/kensan-dev/source/packages/design-tokens/tokens.css
 ```
 
-管理画面は最初 `127.0.0.1:8787` のみ。外出先からアクセスできるとはまだ判定しない。Cloudflare 等の connector は起動しない。添付の service unit は `-mock-worker` 付きで、実モデルや GitHub を一切起動しない。
+管理画面は最初 `127.0.0.1:8787` のみ。外出先からアクセスできるとはまだ判定しない。Cloudflare 等の connector は起動しない。添付の service unit は `-mock-worker` 付きで、実モデルや GitHub を一切起動しない。`-isolated-worker` は `-mock-worker` と排他で、bubblewrap・専用 rootfs・worker binary・worktree・2つの専用認証 home・管理 token が state 内にあること、および Yu と決めた `-inference-window HH:MM-HH:MM`（JST）を要求する。時間帯外では新規推論を配車せず、UI にも理由を表示する。起動時に Claude/Codex の両 sandbox で state 不可視、worktree/auth 書込、provider binary 存在を確認し、一つでも失敗すれば listener も配車も起動しない。実機未検証のため service unit には指定していない。
 
 ## 既に検証できること
 
@@ -33,7 +33,7 @@ sense-dev -listen 127.0.0.1:8787 -data /var/lib/kensan-dev -admin-token-file /va
 - 後続工程の入力 manifest は、それより前の工程の結果 artifact ID・版・SHA-256 と作成 agent をすべて明示する。前工程の私的会話は渡さず、成果物の破損・契約/SHAの変化で配車を止める。
 - Codex App Server アダプタは ChatGPT account と quota を確認し、API key・モデル変更を拒否する単体試験まで。sense での本人認証と実モデル利用は未検証。
 - Claude CLI アダプタは専用の private 設定ディレクトリ、subscription のログイン状態、危険な課金設定の不在を検査し、Read-only 工程に限定。fake CLI で stdin prompt とモデル相違拒否を試験。sense での本人認証と実モデル利用は未検証。
-- bubblewrap 起動器の引数検査では host `/`、state と重複する mount、symlink alias、共有 auth home、runtime 外の実行ファイルを拒否。専用 rootfs 以外のホスト経路は mount しない。ネットワークは購読認証のため共有するので、egress 隔離ではない。sense で bubblewrap/namespace を実行した証拠はなく、実配車は引き続き無効。
+- bubblewrap 起動器の引数検査では host `/`、state と重複する mount、symlink alias、共有 auth home、runtime 外の実行ファイル、欠けた rootfs mount point を拒否。専用 rootfs 以外のホスト経路は mount しない。ネットワークは購読認証のため共有するので、egress 隔離ではない。sense で bubblewrap/namespace を実行した証拠はなく、既定の実配車は引き続き無効。
 - 隔離 worker の通信契約は prompt と既存 session 以外の任意パス・token・コマンドを入力に持たず、未知の JSON フィールドと上限超過を拒否。client は session 永続化コールバック後だけ ACK を返し、結果先行・別 session・余分なイベントを拒否する。実機の OS 隔離・認証・モデル turn は未検証。
 - 版・hash・契約・SHA・宛先を検査する配送と、message ID による重複防止。
 - 作者とは別 session の Release Gate。`allow` には author の成果物、controller 所有の Git 差分 scan、その両方を明示した Gate 入力 manifest、repo/ref/operation/base/head SHA の一致が必要。scan は送信予定の全 commit を検査し、中間 commit の秘密・公開経路・binary・高リスク path を保留する。scan の `candidate` は機密なし・非公開の証明ではなく、独立 agent・CI・配備影響の追加確認が必要。外部操作前に intent を保存する。

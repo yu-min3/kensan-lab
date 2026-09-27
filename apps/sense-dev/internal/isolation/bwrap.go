@@ -58,13 +58,25 @@ func (c Config) Command(ctx context.Context, program string, args ...string) (*e
 			}
 		}
 	}
+	// Nested mounts cannot reliably create destinations below a read-only
+	// root bind. The prepared rootfs must contain empty mount points already.
+	for _, name := range []string{"workspace", "agent-auth", "proc", "dev", "tmp"} {
+		info, err := os.Lstat(filepath.Join(resolved[0], name))
+		if err != nil || !info.IsDir() {
+			return nil, fmt.Errorf("worker rootfs is missing mount point %s", name)
+		}
+	}
 	if _, err := os.Stat(filepath.Join(resolved[0], program)); err != nil {
 		return nil, fmt.Errorf("worker program absent from runtime: %w", err)
 	}
 	if c.Bubblewrap == "" || !filepath.IsAbs(c.Bubblewrap) {
 		return nil, errors.New("absolute bubblewrap binary required")
 	}
-	if info, err := os.Stat(c.Bubblewrap); err != nil || !info.Mode().IsRegular() || info.Mode().Perm()&0111 == 0 {
+	resolvedBwrap, err := filepath.EvalSymlinks(c.Bubblewrap)
+	if err != nil || within(resolved[1], resolvedBwrap) || within(resolved[2], resolvedBwrap) || within(resolved[3], resolvedBwrap) {
+		return nil, errors.New("bubblewrap binary must be outside writable worker mounts and controller state")
+	}
+	if info, err := os.Stat(resolvedBwrap); err != nil || !info.Mode().IsRegular() || info.Mode().Perm()&0111 == 0 {
 		return nil, errors.New("bubblewrap binary must exist and be executable")
 	}
 	argv := []string{
@@ -78,9 +90,17 @@ func (c Config) Command(ctx context.Context, program string, args ...string) (*e
 		"--chdir", "/workspace", "--", program,
 	}
 	argv = append(argv, args...)
-	cmd := exec.CommandContext(ctx, c.Bubblewrap, argv...)
+	cmd := exec.CommandContext(ctx, resolvedBwrap, argv...)
 	cmd.Env = []string{"PATH=/usr/bin:/bin"}
 	return cmd, nil
+}
+
+func within(root, path string) bool {
+	if root == path {
+		return true
+	}
+	rel, err := filepath.Rel(root, path)
+	return err == nil && rel != ".." && !strings.HasPrefix(rel, ".."+string(filepath.Separator))
 }
 
 func overlaps(a, b string) bool {

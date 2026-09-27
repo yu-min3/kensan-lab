@@ -12,7 +12,7 @@ import (
 func testConfig(t *testing.T) Config {
 	t.Helper()
 	base := t.TempDir()
-	for _, name := range []string{"runtime/usr/bin", "worktree", "auth", "state"} {
+	for _, name := range []string{"runtime/usr/bin", "runtime/workspace", "runtime/agent-auth", "runtime/proc", "runtime/dev", "runtime/tmp", "worktree", "auth", "state"} {
 		if err := os.MkdirAll(filepath.Join(base, name), 0700); err != nil {
 			t.Fatal(err)
 		}
@@ -102,5 +102,32 @@ func TestRejectsProgramOutsideRuntime(t *testing.T) {
 		if _, err := c.Command(context.Background(), program); err == nil {
 			t.Errorf("accepted program %q", program)
 		}
+	}
+}
+
+func TestRejectsMissingOrSymlinkedMountPoint(t *testing.T) {
+	c := testConfig(t)
+	if err := os.Remove(filepath.Join(c.RuntimeRoot, "workspace")); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := c.Command(context.Background(), "/usr/bin/worker"); err == nil {
+		t.Fatal("missing rootfs mount point accepted")
+	}
+	if err := os.Symlink(c.ControllerState, filepath.Join(c.RuntimeRoot, "workspace")); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := c.Command(context.Background(), "/usr/bin/worker"); err == nil {
+		t.Fatal("symlinked rootfs mount point accepted")
+	}
+}
+
+func TestRejectsBubblewrapFromWorkerWritablePath(t *testing.T) {
+	c := testConfig(t)
+	c.Bubblewrap = filepath.Join(c.Worktree, "bwrap")
+	if err := os.WriteFile(c.Bubblewrap, []byte("test"), 0700); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := c.Command(context.Background(), "/usr/bin/worker"); err == nil {
+		t.Fatal("worker-writable bubblewrap binary accepted")
 	}
 }

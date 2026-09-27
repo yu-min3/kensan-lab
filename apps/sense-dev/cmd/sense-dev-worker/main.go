@@ -21,7 +21,26 @@ func main() {
 	claude := flag.String("claude-bin", "/usr/local/bin/claude", "Claude CLI path inside sandbox")
 	codex := flag.String("codex-bin", "/usr/local/bin/codex", "Codex CLI path inside sandbox")
 	maxUsage := flag.Float64("max-codex-usage", 80, "maximum accepted subscription usage percent")
+	preflight := flag.Bool("preflight", false, "verify worker mount boundary without running a model")
+	hiddenPath := flag.String("hidden-path", "", "controller state path that must be absent inside the sandbox")
+	preflightProvider := flag.String("provider", "", "provider binary to verify during preflight")
 	flag.Parse()
+	if *preflight {
+		binary := *codex
+		if *preflightProvider == "claude" {
+			binary = *claude
+		} else if *preflightProvider != "codex" {
+			os.Exit(2)
+		}
+		if err := checkPreflight(workdir, authHome, *hiddenPath, binary); err != nil {
+			os.Exit(1)
+		}
+		_ = json.NewEncoder(os.Stdout).Encode(struct {
+			Version int    `json:"version"`
+			Type    string `json:"type"`
+		}{workerwire.Version, "preflight_ok"})
+		return
+	}
 	if *maxUsage <= 0 || *maxUsage > 100 {
 		os.Exit(2)
 	}
@@ -37,6 +56,33 @@ func main() {
 	if err := execute(context.Background(), request, input, os.Stdout, *claude, *codex, *maxUsage); err != nil {
 		os.Exit(1)
 	}
+}
+
+func checkPreflight(worktree, auth, hidden, binary string) error {
+	if hidden == "" || hidden == "/" || binary == "" {
+		return errors.New("preflight paths are incomplete")
+	}
+	if _, err := os.Lstat(hidden); !errors.Is(err, os.ErrNotExist) {
+		return errors.New("controller state path is visible or unverifiable")
+	}
+	for _, dir := range []string{worktree, auth} {
+		file, err := os.CreateTemp(dir, ".worker-preflight-")
+		if err != nil {
+			return errors.New("worker writable mount unavailable")
+		}
+		name := file.Name()
+		if err := file.Close(); err != nil {
+			return err
+		}
+		if err := os.Remove(name); err != nil {
+			return err
+		}
+	}
+	info, err := os.Stat(binary)
+	if err != nil || !info.Mode().IsRegular() || info.Mode().Perm()&0111 == 0 {
+		return errors.New("provider binary unavailable in runtime")
+	}
+	return nil
 }
 
 func execute(ctx context.Context, request workerwire.Request, input *bufio.Reader, output io.Writer, claudeBin, codexBin string, maxUsage float64) error {

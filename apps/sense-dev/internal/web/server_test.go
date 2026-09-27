@@ -16,6 +16,17 @@ import (
 	"github.com/yu-min3/kensan-lab/apps/sense-dev/internal/core"
 )
 
+func TestIsolatedWorkerWaitReasonOutsideWindow(t *testing.T) {
+	state := core.State{Tasks: map[string]core.Task{"task": {ID: "task", Status: "ready"}}, Agents: map[string]core.Agent{}}
+	agent := core.Agent{TaskID: "task", Status: "ready"}
+	if got := agentWaitReason(state, agent, "isolated", false, time.Now()); got != "運転時間外" {
+		t.Fatalf("outside-window reason: %s", got)
+	}
+	if got := agentWaitReason(state, agent, "isolated", true, time.Now()); got != "配車待ち" {
+		t.Fatalf("inside-window reason: %s", got)
+	}
+}
+
 func TestPrivateWebLoginCSRFAndTask(t *testing.T) {
 	dir := t.TempDir()
 	store, err := core.Open(filepath.Join(dir, "state"))
@@ -34,7 +45,7 @@ func TestPrivateWebLoginCSRFAndTask(t *testing.T) {
 	if err := os.WriteFile(css, []byte(":root{--background:40 27% 94%}"), 0600); err != nil {
 		t.Fatal(err)
 	}
-	s, err := New(store, tokenFile, css, false)
+	s, err := New(store, tokenFile, css, "off", nil)
 	if err != nil {
 		t.Fatal(err)
 	}

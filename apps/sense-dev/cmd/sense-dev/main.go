@@ -11,12 +11,15 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
+	"strings"
 	"syscall"
 	"time"
 
 	"github.com/yu-min3/kensan-lab/apps/sense-dev/internal/core"
+	"github.com/yu-min3/kensan-lab/apps/sense-dev/internal/isolation"
 	"github.com/yu-min3/kensan-lab/apps/sense-dev/internal/mock"
 	"github.com/yu-min3/kensan-lab/apps/sense-dev/internal/web"
+	"github.com/yu-min3/kensan-lab/apps/sense-dev/internal/workerclient"
 )
 
 func main() {
@@ -31,12 +34,24 @@ func run() error {
 	token := flag.String("admin-token-file", "", "mode 0600 file with local admin token")
 	tokensCSS := flag.String("tokens-css", "", "path to kensan-lab design tokens.css")
 	mockWorker := flag.Bool("mock-worker", false, "run simulation-only worker; never invokes models or publishes")
+	isolatedWorker := flag.Bool("isolated-worker", false, "opt in to sandboxed subscription model turns; requires host preflight")
+	bubblewrap := flag.String("bwrap", "", "absolute bubblewrap binary path")
+	runtimeRoot := flag.String("worker-rootfs", "", "dedicated non-secret Linux worker rootfs")
+	workerProgram := flag.String("worker-program", "/usr/local/bin/sense-dev-worker", "worker binary path inside rootfs")
+	worktree := flag.String("worker-worktree", "", "writable model worktree")
+	claudeAuth := flag.String("claude-auth-home", "", "private Claude subscription configuration directory")
+	codexAuth := flag.String("codex-auth-home", "", "private Codex subscription configuration directory")
+	turnTimeout := flag.Duration("turn-timeout", 45*time.Minute, "maximum duration of one isolated model turn")
+	inferenceWindow := flag.String("inference-window", "", "required JST HH:MM-HH:MM interval for isolated model dispatch")
 	flag.Parse()
 	if *data == "" || *token == "" || *tokensCSS == "" || !filepath.IsAbs(*data) {
 		return errors.New("-data, -admin-token-file and -tokens-css are required; -data must be absolute")
 	}
 	if err := web.LoopbackOnly(*addr); err != nil {
 		return err
+	}
+	if *mockWorker && *isolatedWorker {
+		return errors.New("mock and isolated workers are mutually exclusive")
 	}
 	store, err := core.Open(*data)
 	if err != nil {
@@ -49,7 +64,44 @@ func run() error {
 	if err := store.RecoverInterrupted(); err != nil {
 		return err
 	}
-	handler, err := web.New(store, *token, *tokensCSS, *mockWorker)
+	mode := "off"
+	var runner core.Runner
+	var scope []string
+	var allowedNow func(time.Time) bool
+	if *mockWorker {
+		mode, runner, scope = "mock", mock.Runner{}, []string{"simulation-only"}
+	}
+	if *isolatedWorker {
+		if *bubblewrap == "" || *runtimeRoot == "" || *worktree == "" || *claudeAuth == "" || *codexAuth == "" || *turnTimeout <= 0 {
+			return errors.New("isolated worker paths and positive timeout are required")
+		}
+		window, err := parseRunWindow(*inferenceWindow)
+		if err != nil {
+			return err
+		}
+		canonicalState, err := filepath.EvalSymlinks(*data)
+		if err != nil {
+			return err
+		}
+		canonicalToken, err := filepath.EvalSymlinks(*token)
+		if err != nil {
+			return err
+		}
+		rel, err := filepath.Rel(canonicalState, canonicalToken)
+		if err != nil || rel == ".." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) {
+			return errors.New("admin token must be inside controller state when isolated workers are enabled")
+		}
+		base := isolation.Config{Bubblewrap: *bubblewrap, RuntimeRoot: *runtimeRoot, Worktree: *worktree, ControllerState: *data}
+		claudeConfig, codexConfig := base, base
+		claudeConfig.AuthHome, codexConfig.AuthHome = *claudeAuth, *codexAuth
+		isolated := workerclient.Runner{Claude: claudeConfig, Codex: codexConfig, WorkerProgram: *workerProgram, Timeout: *turnTimeout}
+		if err := isolated.Preflight(context.Background()); err != nil {
+			return fmt.Errorf("isolated worker disabled: %w", err)
+		}
+		mode, runner, scope = "isolated", isolated, []string{"isolated-model-worker"}
+		allowedNow = window.contains
+	}
+	handler, err := web.New(store, *token, *tokensCSS, mode, allowedNow)
 	if err != nil {
 		return err
 	}
@@ -61,7 +113,7 @@ func run() error {
 	server := &http.Server{Handler: handler.Handler(), ReadHeaderTimeout: 5 * time.Second, MaxHeaderBytes: 1 << 20}
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
-	if *mockWorker {
+	if runner != nil {
 		go func() {
 			ticker := time.NewTicker(2 * time.Second)
 			defer ticker.Stop()
@@ -70,8 +122,11 @@ func run() error {
 				case <-ctx.Done():
 					return
 				case <-ticker.C:
-					if _, err := store.Tick(ctx, mock.Runner{}, []string{"simulation-only"}); err != nil && !errors.Is(err, context.Canceled) {
-						log.Print("mock dispatch needs operator inspection")
+					if allowedNow != nil && !allowedNow(time.Now()) {
+						continue
+					}
+					if _, err := store.Tick(ctx, runner, scope); err != nil && !errors.Is(err, context.Canceled) {
+						log.Print("worker dispatch needs operator inspection")
 					}
 				}
 			}

@@ -24,12 +24,13 @@ import (
 var static embed.FS
 
 type Server struct {
-	store     *core.Store
-	token     []byte
-	tokensCSS string
-	mockMode  bool
-	mu        sync.Mutex
-	sessions  map[string]session
+	store      *core.Store
+	token      []byte
+	tokensCSS  string
+	workerMode string
+	allowedNow func(time.Time) bool
+	mu         sync.Mutex
+	sessions   map[string]session
 }
 
 type session struct {
@@ -59,7 +60,7 @@ func agentOrder(role string) int {
 	}
 }
 
-func agentWaitReason(st core.State, a core.Agent, mockMode bool, now time.Time) string {
+func agentWaitReason(st core.State, a core.Agent, workerMode string, allowed bool, now time.Time) string {
 	if st.Stopped {
 		return "全体停止"
 	}
@@ -82,13 +83,22 @@ func agentWaitReason(st core.State, a core.Agent, mockMode bool, now time.Time) 
 			return "案件依存待ち"
 		}
 	}
-	if !mockMode {
+	if workerMode == "off" {
 		return "実行未設定"
+	}
+	if workerMode == "isolated" && !allowed {
+		return "運転時間外"
 	}
 	return "配車待ち"
 }
 
-func New(store *core.Store, tokenFile, tokensCSS string, mockMode bool) (*Server, error) {
+func New(store *core.Store, tokenFile, tokensCSS, workerMode string, allowedNow func(time.Time) bool) (*Server, error) {
+	if workerMode != "off" && workerMode != "mock" && workerMode != "isolated" {
+		return nil, errors.New("unknown worker mode")
+	}
+	if workerMode == "isolated" && allowedNow == nil {
+		return nil, errors.New("isolated worker requires a run window")
+	}
 	info, err := os.Stat(tokenFile)
 	if err != nil {
 		return nil, err
@@ -107,7 +117,7 @@ func New(store *core.Store, tokenFile, tokensCSS string, mockMode bool) (*Server
 	if info, err := os.Stat(tokensCSS); err != nil || !info.Mode().IsRegular() {
 		return nil, errors.New("design tokens CSS file is required")
 	}
-	return &Server{store: store, token: b, tokensCSS: tokensCSS, mockMode: mockMode, sessions: map[string]session{}}, nil
+	return &Server{store: store, token: b, tokensCSS: tokensCSS, workerMode: workerMode, allowedNow: allowedNow, sessions: map[string]session{}}, nil
 }
 
 func LoopbackOnly(addr string) error {
@@ -262,7 +272,8 @@ func (s *Server) home(w http.ResponseWriter, r *http.Request) {
 	sort.Slice(messages, func(i, j int) bool { return messages[i].CreatedAt.After(messages[j].CreatedAt) })
 	agents := make([]agentView, 0, len(st.Agents))
 	for _, a := range st.Agents {
-		agents = append(agents, agentView{Agent: a, WaitReason: agentWaitReason(st, a, s.mockMode, time.Now())})
+		allowed := s.allowedNow == nil || s.allowedNow(time.Now())
+		agents = append(agents, agentView{Agent: a, WaitReason: agentWaitReason(st, a, s.workerMode, allowed, time.Now())})
 	}
 	sort.Slice(agents, func(i, j int) bool {
 		ai, aj := agents[i].Agent, agents[j].Agent
@@ -300,8 +311,9 @@ func (s *Server) home(w http.ResponseWriter, r *http.Request) {
 		Reports     []core.DailyReport
 		Stopped     bool
 		PausedUntil *time.Time
-		MockMode    bool
-	}{s.csrf(r), tasks, messages, agents, questions, approvals, reports, st.Stopped, st.PausedUntil, s.mockMode})
+		WorkerMode  string
+		WindowOpen  bool
+	}{s.csrf(r), tasks, messages, agents, questions, approvals, reports, st.Stopped, st.PausedUntil, s.workerMode, s.allowedNow == nil || s.allowedNow(time.Now())})
 }
 
 func (s *Server) staticCSS(w http.ResponseWriter, r *http.Request) {
