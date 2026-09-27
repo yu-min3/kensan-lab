@@ -105,6 +105,35 @@ func TestReleaseScanFlagsIntermediateSymlink(t *testing.T) {
 	}
 }
 
+func TestReleaseScanFlagsSecurityBoundaryChanges(t *testing.T) {
+	dir := t.TempDir()
+	gitTest(t, dir, "init", "-q")
+	gitTest(t, dir, "config", "user.name", "Test")
+	gitTest(t, dir, "config", "user.email", "test@example.invalid")
+	base := commitTestFile(t, dir, "README.md", "base\n", "base")
+	paths := []string{
+		"apps/sense-dev/internal/isolation/bwrap.go",
+		"apps/sense-dev/internal/workerclient/client.go",
+		"apps/sense-dev/internal/workerwire/wire.go",
+		"apps/sense-dev/internal/verifier/verifier.go",
+		"apps/sense-dev/internal/web/server.go",
+		"apps/sense-dev/cmd/sense-dev/main.go",
+	}
+	for _, path := range paths {
+		_ = commitTestFile(t, dir, path, "security boundary\n", "change boundary")
+	}
+	head := gitTest(t, dir, "rev-parse", "HEAD")
+	report, err := ScanGitRange(dir, base, head, "pr_create", "refs/heads/feat/canary")
+	if err != nil || report.Status != "needs_human" || report.CommitCount != len(paths) {
+		t.Fatalf("security boundary change was not flagged: %+v %v", report, err)
+	}
+	for _, path := range paths {
+		if !containsFinding(report.Findings, "publication or policy path needs review: "+path) {
+			t.Errorf("missing risk finding for %s", path)
+		}
+	}
+}
+
 func TestParseChangedPathsFlagsSubmoduleMode(t *testing.T) {
 	raw := []byte(":000000 160000 before after A\x00modules/example\x00")
 	paths, risky, err := parseChangedPaths(raw)

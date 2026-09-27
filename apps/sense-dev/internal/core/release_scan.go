@@ -62,7 +62,21 @@ func sensitivePath(path string) bool {
 
 func highRiskPath(path string) bool {
 	p := strings.ToLower(path)
-	return strings.HasPrefix(p, ".github/workflows/") || strings.HasPrefix(p, "clusters/") || strings.HasPrefix(p, "infra/") || strings.HasPrefix(p, "gitops/") || strings.Contains(p, "cloudflared") || strings.Contains(p, "tunnel") || strings.Contains(p, "ingress") || strings.Contains(p, "gateway") || strings.Contains(p, "kustomization") || strings.HasPrefix(p, "apps/sense-dev/deploy/") || strings.HasPrefix(p, "apps/sense-dev/internal/core/release") || strings.Contains(p, "/publisher")
+	for _, prefix := range []string{
+		".github/workflows/", "clusters/", "infra/", "gitops/",
+		"apps/sense-dev/deploy/", "apps/sense-dev/internal/isolation/",
+		"apps/sense-dev/internal/workerclient/", "apps/sense-dev/internal/workerwire/",
+		"apps/sense-dev/internal/verifier/", "apps/sense-dev/internal/core/release",
+		"apps/sense-dev/cmd/sense-dev/",
+	} {
+		if strings.HasPrefix(p, prefix) {
+			return true
+		}
+	}
+	if p == "apps/sense-dev/internal/web/server.go" {
+		return true
+	}
+	return strings.Contains(p, "cloudflared") || strings.Contains(p, "tunnel") || strings.Contains(p, "ingress") || strings.Contains(p, "gateway") || strings.Contains(p, "kustomization") || strings.Contains(p, "/publisher")
 }
 
 // ScanGitRange inspects every commit proposed for transfer, not only the final
