@@ -166,19 +166,38 @@ func TestSchedulerQuotaWaitDoesNotBlockAnotherTeam(t *testing.T) {
 func TestSessionIDCannotCrossAgents(t *testing.T) {
 	s := testStore(t)
 	_, platform := taskAgent(t, s, Platform, "requirements")
-	_, app := taskAgent(t, s, App, "acceptance")
 	first, err := s.BuildManifest(platform.ID, nil)
-	if err != nil {
-		t.Fatal(err)
-	}
-	second, err := s.BuildManifest(app.ID, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if err := s.SetAgentSession(platform.ID, platform.Provider, platform.Model, "shared-thread", first.InputSHA256, 1); err != nil {
 		t.Fatal(err)
 	}
+	claim, ok, err := s.ClaimNext(time.Now())
+	if err != nil || !ok || claim.AgentID != platform.ID {
+		t.Fatalf("claim: %v %+v", err, claim)
+	}
+	if err := s.SetAttemptInput(claim.ID, first.InputSHA256); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.SetAttemptSession(claim.ID, "shared-thread"); err != nil {
+		t.Fatal(err)
+	}
+	_, app := taskAgent(t, s, App, "acceptance")
+	second, err := s.BuildManifest(app.ID, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
 	if err := s.SetAgentSession(app.ID, app.Provider, app.Model, "shared-thread", second.InputSHA256, 1); err == nil {
 		t.Fatal("provider session reused across team boundary")
+	}
+	if err := s.FailAttempt(claim.ID, "interrupted", "test", time.Time{}); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.NewSessionGeneration(platform.ID); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.SetAgentSession(app.ID, app.Provider, app.Model, "shared-thread", second.InputSHA256, 1); err == nil {
+		t.Fatal("historical session reused across team boundary")
 	}
 }

@@ -306,6 +306,11 @@ func (s *Store) SetAgentSession(agentID, provider, model, sessionID, inputHash s
 				return errors.New("provider session already belongs to another agent")
 			}
 		}
+		for _, attempt := range st.Attempts {
+			if attempt.AgentID != agentID && attempt.Provider == provider && attempt.SessionID == sessionID {
+				return errors.New("historical provider session belongs to another agent")
+			}
+		}
 		if a.SessionID != "" && (a.SessionID != sessionID || a.InputHash != inputHash) {
 			return errors.New("existing session bound to different input")
 		}
