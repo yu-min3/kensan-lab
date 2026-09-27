@@ -28,7 +28,8 @@ func (b *limitedBuffer) Write(p []byte) (int, error) {
 }
 
 func gitEvidence(ctx context.Context, repo string, args ...string) ([]byte, error) {
-	cmd := exec.CommandContext(ctx, "git", args...)
+	safeArgs := append([]string{"--no-optional-locks", "-c", "core.fsmonitor=false", "-c", "diff.renames=false"}, args...)
+	cmd := exec.CommandContext(ctx, "git", safeArgs...)
 	cmd.Dir = repo
 	cmd.Env = []string{"PATH=/usr/bin:/bin:/usr/local/bin:/opt/homebrew/bin", "HOME=/nonexistent", "GIT_CONFIG_NOSYSTEM=1", "GIT_CONFIG_GLOBAL=/dev/null", "GIT_NO_REPLACE_OBJECTS=1"}
 	var out limitedBuffer
@@ -118,7 +119,7 @@ func ScanGitRange(repoPath, baseSHA, headSHA, operation, ref string) (ReleaseSca
 		if len(strings.Fields(string(parents))) != 2 {
 			findings["merge or root commit needs manual review"] = true
 		}
-		changed, err := gitEvidence(ctx, root, "diff-tree", "--no-commit-id", "--name-only", "-r", "-z", commit)
+		changed, err := gitEvidence(ctx, root, "diff-tree", "--no-renames", "--no-commit-id", "--name-only", "-r", "-z", commit)
 		if err != nil {
 			return ReleaseScan{}, err
 		}
@@ -135,7 +136,7 @@ func ScanGitRange(repoPath, baseSHA, headSHA, operation, ref string) (ReleaseSca
 				findings["publication or policy path needs review: "+path] = true
 			}
 		}
-		patch, err := gitEvidence(ctx, root, "show", "--format=fuller", "--binary", "--no-ext-diff", commit)
+		patch, err := gitEvidence(ctx, root, "show", "--no-renames", "--format=fuller", "--binary", "--no-ext-diff", commit)
 		if err != nil {
 			return ReleaseScan{}, err
 		}
