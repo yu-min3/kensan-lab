@@ -18,7 +18,7 @@ tags: [kensan-lab, sense, autonomous-development, audit]
 |---|---|---|
 | k3s の現状態を変更せず、loopback の host service を計画する | 条件付き採用 | 13:12 UTC は稼働・約11 GiB空き、13:19 UTC は inactive/disabled・約14 GiB空き。別作業の変更を上書きしない |
 | k3s を本件から停止または再起動 | 却下 | 既存 workload と別作業に影響し、所有者・目的が未確定 |
-| 初回 host 導入案 | 再審査待ち | 独立 reviewer は TOCTOU、既存領域、固定 manifest 不足を理由に `deny`。ローカルで修正中 |
+| 初回 host 導入案 | ローカル審査のみ合格 | TOCTOU、既存領域、systemd 実効設定、固定 policy/manifest を修正し独立コード審査は `allow`。実機操作は別作業との調整が必要で `needs_human` |
 | sense を未確認のまま `private-ready` と記録 | 却下 | AC-01/19 の service・待受・既存到達経路に実機証拠がない |
 | 別 tunnel / Cloudflare route で到達性を補う | 却下 | 明示的な公開承認がなく、非公開境界を迂回する |
 | GitHub push/PR/merge を現時点で実行 | 保留 | scan は一次検査に過ぎず、独立 Gate の実推論・CI/可視性/配備影響の照合と限定 publisher が未完成 |
@@ -45,7 +45,7 @@ tags: [kensan-lab, sense, autonomous-development, audit]
 
 ## 次の作業
 
-1. 別作業による k3s 停止・libvirt 導入の目的と host 利用範囲を確認する。このスレッドから k3s を再起動しない。bootstrap 手順・固定 manifest・rollback を修正し、独立 reviewer の再審査を受ける。
+1. 別作業による k3s 停止・libvirt 導入の目的と host 利用範囲を確認する。このスレッドから k3s を再起動しない。bootstrap の独立コード審査は合格済みだが、実機操作の Gate は直前 baseline・公開経路・期限・再現 build を確認して別に判定する。
 2. worker の別OSユーザー隔離、restart時の orphan turn 照合、credential なし verifier、限定 publisher/outbox を完成させる。
 3. loopback service を導入し、実機 listen・継続 event・再起動/復旧・既存到達経路を検証してから `private-ready` を判定する。
 

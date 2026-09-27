@@ -10,7 +10,9 @@ tags: [kensan-lab, sense, autonomous-development, operations]
 
 初回は既存 k3s に触れず、`sense` の host systemd に simulation-only controller を `127.0.0.1:8787` で配置する。Cloudflare、K8s、GitHub、ルーターは変更しない。導入操作は独立 Release Gate の初回レビュー記録と固定 SHA-256 の照合後に限る。失敗時は service を停止・自動起動無効化し、台帳と token は削除しない。
 
-**現在は実機変更を保留。** 13:16 UTC に別作業で `k3s` が停止・無効化され、libvirt 関連の導入が始まった。誰の作業かと今後の host 用途が確定するまで、この runbook を sense に適用しない。初回独立レビューも `deny` で、導入 script と固定 manifest を修正して再審査する。
+**現在は実機変更を保留。** 13:16 UTC に別作業で `k3s` が停止・無効化され、libvirt 関連の導入が始まった。誰の作業かと今後の host 用途が確定するまで、この runbook を sense に適用しない。script・policy・固定 manifest の独立コード審査は `allow` だが、これは実機操作の許可ではない。実機の Release Gate は `needs_human` のまま。
+
+独立 reviewer は source `e3b022f` から Go 1.25.5 / linux-amd64 / CGO 無効 / `-buildvcs=false -trimpath` で再 build し、候補 binary と同じ SHA-256 `c634683ec048574b8b41d33cb8b01600e1d332bec210b0a1073ef57c09b8389c` を確認した。source commit から候補記録 commit `75087de` までの変更は JSON 候補だけで、Go source/module/static 資産は不変。
 
 ## 実測前提（2026-09-27）
 
