@@ -43,6 +43,34 @@ type agentView struct {
 	WaitReason string
 }
 
+type messageArtifactView struct {
+	ID      string
+	Kind    string
+	Version int
+	SHA256  string
+	Valid   bool
+}
+
+type messageView struct {
+	Message     core.Message
+	FromTeam    core.Team
+	ToTeam      core.Team
+	SourceTitle string
+	TargetTitle string
+	Artifacts   []messageArtifactView
+}
+
+func teamLabel(team core.Team) string {
+	switch team {
+	case core.Platform:
+		return "Platform"
+	case core.App:
+		return "App"
+	default:
+		return "不明"
+	}
+}
+
 func agentOrder(role string) int {
 	switch role {
 	case "requirements", "feedback":
@@ -281,7 +309,7 @@ func (s *Server) csrf(r *http.Request) string {
 
 func (s *Server) home(w http.ResponseWriter, r *http.Request) {
 	b, _ := static.ReadFile("static/index.html")
-	page, err := template.New("home").Parse(string(b))
+	page, err := template.New("home").Funcs(template.FuncMap{"teamLabel": teamLabel}).Parse(string(b))
 	if err != nil {
 		http.Error(w, "template unavailable", http.StatusInternalServerError)
 		return
@@ -292,11 +320,27 @@ func (s *Server) home(w http.ResponseWriter, r *http.Request) {
 		tasks = append(tasks, t)
 	}
 	sort.Slice(tasks, func(i, j int) bool { return tasks[i].CreatedAt.After(tasks[j].CreatedAt) })
-	messages := make([]core.Message, 0, len(st.Messages))
+	messages := make([]messageView, 0, len(st.Messages))
 	for _, m := range st.Messages {
-		messages = append(messages, m)
+		view := messageView{Message: m, FromTeam: st.Agents[m.FromAgent].Team, ToTeam: st.Agents[m.ToAgent].Team, SourceTitle: st.Tasks[m.SourceTask].Title, TargetTitle: st.Tasks[m.TargetTask].Title}
+		if view.SourceTitle == "" {
+			view.SourceTitle = m.SourceTask
+		}
+		if view.TargetTitle == "" {
+			view.TargetTitle = m.TargetTask
+		}
+		for _, ref := range m.ArtifactRefs {
+			artifact, ok := st.Artifacts[ref.ID]
+			valid := ok && artifact.Version == ref.Version && artifact.SHA256 == ref.SHA256
+			kind := "参照不一致・要確認"
+			if valid {
+				kind = artifact.Kind
+			}
+			view.Artifacts = append(view.Artifacts, messageArtifactView{ID: ref.ID, Kind: kind, Version: ref.Version, SHA256: ref.SHA256, Valid: valid})
+		}
+		messages = append(messages, view)
 	}
-	sort.Slice(messages, func(i, j int) bool { return messages[i].CreatedAt.After(messages[j].CreatedAt) })
+	sort.Slice(messages, func(i, j int) bool { return messages[i].Message.CreatedAt.After(messages[j].Message.CreatedAt) })
 	agents := make([]agentView, 0, len(st.Agents))
 	for _, a := range st.Agents {
 		allowed := s.allowedNow == nil || s.allowedNow(time.Now())
@@ -336,7 +380,7 @@ func (s *Server) home(w http.ResponseWriter, r *http.Request) {
 	_ = page.Execute(w, struct {
 		CSRF        string
 		Tasks       []core.Task
-		Messages    []core.Message
+		Messages    []messageView
 		Agents      []agentView
 		Questions   []core.Question
 		Approvals   []core.ApprovalRequest

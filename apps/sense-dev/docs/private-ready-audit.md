@@ -31,7 +31,7 @@ tags: [kensan-lab, sense, autonomous-development, audit]
 | ● 高: 実モデル・費用（AC-04, 06, 07） | 未検証 | Claude/Codex の購読専用 adapter と fake CLI/App Server 試験。Mac/sense 同時利用は未試験 | sense で本人が公式ログイン。契約・モデル利用可能性・従量無効を確認後に4工程とMac優先を実走 |
 | ● 高: Release Gate（AC-09, 18） | 部分 | 全 commit の Git scan、途中 commit で追加後に削除した symlink と submodule mode の `needs_human` 判定、対象 SHA/操作に固定した scan artifact、独立 Gate 入力 manifest、mock転用・誤操作・別SHAの拒否試験。publish は intent の dry-run のみ | CI・PR本文/添付・repo可視性・render設定・公開到達経路の実照合、worker/publisher credential 分離、限定 publisher と reconcile |
 | ▲ 中: 独立 context と工程（AC-13〜16） | 部分 | App/Platform の別 profile/knowledge/memo/session、immutable artifact、manifest hash、前工程の成果物配送、依存配車・provider枠・Mac優先・restart試験。App不合格→Platform修正→同一シナリオ再試験をローカル試験で確認 | 実 worker のOS分離、review session の実運転、session消失後の再作成、実モデル/実 repo での再試験 |
-| ▲ 中: モバイル UI（AC-03, 17） | 部分 | Chrome Playwright 360/390/430px で依頼・Mac優先・停止・日報preview、横はみ出しなし。質問/回答/承認はHTTP試験 | 実機 Safari/Chrome、切断・Access再認証、回答草稿/再送、案件詳細・受入feedbackを E2E |
+| ▲ 中: モバイル UI（AC-03, 17） | 部分 | Chrome Playwright 360/390/430px で依頼・Mac優先・停止・日報previewと、模擬 App/Platform 交換4通の方向・返信元・taskリンク・成果物の種類/版/hashを確認。詳細展開後も横はみ出しなし。質問/回答/承認はHTTP試験 | 実機 Safari/Chrome、切断・Access再認証、回答草稿/再送、実際の差し戻し→修正→再試験を通したブラウザ E2E。模擬交換を実運転証拠にしない |
 | ▲ 中: 日報（AC-11） | preview のみ | JST日付で1件の未配信原本と判断リンク。送信結果は `not_configured` | 宛先確定、timer/outbox、送信不明の照合、2日連続の到達確認 |
 | ▲ 中: canary/pilot（AC-05, 10, 12） | 部分 | Golden Path と既存 app の契約は実装 goal に定義済み。AC-05 の成果物配送・差し戻し・修正・再試験は固定 SHA のローカル試験まで | 対象・rollback固定、実 App feedback/再試験、GitOps後の利用者経路、48時間pilot |
 | ● 高: 外出先入口（AC-02） | 意図的保留 | loopbackのみ、Cloudflare未変更 | Yu の hostname/IdP/本人allowlist承認後に専用 Access/JWT/route を有効化して実機検証。private-ready の条件には含めない |
@@ -41,7 +41,7 @@ tags: [kensan-lab, sense, autonomous-development, audit]
 - Worktree: `/Users/yu/kensan-workspace/.worktrees/sense-autonomous-development`
 - 単体・競合検査: `cd apps/sense-dev && go test -race ./... -count=1 && go vet ./...`
 - 2026-09-27: `TestMockControllerSurvivesProcessRestart` を含む `go test -race ./... -count=1` は全 package pass。これはローカル mock process の証拠で、sense の systemd/reboot 証拠ではない。
-- モバイルブラウザ: `cd apps/kensan/e2e && npm ci && npx playwright test --config playwright.sense-dev.config.ts`（2026-09-27: 3/3 pass）
+- モバイルブラウザ: `cd apps/kensan/e2e && npm ci && npx playwright test --config playwright.sense-dev.config.ts`（2026-09-27: 6/6 pass。交換4通は `e2e/seed-mobile.go` の simulation-only fixture）
 - `apps/sense-dev/deploy/kensan-dev-controller.service` は設定例で、sense には未配置。GitHub remote・Cloudflare・K8s の変更はしていない。
 
 ## 既存到達経路の静的棚卸し（実機証明ではない）
