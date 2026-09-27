@@ -10,8 +10,8 @@ sense 上で動く自動開発 controller の実装。現段階はファイル�
 - `internal/workerwire/`: controller→隔離 worker の版付き JSON 入力と session/result/failure イベントの契約。provider/model の組合せ、入力上限、未知のフィールドを拒否する。
 - `internal/workerclient/` と `cmd/sense-dev-worker/`: bubblewrap 内の worker との stdin/stdout IPC。session ID を controller が永続化して ACK を返すまでモデル turn は開始しない。現 service unit からは起動しない。
 - `internal/worktree/`: task ID ごとの自己完結した Git 作業ツリーを作成・再照合する。隔離内で元 repo の `.git` を参照しないよう、linked worktree ではなくローカル clone を使い、remote と共有 object を除去する。別 branch・symlink・base SHA の不一致を拒否する。
-- `cmd/sense-dev/`: private listener の入口。公開 IP・DNS 名の bind を拒否。`-mock-worker` を明示した時だけ模擬配車する。
-- `deploy/`: host systemd unit の候補。実機未導入。
+- `cmd/sense-dev/`: private listener の入口。公開 IP・DNS 名の bind を拒否。既定は推論 off、既存 service unit は `-mock-worker` のみ。隔離実 worker は明示 opt-in と事前検査が必要。
+- `deploy/`: host systemd unit の候補と、sense の秘密値を出さない read-only 棚卸しスクリプト。実機未導入。
 
 ## 開発時の起動
 
@@ -55,3 +55,9 @@ sense-dev -listen 127.0.0.1:8787 -data /var/lib/kensan-dev -admin-token-file /va
 5. 本人の初回認証と subscription 費用経路を確認後、実モデルの4工程を接続する。Cloudflare は公開承認まで inactive。
 
 実装契約は workspace の `projects/kensan-lab/docs/goal.md`。この README は実装の現在地だけを示す。
+
+## sense に接続できた後の G0/G4a 棚卸し
+
+最初は通常の operator アカウントから `deploy/sense-readonly-inventory.sh` を `bash` で実行する。スクリプトは `sudo`、サービス停止、Secret/ConfigMap の内容表示、プロセス引数・環境変数の表示をしない。結果は保護された証拠として扱い、公開 issue/PR やチャットに生データを貼らない。失敗した項目は `UNAVAILABLE` のまま記録し、非公開・停止安全の証明に読み替えない。
+
+旧 k3s の node が複数、共有 PV/PVC や他ホスト依存がある、quorum/復旧経路が不明な場合は停止しない。停止が許される場合でも、対象 unit/コンテナ、データ/volume、現在の自動起動状態、戻すコマンドを先に記録して可逆操作だけを行う。host の待受一覧だけではインターネット非公開を証明できないため、既存 tunnel/proxy/Ingress、IPv4/IPv6、router/firewall、CI preview/GitOps の経路を別途 read-only で照合する。これらが未確認なら `private-ready` は保留する。
