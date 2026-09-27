@@ -1,0 +1,73 @@
+{
+  "schema_version": 1,
+  "kind": "independent_release_gate_review",
+  "reviewed_at": "2026-09-27T14:17:10Z",
+  "reviewer": {
+    "agent_session": "/root/bootstrap_v2_review",
+    "role": "independent_release_gate_reviewer",
+    "authored_implementation": false,
+    "independence_basis": "Separate Astra reviewer with no author conversation. Independently inspected the fixed source, candidate, policy, artifact hashes and mock-only boundary; rebuilt from git archive. No host operation was performed."
+  },
+  "scope": {
+    "operation": "host_service_first_install",
+    "repo": "yu-min3/kensan-lab",
+    "ref": "feat/sense-autonomous-development",
+    "head_sha": "4918d154c0aaecc7b792547c401c2cad03d5bebc",
+    "source_commit": "4918d154c0aaecc7b792547c401c2cad03d5bebc",
+    "candidate_manifest_commit": "733b1eb",
+    "candidate_manifest_path": "apps/sense-dev/docs/private-bootstrap-candidate-4918d15.json",
+    "candidate_manifest_sha256": "836bf9bc56437946753e7c003ec7b0915859b0e4e9721aba430c4a2e57c096ab",
+    "target_environment": "sense-private-host",
+    "policy_version": "private-bootstrap-v1",
+    "policy_sha256": "b6158fdc6b87bcf2636e80b77889bbb0e6bce367d7f323459106e79d81b43c66",
+    "expires_at": "2026-09-29T14:15:00Z",
+    "artifact_hashes": {
+      "linux_amd64_binary": "060bcdf7291581491a6c22fae7a6e8983b32546a9cfa2707fd5f6d94245eea10",
+      "install_script": "d6cb3666464935dfdc520b6df794b63ad8aab5d1881099ecbcf4e8eeeb002371",
+      "systemd_unit": "6c8e4d444fd0b2262f2ed0895883fa6208ca103bca0c84b79e464fe11ae73017",
+      "tokens_css": "bda4b1d91adb4ccf048cc8e50c33621f970ae991a3c422712c3b9bd5f614c011"
+    }
+  },
+  "decisions": {
+    "code_candidate": "allow",
+    "host_install": "needs_human",
+    "execution_authorized": false
+  },
+  "code_candidate_evidence": [
+    "The binary, installer, unit, CSS and policy SHA-256 values match the candidate; a clean git archive rebuild of the source commit produced the same Linux amd64 binary hash.",
+    "The unit fixes ExecStart to 127.0.0.1:8787 and mock-worker; the program rejects a non-loopback bind and a mock-plus-isolated worker combination.",
+    "The mock runner writes local simulated results only; it performs no model invocation, repository mutation or publication. Daily reports are local outbox records.",
+    "Source changes since e3b022f add App/Platform acceptance, correction, retesting and display. Mock reconciliation remains ledger-only; added worktree activity is isolated-worker-only.",
+    "The installer rejects occupied dedicated identities, paths, unit/drop-ins, registered service and port 8787; locks installation and verifies hashes in protected staging and after installation.",
+    "The installer checks effective systemd fragment, drop-ins, identity, command and environment before enable/start. It creates a 0600 token file under dedicated state and does not expose the token in argv or logs.",
+    "The installer has no k3s, libvirt, Cloudflare, DNS, proxy, tunnel, firewall or existing-data mutation; failure and signal cleanup disable/stop only the armed service while preserving state.",
+    "The independent source checkout passed go test ./... for all 13 packages; installer bash -n passed."
+  ],
+  "independent_rebuild": {
+    "result": "match",
+    "source_method": "git archive 4918d154c0aaecc7b792547c401c2cad03d5bebc",
+    "toolchain": "go1.25.5 darwin/arm64",
+    "goos": "linux",
+    "goarch": "amd64",
+    "cgo_enabled": false,
+    "flags": ["-buildvcs=false", "-trimpath"],
+    "package": "./cmd/sense-dev",
+    "sha256": "060bcdf7291581491a6c22fae7a6e8983b32546a9cfa2707fd5f6d94245eea10"
+  },
+  "host_install_pending_reasons": [
+    "Ownership and host-use coordination for the concurrent k3s stop and libvirt installation are unconfirmed; Yu or the responsible operator must confirm them before transfer or installation.",
+    "The parent's 2026-09-27 14:08 UTC read-only observation is not a fresh pre-install baseline; dedicated identity/path/unit availability and workload impact remain unchecked.",
+    "Existing public reachability paths, including Cloudflare dashboard routes, are unproven; private-ready cannot be declared.",
+    "Protected root staging and the actual operation's manifest, policy, artifact and expiry checks have not been performed."
+  ],
+  "limitations": {
+    "private_ready": false,
+    "v0_complete": false,
+    "host_access_performed": false,
+    "host_mutations_performed": false,
+    "remote_mutations_performed": false,
+    "linux_host_execution_verified": false,
+    "rollback_runtime_verified": false,
+    "authorization_boundary": "The code_candidate allow is a technical review of fixed artifacts, not permission to transfer, install, start a service or change existing workloads. Resolve coordination and fresh baseline, then make a separate host_install decision. Any target, hash, policy, environment or expiry change invalidates reuse."
+  }
+}

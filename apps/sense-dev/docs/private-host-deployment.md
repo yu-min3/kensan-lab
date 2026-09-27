@@ -12,7 +12,7 @@ tags: [kensan-lab, sense, autonomous-development, operations]
 
 **現在は実機変更を保留。** 13:16 UTC に別作業で `k3s` が停止・無効化され、libvirt 関連の導入が始まった。誰の作業かと今後の host 用途が確定するまで、この runbook を sense に適用しない。script・policy・固定 manifest の独立コード審査は `allow` だが、これは実機操作の許可ではない。実機の Release Gate は `needs_human` のまま。
 
-独立 reviewer は source `e3b022f` から Go 1.25.5 / linux-amd64 / CGO 無効 / `-buildvcs=false -trimpath` で再 build し、候補 binary と同じ SHA-256 `c634683ec048574b8b41d33cb8b01600e1d332bec210b0a1073ef57c09b8389c` を確認した。source commit から候補記録 commit `75087de` までの変更は JSON 候補だけで、Go source/module/static 資産は不変。
+最新の固定候補は source `4918d15`、manifest `private-bootstrap-candidate-4918d15.json`（commit `733b1eb`）。独立 Astra reviewer は clean な source archive から Go 1.25.5 / linux-amd64 / CGO 無効 / `-buildvcs=false -trimpath` で再 build し、候補 binary と同じ SHA-256 `060bcdf7291581491a6c22fae7a6e8983b32546a9cfa2707fd5f6d94245eea10` を確認した。判定は `private-bootstrap-review-4918d15.json` に固定した。`code_candidate=allow`、`host_install=needs_human`、`execution_authorized=false`。旧候補 `e3b022f` のレビューを現在の source に転用しない。
 
 ## 実測前提（2026-09-27）
 
@@ -38,7 +38,7 @@ tags: [kensan-lab, sense, autonomous-development, operations]
 ## 実行前チェック
 
 1. clean worktree で `go test -race ./... -count=1` と `go vet ./...`。`GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build -buildvcs=false -trimpath -o <staging-binary> ./cmd/sense-dev` で binary を作る。Go の VCS stamp はこの worktree で別 revision を示したため無効化し、候補 manifest の source SHA と再現 build hash を別に固定する。
-2. 独立 reviewer が `operation/repo/ref/head_sha/target_environment/policy_version/artifact_hashes/expires_at` を持つ固定 manifest、binary・tokens・unit・導入 script の SHA-256、read-only 棚卸し、変更対象、rollback を記録して `allow` とする。作者の自己承認は不可。未成立なら実機への copy/install はしない。
+2. 独立 reviewer が `operation/repo/ref/head_sha/target_environment/policy_version/artifact_hashes/expires_at` を持つ固定 manifest、binary・tokens・unit・導入 script の SHA-256、read-only 棚卸し、変更対象、rollback を記録する。現在の `code_candidate=allow` は実機操作を許可しない。並行作業の調整と直前 baseline の後、別の `host_install=allow` 判定が成立するまで実機への copy/install はしない。作者の自己承認は不可。
 3. `ssh sense` で hostname、`systemctl status k3s`、`ss -ltn`、既存 unit/user/dir、空き容量を再確認する。対象が変わったら再レビューする。
 4. 3入力と script を sense の一時 staging へ転送する。script 自体を root 管理の実行経路へコピー後に hash 照合し、その複製を実行する。3入力は script 内で root 専用 staging へコピー後に再照合される。reviewer に固定された値を `install` 引数へ渡す。secret は引数にしない。
 
