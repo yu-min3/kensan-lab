@@ -12,6 +12,7 @@ sense 上で動く自動開発 controller の実装。現段階はファイル�
 - `internal/worktree/`: task ID ごとの自己完結した Git 作業ツリーを作成・再照合する。隔離内で元 repo の `.git` を参照しないよう、linked worktree ではなくローカル clone を使い、remote と共有 object を除去する。別 branch・symlink・base SHA の不一致を拒否する。連携 App 受入は元 repo ではなく、レビュー済み Platform task のコミットから専用 clone を作る。
 - `internal/verifier/`: 実装と Opus レビューの間で、operator 固定の検証計画と `git diff --check` を credentialless sandbox で実行する。失敗時の出力を attempt に固定し、レビューへの昇格を止める。
 - `cmd/sense-dev/`: private listener の入口。公開 IP・DNS 名の bind を拒否。既定は推論 off、既存 service unit は `-mock-worker` のみ。隔離実 worker は明示 opt-in と事前検査が必要。
+- `cmd/private-route-probe/`: sense 導入後に別ホストから LAN IPv4 と global IPv6 の 8787 直結を試験。接続拒否だけを成功とし、timeout/経路なしを未知として残す。tunnel/proxy/CI の非公開証明は別途必要。
 - `deploy/`: host systemd unit、初回導入・rollback、sense の read-only 棚卸しと導入後 listener smoke。実機未導入。
 
 ## 開発時の起動
@@ -40,7 +41,7 @@ sense-dev -listen 127.0.0.1:8787 -data /var/lib/kensan-dev -admin-token-file /va
 - 隔離 worker の通信契約は prompt と既存 session 以外の任意パス・token・コマンドを入力に持たず、未知の JSON フィールドと上限超過を拒否。client は session 永続化コールバック後だけ ACK を返し、結果先行・別 session・余分なイベントを拒否する。実機の OS 隔離・認証・モデル turn は未検証。
 - 実 worker は task ID から専用 Git 作業ツリーを解決し、base SHA を台帳へ固定してから manifest/配車へ進む。準備に失敗した task は attempt を消費せず待機し、別 task は進められる。reviewer も自分の task 作業ツリーのみを読取専用で見る。clone は `.git` を内部に持ち、remote・alternates を持たず、元 repo を見失っても Git status が動くことを試験済み。Sol の回答だけでなく、commit 済み差分・base/head SHA・diff SHA-256 を immutable 成果物へ固定する。未コミット変更・空変更・大きすぎる差分ではレビューへ進まない。検証器は固定計画の実行結果を別 artifact に残す。ただし sense の bubblewrap 内での Git・テスト実測は未完了。
 - `mock-` session を含む模擬 state は実 worker 起動時に拒否する。実認証後の運転には別の保護された state directory を準備し、模擬成果物を本番入力へ昇格させない。既存 state の削除・移行は自動実行しない。
-- 版・hash・契約・SHA・宛先を検査する配送と、message ID による重複防止。UI で Platform task ID に紐づく App 受入を登録でき、実モデル工程の固定差分・credentialless 検証・Opus 合格がそろった場合だけ controller が3成果物を自動配送する。App はシナリオ・契約・SHA・期待/実測を固定した判定を返し、不合格は Platform 実装 agent に配送して実装/検証/レビューを新 session 世代で再実行する。修正 SHA の受領後、同じ App task の作業ツリーを fast-forward し再試験する。2修正後の再不合格は Yu 判断待ち。mock 成果物や不合格レビューは合格配送に昇格しない。ここまでローカル試験で、sense 実モデル未検証。
+- 版・hash・契約・SHA・宛先を検査する配送と、message ID による重複防止。UI で Platform task ID に紐づく App 受入を登録でき、実モデル工程の固定差分・credentialless 検証・Opus 合格がそろった場合だけ controller が3成果物を自動配送する。App はシナリオ・契約・SHA・期待/実測を固定した判定を返し、不合格は Platform 実装 agent に配送して実装/検証/レビューを新 session 世代で再実行する。修正 SHA の受領後、同じ App task の作業ツリーを fast-forward し再試験する。2修正後の再不合格は Yu 判断待ち。完了済み受入成果物の破損・不正形式は当該 App task だけ確認待ちへ隔離し、他案件の配車を止めない。mock 成果物や不合格レビューは合格配送に昇格しない。ここまでローカル試験で、sense 実モデル未検証。
 - 作者とは別 session の Release Gate。`allow` には Sol の commit 済み差分、credentialless 検証の pass、Opus の SHA 固定 JSON 合格、controller 所有の Git 差分 scan、操作・配備先・影響・戻し方を固定した候補、実際の Astra 出力が必要。未束縛の Gate agent は配車しない。caller が Astra の `deny` や別操作を `allow` に読み替えることを拒否し、publish intent 作成時にも再照合する。scan は送信予定の全 commit を検査し、中間 commit の秘密・公開経路・binary・高リスク path を保留する。scan の `candidate` は機密なし・非公開の証明ではなく、独立 agent・CI・配備影響の追加確認が必要。外部操作前に intent を保存する。
 - UI の loopback bind、管理 token login、HttpOnly cookie、CSRF、停止・Mac優先。provider の自動推論はまだ起動しない。
 - UI から質問への回答と、Release Gate が `needs_human` とした操作の判断を記録。契約/SHA/操作/期限と再送IDを照合し、同じ送信は冪等、古いカードは拒否する。承認記録だけでは publisher は起動せず、独立 Gate の新しい `allow` が必要。

@@ -46,7 +46,7 @@ tags: [kensan-lab, sense, autonomous-development, operations]
 
 1. `sudo bash private-host-service.sh install <binary> <tokens.css> <unit-file> <binary-sha> <tokens-sha> <unit-sha>`。
 2. `sudo bash deploy/private-listener-smoke.sh <reviewed-unit-sha256> <reviewed-binary-sha256>` を sense で read-only 実行する。root 権限は socket 所有 PID と `/proc/<MainPID>/exe` の照合にだけ使う。service、unit/binary hash、実効 fragment/drop-in/ExecStart/Environment、MainPID と socket 所有者、`127.0.0.1:8787` だけの待受、loopback `/login` の HTTP 200 を検査する。`journalctl -u ...` も確認。非 loopback 待受なら即 rollback。
-3. **別ホスト**から sense の LAN IPv4:8787 と global IPv6:8787 への接続拒否を確認する。host 自身から LAN IP を叩く試験で代用しない。timeout、IPv6 到達経路なし、試験元の障害は「拒否成功」でなく試験不能と記録する。8787 の直結拒否だけでは別 port・tunnel・proxy 経由の公開を否定できないため、既存 tunnel/proxy/Ingress/CI、firewall・ルーター、preview 公開の経路を read-only で照合する。smoke script の `EXTERNAL_ROUTE=unverified` はこの別検査が必要な印。経路不明なら `private-ready` は保留。
+3. **別ホスト**から sense の LAN IPv4:8787 と global IPv6:8787 への接続拒否を確認する。Mac の `apps/sense-dev` で `go run ./cmd/private-route-probe -lan-ip <棚卸ししたLAN IPv4> -global-ipv6 <棚卸ししたglobal IPv6>` を実行する。出力 JSON は IP/host 名を含むため保護された非追跡の証拠ファイルへ保存し、公開 PR に貼らない。両方が `direct_refused` のときだけ終了コード0。`reachable` は失敗、timeout・no_route・試験元の障害は `unknown` で失敗とし、「拒否成功」に読み替えない。host 自身から LAN IP を叩く試験で代用しない。8787 の直結拒否だけでは別 port・tunnel・proxy 経由の公開を否定できないため、既存 tunnel/proxy/Ingress/CI、firewall・ルーター、preview 公開の経路を read-only で照合する。smoke script の `EXTERNAL_ROUTE=unverified` はこの別検査が必要な印。経路不明なら `private-ready` は保留。
 4. mock task を投入し、Mac 側の terminal/browser を閉じても event が増えることを確認する。`systemctl restart` と host reboot 後に永続台帳・outbox・重複なしを確認する。reboot は共有 workload への影響と復旧手段を再確認してから行う。
 
 ## 停止・復旧

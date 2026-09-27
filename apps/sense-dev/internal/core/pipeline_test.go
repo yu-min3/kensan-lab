@@ -4,6 +4,8 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -381,6 +383,69 @@ func TestThirdAppFailureRequiresHumanDecision(t *testing.T) {
 	state := s.Snapshot()
 	if state.Tasks[platform.ID].Status != "decision_wait" || state.Tasks[platform.ID].CorrectionCount != 2 || state.Tasks[app.ID].Status != "revision_wait" {
 		t.Fatal("third failure silently restarted correction")
+	}
+}
+
+func TestCorruptAcceptanceEvidenceIsQuarantinedWithoutBlockingOtherTask(t *testing.T) {
+	s := testStore(t)
+	platform, stages, err := s.CreatePlannedTask("mission", Platform, "change", "canary", "v1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	app, appAgent, err := s.CreateLinkedAcceptanceTask(platform.ID, "consumer scenario")
+	if err != nil {
+		t.Fatal(err)
+	}
+	other, _, err := s.CreatePlannedTask("other", App, "analysis", "independent task", "v1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	head := strings.Repeat("a", 40)
+	if err := s.SetHeadSHA(platform.ID, head); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.SetHeadSHA(app.ID, head); err != nil {
+		t.Fatal(err)
+	}
+	body, err := json.Marshal(AcceptanceResult{SchemaVersion: 1, Verdict: "pass", ScenarioID: app.ID, ContractVersion: app.ContractVersion, HeadSHA: head, Expected: app.Title, Observed: "passed"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	artifact, err := s.PutArtifact(appAgent.ID, "result-app_acceptance", body)
+	if err != nil {
+		t.Fatal(err)
+	}
+	ref := artifactRef(artifact)
+	if err := s.update(func(st *State) error {
+		p := st.Tasks[platform.ID]
+		p.Status = "publish_wait"
+		st.Tasks[p.ID] = p
+		for _, stage := range stages {
+			a := st.Agents[stage.ID]
+			a.Status = "completed"
+			st.Agents[a.ID] = a
+		}
+		a := st.Tasks[app.ID]
+		a.Status = "done"
+		st.Tasks[a.ID] = a
+		agent := st.Agents[appAgent.ID]
+		agent.Status = "completed"
+		st.Agents[agent.ID] = agent
+		st.Attempts["corrupt-result"] = Attempt{ID: "corrupt-result", AgentID: agent.ID, TaskID: app.ID, Generation: 1, ContractVersion: app.ContractVersion, HeadSHA: head, Status: "completed", OutputRef: &ref}
+		return nil
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(s.root, artifact.Path), []byte("tampered"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	worked, err := s.Tick(context.Background(), &fakeRunner{}, nil)
+	if err != nil || !worked {
+		t.Fatalf("corrupt App blocked independent task: %t %v", worked, err)
+	}
+	state := s.Snapshot()
+	if state.Tasks[app.ID].Status != "decision_wait" || len(state.Messages) != 0 || state.Tasks[other.ID].Status != "done" {
+		t.Fatal("corrupt App evidence was accepted or blocked unrelated work")
 	}
 }
 

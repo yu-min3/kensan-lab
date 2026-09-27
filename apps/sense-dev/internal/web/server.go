@@ -69,6 +69,9 @@ func agentWaitReason(st core.State, a core.Agent, workerMode string, allowed boo
 	}
 	task := st.Tasks[a.TaskID]
 	if task.Team == core.App && task.Kind == "acceptance" && task.SourceTaskID != "" {
+		if task.Status == "decision_wait" {
+			return "受入証拠の確認待ち"
+		}
 		if st.Tasks[task.SourceTaskID].Status == "decision_wait" {
 			return "Yu の判断待ち"
 		}

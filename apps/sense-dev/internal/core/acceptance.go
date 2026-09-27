@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"io"
 	"strings"
 	"time"
@@ -73,11 +72,17 @@ func (s *Store) ReconcileAcceptanceOutcomes() (int, error) {
 		}
 		body, err := s.ReadArtifact(attempt.OutputRef.ID)
 		if err != nil {
-			return count, err
+			if err := s.quarantineAcceptance(app.ID, attempt.ID, "artifact_unreadable"); err != nil {
+				return count, err
+			}
+			continue
 		}
 		result, err := parseAcceptanceResult(body, app)
 		if err != nil {
-			return count, fmt.Errorf("completed acceptance has invalid result: %w", err)
+			if err := s.quarantineAcceptance(app.ID, attempt.ID, "result_invalid"); err != nil {
+				return count, err
+			}
+			continue
 		}
 		messageID := "acceptance-" + attempt.ID
 		created := false
@@ -152,4 +157,18 @@ func (s *Store) ReconcileAcceptanceOutcomes() (int, error) {
 		}
 	}
 	return count, nil
+}
+
+func (s *Store) quarantineAcceptance(taskID, attemptID, reason string) error {
+	return s.update(func(st *State) error {
+		task, ok := st.Tasks[taskID]
+		attempt := st.Attempts[attemptID]
+		if !ok || task.Team != App || task.Kind != "acceptance" || task.SourceTaskID == "" || attempt.TaskID != taskID || attempt.Status != "completed" || task.Status != "done" && task.Status != "revision_wait" {
+			return nil
+		}
+		task.Status, task.UpdatedAt = "decision_wait", time.Now().UTC()
+		st.Tasks[task.ID] = task
+		st.Events = append(st.Events, event("acceptance_needs_inspection", taskID, reason))
+		return nil
+	})
 }

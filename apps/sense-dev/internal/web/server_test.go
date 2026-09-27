@@ -60,6 +60,9 @@ func TestLinkedAppWaitReason(t *testing.T) {
 	if got := agentWaitReason(state, agent, "mock", true, time.Now()); got != "Yu の判断待ち" {
 		t.Fatalf("decision wait: %s", got)
 	}
+	app.Status = "decision_wait"
+	state.Tasks["app"] = app
+	if got := agentWaitReason(state, agent, "mock", true, time.Now()); got != "受入証拠の確認待ち" { t.Fatalf("corrupt acceptance wait: %s", got) }
 }
 
 func TestCreateLinkedAppAcceptanceFromForm(t *testing.T) {
