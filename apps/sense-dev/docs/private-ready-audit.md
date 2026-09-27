@@ -10,7 +10,7 @@ tags: [kensan-lab, sense, autonomous-development, audit]
 
 **private-ready は未達。** `sense`（192.168.0.113）への SSH が復旧し、2026-09-27 に read-only 棚卸しを実施した。ただし 13:16 UTC にこの作業と別の操作で単一ノード k3s が停止・無効化され、libvirt の導入が始まった。導入対象の前提が変化したため、このスレッドからの sense 変更は保留する。専用 service は未導入で、IPv4/IPv6・既存公開経路の実測も未完了。`private-ready` や v0 完了を宣言しない。Cloudflare・既存公開経路は変更していない。
 
-最新の固定 source SHA: `4918d15`（専用 worktree `feat/sense-autonomous-development`）。manifest `private-bootstrap-candidate-4918d15.json` と独立 Astra 判定 `private-bootstrap-review-4918d15.json` は、再現 build と固定 hash を確認済み。ただし `code_candidate=allow` に限り、`host_install=needs_human`・`execution_authorized=false`。実装と検証はローカル段階で継続中。
+直近の host 導入候補に固定した source SHA は `4918d15`（専用 worktree `feat/sense-autonomous-development`）。manifest `private-bootstrap-candidate-4918d15.json` と独立 Astra 判定 `private-bootstrap-review-4918d15.json` は、その SHA に限って再現 build と固定 hash を確認済み。ただし `code_candidate=allow` に限り、`host_install=needs_human`・`execution_authorized=false`。後続の状態ディレクトリ保護などのコード変更は候補に含まれないため、実機導入時には新しい source から候補・hash・独立レビューを作り直す。実装と検証はローカル段階で継続中。
 
 ## 今回の判断
 

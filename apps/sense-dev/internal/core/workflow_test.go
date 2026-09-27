@@ -83,7 +83,7 @@ func (r releaseReadyRunner) Run(_ context.Context, d Dispatch) (RunResult, error
 
 func testStore(t *testing.T) *Store {
 	t.Helper()
-	s, err := Open(t.TempDir())
+	s, err := Open(filepath.Join(t.TempDir(), "state"))
 	if err != nil {
 		t.Fatal(err)
 	}

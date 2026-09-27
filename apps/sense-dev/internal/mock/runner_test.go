@@ -3,13 +3,14 @@ package mock
 import (
 	"context"
 	"encoding/json"
+	"path/filepath"
 	"testing"
 
 	"github.com/yu-min3/kensan-lab/apps/sense-dev/internal/core"
 )
 
 func TestPlannedTaskRunsToPublishWaitWithoutModel(t *testing.T) {
-	store, err := core.Open(t.TempDir())
+	store, err := core.Open(filepath.Join(t.TempDir(), "state"))
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -23,11 +23,19 @@ type Store struct {
 }
 
 func Open(root string) (*Store, error) {
-	if root == "" || !filepath.IsAbs(root) {
-		return nil, errors.New("state root must be absolute")
+	if root == "" || !filepath.IsAbs(root) || filepath.Clean(root) == "/" {
+		return nil, errors.New("state root must be an absolute non-root directory")
 	}
+	root = filepath.Clean(root)
 	if err := os.MkdirAll(root, 0700); err != nil {
 		return nil, err
+	}
+	info, err := os.Lstat(root)
+	if err != nil || !info.IsDir() || info.Mode()&os.ModeSymlink != 0 {
+		return nil, errors.New("state root must be a real directory")
+	}
+	if info.Mode().Perm()&0077 != 0 {
+		return nil, fmt.Errorf("state root must be private (mode %04o)", info.Mode().Perm())
 	}
 	lock, err := os.OpenFile(filepath.Join(root, "controller.lock"), os.O_CREATE|os.O_RDWR, 0600)
 	if err != nil {
