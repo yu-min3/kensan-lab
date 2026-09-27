@@ -89,12 +89,14 @@ case ${1:-} in
     systemctl daemon-reload
     [[ $(systemctl show "$service" -p LoadState --value) == loaded ]] || { printf 'systemd did not load reviewed unit\n' >&2; exit 1; }
     [[ $(systemctl show "$service" -p FragmentPath --value) == "$unit" ]] || { printf 'unexpected unit fragment\n' >&2; exit 1; }
-    [[ -z $(systemctl show "$service" -p DropInPaths --value) ]] || { printf 'unexpected unit drop-in\n' >&2; exit 1; }
+    dropins=$(systemctl show "$service" -p DropInPaths --value)
+    [[ -z $dropins ]] || { printf 'unexpected unit drop-in\n' >&2; exit 1; }
     [[ $(systemctl show "$service" -p User --value) == kensan-dev ]] || { printf 'unexpected unit user\n' >&2; exit 1; }
     [[ $(systemctl show "$service" -p Group --value) == kensan-dev ]] || { printf 'unexpected unit group\n' >&2; exit 1; }
     exec_start=$(systemctl show "$service" -p ExecStart --value)
     [[ $exec_start == *'path=/opt/kensan-dev/bin/sense-dev'* && $exec_start == *'argv[]=/opt/kensan-dev/bin/sense-dev -listen 127.0.0.1:8787 '* && $exec_start == *'-mock-worker'* ]] || { printf 'unexpected effective ExecStart\n' >&2; exit 1; }
-    [[ -z $(systemctl show "$service" -p Environment --value) ]] || { printf 'unexpected unit environment\n' >&2; exit 1; }
+    environment=$(systemctl show "$service" -p Environment --value)
+    [[ -z $environment ]] || { printf 'unexpected unit environment\n' >&2; exit 1; }
     service_armed=1
     systemctl enable "$service"
     if ! systemctl start "$service" || ! systemctl is-active --quiet "$service"; then
