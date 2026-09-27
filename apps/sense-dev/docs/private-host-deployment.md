@@ -12,7 +12,7 @@ tags: [kensan-lab, sense, autonomous-development, operations]
 
 **現在は実機変更を保留。** 13:16 UTC に別作業で `k3s` が停止・無効化され、14:55 UTC には `sense-llm`（4 GiB）と `sense-desktop`（6 GiB）が稼働・自動起動していた。host の available memory は約4.6 GiB。所有者・用途・資源配分が確定するまで、この runbook を sense に適用しない。固定候補の独立コード審査は `allow` だったが、実機の Release Gate は `needs_human` のまま。
 
-直近の審査済み固定候補は source `b1743e4`、manifest `private-bootstrap-candidate-b1743e4.json`（commit `f294e09`）。独立 Astra reviewer は clean な source archive から Go 1.25.5 / linux-amd64 / CGO 無効 / `-buildvcs=false -trimpath` で再 build し、候補 binary と同じ SHA-256 `6cbbc12fb84faf2dbfee7a83ffc9f1cc39f650ef9f35b93ff01af0e835f3c0b2` を確認した。判定は `private-bootstrap-review-b1743e4.json` に固定した。`code_candidate=allow`、`host_install=needs_human`、`execution_authorized=false`。その後 `ac2a137` で rollback を固定 unit/binary の照合後に限定したため、**この候補は現行 source の導入に使えない**。導入前に候補・hash・独立レビューを更新する。
+直近の審査済み固定候補は source `ee431b9`、manifest `private-bootstrap-candidate-ee431b9.json`（commit `83c52d2`）。独立 Astra reviewer は clean な source archive から Go 1.25.5 / linux-amd64 / CGO 無効 / `-buildvcs=false -trimpath` で再 build し、候補 binary と同じ SHA-256 `6cbbc12fb84faf2dbfee7a83ffc9f1cc39f650ef9f35b93ff01af0e835f3c0b2` を確認した。変更した rollback 分岐は隔離 fixture の正常系1件・拒否系9件で検査した。判定は `private-bootstrap-review-ee431b9.json` に固定した。`code_candidate=allow`、`host_install=needs_human`、`execution_authorized=false`。後続のコード変更、期限切れ、実機環境の変化には候補と独立レビューを更新する。
 
 ## 実測前提（2026-09-27）
 

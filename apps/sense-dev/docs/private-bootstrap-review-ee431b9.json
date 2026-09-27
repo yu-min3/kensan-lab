@@ -1,0 +1,76 @@
+{
+  "schema_version": 1,
+  "kind": "independent_release_gate_review",
+  "reviewed_at": "2026-09-27T15:02:52Z",
+  "reviewer": {
+    "agent_session": "/root/bootstrap_ee431_review",
+    "role": "independent_release_gate_reviewer",
+    "authored_implementation": false,
+    "independence_basis": "Separate Astra reviewer inspected the fixed source, policy, manifest and artifacts, rebuilt from git archive and tested the changed rollback branch in an isolated fixture. No host or external operation."
+  },
+  "scope": {
+    "operation": "host_service_first_install",
+    "repo": "yu-min3/kensan-lab",
+    "ref": "feat/sense-autonomous-development",
+    "head_sha": "ee431b9c37669c0771cff8fab09eed97e324a602",
+    "source_commit": "ee431b9c37669c0771cff8fab09eed97e324a602",
+    "candidate_manifest_commit": "83c52d2f7c5a2baefa144f93e56d7a54aececa68",
+    "candidate_manifest_path": "apps/sense-dev/docs/private-bootstrap-candidate-ee431b9.json",
+    "candidate_manifest_sha256": "9e2a12f68768fcf4d9ab36c62e09c7c24a2d6636a524349873a27494d9128ff5",
+    "target_environment": "sense-private-host",
+    "policy_version": "private-bootstrap-v1",
+    "policy_sha256": "b6158fdc6b87bcf2636e80b77889bbb0e6bce367d7f323459106e79d81b43c66",
+    "expires_at": "2026-09-29T15:00:00Z",
+    "artifact_hashes": {
+      "linux_amd64_binary": "6cbbc12fb84faf2dbfee7a83ffc9f1cc39f650ef9f35b93ff01af0e835f3c0b2",
+      "install_script": "43469054f1e80b170e09cd4d1799b058c289f07702ece6c8eb7694109eb8d938",
+      "systemd_unit": "6c8e4d444fd0b2262f2ed0895883fa6208ca103bca0c84b79e464fe11ae73017",
+      "tokens_css": "bda4b1d91adb4ccf048cc8e50c33621f970ae991a3c422712c3b9bd5f614c011"
+    }
+  },
+  "decisions": {
+    "code_candidate": "allow",
+    "host_install": "needs_human",
+    "transfer_authorized": false,
+    "execution_authorized": false
+  },
+  "code_candidate_evidence": [
+    "Manifest SHA-256 at its fixed commit and policy/binary/installer/unit/tokens hashes match the fixed source archive and worktree.",
+    "Independent Go 1.25.5 linux/amd64 CGO-disabled -buildvcs=false -trimpath rebuild produced the same binary SHA-256. go test -race ./... -count=1 passed all 13 test-bearing packages and go vet ./... passed.",
+    "Unit selects only 127.0.0.1:8787 -mock-worker. The mock runner does not invoke models, edit code or publish; mock and isolated modes are exclusive and non-numeric-loopback bind is rejected.",
+    "Installer rejects occupied identity/path/unit/port, verifies hashes after protected staging and placement, and checks effective systemd settings before start.",
+    "Rollback checks reviewed unit/binary hashes, leaf symlinks, effective fragment/drop-ins/User/Group/Environment and fixed argv before disabling only the dedicated service. An isolated fixture with stubbed systemctl calls passed one valid and nine rejection cases."
+  ],
+  "independent_rebuild": {
+    "result": "match",
+    "source_method": "git archive ee431b9c37669c0771cff8fab09eed97e324a602",
+    "toolchain": "go1.25.5 darwin/arm64",
+    "goos": "linux",
+    "goarch": "amd64",
+    "cgo_enabled": false,
+    "flags": ["-buildvcs=false", "-trimpath"],
+    "package": "./cmd/sense-dev",
+    "sha256": "6cbbc12fb84faf2dbfee7a83ffc9f1cc39f650ef9f35b93ff01af0e835f3c0b2"
+  },
+  "host_install_pending_reasons": [
+    "Coordination with the operator of concurrent k3s/libvirt work is unanswered.",
+    "A fresh pre-install baseline including two autostart VMs, available resources, recovery path and dedicated identity/path/port is required.",
+    "Existing tunnel/proxy, global IPv6 and LAN/public reachability have not been disproven; AC-19 and private-ready remain pending."
+  ],
+  "execution_requirements": [
+    "After coordination and fresh baseline, obtain a separate independent host_install allow decision for the same source, artifacts, policy and expiry.",
+    "Copy the fixed installer to a root-managed path, verify that copy against the fixed install_script SHA-256 and run only the verified copy.",
+    "Do not reuse this review after source, artifact, policy, environment, operation or expiry changes.",
+    "Measure loopback, LAN, IPv4/IPv6 and existing public paths, event continuity and recovery before private-ready."
+  ],
+  "limitations": {
+    "private_ready": false,
+    "v0_complete": false,
+    "host_access_performed": false,
+    "host_mutations_performed": false,
+    "remote_mutations_performed": false,
+    "linux_host_execution_verified": false,
+    "rollback_runtime_verified": false,
+    "authorization_boundary": "code_candidate allow covers only the fixed mock bootstrap package. It does not authorize transfer, installation, real-model execution, notification sending, GitHub operations or public exposure."
+  }
+}
