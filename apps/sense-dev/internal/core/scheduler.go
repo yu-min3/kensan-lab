@@ -142,6 +142,9 @@ func (s *Store) claimNext(now time.Time, requireBase bool) (Attempt, bool, error
 			if a.Status != "ready" && a.Status != "retry_wait" && a.Status != "quota_wait" {
 				continue
 			}
+			if a.Role == "release_gate" && a.ReviewAuthorID == "" {
+				continue
+			}
 			if a.RetryAfter != nil && now.Before(*a.RetryAfter) || a.AttemptCount >= 3 || busyProviders[a.Provider] || busyTasks[a.TaskID] {
 				continue
 			}
@@ -353,7 +356,7 @@ func (s *Store) ManifestPrompt(m ContextManifest) (string, error) {
 	if m.Role == "implementation" {
 		b.WriteString("Implement only this task in the local task checkout. Run relevant tests and commit all intended changes locally before ending the turn. Do not add a remote, push, publish, or change deployment state. Report the tests and the local commit SHA.\n")
 	} else if m.Role == "implementation_review" {
-		b.WriteString("Review the pinned implementation change and independent verification result against the requirements. Do not modify the checkout or inherit the author's conversation. A passing verdict is invalid if the checkout HEAD differs from the manifest HEAD.\n")
+		b.WriteString("Review the pinned implementation change and independent verification result against the requirements. Do not modify the checkout or inherit the author's conversation. A passing verdict is invalid if the checkout HEAD differs from the manifest HEAD. Return only JSON: {\"schema_version\":1,\"verdict\":\"pass|fail|needs_human\",\"head_sha\":\"<manifest head>\",\"implementation_sha256\":\"<implementation artifact SHA-256>\",\"verification_sha256\":\"<verification artifact SHA-256>\",\"reason\":\"<specific evidence>\"}. No Markdown fences.\n")
 	}
 	for _, entry := range []struct {
 		name string

@@ -80,6 +80,17 @@ func TestSchedulerIndependentTeamsAndDependencies(t *testing.T) {
 	}
 }
 
+func TestReleaseGateDoesNotRunWithoutPinnedInputs(t *testing.T) {
+	s := testStore(t)
+	_, gate := taskAgent(t, s, Platform, "release_gate")
+	if attempt, worked, err := s.ClaimNext(time.Now()); err != nil || worked || attempt.ID != "" {
+		t.Fatalf("unbound release gate was dispatched: %+v %t %v", attempt, worked, err)
+	}
+	if s.Snapshot().Agents[gate.ID].Status != "ready" {
+		t.Fatal("unbound release gate state changed")
+	}
+}
+
 func TestIsolatedDispatchWaitsForPinnedTaskBase(t *testing.T) {
 	s := testStore(t)
 	task, _, err := s.CreatePlannedTask("mission", Platform, "change", "pinned worktree", "v1")

@@ -1,12 +1,71 @@
 package core
 
 import (
+	"context"
+	"encoding/json"
+	"errors"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 	"time"
 )
+
+type releaseReadyRunner struct {
+	base, head       string
+	failVerification bool
+	reviewVerdict    string
+	wrongReviewHash  bool
+}
+
+func (r releaseReadyRunner) Run(_ context.Context, d Dispatch) (RunResult, error) {
+	if d.Attempt.Role != "verification" {
+		if err := d.BindSession("thread-" + d.Attempt.ID); err != nil {
+			return RunResult{}, err
+		}
+	}
+	encode := func(value any) RunResult {
+		body, _ := json.Marshal(value)
+		return RunResult{Output: body}
+	}
+	patch := "diff --git a/canary b/canary\n+safe change\n"
+	switch d.Attempt.Role {
+	case "implementation":
+		result := encode(map[string]any{"schema_version": 1, "change": map[string]any{"base_sha": r.base, "head_sha": r.head, "clean": true, "diff_sha256": digest([]byte(patch)), "patch": patch}})
+		result.HeadSHA = r.head
+		return result, nil
+	case "verification":
+		status := "passed"
+		if r.failVerification {
+			status = "failed"
+		}
+		result := encode(map[string]any{"schema_version": 1, "base_sha": r.base, "head_sha": r.head, "diff_sha256": digest([]byte(patch)), "plan_sha256": strings.Repeat("c", 64), "status": status, "checks": []map[string]string{{"name": "git-diff-check", "status": "passed"}, {"name": "unit", "status": status}}})
+		if r.failVerification {
+			return result, RunError{Kind: "failed", Err: errors.New("test failed")}
+		}
+		return result, nil
+	case "implementation_review":
+		var implementation, verification ArtifactRef
+		for _, input := range d.Manifest.StageInputs {
+			switch input.Role {
+			case "implementation":
+				implementation = input.Artifact
+			case "verification":
+				verification = input.Artifact
+			}
+		}
+		verdict := r.reviewVerdict
+		if verdict == "" {
+			verdict = "pass"
+		}
+		if r.wrongReviewHash {
+			verification.SHA256 = strings.Repeat("d", 64)
+		}
+		return encode(map[string]any{"schema_version": 1, "verdict": verdict, "head_sha": r.head, "implementation_sha256": implementation.SHA256, "verification_sha256": verification.SHA256, "reason": "pinned diff and tests reviewed"}), nil
+	default:
+		return RunResult{Output: []byte("stage output")}, nil
+	}
+}
 
 func testStore(t *testing.T) *Store {
 	t.Helper()
@@ -137,22 +196,30 @@ func TestRejectWrongRecipientStaleSHAAndTamperedArtifact(t *testing.T) {
 
 func TestSessionOwnerAndReleaseGate(t *testing.T) {
 	s := testStore(t)
-	task, author := taskAgent(t, s, Platform, "implementation")
-	_, gate := taskAgent(t, s, Platform, "release_gate")
-	if err := s.SetHeadSHA(task.ID, strings.Repeat("a", 40)); err != nil {
-		t.Fatal(err)
-	}
-	if err := s.SetBaseSHA(task.ID, strings.Repeat("b", 40)); err != nil {
-		t.Fatal(err)
-	}
-	am, err := s.BuildManifest(author.ID, nil)
+	task, stages, err := s.CreatePlannedTask("golden-path", Platform, "change", "canary", "contract-v1")
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := s.SetAgentSession(author.ID, author.Provider, author.Model, "thread-author", am.InputSHA256, 1); err != nil {
+	author := stages[2]
+	_, gate := taskAgent(t, s, Platform, "release_gate")
+	if err := s.SetBaseSHA(task.ID, strings.Repeat("b", 40)); err != nil {
 		t.Fatal(err)
 	}
-	source, _ := s.PutArtifact(author.ID, "change_ready", []byte("diff"))
+	for i := 0; i < len(stages); i++ {
+		worked, err := s.Tick(context.Background(), releaseReadyRunner{base: strings.Repeat("b", 40), head: strings.Repeat("a", 40)}, []string{"isolated-model-worker"})
+		if err != nil || !worked {
+			t.Fatalf("prepare release stage %d: %t %v", i, worked, err)
+		}
+	}
+	var source Artifact
+	for _, attempt := range s.Snapshot().Attempts {
+		if attempt.AgentID == author.ID && attempt.OutputRef != nil {
+			source = s.Snapshot().Artifacts[attempt.OutputRef.ID]
+		}
+	}
+	if source.ID == "" {
+		t.Fatal("implementation artifact missing")
+	}
 	scanRef, err := s.recordReleaseScan(ReleaseScan{BaseSHA: strings.Repeat("b", 40), HeadSHA: strings.Repeat("a", 40), Repository: "yu-min3/kensan-lab", Ref: "refs/heads/feat/canary", Operation: "pr_create", PolicyVersion: ReleasePolicyVersion, Status: "candidate", CommitCount: 1, DiffSHA256: strings.Repeat("c", 64), ScannedAt: time.Now().UTC()})
 	if err != nil {
 		t.Fatal(err)
@@ -160,14 +227,14 @@ func TestSessionOwnerAndReleaseGate(t *testing.T) {
 	if err := s.BindReleaseGateInputs(gate.ID, author.ID, []ArtifactRef{artifactRef(source)}, scanRef); err != nil {
 		t.Fatal(err)
 	}
-	gm, err := s.BuildManifest(gate.ID, nil)
-	if err != nil || len(gm.ReviewInputs) != 2 || gm.ReviewAuthorID != author.ID {
+	gm, err := s.BuildManifest(gate.ID, []string{"isolated-model-worker"})
+	if err != nil || len(gm.ReviewInputs) != 4 || gm.ReviewAuthorID != author.ID {
 		t.Fatalf("gate manifest missing evidence: %+v %v", gm, err)
 	}
 	if err := s.SetAgentSession(gate.ID, gate.Provider, gate.Model, "thread-gate", gm.InputSHA256, 1); err != nil {
 		t.Fatal(err)
 	}
-	if err := s.SetAgentSession(gate.ID, gate.Provider, gate.Model, "thread-author", gm.InputSHA256, 1); err == nil {
+	if err := s.SetAgentSession(gate.ID, gate.Provider, gate.Model, s.Snapshot().Agents[author.ID].SessionID, gm.InputSHA256, 1); err == nil {
 		t.Fatal("wrong session reuse accepted")
 	}
 	if err := s.NewSessionGeneration(gate.ID); err != nil {
@@ -176,7 +243,7 @@ func TestSessionOwnerAndReleaseGate(t *testing.T) {
 	if err := s.SetAgentSession(gate.ID, gate.Provider, gate.Model, "thread-gate-2", gm.InputSHA256, 1); err == nil {
 		t.Fatal("old generation accepted")
 	}
-	gm, _ = s.BuildManifest(gate.ID, nil)
+	gm, _ = s.BuildManifest(gate.ID, []string{"isolated-model-worker"})
 	if err := s.SetAgentSession(gate.ID, gate.Provider, gate.Model, "thread-gate-2", gm.InputSHA256, 2); err != nil {
 		t.Fatal(err)
 	}
@@ -218,11 +285,78 @@ func TestSessionOwnerAndReleaseGate(t *testing.T) {
 	if err != nil || first.ID != second.ID {
 		t.Fatal("publish intent is not idempotent")
 	}
+	if err := s.update(func(st *State) error {
+		review := st.Agents[stages[4].ID]
+		review.Status = "failed"
+		st.Agents[review.ID] = review
+		return nil
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.PreparePublish(d.ID, d.Operation, d.Repository, d.Ref, d.HeadSHA); err == nil {
+		t.Fatal("already-created intent survived quality review invalidation")
+	}
+	if err := s.update(func(st *State) error {
+		review := st.Agents[stages[4].ID]
+		review.Status = "completed"
+		st.Agents[review.ID] = review
+		return nil
+	}); err != nil {
+		t.Fatal(err)
+	}
 	if err := s.SetHeadSHA(task.ID, strings.Repeat("b", 40)); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := s.PreparePublish(d.ID, d.Operation, d.Repository, d.Ref, d.HeadSHA); err == nil {
 		t.Fatal("old decision authorized changed head")
+	}
+}
+
+func TestReleaseGateRejectsIncompleteOrNegativeQualityEvidence(t *testing.T) {
+	for _, tc := range []struct {
+		name  string
+		turns int
+		run   releaseReadyRunner
+	}{
+		{"before-verification", 3, releaseReadyRunner{}},
+		{"failed-verification", 4, releaseReadyRunner{failVerification: true}},
+		{"opus-rejected", 5, releaseReadyRunner{reviewVerdict: "fail"}},
+		{"wrong-review-hash", 5, releaseReadyRunner{wrongReviewHash: true}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			s := testStore(t)
+			base, head := strings.Repeat("b", 40), strings.Repeat("a", 40)
+			task, stages, err := s.CreatePlannedTask("golden-path", Platform, "change", "canary", "contract-v1")
+			if err != nil {
+				t.Fatal(err)
+			}
+			if err := s.SetBaseSHA(task.ID, base); err != nil {
+				t.Fatal(err)
+			}
+			for i := 0; i < tc.turns; i++ {
+				worked, err := s.Tick(context.Background(), releaseReadyRunner{base: base, head: head, failVerification: tc.run.failVerification, reviewVerdict: tc.run.reviewVerdict, wrongReviewHash: tc.run.wrongReviewHash}, []string{"isolated-model-worker"})
+				if err != nil || !worked {
+					t.Fatalf("stage %d: %t %v", i, worked, err)
+				}
+			}
+			var source ArtifactRef
+			for _, attempt := range s.Snapshot().Attempts {
+				if attempt.AgentID == stages[2].ID && attempt.OutputRef != nil {
+					source = *attempt.OutputRef
+				}
+			}
+			if source.ID == "" {
+				t.Fatal("fixture implementation missing")
+			}
+			_, gate := taskAgent(t, s, Platform, "release_gate")
+			scanRef, err := s.recordReleaseScan(ReleaseScan{BaseSHA: base, HeadSHA: head, Repository: "yu-min3/kensan-lab", Ref: "refs/heads/feat/canary", Operation: "pr_create", PolicyVersion: ReleasePolicyVersion, Status: "candidate", CommitCount: 1, DiffSHA256: strings.Repeat("c", 64), ScannedAt: time.Now().UTC()})
+			if err != nil {
+				t.Fatal(err)
+			}
+			if err := s.BindReleaseGateInputs(gate.ID, stages[2].ID, []ArtifactRef{source}, scanRef); err == nil {
+				t.Fatal("release gate accepted incomplete or negative quality evidence")
+			}
+		})
 	}
 }
 
