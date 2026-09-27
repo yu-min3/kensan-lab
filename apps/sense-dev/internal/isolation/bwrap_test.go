@@ -1,6 +1,7 @@
 package isolation
 
 import (
+	"context"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -24,7 +25,7 @@ func testConfig(t *testing.T) Config {
 
 func TestCommandMountsOnlyAllowlistedPaths(t *testing.T) {
 	c := testConfig(t)
-	cmd, err := c.Command("/usr/bin/worker", "--task", "one")
+	cmd, err := c.Command(context.Background(), "/usr/bin/worker", "--task", "one")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -55,12 +56,12 @@ func TestCommandMountsOnlyAllowlistedPaths(t *testing.T) {
 func TestRejectsOverlapsAndHostRoot(t *testing.T) {
 	c := testConfig(t)
 	c.AuthHome = c.ControllerState
-	if _, err := c.Command("/usr/bin/worker"); err == nil {
+	if _, err := c.Command(context.Background(), "/usr/bin/worker"); err == nil {
 		t.Fatal("state mounted as auth home")
 	}
 	c = testConfig(t)
 	c.RuntimeRoot = "/"
-	if _, err := c.Command("/usr/bin/worker"); err == nil {
+	if _, err := c.Command(context.Background(), "/usr/bin/worker"); err == nil {
 		t.Fatal("host root mounted as runtime")
 	}
 	c = testConfig(t)
@@ -68,7 +69,7 @@ func TestRejectsOverlapsAndHostRoot(t *testing.T) {
 	if err := os.Mkdir(c.ControllerState, 0700); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := c.Command("/usr/bin/worker"); err == nil {
+	if _, err := c.Command(context.Background(), "/usr/bin/worker"); err == nil {
 		t.Fatal("worktree contains controller state")
 	}
 }
@@ -80,7 +81,7 @@ func TestRejectsSymlinkToState(t *testing.T) {
 		t.Fatal(err)
 	}
 	c.AuthHome = alias
-	if _, err := c.Command("/usr/bin/worker"); err == nil {
+	if _, err := c.Command(context.Background(), "/usr/bin/worker"); err == nil {
 		t.Fatal("symlink alias bypassed overlap check")
 	}
 }
@@ -90,7 +91,7 @@ func TestRejectsSharedAuthHome(t *testing.T) {
 	if err := os.Chmod(c.AuthHome, 0755); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := c.Command("/usr/bin/worker"); err == nil {
+	if _, err := c.Command(context.Background(), "/usr/bin/worker"); err == nil {
 		t.Fatal("world-readable auth home accepted")
 	}
 }
@@ -98,7 +99,7 @@ func TestRejectsSharedAuthHome(t *testing.T) {
 func TestRejectsProgramOutsideRuntime(t *testing.T) {
 	c := testConfig(t)
 	for _, program := range []string{"../worker", "/", "/usr/bin/missing", "/usr/bin/../bin/worker"} {
-		if _, err := c.Command(program); err == nil {
+		if _, err := c.Command(context.Background(), program); err == nil {
 			t.Errorf("accepted program %q", program)
 		}
 	}

@@ -33,6 +33,21 @@ type Event struct {
 	Kind      string `json:"kind,omitempty"`
 }
 
+// Ack is sent only after the controller has durably bound the session to its
+// agent and attempt. The worker must not start a model turn before receiving it.
+type Ack struct {
+	Version   int    `json:"version"`
+	Type      string `json:"type"`
+	SessionID string `json:"session_id"`
+}
+
+func (a Ack) Validate(expected string) error {
+	if a.Version != Version || a.Type != "continue" || expected == "" || a.SessionID != expected {
+		return errors.New("worker session acknowledgement mismatch")
+	}
+	return nil
+}
+
 func (r Request) Validate() error {
 	if r.Version != Version || len(r.AttemptID) == 0 || len(r.AttemptID) > 128 || strings.TrimSpace(r.Prompt) == "" || len(r.Prompt) > MaxPrompt || len(r.ExistingSession) > 256 {
 		return errors.New("invalid worker request envelope")
@@ -55,11 +70,11 @@ func (e Event) Validate() error {
 			return errors.New("invalid session event")
 		}
 	case "result":
-		if e.Output == "" || len(e.Output) > MaxOutput || e.Kind != "" {
+		if e.Output == "" || len(e.Output) > MaxOutput || e.Kind != "" || e.SessionID != "" {
 			return errors.New("invalid result event")
 		}
 	case "failure":
-		if e.Output != "" || !validFailureKind(e.Kind) {
+		if e.Output != "" || e.SessionID != "" || !validFailureKind(e.Kind) {
 			return errors.New("invalid failure event")
 		}
 	default:

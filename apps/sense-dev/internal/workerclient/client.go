@@ -1,0 +1,145 @@
+package workerclient
+
+import (
+	"bufio"
+	"context"
+	"encoding/json"
+	"errors"
+	"fmt"
+	"io"
+	"os/exec"
+	"time"
+
+	"github.com/yu-min3/kensan-lab/apps/sense-dev/internal/core"
+	"github.com/yu-min3/kensan-lab/apps/sense-dev/internal/isolation"
+	"github.com/yu-min3/kensan-lab/apps/sense-dev/internal/workerwire"
+)
+
+// Runner uses a separate bubblewrap process for every provider turn. No
+// controller state path, admin token, or publisher credential is sent over the
+// protocol. Installation must still preflight the actual host namespaces.
+type Runner struct {
+	Claude        isolation.Config
+	Codex         isolation.Config
+	WorkerProgram string
+	Timeout       time.Duration
+}
+
+func (r Runner) Run(ctx context.Context, dispatch core.Dispatch) (core.RunResult, error) {
+	if dispatch.BindSession == nil || r.WorkerProgram == "" || r.Timeout <= 0 {
+		return core.RunResult{}, errors.New("isolated worker configuration incomplete")
+	}
+	request := workerwire.Request{Version: workerwire.Version, AttemptID: dispatch.Attempt.ID, Provider: dispatch.Attempt.Provider, Model: dispatch.Attempt.Model, Prompt: dispatch.Prompt, ExistingSession: dispatch.Attempt.SessionID}
+	if err := request.Validate(); err != nil {
+		return core.RunResult{}, err
+	}
+	config := r.Codex
+	if request.Provider == "claude" {
+		config = r.Claude
+	}
+	turnCtx, cancel := context.WithTimeout(ctx, r.Timeout)
+	defer cancel()
+	cmd, err := config.Command(turnCtx, r.WorkerProgram)
+	if err != nil {
+		return core.RunResult{}, err
+	}
+	result, err := runProcess(cmd, request, dispatch.BindSession)
+	if errors.Is(turnCtx.Err(), context.DeadlineExceeded) {
+		return core.RunResult{}, core.RunError{Kind: "retry_wait", Err: context.DeadlineExceeded}
+	}
+	if errors.Is(ctx.Err(), context.Canceled) {
+		return core.RunResult{}, core.RunError{Kind: "interrupted", Err: context.Canceled}
+	}
+	return result, err
+}
+
+func runProcess(cmd *exec.Cmd, request workerwire.Request, bindSession func(string) error) (core.RunResult, error) {
+	input, err := cmd.StdinPipe()
+	if err != nil {
+		return core.RunResult{}, err
+	}
+	output, err := cmd.StdoutPipe()
+	if err != nil {
+		return core.RunResult{}, err
+	}
+	// Provider stderr is deliberately discarded. It can contain prompts,
+	// credentials, or model output and must not enter controller logs.
+	cmd.Stderr = io.Discard
+	if err := cmd.Start(); err != nil {
+		return core.RunResult{}, err
+	}
+	reaped := false
+	defer func() {
+		_ = input.Close()
+		if !reaped && cmd.Process != nil {
+			_ = cmd.Process.Kill()
+			_ = cmd.Wait()
+		}
+	}()
+	if err := json.NewEncoder(input).Encode(request); err != nil {
+		return core.RunResult{}, err
+	}
+	result, err := readEvents(output, input, request.ExistingSession, bindSession)
+	if err != nil {
+		return core.RunResult{}, err
+	}
+	if err := cmd.Wait(); err != nil {
+		reaped = true
+		return core.RunResult{}, fmt.Errorf("isolated worker exited unsuccessfully: %w", err)
+	}
+	reaped = true
+	return result, nil
+}
+
+func readEvents(input io.Reader, ackOutput io.Writer, existingSession string, bindSession func(string) error) (core.RunResult, error) {
+	scanner := bufio.NewScanner(input)
+	scanner.Buffer(make([]byte, 64*1024), workerwire.MaxOutput+4096)
+	bound := false
+	terminal := false
+	var result core.RunResult
+	var failure error
+	for scanner.Scan() {
+		if terminal {
+			return core.RunResult{}, errors.New("worker emitted data after terminal event")
+		}
+		var event workerwire.Event
+		if err := json.Unmarshal(scanner.Bytes(), &event); err != nil {
+			return core.RunResult{}, errors.New("invalid worker event JSON")
+		}
+		if err := event.Validate(); err != nil {
+			return core.RunResult{}, err
+		}
+		switch event.Type {
+		case "session":
+			if bound || existingSession != "" && existingSession != event.SessionID {
+				return core.RunResult{}, errors.New("worker session mismatch")
+			}
+			if err := bindSession(event.SessionID); err != nil {
+				return core.RunResult{}, err
+			}
+			if err := json.NewEncoder(ackOutput).Encode(workerwire.Ack{Version: workerwire.Version, Type: "continue", SessionID: event.SessionID}); err != nil {
+				return core.RunResult{}, err
+			}
+			bound = true
+		case "result":
+			if !bound {
+				return core.RunResult{}, errors.New("worker returned result before session binding")
+			}
+			result.Output = []byte(event.Output)
+			terminal = true
+		case "failure":
+			failure = core.RunError{Kind: event.Kind, Err: errors.New("isolated provider turn failed")}
+			terminal = true
+		}
+	}
+	if err := scanner.Err(); err != nil {
+		return core.RunResult{}, err
+	}
+	if !terminal {
+		return core.RunResult{}, errors.New("worker exited without terminal event")
+	}
+	if failure != nil {
+		return core.RunResult{}, failure
+	}
+	return result, nil
+}

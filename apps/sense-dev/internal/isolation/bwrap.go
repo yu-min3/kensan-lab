@@ -4,6 +4,7 @@
 package isolation
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"os"
@@ -27,7 +28,7 @@ type Config struct {
 // runtime, a writable worktree, and the provider's dedicated auth home.
 // Network is shared for subscription login; this does not provide egress
 // isolation. No ambient environment or extra file descriptors are supplied.
-func (c Config) Command(program string, args ...string) (*exec.Cmd, error) {
+func (c Config) Command(ctx context.Context, program string, args ...string) (*exec.Cmd, error) {
 	if !strings.HasPrefix(program, "/") || filepath.Clean(program) != program || program == "/" {
 		return nil, errors.New("worker program must be a clean absolute path inside runtime")
 	}
@@ -77,7 +78,7 @@ func (c Config) Command(program string, args ...string) (*exec.Cmd, error) {
 		"--chdir", "/workspace", "--", program,
 	}
 	argv = append(argv, args...)
-	cmd := exec.Command(c.Bubblewrap, argv...)
+	cmd := exec.CommandContext(ctx, c.Bubblewrap, argv...)
 	cmd.Env = []string{"PATH=/usr/bin:/bin"}
 	return cmd, nil
 }

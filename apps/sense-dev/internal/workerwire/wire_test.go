@@ -43,10 +43,20 @@ func TestEventsAreConstrained(t *testing.T) {
 		{Version: Version, Type: "failure", Kind: "publish"},
 		{Version: Version, Type: "session", SessionID: ""},
 		{Version: Version, Type: "session", SessionID: "s", Output: "secret"},
+		{Version: Version, Type: "result", SessionID: "s", Output: "done"},
 	}
 	for _, event := range bad {
 		if err := event.Validate(); err == nil {
 			t.Fatalf("invalid event accepted: %+v", event)
 		}
+	}
+}
+
+func TestAckMustMatchPersistedSession(t *testing.T) {
+	if err := (Ack{Version: Version, Type: "continue", SessionID: "thread-1"}).Validate("thread-1"); err != nil {
+		t.Fatal(err)
+	}
+	if err := (Ack{Version: Version, Type: "continue", SessionID: "thread-2"}).Validate("thread-1"); err == nil {
+		t.Fatal("wrong session acknowledged")
 	}
 }
