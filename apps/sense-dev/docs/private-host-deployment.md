@@ -45,8 +45,8 @@ tags: [kensan-lab, sense, autonomous-development, operations]
 ## 導入・検証
 
 1. `sudo bash private-host-service.sh install <binary> <tokens.css> <unit-file> <binary-sha> <tokens-sha> <unit-sha>`。
-2. `systemctl is-enabled/is-active kensan-dev-controller.service`、`journalctl -u ...`、`ss -ltnp` を確認。`127.0.0.1:8787` 以外の待受なら即 rollback。
-3. sense 自身の loopback HTTP と、別ホストから sense の LAN IP:8787 への拒否を確認する。IPv4/IPv6 双方、既存 tunnel/proxy/Ingress/CI と firewall・ルーターの経路を read-only で照合する。経路不明なら `private-ready` は保留。
+2. `sudo bash deploy/private-listener-smoke.sh <reviewed-unit-sha256> <reviewed-binary-sha256>` を sense で read-only 実行する。root 権限は socket 所有 PID と `/proc/<MainPID>/exe` の照合にだけ使う。service、unit/binary hash、実効 fragment/drop-in/ExecStart/Environment、MainPID と socket 所有者、`127.0.0.1:8787` だけの待受、loopback `/login` の HTTP 200 を検査する。`journalctl -u ...` も確認。非 loopback 待受なら即 rollback。
+3. **別ホスト**から sense の LAN IPv4:8787 と global IPv6:8787 への接続拒否を確認する。host 自身から LAN IP を叩く試験で代用しない。timeout、IPv6 到達経路なし、試験元の障害は「拒否成功」でなく試験不能と記録する。8787 の直結拒否だけでは別 port・tunnel・proxy 経由の公開を否定できないため、既存 tunnel/proxy/Ingress/CI、firewall・ルーター、preview 公開の経路を read-only で照合する。smoke script の `EXTERNAL_ROUTE=unverified` はこの別検査が必要な印。経路不明なら `private-ready` は保留。
 4. mock task を投入し、Mac 側の terminal/browser を閉じても event が増えることを確認する。`systemctl restart` と host reboot 後に永続台帳・outbox・重複なしを確認する。reboot は共有 workload への影響と復旧手段を再確認してから行う。
 
 ## 停止・復旧

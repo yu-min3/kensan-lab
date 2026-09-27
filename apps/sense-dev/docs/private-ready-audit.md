@@ -27,7 +27,7 @@ tags: [kensan-lab, sense, autonomous-development, audit]
 
 | 領域 / AC | 状態 | 現在の証拠 | private-ready までに必要なもの |
 |---|---|---|---|
-| ● 高: sense 稼働・非公開性（AC-01, 08, 19） | 部分 | SSH 復旧。Ubuntu 24.04.4、4 CPU / 15 GiB RAM、root 空き 146 GiB、`/data` 空き 870 GiB。k3s は 13:12 UTC に Ready、13:19 UTC に inactive/disabled。host の 8787 は未使用。global IPv6 あり。unit は未導入 | 別作業との調整、独立 Gate 再審査、host service 導入、IPv4/IPv6・既存 tunnel/proxy/Ingress/CI の実測、reboot/復旧 E2E |
+| ● 高: sense 稼働・非公開性（AC-01, 08, 19） | 部分 | SSH 復旧。Ubuntu 24.04.4、4 CPU / 15 GiB RAM、root 空き 146 GiB、`/data` 空き 870 GiB。k3s は 13:12 UTC に Ready、13:19 UTC に inactive/disabled。host の 8787 は未使用。global IPv6 あり。unit は未導入。listener/実効 unit/MainPID/binary hash の read-only smoke は独立コード審査済み、未実行 | 別作業との調整、独立 Gate 再審査、host service 導入、IPv4/IPv6・既存 tunnel/proxy/Ingress/CI の実測、reboot/復旧 E2E |
 | ● 高: 実モデル・費用（AC-04, 06, 07） | 未検証 | Claude/Codex の購読専用 adapter と fake CLI/App Server 試験。Mac/sense 同時利用は未試験 | sense で本人が公式ログイン。契約・モデル利用可能性・従量無効を確認後に4工程とMac優先を実走 |
 | ● 高: Release Gate（AC-09, 18） | 部分 | 全 commit の Git scan、対象 SHA/操作に固定した scan artifact、独立 Gate 入力 manifest、mock転用・誤操作・別SHAの拒否試験。publish は intent の dry-run のみ | CI・PR本文/添付・repo可視性・render設定・公開到達経路の実照合、worker/publisher credential 分離、限定 publisher と reconcile |
 | ▲ 中: 独立 context と工程（AC-13〜16） | 部分 | App/Platform の別 profile/knowledge/memo/session、immutable artifact、manifest hash、前工程の成果物配送、依存配車・provider枠・Mac優先・restart試験 | 実 worker のOS分離、review session の実運転、session消失後の再作成、App不合格→Platform修正→再試験 |

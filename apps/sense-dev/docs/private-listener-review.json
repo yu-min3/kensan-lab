@@ -1,0 +1,55 @@
+{
+  "schema_version": 1,
+  "kind": "independent_listener_smoke_code_review",
+  "reviewed_at": "2026-09-27T13:34:17Z",
+  "reviewer": {
+    "agent_session": "/root/bootstrap_gate",
+    "role": "independent_release_gate_reviewer",
+    "authored_script": false,
+    "basis": "Direct script and runbook inspection, local bash syntax validation, and SHA-256 verification."
+  },
+  "target": {
+    "script": "apps/sense-dev/deploy/private-listener-smoke.sh",
+    "script_sha256": "0b0d615ee16ae31864593081e9d747544b92def0f193f68b715d55c68116945b",
+    "environment": "sense-private-host",
+    "purpose": "Read-only point-in-time listener and service verification after an independently authorized first installation."
+  },
+  "code_review": "allow",
+  "required_code_fixes": [],
+  "syntax_validation": "bash -n passed",
+  "false_positive_controls_reviewed": [
+    "systemctl, ss and curl query failures reject the check.",
+    "Expected unit hash, fragment, absence of drop-ins, effective ExecStart, User, Group and Environment are checked.",
+    "MainPID, running executable path/hash, installed executable hash and listener owner PID are correlated.",
+    "MainPID is compared before and after HTTP verification to detect a service restart during the check.",
+    "TCP listeners across IPv4 and IPv6 are inspected; exactly one 127.0.0.1:8787 listener is required.",
+    "curl -q disables user configuration, proxy use is disabled, and /login must return HTTP 200."
+  ],
+  "secrets_and_side_effects": {
+    "secret_values_printed_by_script": false,
+    "http_response_body_printed": false,
+    "service_mutation_commands_present": false,
+    "http_operation": "GET /login only",
+    "root_requirement": "Socket ownership and /proc executable inspection require root visibility; the script does not change service configuration."
+  },
+  "runtime_evidence": {
+    "executed_on_sense": false,
+    "separate_host_ipv4_ipv6_tested": false,
+    "public_routes_audited": false,
+    "continued_operation_verified": false,
+    "private_ready": false
+  },
+  "limitations": [
+    "Static review and bash syntax validation do not establish runtime success on sense.",
+    "The script checks a point in time and does not guarantee continued service operation or continued privacy.",
+    "Separate-host LAN IPv4 and global IPv6 checks remain required; timeout, missing routing and test-origin failures are inconclusive.",
+    "Direct port 8787 refusal does not rule out publication through another port, tunnel, proxy, ingress, CI or preview route.",
+    "The script explicitly reports EXTERNAL_ROUTE=unverified; private-ready requires separate reachability evidence.",
+    "This code_review allow does not authorize transfer, host installation, service changes, reboot or remote mutations."
+  ],
+  "review_actions": {
+    "sense_operations_performed": false,
+    "remote_mutations_performed": false,
+    "commits_created": false
+  }
+}
