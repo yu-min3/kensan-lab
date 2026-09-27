@@ -30,6 +30,10 @@ func (s *Store) CreateTask(mission string, team Team, kind, title, contract stri
 }
 
 func (s *Store) AddAgent(taskID, role, provider, model string) (Agent, error) {
+	return s.AddAgentWithDeps(taskID, role, provider, model, nil)
+}
+
+func (s *Store) AddAgentWithDeps(taskID, role, provider, model string, dependsOn []string) (Agent, error) {
 	if taskID == "" || role == "" || provider == "" || model == "" {
 		return Agent{}, errors.New("task, role, provider and model are required")
 	}
@@ -43,7 +47,15 @@ func (s *Store) AddAgent(taskID, role, provider, model string) (Agent, error) {
 		if !ok {
 			return errors.New("task not found")
 		}
-		a = Agent{ID: id, TaskID: taskID, Team: t.Team, Role: role, Provider: provider, Model: model, SessionGeneration: 1, MemoVersion: 0, Status: "ready", UpdatedAt: time.Now().UTC()}
+		seen := map[string]bool{}
+		for _, depID := range dependsOn {
+			dep, ok := st.Agents[depID]
+			if !ok || dep.TaskID != taskID || seen[depID] {
+				return errors.New("agent dependency must be a distinct agent in the same task")
+			}
+			seen[depID] = true
+		}
+		a = Agent{ID: id, TaskID: taskID, Team: t.Team, Role: role, Provider: provider, Model: model, SessionGeneration: 1, MemoVersion: 0, Status: "ready", DependsOn: append([]string(nil), dependsOn...), UpdatedAt: time.Now().UTC()}
 		st.Agents[id] = a
 		st.Events = append(st.Events, event("agent_created", id, taskID))
 		return nil
@@ -288,6 +300,11 @@ func (s *Store) SetAgentSession(agentID, provider, model, sessionID, inputHash s
 		a, ok := st.Agents[agentID]
 		if !ok || a.Provider != provider || a.Model != model || a.SessionGeneration != generation {
 			return errors.New("session owner, provider, model or generation mismatch")
+		}
+		for otherID, other := range st.Agents {
+			if otherID != agentID && other.Provider == provider && other.SessionID == sessionID {
+				return errors.New("provider session already belongs to another agent")
+			}
 		}
 		if a.SessionID != "" && (a.SessionID != sessionID || a.InputHash != inputHash) {
 			return errors.New("existing session bound to different input")

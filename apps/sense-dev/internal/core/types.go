@@ -27,18 +27,43 @@ type Task struct {
 }
 
 type Agent struct {
-	ID                string    `json:"id"`
-	TaskID            string    `json:"task_id"`
-	Team              Team      `json:"team"`
-	Role              string    `json:"role"`
-	Provider          string    `json:"provider"`
-	Model             string    `json:"model"`
-	SessionID         string    `json:"session_id,omitempty"`
-	SessionGeneration int       `json:"session_generation"`
-	InputHash         string    `json:"input_hash,omitempty"`
-	MemoVersion       int       `json:"memo_version"`
-	Status            string    `json:"status"`
-	UpdatedAt         time.Time `json:"updated_at"`
+	ID                string     `json:"id"`
+	TaskID            string     `json:"task_id"`
+	Team              Team       `json:"team"`
+	Role              string     `json:"role"`
+	Provider          string     `json:"provider"`
+	Model             string     `json:"model"`
+	SessionID         string     `json:"session_id,omitempty"`
+	SessionGeneration int        `json:"session_generation"`
+	InputHash         string     `json:"input_hash,omitempty"`
+	MemoVersion       int        `json:"memo_version"`
+	Status            string     `json:"status"`
+	DependsOn         []string   `json:"depends_on,omitempty"`
+	AttemptCount      int        `json:"attempt_count"`
+	RetryAfter        *time.Time `json:"retry_after,omitempty"`
+	UpdatedAt         time.Time  `json:"updated_at"`
+}
+
+type Attempt struct {
+	ID              string       `json:"id"`
+	AgentID         string       `json:"agent_id"`
+	TaskID          string       `json:"task_id"`
+	MissionID       string       `json:"mission_id"`
+	Team            Team         `json:"team"`
+	Role            string       `json:"role"`
+	Provider        string       `json:"provider"`
+	Model           string       `json:"model"`
+	SessionID       string       `json:"session_id,omitempty"`
+	Generation      int          `json:"session_generation"`
+	InputHash       string       `json:"input_manifest_hash"`
+	ContractVersion string       `json:"contract_version"`
+	BaseSHA         string       `json:"base_sha,omitempty"`
+	HeadSHA         string       `json:"head_sha,omitempty"`
+	Status          string       `json:"status"`
+	Reason          string       `json:"reason,omitempty"`
+	OutputRef       *ArtifactRef `json:"output_ref,omitempty"`
+	StartedAt       time.Time    `json:"started_at"`
+	FinishedAt      *time.Time   `json:"finished_at,omitempty"`
 }
 
 type Artifact struct {
@@ -146,6 +171,7 @@ type State struct {
 	SchemaVersion int                        `json:"schema_version"`
 	Tasks         map[string]Task            `json:"tasks"`
 	Agents        map[string]Agent           `json:"agents"`
+	Attempts      map[string]Attempt         `json:"attempts"`
 	Artifacts     map[string]Artifact        `json:"artifacts"`
 	Messages      map[string]Message         `json:"messages"`
 	Decisions     map[string]ReleaseDecision `json:"decisions"`
@@ -156,5 +182,5 @@ type State struct {
 }
 
 func NewState() State {
-	return State{SchemaVersion: SchemaVersion, Tasks: map[string]Task{}, Agents: map[string]Agent{}, Artifacts: map[string]Artifact{}, Messages: map[string]Message{}, Decisions: map[string]ReleaseDecision{}, Intents: map[string]PublishIntent{}, Events: []Event{}}
+	return State{SchemaVersion: SchemaVersion, Tasks: map[string]Task{}, Agents: map[string]Agent{}, Attempts: map[string]Attempt{}, Artifacts: map[string]Artifact{}, Messages: map[string]Message{}, Decisions: map[string]ReleaseDecision{}, Intents: map[string]PublishIntent{}, Events: []Event{}}
 }
