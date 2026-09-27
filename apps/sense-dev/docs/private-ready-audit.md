@@ -10,7 +10,7 @@ tags: [kensan-lab, sense, autonomous-development, audit]
 
 **private-ready は未達。** `sense`（192.168.0.113）への SSH が復旧し、2026-09-27 に read-only 棚卸しを実施した。ただし 13:16 UTC にこの作業と別の操作で単一ノード k3s が停止・無効化され、libvirt の導入が始まった。導入対象の前提が変化したため、このスレッドからの sense 変更は保留する。専用 service は未導入で、IPv4/IPv6・既存公開経路の実測も未完了。`private-ready` や v0 完了を宣言しない。Cloudflare・既存公開経路は変更していない。
 
-直近の審査済み host 導入候補に固定した source SHA は `8c4101b`（専用 worktree `feat/sense-autonomous-development`）。manifest `private-bootstrap-candidate-8c4101b.json`（commit `e105291`）と独立 Astra 判定 `private-bootstrap-review-8c4101b.json` は、その SHA に限って再現 build と固定 hash を確認済み。`code_candidate=allow` だが、`host_install=needs_human`・`execution_authorized=false`。後続の `ae148e8` で Release Gate の検査範囲を強化したため、**現行 HEAD の導入候補ではない**。実機導入には新しい候補・hash・独立レビューが必要。コード審査は host への転送・導入の許可ではない。
+直近の審査済み host 導入候補に固定した source SHA は `b1743e4`（専用 worktree `feat/sense-autonomous-development`）。manifest `private-bootstrap-candidate-b1743e4.json`（commit `f294e09`）と独立 Astra 判定 `private-bootstrap-review-b1743e4.json` は、その SHA に限って再現 build と固定 hash を確認済み。`code_candidate=allow` だが、`host_install=needs_human`・`execution_authorized=false`。コード審査は host への転送・導入の許可ではない。
 
 ## 今回の判断
 
@@ -18,7 +18,7 @@ tags: [kensan-lab, sense, autonomous-development, audit]
 |---|---|---|
 | k3s の現状態を変更せず、loopback の host service を計画する | 条件付き採用 | 13:12 UTC は稼働・約11 GiB空き、13:19 UTC は inactive/disabled・約14 GiB空き。別作業の変更を上書きしない |
 | k3s を本件から停止または再起動 | 却下 | 既存 workload と別作業に影響し、所有者・目的が未確定 |
-| 初回 host 導入案 | ローカル審査のみ合格 | source `8c4101b` を独立 Astra reviewer が再buildし、候補 binary の hash 一致。mock/loopback 境界、状態ディレクトリ、既存領域、systemd 実効設定、固定 policy/manifest を確認し `code_candidate=allow`。実機操作は別作業との調整が必要で `host_install=needs_human` |
+| 初回 host 導入案 | ローカル審査のみ合格 | source `b1743e4` を独立 Astra reviewer が再buildし、候補 binary の hash 一致。mock/loopback 境界、状態ディレクトリ、既存領域、systemd 実効設定、固定 policy/manifest を確認し `code_candidate=allow`。実機操作は別作業との調整が必要で `host_install=needs_human` |
 | sense を未確認のまま `private-ready` と記録 | 却下 | AC-01/19 の service・待受・既存到達経路に実機証拠がない |
 | 別 tunnel / Cloudflare route で到達性を補う | 却下 | 明示的な公開承認がなく、非公開境界を迂回する |
 | GitHub push/PR/merge を現時点で実行 | 保留 | scan は一次検査に過ぎず、独立 Gate の実推論・CI/可視性/配備影響の照合と限定 publisher が未完成 |
@@ -57,7 +57,7 @@ Cloudflare の設定を変更しないことと、既存公開経路が無いこ
 
 ## 次の作業
 
-1. 別作業による k3s 停止・libvirt 導入の目的と host 利用範囲を確認する。このスレッドから k3s を再起動しない。source `8c4101b` の独立コード審査は合格済みだが、実機操作の Gate は直前 baseline・公開経路・期限・固定 artifact を確認して別に判定する。候補期限は 2026-09-29 14:45 UTC で、切れたら再作成・再審査する。
+1. 別作業による k3s 停止・libvirt 導入の目的と host 利用範囲を確認する。このスレッドから k3s を再起動しない。source `b1743e4` の独立コード審査は合格済みだが、実機操作の Gate は直前 baseline・公開経路・期限・固定 artifact を確認して別に判定する。候補期限は 2026-09-29 14:55 UTC で、切れたら再作成・再審査する。
 2. worker の別OSユーザー隔離、restart時の orphan turn 照合、credential なし verifier、限定 publisher/outbox を完成させる。
 3. loopback service を導入し、実機 listen・継続 event・再起動/復旧・既存到達経路を検証してから `private-ready` を判定する。
 
