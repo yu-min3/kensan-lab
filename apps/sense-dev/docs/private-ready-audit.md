@@ -43,6 +43,17 @@ tags: [kensan-lab, sense, autonomous-development, audit]
 - モバイルブラウザ: `cd apps/kensan/e2e && npm ci && npx playwright test --config playwright.sense-dev.config.ts`（2026-09-27: 3/3 pass）
 - `apps/sense-dev/deploy/kensan-dev-controller.service` は設定例で、sense には未配置。GitHub remote・Cloudflare・K8s の変更はしていない。
 
+## 既存到達経路の静的棚卸し（実機証明ではない）
+
+| 経路 | repo で確認した事実 | 残る実機・外部証拠 |
+|---|---|---|
+| Cloudflare Tunnel | `kubernetes/network/cloudflare-tunnel/deployment.yaml` は token で起動する K8s pod。`README.md` は public hostname と origin が Cloudflare Zero Trust dashboard 管理と明記。静的 manifest に `hostNetwork` 指定はない | dashboard の read-only route/Access 照合、pod の実効 spec と起動状態。Git に hostname がないことを「route なし」と扱わない |
+| Istio / Cilium / K8s | repo の K8s・CI・chart に `sense-dev`、`kensan-dev`、port `8787` の参照は見つからない。既存 Gateway は公開・LAN 経路を持つ | k3s が再稼働した場合の実効 Ingress/HTTPRoute/Service/Pod と、host への転送経路。静的検索は runtime drift を否定しない |
+| GitHub Pages / CI | `.github/workflows/docs.yml` は `main` への対象 path push で Pages deploy。現在の作業は専用 branch・ローカルのみで remote 操作なし | push/PR/merge 前に送信する全 commit、workflow、公開 repo 可視性、artifact/preview を専用 Release Gate が再照合 |
+| host / IPv6 | sense に global IPv6 があり、候補 unit は `127.0.0.1:8787`。導入後の smoke は実効 unit・socket owner・binary を照合する | 別ホストから IPv4/IPv6 の直結拒否と、別 port・proxy・tunnel 経由を確認。timeout や経路なしは拒否成功とみなさない |
+
+Cloudflare の設定を変更しないことと、既存公開経路が無いことは別。公開 hostname は Git だけでは列挙できず、K8s が停止中の現在は実効 Pod 経路も確認できないため、AC-19 は未達とする。
+
 ## 次の作業
 
 1. 別作業による k3s 停止・libvirt 導入の目的と host 利用範囲を確認する。このスレッドから k3s を再起動しない。bootstrap の独立コード審査は合格済みだが、実機操作の Gate は直前 baseline・公開経路・期限・再現 build を確認して別に判定する。

@@ -23,5 +23,11 @@
 <tr><td>▲ canary/pilot<br><small>AC-05/10/12</small></td><td class="status no">未着手</td><td>mission 契約のみ</td><td>対象とrollback固定、App再試験、GitOps後の利用経路、48時間pilot</td></tr>
 <tr><td>● 外出先入口<br><small>AC-02</small></td><td class="status no">意図的保留</td><td>loopbackのみ、Cloudflare未変更</td><td>別途承認後にAccess/JWT/routeと実機回線試験。private-readyには含めない</td></tr>
 </tbody></table></div>
+<h2>既存公開経路 — 静的確認の限界</h2><div class="table-wrap"><table><thead><tr><th>経路</th><th>判定</th><th>repoで確認した事実</th><th>残る実証</th></tr></thead><tbody>
+<tr><td>● Cloudflare Tunnel</td><td class="status no">未証明</td><td>K8sのcloudflaredはtoken管理。public hostnameとoriginはCloudflare dashboard管理で、Gitから列挙できない。静的manifestにhostNetwork指定なし</td><td>dashboard route/Accessのread-only照合、実効pod specと起動状態</td></tr>
+<tr><td>▲ Istio / Cilium / K8s</td><td class="status part">静的のみ</td><td>K8s・CI・chartにsense-dev/kensan-dev/8787の参照なし。既存Gatewayには公開/LAN経路がある</td><td>k3s再稼働時の実効Route/Service/Pod、host転送とruntime drift</td></tr>
+<tr><td>▲ GitHub Pages / CI</td><td class="status part">静的のみ</td><td>docs workflowはmainへの対象path pushでPages deploy。現branchはremote未送信</td><td>push/PR/merge前に全commit・workflow・repo可視性・artifact/previewをGate再判定</td></tr>
+<tr><td>● host / IPv6</td><td class="status no">未実測</td><td>global IPv6あり。候補unitは127.0.0.1:8787。smokeは所有PIDとbinaryまで照合</td><td>別ホストのIPv4/IPv6直結拒否と、別port・proxy・tunnel経路。timeoutは成功としない</td></tr>
+</tbody></table></div><p class="muted">Cloudflareを変更しないことは、既存公開経路がない証明ではない。dashboardと実効経路を確認するまでAC-19は未達。</p>
 <h2>再現・再開</h2><div class="panel"><p><code>cd apps/sense-dev &amp;&amp; go test -race ./... -count=1 &amp;&amp; go vet ./...</code></p><p><code>cd apps/kensan/e2e &amp;&amp; npm ci &amp;&amp; npx playwright test --config playwright.sense-dev.config.ts</code> — 3/3 pass</p><p>次は別作業の host 利用範囲を確認 → bootstrap と固定 manifest の再審査 → loopback service 導入 → IPv4/IPv6・既存公開経路・restart を実測。未確認なら判定を保留。</p></div>
 <h2>Yu が決めるべきこと</h2><ol><li>同時進行している sense の k3s 停止・libvirt 導入と、本件の host 利用を調整する。</li><li>実認証時の Claude upgrade、モデル枠、運転時間帯を決める（模擬運転は待たない）。</li><li>日報宛先と、将来の hostname / Access IdP / 本人 allowlist を決める（公開は別承認）。</li></ol><div class="footer">原本: <code>apps/sense-dev/docs/private-ready-audit.md</code> · このスレッドから GitHub remote / Cloudflare / K8s の変更なし</div></main></body></html>
