@@ -38,6 +38,9 @@ func (e RunError) Unwrap() error { return e.Err }
 // Tick executes at most one ready agent. Multiple Tick callers may run at
 // once; ClaimNext atomically enforces one active turn per provider and task.
 func (s *Store) Tick(ctx context.Context, runner Runner, scope []string) (bool, error) {
+	if _, err := s.ReconcileReviewedHandoffs(); err != nil {
+		return false, err
+	}
 	requireBase := false
 	for _, item := range scope {
 		if item == "isolated-model-worker" {

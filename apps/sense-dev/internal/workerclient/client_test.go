@@ -29,6 +29,18 @@ func TestRunnerRejectsUnpinnedTaskWorktree(t *testing.T) {
 	}
 }
 
+func TestRunnerRejectsMismatchedLinkedConsumerRevision(t *testing.T) {
+	runner := Runner{WorkerProgram: "/usr/local/bin/sense-dev-worker", Timeout: time.Minute}
+	_, err := runner.Run(context.Background(), core.Dispatch{
+		Attempt:  core.Attempt{ID: "attempt-1", TaskID: strings.Repeat("a", 32), Role: "app_acceptance", Provider: "claude", Model: "opus", BaseSHA: strings.Repeat("b", 40), HeadSHA: strings.Repeat("c", 40)},
+		Manifest: core.ContextManifest{Team: core.App, SourceTaskID: strings.Repeat("d", 32), HeadSHA: strings.Repeat("c", 40)},
+		Prompt:   "accept", BindSession: func(string) error { return nil },
+	})
+	if err == nil || !strings.Contains(err.Error(), "linked consumer revision") {
+		t.Fatalf("mismatched linked checkout accepted: %v", err)
+	}
+}
+
 func TestReadEventsPersistsSessionBeforeAck(t *testing.T) {
 	events := "{\"version\":1,\"type\":\"session\",\"session_id\":\"thread-1\"}\n{\"version\":1,\"type\":\"result\",\"output\":\"done\"}\n"
 	var ack bytes.Buffer

@@ -5,9 +5,11 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/yu-min3/kensan-lab/apps/sense-dev/internal/core"
+	"github.com/yu-min3/kensan-lab/apps/sense-dev/internal/mock"
 	"github.com/yu-min3/kensan-lab/apps/sense-dev/internal/worktree"
 )
 
@@ -91,5 +93,78 @@ func TestLiveWorkerRejectsSimulationHistory(t *testing.T) {
 	}
 	if err := rejectSimulationHistory(core.State{}); err != nil {
 		t.Fatal(err)
+	}
+}
+
+func TestLinkedAcceptanceCheckoutWaitsAndUsesPlatformCommit(t *testing.T) {
+	root := t.TempDir()
+	source, worktrees := filepath.Join(root, "source"), filepath.Join(root, "worktrees")
+	for _, path := range []string{source, worktrees} {
+		if err := os.Mkdir(path, 0700); err != nil {
+			t.Fatal(err)
+		}
+	}
+	for _, args := range [][]string{{"init", "-q"}, {"config", "user.email", "sense-dev@example.invalid"}, {"config", "user.name", "Sense Dev"}, {"commit", "--allow-empty", "-m", "initial"}} {
+		if output, err := exec.Command("git", append([]string{"-C", source}, args...)...).CombinedOutput(); err != nil {
+			t.Fatalf("git setup: %s %v", output, err)
+		}
+	}
+	store, err := core.Open(filepath.Join(root, "state"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer store.Close()
+	if err := store.SeedKnowledge(); err != nil {
+		t.Fatal(err)
+	}
+	platform, _, err := store.CreatePlannedTask("mission", core.Platform, "change", "change", "v1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	app, _, err := store.CreateLinkedAcceptanceTask(platform.ID, "accept")
+	if err != nil {
+		t.Fatal(err)
+	}
+	manager := worktree.Manager{Source: source, Root: worktrees}
+	if err := prepareReadyWorktrees(context.Background(), store, manager); err != nil {
+		t.Fatal(err)
+	}
+	if store.Snapshot().Tasks[app.ID].BaseSHA != "" {
+		t.Fatal("App checkout created before handoff")
+	}
+	platformPath := filepath.Join(worktrees, platform.ID)
+	if err := os.WriteFile(filepath.Join(platformPath, "reviewed.txt"), []byte("new contract"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	for _, args := range [][]string{{"add", "reviewed.txt"}, {"commit", "-m", "reviewed"}} {
+		if output, err := exec.Command("git", append([]string{"-C", platformPath}, args...)...).CombinedOutput(); err != nil {
+			t.Fatalf("platform commit: %s %v", output, err)
+		}
+	}
+	output, err := exec.Command("git", "-C", platformPath, "rev-parse", "HEAD").Output()
+	if err != nil {
+		t.Fatal(err)
+	}
+	head := strings.TrimSpace(string(output))
+	if err := store.SetHeadSHA(platform.ID, head); err != nil {
+		t.Fatal(err)
+	}
+	for i := 0; i < 5; i++ {
+		if worked, err := store.Tick(context.Background(), mock.Runner{}, []string{"simulation-only"}); err != nil || !worked {
+			t.Fatalf("platform stage %d: %t %v", i, worked, err)
+		}
+	}
+	if err := store.SetHeadSHA(app.ID, head); err != nil {
+		t.Fatal(err)
+	} // Simulate the pinned delivery; evidence policy is tested in core.
+	if err := prepareReadyWorktrees(context.Background(), store, manager); err != nil {
+		t.Fatal(err)
+	}
+	if store.Snapshot().Tasks[app.ID].BaseSHA != head {
+		t.Fatal("App checkout did not pin Platform head")
+	}
+	body, err := os.ReadFile(filepath.Join(worktrees, app.ID, "reviewed.txt"))
+	if err != nil || string(body) != "new contract" {
+		t.Fatalf("App missed Platform change: %q %v", body, err)
 	}
 }

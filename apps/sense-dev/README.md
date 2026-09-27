@@ -9,7 +9,7 @@ sense 上で動く自動開発 controller の実装。現段階はファイル�
 - `internal/isolation/`: Linux bubblewrap の worker 起動引数。モデル worker は専用 rootfs を読取専用、Sol の worktree と購読認証 home のみ書込可で渡す。検証器は認証 home を渡さず、ネットワークなし・worktree 読取専用で起動する。controller state/admin token の経路重複を拒否する。
 - `internal/workerwire/`: controller→隔離 worker の版付き JSON 入力と session/result/failure イベントの契約。provider/model の組合せ、入力上限、未知のフィールドを拒否する。
 - `internal/workerclient/` と `cmd/sense-dev-worker/`: bubblewrap 内の worker との stdin/stdout IPC。session ID を controller が永続化して ACK を返すまでモデル turn は開始しない。現 service unit からは起動しない。
-- `internal/worktree/`: task ID ごとの自己完結した Git 作業ツリーを作成・再照合する。隔離内で元 repo の `.git` を参照しないよう、linked worktree ではなくローカル clone を使い、remote と共有 object を除去する。別 branch・symlink・base SHA の不一致を拒否する。
+- `internal/worktree/`: task ID ごとの自己完結した Git 作業ツリーを作成・再照合する。隔離内で元 repo の `.git` を参照しないよう、linked worktree ではなくローカル clone を使い、remote と共有 object を除去する。別 branch・symlink・base SHA の不一致を拒否する。連携 App 受入は元 repo ではなく、レビュー済み Platform task のコミットから専用 clone を作る。
 - `internal/verifier/`: 実装と Opus レビューの間で、operator 固定の検証計画と `git diff --check` を credentialless sandbox で実行する。失敗時の出力を attempt に固定し、レビューへの昇格を止める。
 - `cmd/sense-dev/`: private listener の入口。公開 IP・DNS 名の bind を拒否。既定は推論 off、既存 service unit は `-mock-worker` のみ。隔離実 worker は明示 opt-in と事前検査が必要。
 - `deploy/`: host systemd unit、初回導入・rollback、sense の read-only 棚卸しと導入後 listener smoke。実機未導入。
@@ -40,7 +40,7 @@ sense-dev -listen 127.0.0.1:8787 -data /var/lib/kensan-dev -admin-token-file /va
 - 隔離 worker の通信契約は prompt と既存 session 以外の任意パス・token・コマンドを入力に持たず、未知の JSON フィールドと上限超過を拒否。client は session 永続化コールバック後だけ ACK を返し、結果先行・別 session・余分なイベントを拒否する。実機の OS 隔離・認証・モデル turn は未検証。
 - 実 worker は task ID から専用 Git 作業ツリーを解決し、base SHA を台帳へ固定してから manifest/配車へ進む。準備に失敗した task は attempt を消費せず待機し、別 task は進められる。reviewer も自分の task 作業ツリーのみを読取専用で見る。clone は `.git` を内部に持ち、remote・alternates を持たず、元 repo を見失っても Git status が動くことを試験済み。Sol の回答だけでなく、commit 済み差分・base/head SHA・diff SHA-256 を immutable 成果物へ固定する。未コミット変更・空変更・大きすぎる差分ではレビューへ進まない。検証器は固定計画の実行結果を別 artifact に残す。ただし sense の bubblewrap 内での Git・テスト実測は未完了。
 - `mock-` session を含む模擬 state は実 worker 起動時に拒否する。実認証後の運転には別の保護された state directory を準備し、模擬成果物を本番入力へ昇格させない。既存 state の削除・移行は自動実行しない。
-- 版・hash・契約・SHA・宛先を検査する配送と、message ID による重複防止。Platform のレビュー済み変更に紐づく App 受入 task は、現在の head SHA に一致する `change_ready` を受領するまで配車しない。これは core の試験までで、UI/自動 handoff は未接続。
+- 版・hash・契約・SHA・宛先を検査する配送と、message ID による重複防止。UI で Platform task ID に紐づく App 受入を登録でき、実モデル工程の固定差分・credentialless 検証・Opus 合格がそろった場合だけ controller が3成果物を自動配送する。現在の head SHA と受領が一致するまで App を配車しない。mock 成果物や不合格レビューは合格配送に昇格しない。ここまでローカル試験で、sense 実モデル未検証。
 - 作者とは別 session の Release Gate。`allow` には Sol の commit 済み差分、credentialless 検証の pass、Opus の SHA 固定 JSON 合格、controller 所有の Git 差分 scan、操作・配備先・影響・戻し方を固定した候補、実際の Astra 出力が必要。未束縛の Gate agent は配車しない。caller が Astra の `deny` や別操作を `allow` に読み替えることを拒否し、publish intent 作成時にも再照合する。scan は送信予定の全 commit を検査し、中間 commit の秘密・公開経路・binary・高リスク path を保留する。scan の `candidate` は機密なし・非公開の証明ではなく、独立 agent・CI・配備影響の追加確認が必要。外部操作前に intent を保存する。
 - UI の loopback bind、管理 token login、HttpOnly cookie、CSRF、停止・Mac優先。provider の自動推論はまだ起動しない。
 - UI から質問への回答と、Release Gate が `needs_human` とした操作の判断を記録。契約/SHA/操作/期限と再送IDを照合し、同じ送信は冪等、古いカードは拒否する。承認記録だけでは publisher は起動せず、独立 Gate の新しい `allow` が必要。
@@ -52,7 +52,7 @@ sense-dev -listen 127.0.0.1:8787 -data /var/lib/kensan-dev -admin-token-file /va
 
 1. 専用 rootfs と canary に対応する固定検証計画を用意し、sense で bubblewrap/user namespace の fail-closed preflight、state/token不可視、credentialless verifier のネットワーク/認証遮断、実プロセス kill と再起動照合を通す。auth待機と中断照合・再開、実検証器の運転証拠は未完了。現 service unit は fake runner 専用。Claude の書込系 tool は隔離 worker が完成するまで解放しない。
 2. Release Gate の CI/PR本文/添付/公開経路/配備影響/可視性を実状態に照らし、限定 publisher と外部操作の reconcile を実装する。構造化判定との一致はローカル試験のみで、実モデル判定の品質証拠はない。現時点の Git scan は一次スクリーニング、`PublishIntent` は dry-run 台帳だけで、GitHub へは送らない。
-3. 管理画面に受入結果の入力・配送、案件詳細を追加し、360/390/430 px と実機幅、切断復旧を検証する。レビュー済み Platform 成果物の自動 handoff と、App 差し戻し→Platform 修正→新 SHA での App 再試験は未実装。質問/回答・SHA-bound 承認・日報 preview は HTTP テストまでで、実スマホ未検証。日報の宛先/送信 adapter と送信不明の実照合は未実装。timer/outbox はローカル試験のみ。
+3. 管理画面に受入結果の入力・配送、案件詳細を追加し、360/390/430 px と実機幅、切断復旧を検証する。App 差し戻し→Platform 修正→新 SHA での App 再試験は未実装。質問/回答・SHA-bound 承認・日報 preview は HTTP テストまでで、実スマホ未検証。日報の宛先/送信 adapter と送信不明の実照合は未実装。timer/outbox はローカル試験のみ。
 4. sense への SSH は復旧し、CPU/RAM/ディスクと単一ノード k3s 等を read-only 棚卸し済み。ただし別作業で k3s が停止・libvirt が導入されたため、この作業からの host 変更は調整待ち。bootstrap code/manifest と導入後 listener smoke は独立レビュー済みだが、実機導入・IPv4/IPv6/Cloudflare dashboard 等の公開経路・host reboot は未検証で `private-ready` 未達。詳細は `docs/private-ready-audit.md`。
 5. 本人の初回認証と subscription 費用経路を確認後、実モデルの4工程と独立検証を接続する。Cloudflare は公開承認まで inactive。
 

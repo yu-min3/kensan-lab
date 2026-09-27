@@ -174,6 +174,18 @@ func (s *Store) SendMessage(m Message) (Message, error) {
 			return Message{}, fmt.Errorf("invalid outgoing artifact: %w", err)
 		}
 	}
+	var linkedProof releaseProof
+	linkedTarget := s.Snapshot().Tasks[m.TargetTask]
+	if linkedTarget.SourceTaskID != "" {
+		var err error
+		linkedProof, err = s.reviewedChangeProof(linkedTarget.SourceTaskID)
+		if err != nil {
+			return Message{}, fmt.Errorf("linked acceptance requires a passed change proof: %w", err)
+		}
+		if len(m.ArtifactRefs) != 3 || m.ArtifactRefs[0] != linkedProof.Implementation || m.ArtifactRefs[1] != linkedProof.Verification || m.ArtifactRefs[2] != linkedProof.QualityReview {
+			return Message{}, errors.New("linked acceptance must include implementation, verification and review evidence")
+		}
+	}
 	err := s.update(func(st *State) error {
 		if old, ok := st.Messages[m.ID]; ok {
 			if sameMessage(old, m) {
@@ -194,7 +206,7 @@ func (s *Store) SendMessage(m Message) (Message, error) {
 		if fromTask.MissionID != toTask.MissionID || fromTask.ContractVersion != m.ContractVersion || toTask.ContractVersion != m.ContractVersion {
 			return errors.New("mission or contract version mismatch")
 		}
-		if toTask.SourceTaskID != "" && (m.Kind != "change_ready" || m.SourceTask != toTask.SourceTaskID || !fullSHA(m.HeadSHA) || !reviewedPlatformChange(fromTask, from)) {
+		if toTask.SourceTaskID != "" && (m.Kind != "change_ready" || m.SourceTask != toTask.SourceTaskID || !fullSHA(m.HeadSHA) || toTask.BaseSHA != "" || !reviewedPlatformChange(fromTask, from) || !releaseProofStillCurrent(st, fromTask.ID, linkedProof)) {
 			return errors.New("linked acceptance requires reviewed Platform change_ready at a full head SHA")
 		}
 		if m.HeadSHA != "" && fromTask.HeadSHA != m.HeadSHA {
@@ -208,7 +220,7 @@ func (s *Store) SendMessage(m Message) (Message, error) {
 		}
 		for _, ref := range m.ArtifactRefs {
 			a, ok := st.Artifacts[ref.ID]
-			if !ok || a.AgentID != from.ID || a.Version != ref.Version || a.SHA256 != ref.SHA256 {
+			if !ok || toTask.SourceTaskID == "" && a.AgentID != from.ID || a.TaskID != fromTask.ID || a.Version != ref.Version || a.SHA256 != ref.SHA256 {
 				return errors.New("artifact reference mismatch")
 			}
 		}
@@ -261,7 +273,7 @@ func (s *Store) ReceiveMessage(agentID, messageID string) error {
 		}
 		target := st.Tasks[m.TargetTask]
 		if target.SourceTaskID != "" {
-			if m.Kind != "change_ready" || m.SourceTask != target.SourceTaskID || !fullSHA(m.HeadSHA) || target.HeadSHA != "" && target.HeadSHA != m.HeadSHA {
+			if m.Kind != "change_ready" || m.SourceTask != target.SourceTaskID || !fullSHA(m.HeadSHA) || target.BaseSHA != "" || target.HeadSHA != "" && target.HeadSHA != m.HeadSHA {
 				return errors.New("linked acceptance handoff is stale or from another task")
 			}
 		}

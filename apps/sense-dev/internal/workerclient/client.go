@@ -82,7 +82,16 @@ func (r Runner) Run(ctx context.Context, dispatch core.Dispatch) (core.RunResult
 	if dispatch.Attempt.BaseSHA == "" {
 		return core.RunResult{}, errors.New("task base SHA must be pinned before isolated dispatch")
 	}
-	taskWorktree, pinnedBase, err := r.Worktrees.Ensure(ctx, dispatch.Attempt.TaskID, dispatch.Attempt.BaseSHA)
+	var taskWorktree, pinnedBase string
+	var err error
+	if dispatch.Manifest.SourceTaskID != "" {
+		if request.Role != "app_acceptance" || dispatch.Manifest.Team != core.App || dispatch.Attempt.BaseSHA != dispatch.Attempt.HeadSHA || dispatch.Attempt.HeadSHA != dispatch.Manifest.HeadSHA {
+			return core.RunResult{}, errors.New("linked consumer revision is not a pinned App acceptance")
+		}
+		taskWorktree, pinnedBase, err = r.Worktrees.EnsureFromTask(ctx, dispatch.Attempt.TaskID, dispatch.Manifest.SourceTaskID, dispatch.Attempt.HeadSHA)
+	} else {
+		taskWorktree, pinnedBase, err = r.Worktrees.Ensure(ctx, dispatch.Attempt.TaskID, dispatch.Attempt.BaseSHA)
+	}
 	if err != nil || pinnedBase != dispatch.Attempt.BaseSHA {
 		return core.RunResult{}, errors.New("task-scoped worktree failed validation")
 	}

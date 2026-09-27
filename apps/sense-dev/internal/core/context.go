@@ -51,7 +51,7 @@ func (s *Store) BuildManifest(agentID string, allowedScope []string) (ContextMan
 	if !hasProfile || !hasKnowledge || !hasCommon {
 		return ContextManifest{}, errors.New("team knowledge is not seeded")
 	}
-	m := ContextManifest{SchemaVersion: SchemaVersion, MissionID: t.MissionID, TaskID: t.ID, Team: a.Team, Role: a.Role, AgentID: a.ID, Provider: a.Provider, Model: a.Model, Generation: a.SessionGeneration, TeamProfile: artifactRef(profile), TeamKnowledge: artifactRef(knowledge), CommonKnowledge: artifactRef(common), Inbox: []ArtifactRef{}, StageInputs: []StageInput{}, ReviewInputs: append([]ArtifactRef{}, a.ReviewInputs...), ReviewAuthorID: a.ReviewAuthorID, MessageIDs: []string{}, ContractVersion: t.ContractVersion, BaseSHA: t.BaseSHA, HeadSHA: t.HeadSHA, AllowedScope: append([]string(nil), allowedScope...)}
+	m := ContextManifest{SchemaVersion: SchemaVersion, MissionID: t.MissionID, TaskID: t.ID, SourceTaskID: t.SourceTaskID, Team: a.Team, Role: a.Role, AgentID: a.ID, Provider: a.Provider, Model: a.Model, Generation: a.SessionGeneration, TeamProfile: artifactRef(profile), TeamKnowledge: artifactRef(knowledge), CommonKnowledge: artifactRef(common), Inbox: []ArtifactRef{}, StageInputs: []StageInput{}, ReviewInputs: append([]ArtifactRef{}, a.ReviewInputs...), ReviewAuthorID: a.ReviewAuthorID, MessageIDs: []string{}, ContractVersion: t.ContractVersion, BaseSHA: t.BaseSHA, HeadSHA: t.HeadSHA, AllowedScope: append([]string(nil), allowedScope...)}
 	if memo, ok := latest(st, a.ID, "memo"); ok {
 		ref := artifactRef(memo)
 		m.AgentMemo = &ref

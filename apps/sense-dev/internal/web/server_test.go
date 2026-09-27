@@ -33,6 +33,77 @@ func TestIsolatedWorkerWaitReasonOutsideWindow(t *testing.T) {
 	}
 }
 
+func TestLinkedAppWaitReason(t *testing.T) {
+	state := core.State{Tasks: map[string]core.Task{
+		"platform": {ID: "platform", Team: core.Platform, Kind: "change", Status: "publish_wait", HeadSHA: strings.Repeat("a", 40)},
+		"app":      {ID: "app", Team: core.App, Kind: "acceptance", Status: "ready", SourceTaskID: "platform"},
+	}, Agents: map[string]core.Agent{}}
+	agent := core.Agent{TaskID: "app", Team: core.App, Status: "ready"}
+	if got := agentWaitReason(state, agent, "mock", true, time.Now()); got != "Platform の合格成果物待ち" {
+		t.Fatalf("unreceived handoff: %s", got)
+	}
+	app := state.Tasks["app"]
+	app.HeadSHA = strings.Repeat("b", 40)
+	state.Tasks["app"] = app
+	if got := agentWaitReason(state, agent, "mock", true, time.Now()); got != "Platform 版不一致・要確認" {
+		t.Fatalf("stale handoff: %s", got)
+	}
+}
+
+func TestCreateLinkedAppAcceptanceFromForm(t *testing.T) {
+	dir := t.TempDir()
+	store, err := core.Open(filepath.Join(dir, "state"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer store.Close()
+	platform, _, err := store.CreatePlannedTask("golden-path", core.Platform, "change", "canary", "v1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	tokenFile := filepath.Join(dir, "token")
+	cssFile := filepath.Join(dir, "tokens.css")
+	if err := os.WriteFile(tokenFile, []byte(strings.Repeat("t", 64)), 0600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(cssFile, []byte(":root{}"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	server, err := New(store, tokenFile, cssFile, "off", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	form := url.Values{"source_task": {platform.ID}, "mission": {"golden-path"}, "contract": {"v1"}, "team": {"app"}, "kind": {"acceptance"}, "title": {"consumer canary"}}
+	request := func() *http.Request {
+		return httptest.NewRequest(http.MethodPost, "/api/tasks", strings.NewReader(form.Encode()))
+	}
+	form.Set("contract", "wrong")
+	bad := request()
+	bad.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	badResponse := httptest.NewRecorder()
+	server.createTask(badResponse, bad)
+	if badResponse.Code != http.StatusBadRequest || len(store.Snapshot().Tasks) != 1 {
+		t.Fatal("mismatched contract was accepted")
+	}
+	form.Set("contract", "v1")
+	good := request()
+	good.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	goodResponse := httptest.NewRecorder()
+	server.createTask(goodResponse, good)
+	if goodResponse.Code != http.StatusSeeOther {
+		t.Fatalf("linked task form: %d %s", goodResponse.Code, goodResponse.Body.String())
+	}
+	linked := 0
+	for _, task := range store.Snapshot().Tasks {
+		if task.SourceTaskID == platform.ID && task.Team == core.App && task.Kind == "acceptance" {
+			linked++
+		}
+	}
+	if linked != 1 {
+		t.Fatalf("linked App tasks=%d", linked)
+	}
+}
+
 func TestPrivateWebLoginCSRFAndTask(t *testing.T) {
 	dir := t.TempDir()
 	store, err := core.Open(filepath.Join(dir, "state"))

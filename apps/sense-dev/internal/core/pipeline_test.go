@@ -44,7 +44,7 @@ func TestPlannedPipelineHasIndependentStages(t *testing.T) {
 
 func TestLinkedAcceptanceWaitsForReceivedCurrentPlatformHead(t *testing.T) {
 	s := testStore(t)
-	platform, stages, err := s.CreatePlannedTask("mission", Platform, "change", "golden path canary", "contract-v1")
+	platform, _, err := s.CreatePlannedTask("mission", Platform, "change", "golden path canary", "contract-v1")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -58,78 +58,98 @@ func TestLinkedAcceptanceWaitsForReceivedCurrentPlatformHead(t *testing.T) {
 	if _, _, err := s.CreateLinkedAcceptanceTask(app.ID, "invalid source"); err == nil {
 		t.Fatal("App source accepted")
 	}
-	if err := s.update(func(st *State) error {
-		for _, stage := range stages {
-			a := st.Agents[stage.ID]
-			a.Status = "pending"
-			st.Agents[a.ID] = a
-		}
-		return nil
-	}); err != nil {
+	base, head := strings.Repeat("a", 40), strings.Repeat("b", 40)
+	if err := s.SetBaseSHA(platform.ID, base); err != nil {
 		t.Fatal(err)
 	}
-	assertNoClaim := func(label string) {
-		t.Helper()
-		if attempt, ok, err := s.ClaimNext(time.Now()); err != nil || ok {
-			t.Fatalf("%s: claimed %+v: %v", label, attempt, err)
+	for i := 0; i < 5; i++ {
+		if worked, err := s.Tick(context.Background(), releaseReadyRunner{base: base, head: head}, []string{"isolated-model-worker"}); err != nil || !worked {
+			t.Fatalf("Platform stage %d: worked=%t err=%v", i, worked, err)
 		}
 	}
-	assertNoClaim("no handoff")
-	head := strings.Repeat("a", 40)
-	if err := s.SetHeadSHA(platform.ID, head); err != nil {
+	if got := s.Snapshot().Tasks[app.ID].HeadSHA; got != "" {
+		t.Fatalf("App ran before handoff: %s", got)
+	}
+	if count, err := s.ReconcileReviewedHandoffs(); err != nil || count != 1 {
+		t.Fatalf("handoff count=%d err=%v", count, err)
+	}
+	if count, err := s.ReconcileReviewedHandoffs(); err != nil || count != 0 {
+		t.Fatalf("duplicate handoff count=%d err=%v", count, err)
+	}
+	root := s.root
+	if err := s.Close(); err != nil {
 		t.Fatal(err)
 	}
-	artifact, err := s.PutArtifact(stages[4].ID, "change_ready", []byte("reviewed platform change"))
+	s, err = Open(root)
 	if err != nil {
 		t.Fatal(err)
 	}
-	message := Message{ID: "linked-handoff", CorrelationID: "mission", FromAgent: stages[4].ID, ToAgent: appAgent.ID, SourceTask: platform.ID, TargetTask: app.ID, Kind: "change_ready", ArtifactRefs: []ArtifactRef{artifactRef(artifact)}, ContractVersion: platform.ContractVersion, HeadSHA: head}
-	wrong := message
-	wrong.ID = "wrong-kind"
-	wrong.Kind = "note"
-	if _, err := s.SendMessage(wrong); err == nil {
-		t.Fatal("non-change-ready handoff accepted")
-	}
-	if _, err := s.SendMessage(message); err == nil {
-		t.Fatal("unreviewed Platform change accepted")
-	}
-	if err := s.update(func(st *State) error {
-		for _, stage := range stages {
-			a := st.Agents[stage.ID]
-			a.Status = "completed"
-			st.Agents[a.ID] = a
-		}
-		p := st.Tasks[platform.ID]
-		p.Status = "publish_wait"
-		st.Tasks[p.ID] = p
-		return nil
-	}); err != nil {
-		t.Fatal(err)
-	}
-	if _, err := s.SendMessage(message); err != nil {
-		t.Fatal(err)
-	}
-	assertNoClaim("pending handoff")
-	if err := s.ReceiveMessage(appAgent.ID, message.ID); err != nil {
-		t.Fatal(err)
+	defer s.Close()
+	if count, err := s.ReconcileReviewedHandoffs(); err != nil || count != 0 {
+		t.Fatalf("restart duplicated handoff: %d %v", count, err)
 	}
 	if got := s.Snapshot().Tasks[app.ID].HeadSHA; got != head {
 		t.Fatalf("App head not pinned: %s", got)
 	}
-	if err := s.SetHeadSHA(platform.ID, strings.Repeat("b", 40)); err != nil {
+	if len(s.Snapshot().Messages) != 1 {
+		t.Fatal("handoff was duplicated")
+	}
+	if err := s.SetHeadSHA(platform.ID, strings.Repeat("c", 40)); err != nil {
 		t.Fatal(err)
 	}
-	assertNoClaim("stale handoff")
+	if attempt, ok, err := s.ClaimNext(time.Now()); err != nil || ok {
+		t.Fatalf("stale handoff claimed %+v: %v", attempt, err)
+	}
 	if err := s.SetHeadSHA(platform.ID, head); err != nil {
 		t.Fatal(err)
 	}
 	manifest, err := s.BuildManifest(appAgent.ID, nil)
-	if err != nil || len(manifest.Inbox) != 1 || manifest.Inbox[0].ID != artifact.ID {
+	if err != nil || len(manifest.Inbox) != 3 || len(manifest.MessageIDs) != 1 {
 		t.Fatalf("App inbox mismatch: %+v %v", manifest, err)
 	}
 	attempt, ok, err := s.ClaimNext(time.Now())
 	if err != nil || !ok || attempt.AgentID != appAgent.ID || attempt.HeadSHA != head {
 		t.Fatalf("App acceptance not claimed: %+v %v", attempt, err)
+	}
+}
+
+func TestRejectedReviewCannotTriggerAppHandoff(t *testing.T) {
+	s := testStore(t)
+	platform, stages, err := s.CreatePlannedTask("mission", Platform, "change", "canary", "v1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	app, appAgent, err := s.CreateLinkedAcceptanceTask(platform.ID, "acceptance")
+	if err != nil {
+		t.Fatal(err)
+	}
+	base, head := strings.Repeat("a", 40), strings.Repeat("b", 40)
+	if err := s.SetBaseSHA(platform.ID, base); err != nil {
+		t.Fatal(err)
+	}
+	for i := 0; i < 5; i++ {
+		if worked, err := s.Tick(context.Background(), releaseReadyRunner{base: base, head: head, reviewVerdict: "fail"}, []string{"isolated-model-worker"}); err != nil || !worked {
+			t.Fatalf("stage %d: %t %v", i, worked, err)
+		}
+	}
+	if count, err := s.ReconcileReviewedHandoffs(); err != nil || count != 0 {
+		t.Fatalf("rejected review delivered: %d %v", count, err)
+	}
+	var ref *ArtifactRef
+	for _, attempt := range s.Snapshot().Attempts {
+		if attempt.AgentID == stages[4].ID && attempt.Status == "completed" {
+			ref = attempt.OutputRef
+		}
+	}
+	if ref == nil {
+		t.Fatal("missing rejected review artifact")
+	}
+	message := Message{ID: "forged-pass", CorrelationID: "mission", FromAgent: stages[4].ID, ToAgent: appAgent.ID, SourceTask: platform.ID, TargetTask: app.ID, Kind: "change_ready", ArtifactRefs: []ArtifactRef{*ref}, ContractVersion: platform.ContractVersion, HeadSHA: head}
+	if _, err := s.SendMessage(message); err == nil {
+		t.Fatal("manual handoff bypassed rejected review")
+	}
+	if s.Snapshot().Tasks[app.ID].HeadSHA != "" || len(s.Snapshot().Messages) != 0 {
+		t.Fatal("rejected change reached App")
 	}
 }
 

@@ -110,6 +110,7 @@ type ContextManifest struct {
 	SchemaVersion   int           `json:"schema_version"`
 	MissionID       string        `json:"mission_id"`
 	TaskID          string        `json:"task_id"`
+	SourceTaskID    string        `json:"source_task_id,omitempty"`
 	Team            Team          `json:"team"`
 	Role            string        `json:"role"`
 	AgentID         string        `json:"agent_id"`

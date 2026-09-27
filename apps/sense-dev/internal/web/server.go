@@ -83,6 +83,16 @@ func agentWaitReason(st core.State, a core.Agent, workerMode string, allowed boo
 			return "案件依存待ち"
 		}
 	}
+	task := st.Tasks[a.TaskID]
+	if task.Team == core.App && task.Kind == "acceptance" && task.SourceTaskID != "" {
+		source := st.Tasks[task.SourceTaskID]
+		if task.HeadSHA == "" {
+			return "Platform の合格成果物待ち"
+		}
+		if source.HeadSHA != task.HeadSHA {
+			return "Platform 版不一致・要確認"
+		}
+	}
 	if workerMode == "off" {
 		return "実行未設定"
 	}
@@ -369,7 +379,21 @@ func (s *Server) createTask(w http.ResponseWriter, r *http.Request) {
 	if kind == "feedback" {
 		kind = "analysis"
 	}
-	_, _, err := s.store.CreatePlannedTask(r.Form.Get("mission"), core.Team(r.Form.Get("team")), kind, r.Form.Get("title"), r.Form.Get("contract"))
+	var err error
+	if source := strings.TrimSpace(r.Form.Get("source_task")); source != "" {
+		if core.Team(r.Form.Get("team")) != core.App || kind != "acceptance" {
+			http.Error(w, "source task is only valid for App acceptance", http.StatusBadRequest)
+			return
+		}
+		platform := s.store.Snapshot().Tasks[source]
+		if platform.ID == "" || platform.MissionID != r.Form.Get("mission") || platform.ContractVersion != r.Form.Get("contract") {
+			http.Error(w, "source task mission or contract mismatch", http.StatusBadRequest)
+			return
+		}
+		_, _, err = s.store.CreateLinkedAcceptanceTask(source, r.Form.Get("title"))
+	} else {
+		_, _, err = s.store.CreatePlannedTask(r.Form.Get("mission"), core.Team(r.Form.Get("team")), kind, r.Form.Get("title"), r.Form.Get("contract"))
+	}
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return

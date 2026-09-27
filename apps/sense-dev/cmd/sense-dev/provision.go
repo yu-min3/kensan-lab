@@ -28,11 +28,25 @@ func rejectSimulationHistory(state core.State) error {
 // isolated dispatch without consuming an attempt or blocking other tasks.
 func prepareReadyWorktrees(ctx context.Context, store *core.Store, manager worktree.Manager) error {
 	var failures []error
-	for _, task := range store.Snapshot().Tasks {
+	state := store.Snapshot()
+	for _, task := range state.Tasks {
 		if task.BaseSHA != "" || task.Status == "done" || task.Status == "failed" || task.Status == "publish_wait" {
 			continue
 		}
-		_, base, err := manager.Ensure(ctx, task.ID, "")
+		var base string
+		var err error
+		if task.Team == core.App && task.Kind == "acceptance" && task.SourceTaskID != "" {
+			if task.HeadSHA == "" {
+				continue // The reviewed producer revision has not been delivered yet.
+			}
+			source := state.Tasks[task.SourceTaskID]
+			if source.HeadSHA != task.HeadSHA || source.Status != "publish_wait" {
+				continue // A stale handoff must not create a checkout.
+			}
+			_, base, err = manager.EnsureFromTask(ctx, task.ID, source.ID, task.HeadSHA)
+		} else {
+			_, base, err = manager.Ensure(ctx, task.ID, "")
+		}
 		if err == nil {
 			err = store.SetBaseSHA(task.ID, base)
 		}

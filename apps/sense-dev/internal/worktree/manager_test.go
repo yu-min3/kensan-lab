@@ -128,3 +128,45 @@ func TestRejectsRemoteAddedToTaskCheckout(t *testing.T) {
 		t.Fatal("task checkout with a remote was accepted")
 	}
 }
+
+func TestConsumerCheckoutStartsAtReviewedProducerCommit(t *testing.T) {
+	m, original := testManager(t)
+	producerID, consumerID := strings.Repeat("a", 32), strings.Repeat("b", 32)
+	producer, _, err := m.Ensure(context.Background(), producerID, original)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(producer, "change.txt"), []byte("reviewed change\n"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := git(context.Background(), producer, "add", "change.txt"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := git(context.Background(), producer, "commit", "-m", "reviewed change"); err != nil {
+		t.Fatal(err)
+	}
+	head, err := git(context.Background(), producer, "rev-parse", "HEAD")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if head == original {
+		t.Fatal("producer did not advance")
+	}
+	consumer, base, err := m.EnsureFromTask(context.Background(), consumerID, producerID, head)
+	if err != nil || base != head {
+		t.Fatalf("consumer at wrong revision: %s %v", base, err)
+	}
+	body, err := os.ReadFile(filepath.Join(consumer, "change.txt"))
+	if err != nil || string(body) != "reviewed change\n" {
+		t.Fatalf("consumer did not see change: %q %v", body, err)
+	}
+	if _, _, err := m.EnsureFromTask(context.Background(), consumerID, producerID, original); err == nil {
+		t.Fatal("stale reviewed head accepted")
+	}
+	if err := os.WriteFile(filepath.Join(consumer, "change.txt"), []byte("consumer edit"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	if _, _, err := m.EnsureFromTask(context.Background(), consumerID, producerID, head); err == nil {
+		t.Fatal("dirty consumer checkout accepted")
+	}
+}
