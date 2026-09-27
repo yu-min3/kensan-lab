@@ -7,6 +7,7 @@ sense 上で動く自動開発 controller の実装。現段階はファイル�
 - `internal/core/`: 単一 writer の台帳、immutable 成果物、team/agent context、message、Release Gate。
 - `internal/web/`: loopback 管理画面。Whetstone の `packages/design-tokens/tokens.css` を原本として読む。
 - `internal/isolation/`: Linux bubblewrap の worker 起動引数。専用 rootfs を読取専用、worktree と購読認証 home のみ書込可で渡す。controller state/admin token の経路重複を拒否する。実 worker にはまだ未接続。
+- `internal/workerwire/`: controller→隔離 worker の版付き JSON 入力と session/result/failure イベントの契約。provider/model の組合せ、入力上限、未知のフィールドを拒否する。実 IPC は未接続。
 - `cmd/sense-dev/`: private listener の入口。公開 IP・DNS 名の bind を拒否。`-mock-worker` を明示した時だけ模擬配車する。
 - `deploy/`: host systemd unit の候補。実機未導入。
 
@@ -32,6 +33,7 @@ sense-dev -listen 127.0.0.1:8787 -data /var/lib/kensan-dev -admin-token-file /va
 - Codex App Server アダプタは ChatGPT account と quota を確認し、API key・モデル変更を拒否する単体試験まで。sense での本人認証と実モデル利用は未検証。
 - Claude CLI アダプタは専用の private 設定ディレクトリ、subscription のログイン状態、危険な課金設定の不在を検査し、Read-only 工程に限定。fake CLI で stdin prompt とモデル相違拒否を試験。sense での本人認証と実モデル利用は未検証。
 - bubblewrap 起動器の引数検査では host `/`、state と重複する mount、symlink alias、共有 auth home、runtime 外の実行ファイルを拒否。専用 rootfs 以外のホスト経路は mount しない。ネットワークは購読認証のため共有するので、egress 隔離ではない。sense で bubblewrap/namespace を実行した証拠はなく、実配車は引き続き無効。
+- 隔離 worker の通信契約は prompt と既存 session 以外の任意パス・token・コマンドを入力に持たず、未知の JSON フィールドと上限超過を拒否。実 worker との双方向 IPC と session 永続化は未接続。
 - 版・hash・契約・SHA・宛先を検査する配送と、message ID による重複防止。
 - 作者とは別 session の Release Gate。`allow` には author の成果物、controller 所有の Git 差分 scan、その両方を明示した Gate 入力 manifest、repo/ref/operation/base/head SHA の一致が必要。scan は送信予定の全 commit を検査し、中間 commit の秘密・公開経路・binary・高リスク path を保留する。scan の `candidate` は機密なし・非公開の証明ではなく、独立 agent・CI・配備影響の追加確認が必要。外部操作前に intent を保存する。
 - UI の loopback bind、管理 token login、HttpOnly cookie、CSRF、停止・Mac優先。provider の自動推論はまだ起動しない。
