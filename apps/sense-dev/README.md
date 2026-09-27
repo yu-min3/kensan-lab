@@ -12,7 +12,7 @@ sense 上で動く自動開発 controller の実装。現段階はファイル�
 - `internal/worktree/`: task ID ごとの自己完結した Git 作業ツリーを作成・再照合する。隔離内で元 repo の `.git` を参照しないよう、linked worktree ではなくローカル clone を使い、remote と共有 object を除去する。別 branch・symlink・base SHA の不一致を拒否する。
 - `internal/verifier/`: 実装と Opus レビューの間で、operator 固定の検証計画と `git diff --check` を credentialless sandbox で実行する。失敗時の出力を attempt に固定し、レビューへの昇格を止める。
 - `cmd/sense-dev/`: private listener の入口。公開 IP・DNS 名の bind を拒否。既定は推論 off、既存 service unit は `-mock-worker` のみ。隔離実 worker は明示 opt-in と事前検査が必要。
-- `deploy/`: host systemd unit の候補と、sense の秘密値を出さない read-only 棚卸しスクリプト。実機未導入。
+- `deploy/`: host systemd unit、初回導入・rollback、sense の read-only 棚卸しと導入後 listener smoke。実機未導入。
 
 ## 開発時の起動
 
@@ -29,6 +29,7 @@ sense-dev -listen 127.0.0.1:8787 -data /var/lib/kensan-dev -admin-token-file /va
 ## 既に検証できること
 
 - state の atomic write と OS lock による単一 controller。再起動後に task、agent、message を復元。
+- 実 controller process の E2E で、loopback 管理画面からの task 登録→HTTP client の待機中も mock 配車→SIGTERM→同じ state で再起動→既存 task/attempt 復元→新 task の自走を確認。これはローカル模擬運転であり、sense の systemd・host reboot・実モデルの復旧証拠ではない。
 - App と Platform の profile/knowledge/memo を入力 manifest で区別し、受領した成果物だけを inbox に追加。
 - fake worker で依存関係、provider ごと最大1実行、quota待機中の別 task、Mac優先、中断記録を試験。再起動中の実行は自動再送せず inspection 待ちにする。
 - UI から変更 task を登録すると Fable→Astra→Sol→credentialless 検証→Opus の独立工程を一括作成。`-mock-worker` は各工程の台帳と入力 manifest を模擬実行し、`simulation_only` の成果物だけを残す。外部発行の根拠にはしない。
@@ -52,13 +53,13 @@ sense-dev -listen 127.0.0.1:8787 -data /var/lib/kensan-dev -admin-token-file /va
 1. 専用 rootfs と canary に対応する固定検証計画を用意し、sense で bubblewrap/user namespace の fail-closed preflight、state/token不可視、credentialless verifier のネットワーク/認証遮断、実プロセス kill と再起動照合を通す。auth待機と中断照合・再開、実検証器の運転証拠は未完了。現 service unit は fake runner 専用。Claude の書込系 tool は隔離 worker が完成するまで解放しない。
 2. Release Gate の CI/PR本文/添付/公開経路/配備影響/可視性を実状態に照らし、限定 publisher と外部操作の reconcile を実装する。構造化判定との一致はローカル試験のみで、実モデル判定の品質証拠はない。現時点の Git scan は一次スクリーニング、`PublishIntent` は dry-run 台帳だけで、GitHub へは送らない。
 3. 管理画面に受入結果の入力・配送、案件詳細を追加し、360/390/430 px と実機幅、切断復旧を検証する。質問/回答・SHA-bound 承認・日報 preview は HTTP テストまでで、実スマホ未検証。日報の宛先/送信 adapter と送信不明の実照合は未実装。timer/outbox はローカル試験のみ。
-4. sense へ read-only 接続して CPU/RAM/ディスク、旧 k3s/cluster membership、待受・既存公開経路を実測する。現在 SSH がタイムアウトするため、private-ready は未判定。
+4. sense への SSH は復旧し、CPU/RAM/ディスクと単一ノード k3s 等を read-only 棚卸し済み。ただし別作業で k3s が停止・libvirt が導入されたため、この作業からの host 変更は調整待ち。bootstrap code/manifest と導入後 listener smoke は独立レビュー済みだが、実機導入・IPv4/IPv6/Cloudflare dashboard 等の公開経路・host reboot は未検証で `private-ready` 未達。詳細は `docs/private-ready-audit.md`。
 5. 本人の初回認証と subscription 費用経路を確認後、実モデルの4工程と独立検証を接続する。Cloudflare は公開承認まで inactive。
 
 実装契約は workspace の `projects/kensan-lab/docs/goal.md`。この README は実装の現在地だけを示す。
 
-## sense に接続できた後の G0/G4a 棚卸し
+## sense の G0/G4a 棚卸しと再確認
 
-最初は通常の operator アカウントから `deploy/sense-readonly-inventory.sh` を `bash` で実行する。スクリプトは `sudo`、サービス停止、Secret/ConfigMap の内容表示、プロセス引数・環境変数の表示をしない。結果は保護された証拠として扱い、公開 issue/PR やチャットに生データを貼らない。失敗した項目は `UNAVAILABLE` のまま記録し、非公開・停止安全の証明に読み替えない。
+最初の read-only 棚卸しは実施済み。実機導入前には通常の operator アカウントから `deploy/sense-readonly-inventory.sh` を `bash` で再実行する。スクリプトは `sudo`、サービス停止、Secret/ConfigMap の内容表示、プロセス引数・環境変数の表示をしない。結果は保護された証拠として扱い、公開 issue/PR やチャットに生データを貼らない。失敗した項目は `UNAVAILABLE` のまま記録し、非公開・停止安全の証明に読み替えない。
 
 旧 k3s の node が複数、共有 PV/PVC や他ホスト依存がある、quorum/復旧経路が不明な場合は停止しない。停止が許される場合でも、対象 unit/コンテナ、データ/volume、現在の自動起動状態、戻すコマンドを先に記録して可逆操作だけを行う。host の待受一覧だけではインターネット非公開を証明できないため、既存 tunnel/proxy/Ingress、IPv4/IPv6、router/firewall、CI preview/GitOps の経路を別途 read-only で照合する。これらが未確認なら `private-ready` は保留する。
