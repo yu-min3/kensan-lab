@@ -61,7 +61,7 @@ test.afterAll(async () => {
 });
 
 for (const width of [360, 390, 430]) {
-  test(`${width}px で依頼・停止・日報プレビューが横にはみ出さない`, async ({ page }) => {
+  test(`${width}px で依頼・停止・日報プレビューが横にはみ出さない`, async ({ page }, testInfo) => {
     await page.setViewportSize({ width, height: 844 });
     await page.goto(`${baseURL}/login`);
     await page.getByLabel("管理トークン").fill(token);
@@ -81,5 +81,6 @@ for (const width of [360, 390, 430]) {
     await expect(page.getByText(/not_configured/)).toBeVisible();
     const sizes = await page.evaluate(() => ({ page: document.documentElement.scrollWidth, viewport: window.innerWidth }));
     expect(sizes.page).toBeLessThanOrEqual(sizes.viewport);
+    await page.screenshot({ path: testInfo.outputPath("mobile.png"), fullPage: true });
   });
 }

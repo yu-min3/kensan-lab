@@ -181,7 +181,7 @@ func TestPrivateWebLoginCSRFAndTask(t *testing.T) {
 	}
 	b, _ = io.ReadAll(resp.Body)
 	resp.Body.Close()
-	if !strings.Contains(string(b), "契約を確認する") || !strings.Contains(string(b), "Platform") || !strings.Contains(string(b), "対象の契約版は？") || !strings.Contains(string(b), "承認を記録") && !strings.Contains(string(b), "approved") || !strings.Contains(string(b), "not_configured") {
+	if !strings.Contains(string(b), "契約を確認する") || !strings.Contains(string(b), "Platform") || !strings.Contains(string(b), "対象の契約版は？") || !strings.Contains(string(b), "承認を記録") && !strings.Contains(string(b), "approved") || !strings.Contains(string(b), "not_configured") || !strings.Contains(string(b), "依存待ち: requirements") {
 		t.Fatal("task missing from UI")
 	}
 }

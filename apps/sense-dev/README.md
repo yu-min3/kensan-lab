@@ -36,6 +36,7 @@ sense-dev -listen 127.0.0.1:8787 -data /var/lib/kensan-dev -admin-token-file /va
 - UI から質問への回答と、Release Gate が `needs_human` とした操作の判断を記録。契約/SHA/操作/期限と再送IDを照合し、同じ送信は冪等、古いカードは拒否する。承認記録だけでは publisher は起動せず、独立 Gate の新しい `allow` が必要。
 - 回答草稿は同じブラウザタブの `sessionStorage` で再読込・再認証から復元。送信が確定した質問の草稿は削除する。保存できないブラウザでも通常フォームは利用可能。
 - JST日付で日報 preview を1日1件だけ保存し、案件・判断リンクと未配信状態を表示。宛先未設定のため送信機構と日次 timer はまだない。
+- 既存 Playwright 基盤で 360/390/430 CSS px の依頼・Mac優先・停止・日報previewと横はみ出しを Chrome で確認。Agent は工程順に並べ、依存待ち・未設定などの理由を表示。実機 Safari/Chrome と外出先経路は未検証。
 
 ## 未完了と再開点
 

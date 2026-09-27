@@ -37,6 +37,57 @@ type session struct {
 	expires time.Time
 }
 
+type agentView struct {
+	Agent      core.Agent
+	WaitReason string
+}
+
+func agentOrder(role string) int {
+	switch role {
+	case "requirements", "feedback":
+		return 0
+	case "design_review", "app_acceptance":
+		return 1
+	case "implementation":
+		return 2
+	case "implementation_review":
+		return 3
+	case "release_gate":
+		return 4
+	default:
+		return 5
+	}
+}
+
+func agentWaitReason(st core.State, a core.Agent, mockMode bool, now time.Time) string {
+	if st.Stopped {
+		return "全体停止"
+	}
+	if st.PausedUntil != nil && now.Before(*st.PausedUntil) {
+		return "Mac 優先"
+	}
+	if a.Status != "ready" {
+		return a.Status
+	}
+	for _, depID := range a.DependsOn {
+		if dep, ok := st.Agents[depID]; !ok || dep.Status != "completed" {
+			if ok {
+				return "依存待ち: " + dep.Role
+			}
+			return "依存関係が不明"
+		}
+	}
+	for _, depID := range st.Tasks[a.TaskID].DependsOn {
+		if dep, ok := st.Tasks[depID]; !ok || dep.Status != "done" {
+			return "案件依存待ち"
+		}
+	}
+	if !mockMode {
+		return "実行未設定"
+	}
+	return "配車待ち"
+}
+
 func New(store *core.Store, tokenFile, tokensCSS string, mockMode bool) (*Server, error) {
 	info, err := os.Stat(tokenFile)
 	if err != nil {
@@ -209,11 +260,20 @@ func (s *Server) home(w http.ResponseWriter, r *http.Request) {
 		messages = append(messages, m)
 	}
 	sort.Slice(messages, func(i, j int) bool { return messages[i].CreatedAt.After(messages[j].CreatedAt) })
-	agents := make([]core.Agent, 0, len(st.Agents))
+	agents := make([]agentView, 0, len(st.Agents))
 	for _, a := range st.Agents {
-		agents = append(agents, a)
+		agents = append(agents, agentView{Agent: a, WaitReason: agentWaitReason(st, a, s.mockMode, time.Now())})
 	}
-	sort.Slice(agents, func(i, j int) bool { return agents[i].ID < agents[j].ID })
+	sort.Slice(agents, func(i, j int) bool {
+		ai, aj := agents[i].Agent, agents[j].Agent
+		if ai.TaskID != aj.TaskID {
+			return st.Tasks[ai.TaskID].CreatedAt.Before(st.Tasks[aj.TaskID].CreatedAt)
+		}
+		if agentOrder(ai.Role) != agentOrder(aj.Role) {
+			return agentOrder(ai.Role) < agentOrder(aj.Role)
+		}
+		return ai.ID < aj.ID
+	})
 	questions := make([]core.Question, 0, len(st.Questions))
 	for _, q := range st.Questions {
 		questions = append(questions, q)
@@ -234,7 +294,7 @@ func (s *Server) home(w http.ResponseWriter, r *http.Request) {
 		CSRF        string
 		Tasks       []core.Task
 		Messages    []core.Message
-		Agents      []core.Agent
+		Agents      []agentView
 		Questions   []core.Question
 		Approvals   []core.ApprovalRequest
 		Reports     []core.DailyReport
