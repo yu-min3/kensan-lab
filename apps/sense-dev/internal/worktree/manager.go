@@ -138,7 +138,7 @@ func nested(root, path string) bool {
 }
 
 func git(ctx context.Context, repo string, args ...string) (string, error) {
-	argv := append([]string{"-c", "core.hooksPath=/dev/null", "-C", repo}, args...)
+	argv := append([]string{"-c", "core.hooksPath=/dev/null", "-c", "core.fsmonitor=false", "-C", repo}, args...)
 	cmd := exec.CommandContext(ctx, "git", argv...)
 	cmd.Env = []string{"PATH=" + os.Getenv("PATH"), "HOME=" + os.Getenv("HOME"), "GIT_TERMINAL_PROMPT=0", "GIT_CONFIG_NOSYSTEM=1", "GIT_CONFIG_GLOBAL=/dev/null"}
 	output, err := cmd.Output()

@@ -23,7 +23,8 @@ type Dispatch struct {
 }
 
 type RunResult struct {
-	Output []byte
+	Output  []byte
+	HeadSHA string
 }
 
 type RunError struct {
@@ -101,7 +102,7 @@ func (s *Store) Tick(ctx context.Context, runner Runner, scope []string) (bool, 
 		_ = s.FailAttempt(a.ID, "failed", "output could not be persisted", time.Time{})
 		return true, err
 	}
-	return true, s.CompleteAttempt(a.ID, artifactRef(artifact))
+	return true, s.CompleteAttemptAtHead(a.ID, artifactRef(artifact), result.HeadSHA)
 }
 
 func (s *Store) ClaimNext(now time.Time) (Attempt, bool, error) {
@@ -204,8 +205,17 @@ func (s *Store) SetAttemptSession(attemptID, sessionID string) error {
 }
 
 func (s *Store) CompleteAttempt(attemptID string, output ArtifactRef) error {
+	return s.CompleteAttemptAtHead(attemptID, output, "")
+}
+
+// CompleteAttemptAtHead atomically binds a locally committed implementation
+// result to the task's reviewed head. Later stages reject a stale head.
+func (s *Store) CompleteAttemptAtHead(attemptID string, output ArtifactRef, headSHA string) error {
 	if err := s.verifyRef(output); err != nil {
 		return err
+	}
+	if headSHA != "" && !fullSHA(headSHA) {
+		return errors.New("implementation head must be a full Git SHA")
 	}
 	return s.update(func(st *State) error {
 		a, ok := st.Attempts[attemptID]
@@ -216,13 +226,23 @@ func (s *Store) CompleteAttempt(attemptID string, output ArtifactRef) error {
 		if artifact.AgentID != a.AgentID || artifact.TaskID != a.TaskID {
 			return errors.New("output belongs to another agent or task")
 		}
+		t := st.Tasks[a.TaskID]
+		if t.HeadSHA != a.HeadSHA {
+			return errors.New("task head changed during attempt")
+		}
+		if headSHA != "" {
+			if a.Role != "implementation" || headSHA == a.BaseSHA {
+				return errors.New("only a changed implementation can advance task head")
+			}
+			a.HeadSHA = headSHA
+			t.HeadSHA = headSHA
+		}
 		now := time.Now().UTC()
 		a.Status, a.OutputRef, a.FinishedAt = "completed", &output, &now
 		st.Attempts[attemptID] = a
 		agent := st.Agents[a.AgentID]
 		agent.Status, agent.UpdatedAt = "completed", now
 		st.Agents[agent.ID] = agent
-		t := st.Tasks[a.TaskID]
 		allDone := true
 		for _, other := range st.Agents {
 			if other.TaskID == t.ID && other.Status != "completed" {
@@ -236,6 +256,8 @@ func (s *Store) CompleteAttempt(attemptID string, output ArtifactRef) error {
 			} else {
 				t.Status = "publish_wait"
 			}
+		}
+		if headSHA != "" || allDone {
 			t.UpdatedAt = now
 			st.Tasks[t.ID] = t
 		}
@@ -302,6 +324,11 @@ func (s *Store) ManifestPrompt(m ContextManifest) (string, error) {
 	var b strings.Builder
 	fmt.Fprintf(&b, "Mission %s; task %s; team %s; role %s; contract %s; input manifest SHA-256 %s.\n", m.MissionID, m.TaskID, m.Team, m.Role, m.ContractVersion, m.InputSHA256)
 	fmt.Fprintf(&b, "Task: %s (%s). Base SHA: %s. Head SHA: %s. Allowed scope: %s.\n", t.Title, t.Kind, m.BaseSHA, m.HeadSHA, strings.Join(m.AllowedScope, ", "))
+	if m.Role == "implementation" {
+		b.WriteString("Implement only this task in the local task checkout. Run relevant tests and commit all intended changes locally before ending the turn. Do not add a remote, push, publish, or change deployment state. Report the tests and the local commit SHA.\n")
+	} else if m.Role == "implementation_review" {
+		b.WriteString("Review the pinned implementation change and its tests against the requirements. Do not modify the checkout or inherit the author's conversation. A passing verdict is invalid if the checkout HEAD differs from the manifest HEAD.\n")
+	}
 	for _, entry := range []struct {
 		name string
 		ref  ArtifactRef

@@ -98,6 +98,57 @@ func TestIsolatedDispatchWaitsForPinnedTaskBase(t *testing.T) {
 	}
 }
 
+func TestCommittedImplementationHeadBindsReviewInput(t *testing.T) {
+	s := testStore(t)
+	task, err := s.CreateTask("mission", Platform, "change", "canary", "v1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	base, head := strings.Repeat("a", 40), strings.Repeat("b", 40)
+	if err := s.SetBaseSHA(task.ID, base); err != nil {
+		t.Fatal(err)
+	}
+	author, err := s.AddAgent(task.ID, "implementation", "codex", "gpt-6-sol")
+	if err != nil {
+		t.Fatal(err)
+	}
+	reviewer, err := s.AddAgentWithDeps(task.ID, "implementation_review", "claude", "opus", []string{author.ID})
+	if err != nil {
+		t.Fatal(err)
+	}
+	attempt, ok, err := s.ClaimNext(time.Now())
+	if err != nil || !ok || attempt.AgentID != author.ID {
+		t.Fatalf("claim: %+v %t %v", attempt, ok, err)
+	}
+	if err := s.SetAttemptInput(attempt.ID, strings.Repeat("c", 64)); err != nil {
+		t.Fatal(err)
+	}
+	artifact, err := s.PutArtifact(author.ID, "result-implementation", []byte("fixed diff"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := s.CompleteAttemptAtHead(attempt.ID, artifactRef(artifact), base); err == nil {
+		t.Fatal("unchanged base promoted")
+	}
+	if err := s.CompleteAttemptAtHead(attempt.ID, artifactRef(artifact), head); err != nil {
+		t.Fatal(err)
+	}
+	state := s.Snapshot()
+	if state.Tasks[task.ID].HeadSHA != head || state.Attempts[attempt.ID].HeadSHA != head {
+		t.Fatal("implementation head not bound atomically")
+	}
+	manifest, err := s.BuildManifest(reviewer.ID, []string{"read-only"})
+	if err != nil || manifest.HeadSHA != head || len(manifest.StageInputs) != 1 || manifest.StageInputs[0].Artifact.ID != artifact.ID {
+		t.Fatalf("review input not bound to implementation: %+v %v", manifest, err)
+	}
+	if err := s.SetHeadSHA(task.ID, strings.Repeat("d", 40)); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.BuildManifest(reviewer.ID, nil); err == nil {
+		t.Fatal("stale implementation artifact accepted for new head")
+	}
+}
+
 func TestSchedulerProviderSlotPauseAndRecovery(t *testing.T) {
 	s := testStore(t)
 	_, first := taskAgent(t, s, Platform, "first")

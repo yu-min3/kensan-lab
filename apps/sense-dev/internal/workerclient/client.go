@@ -108,6 +108,31 @@ func (r Runner) Run(ctx context.Context, dispatch core.Dispatch) (core.RunResult
 	if errors.Is(ctx.Err(), context.Canceled) {
 		return core.RunResult{}, core.RunError{Kind: "interrupted", Err: context.Canceled}
 	}
+	if err != nil {
+		return core.RunResult{}, err
+	}
+	if request.Role == "implementation" {
+		if _, _, err := r.Worktrees.Ensure(ctx, dispatch.Attempt.TaskID, dispatch.Attempt.BaseSHA); err != nil {
+			return core.RunResult{}, errors.New("task checkout changed identity after implementation")
+		}
+		change, err := worktree.Capture(ctx, taskWorktree, dispatch.Attempt.BaseSHA)
+		if err != nil {
+			return core.RunResult{}, fmt.Errorf("implementation change could not be captured: %w", err)
+		}
+		if !change.Clean || change.HeadSHA == change.BaseSHA {
+			return core.RunResult{}, errors.New("implementation must commit all intended changes locally before review")
+		}
+		body, err := json.Marshal(struct {
+			SchemaVersion int               `json:"schema_version"`
+			ModelOutput   string            `json:"model_output"`
+			Change        worktree.Snapshot `json:"change"`
+		}{SchemaVersion: 1, ModelOutput: string(result.Output), Change: change})
+		if err != nil || len(body) > 2<<20 {
+			return core.RunResult{}, errors.New("implementation evidence exceeds artifact limit")
+		}
+		result.Output = body
+		result.HeadSHA = change.HeadSHA
+	}
 	return result, err
 }
 
