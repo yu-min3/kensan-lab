@@ -43,6 +43,9 @@ func TestPrivateWebLoginCSRFAndTask(t *testing.T) {
 	if err := store.SeedKnowledge(); err != nil {
 		t.Fatal(err)
 	}
+	if _, created, err := store.QueueDailyReport(time.Date(2026, 9, 27, 15, 5, 0, 0, time.UTC)); err != nil || !created {
+		t.Fatalf("scheduled report setup failed: %t %v", created, err)
+	}
 	tokenFile := filepath.Join(dir, "admin-token")
 	if err := os.WriteFile(tokenFile, []byte(strings.Repeat("t", 64)), 0600); err != nil {
 		t.Fatal(err)
@@ -85,6 +88,9 @@ func TestPrivateWebLoginCSRFAndTask(t *testing.T) {
 	resp.Body.Close()
 	if resp.StatusCode != 200 {
 		t.Fatalf("login failed: %d %s", resp.StatusCode, b)
+	}
+	if !strings.Contains(string(b), `id="daily-2026-09-27"`) || !strings.Contains(string(b), "waiting_destination") {
+		t.Fatal("scheduled outbox is missing from private dashboard")
 	}
 	csrfMatch := regexp.MustCompile(`name="csrf" value="([a-f0-9]+)"`).FindSubmatch(b)
 	if len(csrfMatch) != 2 {

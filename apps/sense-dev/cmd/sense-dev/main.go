@@ -66,6 +66,9 @@ func run() error {
 	if err := store.RecoverInterrupted(); err != nil {
 		return err
 	}
+	if err := store.RecoverSendingReports(); err != nil {
+		return err
+	}
 	mode := "off"
 	var runner core.Runner
 	var scope []string
@@ -120,6 +123,24 @@ func run() error {
 	server := &http.Server{Handler: handler.Handler(), ReadHeaderTimeout: 5 * time.Second, MaxHeaderBytes: 1 << 20}
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
+	go func() {
+		queue := func() {
+			if _, _, err := store.QueueDailyReport(time.Now()); err != nil {
+				log.Print("daily report outbox needs operator inspection")
+			}
+		}
+		queue()
+		ticker := time.NewTicker(time.Minute)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-ticker.C:
+				queue()
+			}
+		}
+	}()
 	if runner != nil {
 		go func() {
 			ticker := time.NewTicker(2 * time.Second)

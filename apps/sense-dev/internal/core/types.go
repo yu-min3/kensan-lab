@@ -235,23 +235,41 @@ type DailyReport struct {
 	SentAt         *time.Time `json:"sent_at,omitempty"`
 }
 
+// ReportOutboxEntry is the immutable scheduled snapshot plus its separately
+// reconciled delivery state. A preview is never silently promoted to delivery.
+type ReportOutboxEntry struct {
+	Date                   string     `json:"date"`
+	Status                 string     `json:"status"`
+	Summary                string     `json:"summary"`
+	TaskIDs                []string   `json:"task_ids"`
+	PendingIDs             []string   `json:"pending_ids"`
+	Destination            string     `json:"destination,omitempty"`
+	AttemptID              string     `json:"attempt_id,omitempty"`
+	ExternalID             string     `json:"external_id,omitempty"`
+	ReconciliationEvidence string     `json:"reconciliation_evidence,omitempty"`
+	CreatedAt              time.Time  `json:"created_at"`
+	UpdatedAt              time.Time  `json:"updated_at"`
+	SentAt                 *time.Time `json:"sent_at,omitempty"`
+}
+
 type State struct {
-	SchemaVersion int                        `json:"schema_version"`
-	Tasks         map[string]Task            `json:"tasks"`
-	Agents        map[string]Agent           `json:"agents"`
-	Attempts      map[string]Attempt         `json:"attempts"`
-	Artifacts     map[string]Artifact        `json:"artifacts"`
-	Messages      map[string]Message         `json:"messages"`
-	Decisions     map[string]ReleaseDecision `json:"decisions"`
-	Intents       map[string]PublishIntent   `json:"intents"`
-	Questions     map[string]Question        `json:"questions"`
-	Approvals     map[string]ApprovalRequest `json:"approvals"`
-	Reports       map[string]DailyReport     `json:"reports"`
-	Events        []Event                    `json:"events"`
-	PausedUntil   *time.Time                 `json:"paused_until,omitempty"`
-	Stopped       bool                       `json:"stopped"`
+	SchemaVersion int                          `json:"schema_version"`
+	Tasks         map[string]Task              `json:"tasks"`
+	Agents        map[string]Agent             `json:"agents"`
+	Attempts      map[string]Attempt           `json:"attempts"`
+	Artifacts     map[string]Artifact          `json:"artifacts"`
+	Messages      map[string]Message           `json:"messages"`
+	Decisions     map[string]ReleaseDecision   `json:"decisions"`
+	Intents       map[string]PublishIntent     `json:"intents"`
+	Questions     map[string]Question          `json:"questions"`
+	Approvals     map[string]ApprovalRequest   `json:"approvals"`
+	Reports       map[string]DailyReport       `json:"reports"`
+	ReportOutbox  map[string]ReportOutboxEntry `json:"report_outbox"`
+	Events        []Event                      `json:"events"`
+	PausedUntil   *time.Time                   `json:"paused_until,omitempty"`
+	Stopped       bool                         `json:"stopped"`
 }
 
 func NewState() State {
-	return State{SchemaVersion: SchemaVersion, Tasks: map[string]Task{}, Agents: map[string]Agent{}, Attempts: map[string]Attempt{}, Artifacts: map[string]Artifact{}, Messages: map[string]Message{}, Decisions: map[string]ReleaseDecision{}, Intents: map[string]PublishIntent{}, Questions: map[string]Question{}, Approvals: map[string]ApprovalRequest{}, Reports: map[string]DailyReport{}, Events: []Event{}}
+	return State{SchemaVersion: SchemaVersion, Tasks: map[string]Task{}, Agents: map[string]Agent{}, Attempts: map[string]Attempt{}, Artifacts: map[string]Artifact{}, Messages: map[string]Message{}, Decisions: map[string]ReleaseDecision{}, Intents: map[string]PublishIntent{}, Questions: map[string]Question{}, Approvals: map[string]ApprovalRequest{}, Reports: map[string]DailyReport{}, ReportOutbox: map[string]ReportOutboxEntry{}, Events: []Event{}}
 }

@@ -303,6 +303,11 @@ func (s *Server) home(w http.ResponseWriter, r *http.Request) {
 		reports = append(reports, report)
 	}
 	sort.Slice(reports, func(i, j int) bool { return reports[i].Date > reports[j].Date })
+	outbox := make([]core.ReportOutboxEntry, 0, len(st.ReportOutbox))
+	for _, entry := range st.ReportOutbox {
+		outbox = append(outbox, entry)
+	}
+	sort.Slice(outbox, func(i, j int) bool { return outbox[i].Date > outbox[j].Date })
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	_ = page.Execute(w, struct {
 		CSRF        string
@@ -312,11 +317,12 @@ func (s *Server) home(w http.ResponseWriter, r *http.Request) {
 		Questions   []core.Question
 		Approvals   []core.ApprovalRequest
 		Reports     []core.DailyReport
+		Outbox      []core.ReportOutboxEntry
 		Stopped     bool
 		PausedUntil *time.Time
 		WorkerMode  string
 		WindowOpen  bool
-	}{s.csrf(r), tasks, messages, agents, questions, approvals, reports, st.Stopped, st.PausedUntil, s.workerMode, s.allowedNow == nil || s.allowedNow(time.Now())})
+	}{s.csrf(r), tasks, messages, agents, questions, approvals, reports, outbox, st.Stopped, st.PausedUntil, s.workerMode, s.allowedNow == nil || s.allowedNow(time.Now())})
 }
 
 func (s *Server) staticCSS(w http.ResponseWriter, r *http.Request) {
