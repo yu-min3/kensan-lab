@@ -65,6 +65,12 @@ func (s *Store) RecordReleaseDecision(d ReleaseDecision) (ReleaseDecision, error
 		if !okA || !okG || author.ID == gate.ID || gate.Role != "release_gate" || gate.SessionID == "" || author.SessionID == gate.SessionID {
 			return errors.New("independent release gate session required")
 		}
+		if st.Tasks[author.TaskID].MissionID != st.Tasks[gate.TaskID].MissionID || st.Tasks[author.TaskID].ContractVersion != st.Tasks[gate.TaskID].ContractVersion {
+			return errors.New("release gate mission or contract mismatch")
+		}
+		if d.Verdict == "allow" && (strings.HasPrefix(author.SessionID, "mock-") || strings.HasPrefix(gate.SessionID, "mock-")) {
+			return errors.New("simulation sessions cannot authorize release")
+		}
 		if st.Tasks[author.TaskID].HeadSHA != d.HeadSHA {
 			return errors.New("decision head differs from current task")
 		}

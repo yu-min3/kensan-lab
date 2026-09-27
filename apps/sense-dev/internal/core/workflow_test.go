@@ -211,3 +211,33 @@ func TestSingleWriterLock(t *testing.T) {
 		t.Fatal("second controller acquired same state")
 	}
 }
+
+func TestMockReleaseCannotAuthorizePublish(t *testing.T) {
+	s := testStore(t)
+	task, author := taskAgent(t, s, Platform, "implementation")
+	_, gate := taskAgent(t, s, Platform, "release_gate")
+	if err := s.SetHeadSHA(task.ID, strings.Repeat("a", 40)); err != nil {
+		t.Fatal(err)
+	}
+	for _, a := range []Agent{author, gate} {
+		m, err := s.BuildManifest(a.ID, nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := s.SetAgentSession(a.ID, a.Provider, a.Model, "mock-"+a.ID, m.InputSHA256, 1); err != nil {
+			t.Fatal(err)
+		}
+	}
+	source, err := s.PutArtifact(author.ID, "change_ready", []byte("mock diff"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	evidence, err := s.PutArtifact(gate.ID, "review", []byte("mock review"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	d := ReleaseDecision{AuthorAgentID: author.ID, GateAgentID: gate.ID, Verdict: "allow", Reason: "mock", Operation: "pr_create", Repository: "yu-min3/kensan-lab", Ref: "refs/heads/feat/mock", HeadSHA: strings.Repeat("a", 40), TargetEnvironment: "github", PolicyVersion: ReleasePolicyVersion, ArtifactRefs: []ArtifactRef{artifactRef(source)}, EvidenceRefs: []ArtifactRef{artifactRef(evidence)}, SecretFree: true, PrivateTarget: true, Reversible: true, ExpiresAt: time.Now().Add(time.Hour)}
+	if _, err := s.RecordReleaseDecision(d); err == nil {
+		t.Fatal("simulation authorized release")
+	}
+}
