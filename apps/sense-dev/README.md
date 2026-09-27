@@ -1,6 +1,6 @@
 # sense-dev
 
-sense 上で動く自動開発 controller の実装。現段階はファイル台帳、App/Platform の独立 context、版付き成果物配送、依存付きの fake worker 配車、独立 Release Gate の判定と publish intent、本人用の loopback 管理画面、Codex App Server アダプタまで。OS service に配車ループはまだ接続していない。Claude 接続、GitHub 操作、日報、sense 実機導入も未完了。
+sense 上で動く自動開発 controller の実装。現段階はファイル台帳、App/Platform の独立 context、版付き成果物配送、依存付きの fake worker 配車、独立 Release Gate の判定と publish intent、本人用の loopback 管理画面、公式 CLI アダプタまで。OS service に配車ループはまだ接続していない。GitHub 操作、日報、sense 実機導入も未完了。
 
 ## 配置
 
@@ -27,13 +27,14 @@ sense-dev -listen 127.0.0.1:8787 -data /var/lib/kensan-dev -admin-token-file /va
 - App と Platform の profile/knowledge/memo を入力 manifest で区別し、受領した成果物だけを inbox に追加。
 - fake worker で依存関係、provider ごと最大1実行、quota待機中の別 task、Mac優先、中断記録を試験。再起動中の実行は自動再送せず inspection 待ちにする。
 - Codex App Server アダプタは ChatGPT account と quota を確認し、API key・モデル変更を拒否する単体試験まで。sense での本人認証と実モデル利用は未検証。
+- Claude CLI アダプタは専用の private 設定ディレクトリ、subscription のログイン状態、危険な課金設定の不在を検査し、Read-only 工程に限定。fake CLI で stdin prompt とモデル相違拒否を試験。sense での本人認証と実モデル利用は未検証。
 - 版・hash・契約・SHA・宛先を検査する配送と、message ID による重複防止。
 - 作者とは別 session の Release Gate。`allow` は委任操作、非公開、機密なし、可逆性、必要な CI を満たす場合だけ台帳に保存。外部操作前に intent を保存する。
 - UI の loopback bind、管理 token login、HttpOnly cookie、CSRF、停止・Mac優先。provider の自動推論はまだ起動しない。
 
 ## 未完了と再開点
 
-1. Claude adapter、OS service と durable scheduler の接続、task pipeline 作成、worker の権限隔離、auth待機と中断照合・再開を実装する。現 scheduler は fake runner 用で、UI から作った task に agent はまだ自動割当されない。
+1. OS service と durable scheduler の接続、task pipeline 作成、worker の権限隔離、auth待機と中断照合・再開を実装する。現 scheduler は fake runner 用で、UI から作った task に agent はまだ自動割当されない。Claude の書込系 tool は隔離 worker が完成するまで解放しない。
 2. Release Gate の証拠を実際の Git 差分/CI/公開経路に照らし、限定 publisher と外部操作の reconcile を実装する。現時点の `PublishIntent` は dry-run 台帳だけで、GitHub へは送らない。
 3. 管理画面に agent 割当、質問/回答、受入結果、SHA-bound 承認、日報を追加し、実機幅と切断復旧を検証する。
 4. sense へ read-only 接続して CPU/RAM/ディスク、旧 k3s/cluster membership、待受・既存公開経路を実測する。現在 SSH がタイムアウトするため、private-ready は未判定。
