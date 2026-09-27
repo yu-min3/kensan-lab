@@ -21,6 +21,14 @@ func TestRunnerRejectsReviewerWithWritableModel(t *testing.T) {
 	}
 }
 
+func TestRunnerRejectsUnpinnedTaskWorktree(t *testing.T) {
+	runner := Runner{WorkerProgram: "/usr/local/bin/sense-dev-worker", Timeout: time.Minute}
+	_, err := runner.Run(context.Background(), core.Dispatch{Attempt: core.Attempt{ID: "attempt-1", TaskID: strings.Repeat("a", 32), Role: "implementation", Provider: "codex", Model: "gpt-6-sol"}, Prompt: "work", BindSession: func(string) error { return nil }})
+	if err == nil {
+		t.Fatal("isolated turn started without a pinned task worktree")
+	}
+}
+
 func TestReadEventsPersistsSessionBeforeAck(t *testing.T) {
 	events := "{\"version\":1,\"type\":\"session\",\"session_id\":\"thread-1\"}\n{\"version\":1,\"type\":\"result\",\"output\":\"done\"}\n"
 	var ack bytes.Buffer

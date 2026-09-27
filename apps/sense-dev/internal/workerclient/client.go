@@ -14,6 +14,7 @@ import (
 	"github.com/yu-min3/kensan-lab/apps/sense-dev/internal/core"
 	"github.com/yu-min3/kensan-lab/apps/sense-dev/internal/isolation"
 	"github.com/yu-min3/kensan-lab/apps/sense-dev/internal/workerwire"
+	"github.com/yu-min3/kensan-lab/apps/sense-dev/internal/worktree"
 )
 
 // Runner uses a separate bubblewrap process for every provider turn. No
@@ -24,6 +25,7 @@ type Runner struct {
 	Codex         isolation.Config
 	WorkerProgram string
 	Timeout       time.Duration
+	Worktrees     worktree.Manager
 }
 
 // Preflight executes the trusted worker inside both sandboxes before the
@@ -77,11 +79,19 @@ func (r Runner) Run(ctx context.Context, dispatch core.Dispatch) (core.RunResult
 	if err := request.Validate(); err != nil {
 		return core.RunResult{}, err
 	}
+	if dispatch.Attempt.BaseSHA == "" {
+		return core.RunResult{}, errors.New("task base SHA must be pinned before isolated dispatch")
+	}
+	taskWorktree, pinnedBase, err := r.Worktrees.Ensure(ctx, dispatch.Attempt.TaskID, dispatch.Attempt.BaseSHA)
+	if err != nil || pinnedBase != dispatch.Attempt.BaseSHA {
+		return core.RunResult{}, errors.New("task-scoped worktree failed validation")
+	}
 	config := r.Codex
 	if request.Provider == "claude" {
 		config = r.Claude
 	}
 	config.ReadOnlyWorktree = request.Model != "gpt-6-sol"
+	config.Worktree = taskWorktree
 	turnCtx, cancel := context.WithTimeout(ctx, r.Timeout)
 	defer cancel()
 	cmd, err := config.Command(turnCtx, r.WorkerProgram)

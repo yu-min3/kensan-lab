@@ -22,8 +22,14 @@ func TestIsolatedWorkerWaitReasonOutsideWindow(t *testing.T) {
 	if got := agentWaitReason(state, agent, "isolated", false, time.Now()); got != "運転時間外" {
 		t.Fatalf("outside-window reason: %s", got)
 	}
+	if got := agentWaitReason(state, agent, "isolated", true, time.Now()); got != "作業ツリー準備待ち" {
+		t.Fatalf("inside-window unpinned reason: %s", got)
+	}
+	task := state.Tasks["task"]
+	task.BaseSHA = strings.Repeat("a", 40)
+	state.Tasks["task"] = task
 	if got := agentWaitReason(state, agent, "isolated", true, time.Now()); got != "配車待ち" {
-		t.Fatalf("inside-window reason: %s", got)
+		t.Fatalf("inside-window pinned reason: %s", got)
 	}
 }
 

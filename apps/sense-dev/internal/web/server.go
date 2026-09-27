@@ -89,6 +89,9 @@ func agentWaitReason(st core.State, a core.Agent, workerMode string, allowed boo
 	if workerMode == "isolated" && !allowed {
 		return "運転時間外"
 	}
+	if workerMode == "isolated" && st.Tasks[a.TaskID].BaseSHA == "" {
+		return "作業ツリー準備待ち"
+	}
 	return "配車待ち"
 }
 

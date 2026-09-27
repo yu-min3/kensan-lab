@@ -37,7 +37,13 @@ func (e RunError) Unwrap() error { return e.Err }
 // Tick executes at most one ready agent. Multiple Tick callers may run at
 // once; ClaimNext atomically enforces one active turn per provider and task.
 func (s *Store) Tick(ctx context.Context, runner Runner, scope []string) (bool, error) {
-	a, ok, err := s.ClaimNext(time.Now().UTC())
+	requireBase := false
+	for _, item := range scope {
+		if item == "isolated-model-worker" {
+			requireBase = true
+		}
+	}
+	a, ok, err := s.claimNext(time.Now().UTC(), requireBase)
 	if err != nil || !ok {
 		return false, err
 	}
@@ -99,6 +105,10 @@ func (s *Store) Tick(ctx context.Context, runner Runner, scope []string) (bool, 
 }
 
 func (s *Store) ClaimNext(now time.Time) (Attempt, bool, error) {
+	return s.claimNext(now, false)
+}
+
+func (s *Store) claimNext(now time.Time, requireBase bool) (Attempt, bool, error) {
 	id, err := newID()
 	if err != nil {
 		return Attempt{}, false, err
@@ -125,7 +135,7 @@ func (s *Store) ClaimNext(now time.Time) (Attempt, bool, error) {
 				continue
 			}
 			t, ok := st.Tasks[a.TaskID]
-			if !ok || t.Status == "failed" || t.Status == "done" || t.Status == "publish_wait" {
+			if !ok || t.Status == "failed" || t.Status == "done" || t.Status == "publish_wait" || requireBase && t.BaseSHA == "" {
 				continue
 			}
 			ready := true

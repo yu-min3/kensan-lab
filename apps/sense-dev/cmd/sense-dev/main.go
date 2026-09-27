@@ -20,6 +20,7 @@ import (
 	"github.com/yu-min3/kensan-lab/apps/sense-dev/internal/mock"
 	"github.com/yu-min3/kensan-lab/apps/sense-dev/internal/web"
 	"github.com/yu-min3/kensan-lab/apps/sense-dev/internal/workerclient"
+	"github.com/yu-min3/kensan-lab/apps/sense-dev/internal/worktree"
 )
 
 func main() {
@@ -38,7 +39,8 @@ func run() error {
 	bubblewrap := flag.String("bwrap", "", "absolute bubblewrap binary path")
 	runtimeRoot := flag.String("worker-rootfs", "", "dedicated non-secret Linux worker rootfs")
 	workerProgram := flag.String("worker-program", "/usr/local/bin/sense-dev-worker", "worker binary path inside rootfs")
-	worktree := flag.String("worker-worktree", "", "writable model worktree")
+	worktreeRoot := flag.String("worker-worktree-root", "", "private root for task-scoped Git worktrees")
+	sourceRepo := flag.String("source-repo", "", "local trusted Git repository used to create task worktrees")
 	claudeAuth := flag.String("claude-auth-home", "", "private Claude subscription configuration directory")
 	codexAuth := flag.String("codex-auth-home", "", "private Codex subscription configuration directory")
 	turnTimeout := flag.Duration("turn-timeout", 45*time.Minute, "maximum duration of one isolated model turn")
@@ -68,11 +70,15 @@ func run() error {
 	var runner core.Runner
 	var scope []string
 	var allowedNow func(time.Time) bool
+	var worktrees worktree.Manager
 	if *mockWorker {
 		mode, runner, scope = "mock", mock.Runner{}, []string{"simulation-only"}
 	}
 	if *isolatedWorker {
-		if *bubblewrap == "" || *runtimeRoot == "" || *worktree == "" || *claudeAuth == "" || *codexAuth == "" || *turnTimeout <= 0 {
+		if err := rejectSimulationHistory(store.Snapshot()); err != nil {
+			return err
+		}
+		if *bubblewrap == "" || *runtimeRoot == "" || *worktreeRoot == "" || *sourceRepo == "" || *claudeAuth == "" || *codexAuth == "" || *turnTimeout <= 0 {
 			return errors.New("isolated worker paths and positive timeout are required")
 		}
 		window, err := parseRunWindow(*inferenceWindow)
@@ -91,10 +97,11 @@ func run() error {
 		if err != nil || rel == ".." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) {
 			return errors.New("admin token must be inside controller state when isolated workers are enabled")
 		}
-		base := isolation.Config{Bubblewrap: *bubblewrap, RuntimeRoot: *runtimeRoot, Worktree: *worktree, ControllerState: *data}
+		worktrees = worktree.Manager{Source: *sourceRepo, Root: *worktreeRoot}
+		base := isolation.Config{Bubblewrap: *bubblewrap, RuntimeRoot: *runtimeRoot, Worktree: *worktreeRoot, ControllerState: *data}
 		claudeConfig, codexConfig := base, base
 		claudeConfig.AuthHome, codexConfig.AuthHome = *claudeAuth, *codexAuth
-		isolated := workerclient.Runner{Claude: claudeConfig, Codex: codexConfig, WorkerProgram: *workerProgram, Timeout: *turnTimeout}
+		isolated := workerclient.Runner{Claude: claudeConfig, Codex: codexConfig, WorkerProgram: *workerProgram, Timeout: *turnTimeout, Worktrees: worktrees}
 		if err := isolated.Preflight(context.Background()); err != nil {
 			return fmt.Errorf("isolated worker disabled: %w", err)
 		}
@@ -124,6 +131,11 @@ func run() error {
 				case <-ticker.C:
 					if allowedNow != nil && !allowedNow(time.Now()) {
 						continue
+					}
+					if mode == "isolated" {
+						if err := prepareReadyWorktrees(ctx, store, worktrees); err != nil {
+							log.Print("task worktree preparation needs operator inspection")
+						}
 					}
 					if _, err := store.Tick(ctx, runner, scope); err != nil && !errors.Is(err, context.Canceled) {
 						log.Print("worker dispatch needs operator inspection")

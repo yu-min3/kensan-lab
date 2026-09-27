@@ -80,6 +80,24 @@ func TestSchedulerIndependentTeamsAndDependencies(t *testing.T) {
 	}
 }
 
+func TestIsolatedDispatchWaitsForPinnedTaskBase(t *testing.T) {
+	s := testStore(t)
+	task, _, err := s.CreatePlannedTask("mission", Platform, "change", "pinned worktree", "v1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	runner := &fakeRunner{}
+	if worked, err := s.Tick(context.Background(), runner, []string{"isolated-model-worker"}); err != nil || worked {
+		t.Fatalf("unprovisioned task was dispatched: %t %v", worked, err)
+	}
+	if err := s.SetBaseSHA(task.ID, strings.Repeat("a", 40)); err != nil {
+		t.Fatal(err)
+	}
+	if worked, err := s.Tick(context.Background(), runner, []string{"isolated-model-worker"}); err != nil || !worked {
+		t.Fatalf("provisioned task not dispatched: %t %v", worked, err)
+	}
+}
+
 func TestSchedulerProviderSlotPauseAndRecovery(t *testing.T) {
 	s := testStore(t)
 	_, first := taskAgent(t, s, Platform, "first")

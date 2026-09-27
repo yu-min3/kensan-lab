@@ -1,0 +1,99 @@
+package worktree
+
+import (
+	"context"
+	"os"
+	"path/filepath"
+	"strings"
+	"testing"
+)
+
+func testManager(t *testing.T) (Manager, string) {
+	t.Helper()
+	base := t.TempDir()
+	source, root := filepath.Join(base, "source"), filepath.Join(base, "worktrees")
+	for _, path := range []string{source, root} {
+		if err := os.Mkdir(path, 0700); err != nil {
+			t.Fatal(err)
+		}
+	}
+	ctx := context.Background()
+	for _, argv := range [][]string{{"init", "-q"}, {"config", "user.email", "sense-dev@example.invalid"}, {"config", "user.name", "Sense Dev"}, {"commit", "--allow-empty", "-m", "initial"}} {
+		if _, err := git(ctx, source, argv...); err != nil {
+			t.Fatal(err)
+		}
+	}
+	sha, err := git(ctx, source, "rev-parse", "HEAD")
+	if err != nil {
+		t.Fatal(err)
+	}
+	return Manager{Source: source, Root: root}, sha
+}
+
+func TestTaskWorktreesAreDistinctAndPinned(t *testing.T) {
+	m, sourceSHA := testManager(t)
+	ids := []string{strings.Repeat("a", 32), strings.Repeat("b", 32)}
+	paths := make([]string, 0, 2)
+	for _, id := range ids {
+		path, base, err := m.Ensure(context.Background(), id, "")
+		if err != nil || base != sourceSHA {
+			t.Fatalf("task worktree not pinned: %s %s %v", path, base, err)
+		}
+		paths = append(paths, path)
+		if reopened, gotBase, err := m.Ensure(context.Background(), id, base); err != nil || reopened != path || gotBase != base {
+			t.Fatalf("task worktree not idempotent: %s %s %v", reopened, gotBase, err)
+		}
+	}
+	if paths[0] == paths[1] {
+		t.Fatal("two tasks share a worktree")
+	}
+	if _, err := git(context.Background(), paths[0], "commit", "--allow-empty", "-m", "task A"); err != nil {
+		t.Fatal(err)
+	}
+	if _, _, err := m.Ensure(context.Background(), ids[0], sourceSHA); err != nil {
+		t.Fatalf("task's descendant commit rejected: %v", err)
+	}
+	headB, err := git(context.Background(), paths[1], "rev-parse", "HEAD")
+	if err != nil || headB != sourceSHA {
+		t.Fatalf("task B observed task A commit: %s %v", headB, err)
+	}
+}
+
+func TestRejectsPathEscapeAndWrongRepository(t *testing.T) {
+	m, sha := testManager(t)
+	if _, _, err := m.Ensure(context.Background(), "../outside", sha); err == nil {
+		t.Fatal("path traversal accepted")
+	}
+	id := strings.Repeat("c", 32)
+	if err := os.Symlink(m.Source, filepath.Join(m.Root, id)); err != nil {
+		t.Fatal(err)
+	}
+	if _, _, err := m.Ensure(context.Background(), id, sha); err == nil {
+		t.Fatal("symlinked worktree accepted")
+	}
+	if err := os.Remove(filepath.Join(m.Root, id)); err != nil {
+		t.Fatal(err)
+	}
+	wrong := filepath.Join(m.Root, id)
+	if err := os.Mkdir(wrong, 0700); err != nil {
+		t.Fatal(err)
+	}
+	if _, _, err := m.Ensure(context.Background(), id, sha); err == nil {
+		t.Fatal("unrelated directory accepted")
+	}
+}
+
+func TestRejectsChangedTaskBranch(t *testing.T) {
+	m, sha := testManager(t)
+	id := strings.Repeat("d", 32)
+	path, _, err := m.Ensure(context.Background(), id, sha)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := git(context.Background(), path, "switch", "-c", "unexpected"); err != nil {
+		t.Fatal(err)
+	}
+	if _, _, err := m.Ensure(context.Background(), id, sha); err == nil {
+		t.Fatal("task branch switch accepted")
+	}
+}
