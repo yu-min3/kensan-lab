@@ -165,6 +165,9 @@ func (s *Store) claimNext(now time.Time, requireBase bool) (Attempt, bool, error
 					break
 				}
 			}
+			if ready && !linkedAcceptanceReady(st, t, a) {
+				ready = false
+			}
 			if ready {
 				candidates = append(candidates, a)
 			}
@@ -188,6 +191,27 @@ func (s *Store) claimNext(now time.Time, requireBase bool) (Attempt, bool, error
 		return nil
 	})
 	return claimed, claimed.ID != "", err
+}
+
+func linkedAcceptanceReady(st *State, task Task, agent Agent) bool {
+	if task.Kind != "acceptance" || task.SourceTaskID == "" {
+		return true
+	}
+	source, ok := st.Tasks[task.SourceTaskID]
+	if !ok || source.Team != Platform || source.Status != "publish_wait" || source.MissionID != task.MissionID || source.ContractVersion != task.ContractVersion || !fullSHA(source.HeadSHA) || task.HeadSHA != source.HeadSHA {
+		return false
+	}
+	for _, message := range st.Messages {
+		from := st.Agents[message.FromAgent]
+		if message.Status == "received" && message.Kind == "change_ready" && message.SourceTask == source.ID && message.TargetTask == task.ID && message.ToAgent == agent.ID && message.HeadSHA == source.HeadSHA && message.ContractVersion == task.ContractVersion && reviewedPlatformChange(source, from) {
+			return true
+		}
+	}
+	return false
+}
+
+func reviewedPlatformChange(task Task, sender Agent) bool {
+	return task.Team == Platform && task.Kind == "change" && task.Status == "publish_wait" && sender.TaskID == task.ID && sender.Role == "implementation_review" && sender.Status == "completed"
 }
 
 func (s *Store) SetAttemptInput(attemptID, hash string) error {

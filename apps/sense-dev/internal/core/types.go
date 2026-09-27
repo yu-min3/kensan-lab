@@ -21,6 +21,7 @@ type Task struct {
 	ContractVersion string    `json:"contract_version"`
 	BaseSHA         string    `json:"base_sha,omitempty"`
 	HeadSHA         string    `json:"head_sha,omitempty"`
+	SourceTaskID    string    `json:"source_task_id,omitempty"`
 	DependsOn       []string  `json:"depends_on,omitempty"`
 	CreatedAt       time.Time `json:"created_at"`
 	UpdatedAt       time.Time `json:"updated_at"`

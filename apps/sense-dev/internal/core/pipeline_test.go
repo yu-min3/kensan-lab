@@ -5,6 +5,7 @@ import (
 	"errors"
 	"strings"
 	"testing"
+	"time"
 )
 
 func TestPlannedPipelineHasIndependentStages(t *testing.T) {
@@ -38,6 +39,97 @@ func TestPlannedPipelineHasIndependentStages(t *testing.T) {
 	}
 	if len(s.Snapshot().Tasks) != 2 {
 		t.Fatal("rejected task partially persisted")
+	}
+}
+
+func TestLinkedAcceptanceWaitsForReceivedCurrentPlatformHead(t *testing.T) {
+	s := testStore(t)
+	platform, stages, err := s.CreatePlannedTask("mission", Platform, "change", "golden path canary", "contract-v1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	app, appAgent, err := s.CreateLinkedAcceptanceTask(platform.ID, "consumer acceptance")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if app.SourceTaskID != platform.ID || app.MissionID != platform.MissionID || app.ContractVersion != platform.ContractVersion || appAgent.Team != App {
+		t.Fatalf("incorrect linkage: %+v %+v", app, appAgent)
+	}
+	if _, _, err := s.CreateLinkedAcceptanceTask(app.ID, "invalid source"); err == nil {
+		t.Fatal("App source accepted")
+	}
+	if err := s.update(func(st *State) error {
+		for _, stage := range stages {
+			a := st.Agents[stage.ID]
+			a.Status = "pending"
+			st.Agents[a.ID] = a
+		}
+		return nil
+	}); err != nil {
+		t.Fatal(err)
+	}
+	assertNoClaim := func(label string) {
+		t.Helper()
+		if attempt, ok, err := s.ClaimNext(time.Now()); err != nil || ok {
+			t.Fatalf("%s: claimed %+v: %v", label, attempt, err)
+		}
+	}
+	assertNoClaim("no handoff")
+	head := strings.Repeat("a", 40)
+	if err := s.SetHeadSHA(platform.ID, head); err != nil {
+		t.Fatal(err)
+	}
+	artifact, err := s.PutArtifact(stages[4].ID, "change_ready", []byte("reviewed platform change"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	message := Message{ID: "linked-handoff", CorrelationID: "mission", FromAgent: stages[4].ID, ToAgent: appAgent.ID, SourceTask: platform.ID, TargetTask: app.ID, Kind: "change_ready", ArtifactRefs: []ArtifactRef{artifactRef(artifact)}, ContractVersion: platform.ContractVersion, HeadSHA: head}
+	wrong := message
+	wrong.ID = "wrong-kind"
+	wrong.Kind = "note"
+	if _, err := s.SendMessage(wrong); err == nil {
+		t.Fatal("non-change-ready handoff accepted")
+	}
+	if _, err := s.SendMessage(message); err == nil {
+		t.Fatal("unreviewed Platform change accepted")
+	}
+	if err := s.update(func(st *State) error {
+		for _, stage := range stages {
+			a := st.Agents[stage.ID]
+			a.Status = "completed"
+			st.Agents[a.ID] = a
+		}
+		p := st.Tasks[platform.ID]
+		p.Status = "publish_wait"
+		st.Tasks[p.ID] = p
+		return nil
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.SendMessage(message); err != nil {
+		t.Fatal(err)
+	}
+	assertNoClaim("pending handoff")
+	if err := s.ReceiveMessage(appAgent.ID, message.ID); err != nil {
+		t.Fatal(err)
+	}
+	if got := s.Snapshot().Tasks[app.ID].HeadSHA; got != head {
+		t.Fatalf("App head not pinned: %s", got)
+	}
+	if err := s.SetHeadSHA(platform.ID, strings.Repeat("b", 40)); err != nil {
+		t.Fatal(err)
+	}
+	assertNoClaim("stale handoff")
+	if err := s.SetHeadSHA(platform.ID, head); err != nil {
+		t.Fatal(err)
+	}
+	manifest, err := s.BuildManifest(appAgent.ID, nil)
+	if err != nil || len(manifest.Inbox) != 1 || manifest.Inbox[0].ID != artifact.ID {
+		t.Fatalf("App inbox mismatch: %+v %v", manifest, err)
+	}
+	attempt, ok, err := s.ClaimNext(time.Now())
+	if err != nil || !ok || attempt.AgentID != appAgent.ID || attempt.HeadSHA != head {
+		t.Fatalf("App acceptance not claimed: %+v %v", attempt, err)
 	}
 }
 

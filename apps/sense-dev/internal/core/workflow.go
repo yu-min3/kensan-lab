@@ -194,6 +194,9 @@ func (s *Store) SendMessage(m Message) (Message, error) {
 		if fromTask.MissionID != toTask.MissionID || fromTask.ContractVersion != m.ContractVersion || toTask.ContractVersion != m.ContractVersion {
 			return errors.New("mission or contract version mismatch")
 		}
+		if toTask.SourceTaskID != "" && (m.Kind != "change_ready" || m.SourceTask != toTask.SourceTaskID || !fullSHA(m.HeadSHA) || !reviewedPlatformChange(fromTask, from)) {
+			return errors.New("linked acceptance requires reviewed Platform change_ready at a full head SHA")
+		}
 		if m.HeadSHA != "" && fromTask.HeadSHA != m.HeadSHA {
 			return errors.New("stale head SHA")
 		}
@@ -256,6 +259,12 @@ func (s *Store) ReceiveMessage(agentID, messageID string) error {
 		if m.HeadSHA != "" && st.Tasks[m.SourceTask].HeadSHA != m.HeadSHA {
 			return errors.New("message source head is stale")
 		}
+		target := st.Tasks[m.TargetTask]
+		if target.SourceTaskID != "" {
+			if m.Kind != "change_ready" || m.SourceTask != target.SourceTaskID || !fullSHA(m.HeadSHA) || target.HeadSHA != "" && target.HeadSHA != m.HeadSHA {
+				return errors.New("linked acceptance handoff is stale or from another task")
+			}
+		}
 		for _, ref := range m.ArtifactRefs {
 			a, ok := st.Artifacts[ref.ID]
 			if !ok || a.SHA256 != ref.SHA256 || a.Version != ref.Version {
@@ -265,6 +274,10 @@ func (s *Store) ReceiveMessage(agentID, messageID string) error {
 		now := time.Now().UTC()
 		m.Status, m.ReceivedAt = "received", &now
 		st.Messages[messageID] = m
+		if target.SourceTaskID != "" {
+			target.HeadSHA, target.UpdatedAt = m.HeadSHA, now
+			st.Tasks[target.ID] = target
+		}
 		st.Events = append(st.Events, event("message_received", messageID, agentID))
 		return nil
 	})

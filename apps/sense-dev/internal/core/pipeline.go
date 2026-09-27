@@ -75,3 +75,35 @@ func (s *Store) CreatePlannedTask(mission string, team Team, kind, title, contra
 	}
 	return task, agents, nil
 }
+
+// CreateLinkedAcceptanceTask makes an independent App task. Its agent cannot
+// run until it receives a change_ready artifact for the current Platform head.
+func (s *Store) CreateLinkedAcceptanceTask(platformTaskID, title string) (Task, Agent, error) {
+	if strings.TrimSpace(platformTaskID) == "" || strings.TrimSpace(title) == "" {
+		return Task{}, Agent{}, errors.New("platform task and acceptance title are required")
+	}
+	taskID, err := newID()
+	if err != nil {
+		return Task{}, Agent{}, err
+	}
+	agentID, err := newID()
+	if err != nil {
+		return Task{}, Agent{}, err
+	}
+	var task Task
+	var agent Agent
+	err = s.update(func(st *State) error {
+		source, ok := st.Tasks[platformTaskID]
+		if !ok || source.Team != Platform || source.Kind != "change" {
+			return errors.New("source must be a Platform change task")
+		}
+		now := time.Now().UTC()
+		task = Task{ID: taskID, MissionID: source.MissionID, Team: App, Kind: "acceptance", Title: title, Status: "ready", ContractVersion: source.ContractVersion, SourceTaskID: source.ID, CreatedAt: now, UpdatedAt: now}
+		agent = Agent{ID: agentID, TaskID: taskID, Team: App, Role: "app_acceptance", Provider: "claude", Model: "opus", SessionGeneration: 1, Status: "ready", UpdatedAt: now}
+		st.Tasks[task.ID] = task
+		st.Agents[agent.ID] = agent
+		st.Events = append(st.Events, event("acceptance_linked", task.ID, source.ID))
+		return nil
+	})
+	return task, agent, err
+}
