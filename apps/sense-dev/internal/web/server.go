@@ -67,6 +67,18 @@ func agentWaitReason(st core.State, a core.Agent, workerMode string, allowed boo
 	if st.PausedUntil != nil && now.Before(*st.PausedUntil) {
 		return "Mac 優先"
 	}
+	task := st.Tasks[a.TaskID]
+	if task.Team == core.App && task.Kind == "acceptance" && task.SourceTaskID != "" {
+		if st.Tasks[task.SourceTaskID].Status == "decision_wait" {
+			return "Yu の判断待ち"
+		}
+		if task.Status == "revision_wait" {
+			return "Platform 修正待ち"
+		}
+		if task.HeadSHA != "" && task.BaseSHA != "" && task.BaseSHA != task.HeadSHA {
+			return "App 作業ツリー更新待ち"
+		}
+	}
 	if a.Status != "ready" {
 		return a.Status
 	}
@@ -83,7 +95,6 @@ func agentWaitReason(st core.State, a core.Agent, workerMode string, allowed boo
 			return "案件依存待ち"
 		}
 	}
-	task := st.Tasks[a.TaskID]
 	if task.Team == core.App && task.Kind == "acceptance" && task.SourceTaskID != "" {
 		source := st.Tasks[task.SourceTaskID]
 		if task.HeadSHA == "" {

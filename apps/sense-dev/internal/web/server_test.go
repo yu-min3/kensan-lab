@@ -48,6 +48,18 @@ func TestLinkedAppWaitReason(t *testing.T) {
 	if got := agentWaitReason(state, agent, "mock", true, time.Now()); got != "Platform 版不一致・要確認" {
 		t.Fatalf("stale handoff: %s", got)
 	}
+	app.Status = "revision_wait"
+	state.Tasks["app"] = app
+	agent.Status = "completed"
+	if got := agentWaitReason(state, agent, "mock", true, time.Now()); got != "Platform 修正待ち" {
+		t.Fatalf("correction wait: %s", got)
+	}
+	platform := state.Tasks["platform"]
+	platform.Status = "decision_wait"
+	state.Tasks["platform"] = platform
+	if got := agentWaitReason(state, agent, "mock", true, time.Now()); got != "Yu の判断待ち" {
+		t.Fatalf("decision wait: %s", got)
+	}
 }
 
 func TestCreateLinkedAppAcceptanceFromForm(t *testing.T) {

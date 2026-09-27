@@ -131,6 +131,66 @@ func (m Manager) EnsureFromTask(ctx context.Context, taskID, sourceTaskID, headS
 	return path, headSHA, nil
 }
 
+// AdvanceFromTask fast-forwards a clean consumer checkout to a reviewed
+// producer correction. A crash after the fast-forward is safe to retry.
+func (m Manager) AdvanceFromTask(ctx context.Context, taskID, sourceTaskID, fromHead, toHead string) (string, error) {
+	if !taskIDPattern.MatchString(taskID) || !taskIDPattern.MatchString(sourceTaskID) || taskID == sourceTaskID || !shaPattern.MatchString(fromHead) || !shaPattern.MatchString(toHead) || fromHead == toHead {
+		return "", errors.New("invalid consumer correction identity")
+	}
+	source, root, err := m.paths()
+	if err != nil {
+		return "", err
+	}
+	producer, path := filepath.Join(root, sourceTaskID), filepath.Join(root, taskID)
+	if info, err := os.Lstat(producer); err != nil || !info.IsDir() || info.Mode()&os.ModeSymlink != 0 {
+		return "", errors.New("producer checkout is unavailable")
+	}
+	if info, err := os.Lstat(path); err != nil || !info.IsDir() || info.Mode()&os.ModeSymlink != 0 {
+		return "", errors.New("consumer checkout is unavailable")
+	}
+	if err := validate(ctx, source, producer, "sense-dev/"+sourceTaskID, ""); err != nil {
+		return "", err
+	}
+	if err := validate(ctx, producer, path, "sense-dev/"+taskID, fromHead); err != nil {
+		return "", err
+	}
+	producerHead, err := git(ctx, producer, "rev-parse", "HEAD")
+	if err != nil || producerHead != toHead {
+		return "", errors.New("producer is not at corrected head")
+	}
+	if dirty, err := git(ctx, producer, "status", "--porcelain"); err != nil || dirty != "" {
+		return "", errors.New("producer checkout is dirty")
+	}
+	consumerHead, err := git(ctx, path, "rev-parse", "HEAD")
+	if err != nil || consumerHead != fromHead && consumerHead != toHead {
+		return "", errors.New("consumer checkout moved unexpectedly")
+	}
+	if dirty, err := git(ctx, path, "status", "--porcelain"); err != nil || dirty != "" {
+		return "", errors.New("consumer checkout is dirty")
+	}
+	if consumerHead == fromHead {
+		if _, err := git(ctx, path, "fetch", "--no-tags", producer, "refs/heads/sense-dev/"+sourceTaskID); err != nil {
+			return "", errors.New("corrected commit could not be fetched")
+		}
+		if fetched, err := git(ctx, path, "rev-parse", "FETCH_HEAD"); err != nil || fetched != toHead {
+			return "", errors.New("fetched commit is not the reviewed head")
+		}
+		if _, err := git(ctx, path, "merge", "--ff-only", "FETCH_HEAD"); err != nil {
+			return "", errors.New("consumer correction is not fast-forwardable")
+		}
+	}
+	if err := validate(ctx, producer, path, "sense-dev/"+taskID, toHead); err != nil {
+		return "", err
+	}
+	if final, err := git(ctx, path, "rev-parse", "HEAD"); err != nil || final != toHead {
+		return "", errors.New("consumer checkout did not reach reviewed head")
+	}
+	if dirty, err := git(ctx, path, "status", "--porcelain"); err != nil || dirty != "" {
+		return "", errors.New("consumer checkout became dirty")
+	}
+	return path, nil
+}
+
 func (m Manager) paths() (string, string, error) {
 	if !filepath.IsAbs(m.Source) || !filepath.IsAbs(m.Root) || m.Source == "/" || m.Root == "/" {
 		return "", "", errors.New("source and worktree root must be absolute non-root paths")

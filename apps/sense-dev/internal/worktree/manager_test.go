@@ -163,10 +163,33 @@ func TestConsumerCheckoutStartsAtReviewedProducerCommit(t *testing.T) {
 	if _, _, err := m.EnsureFromTask(context.Background(), consumerID, producerID, original); err == nil {
 		t.Fatal("stale reviewed head accepted")
 	}
+	if err := os.WriteFile(filepath.Join(producer, "change.txt"), []byte("corrected change\n"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := git(context.Background(), producer, "add", "change.txt"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := git(context.Background(), producer, "commit", "-m", "correction"); err != nil {
+		t.Fatal(err)
+	}
+	corrected, err := git(context.Background(), producer, "rev-parse", "HEAD")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := m.AdvanceFromTask(context.Background(), consumerID, producerID, head, corrected); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := m.AdvanceFromTask(context.Background(), consumerID, producerID, head, corrected); err != nil {
+		t.Fatalf("advance not restart-safe: %v", err)
+	}
+	body, err = os.ReadFile(filepath.Join(consumer, "change.txt"))
+	if err != nil || string(body) != "corrected change\n" {
+		t.Fatalf("consumer missed correction: %q %v", body, err)
+	}
 	if err := os.WriteFile(filepath.Join(consumer, "change.txt"), []byte("consumer edit"), 0600); err != nil {
 		t.Fatal(err)
 	}
-	if _, _, err := m.EnsureFromTask(context.Background(), consumerID, producerID, head); err == nil {
+	if _, err := m.AdvanceFromTask(context.Background(), consumerID, producerID, head, corrected); err == nil {
 		t.Fatal("dirty consumer checkout accepted")
 	}
 }

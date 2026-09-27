@@ -69,6 +69,19 @@ func (s *Store) BuildManifest(agentID string, allowedScope []string) (ContextMan
 		m.MessageIDs = append(m.MessageIDs, id)
 		m.Inbox = append(m.Inbox, msg.ArtifactRefs...)
 	}
+	if t.Team == App && t.Kind == "acceptance" && t.SourceTaskID != "" && a.SessionGeneration > 1 {
+		var previous Attempt
+		for _, attempt := range st.Attempts {
+			if attempt.AgentID == a.ID && attempt.Generation == a.SessionGeneration-1 && attempt.Status == "completed" && attempt.OutputRef != nil && (previous.ID == "" || attempt.StartedAt.After(previous.StartedAt)) {
+				previous = attempt
+			}
+		}
+		if previous.ID == "" || previous.HeadSHA == t.HeadSHA {
+			return ContextManifest{}, errors.New("retest lacks a distinct previous acceptance result")
+		}
+		ref := *previous.OutputRef
+		m.PreviousAcceptance = &ref
+	}
 	for _, depID := range a.DependsOn {
 		dep, ok := st.Agents[depID]
 		if !ok || dep.TaskID != t.ID || dep.Status != "completed" {
@@ -102,6 +115,11 @@ func (s *Store) BuildManifest(agentID string, allowedScope []string) (ContextMan
 	for _, ref := range m.ReviewInputs {
 		if err := s.verifyRef(ref); err != nil {
 			return ContextManifest{}, fmt.Errorf("review input %s: %w", ref.ID, err)
+		}
+	}
+	if m.PreviousAcceptance != nil {
+		if err := s.verifyRef(*m.PreviousAcceptance); err != nil {
+			return ContextManifest{}, fmt.Errorf("previous acceptance result: %w", err)
 		}
 	}
 	if m.AgentMemo != nil {

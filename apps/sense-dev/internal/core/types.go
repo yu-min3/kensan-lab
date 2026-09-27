@@ -22,6 +22,7 @@ type Task struct {
 	BaseSHA         string    `json:"base_sha,omitempty"`
 	HeadSHA         string    `json:"head_sha,omitempty"`
 	SourceTaskID    string    `json:"source_task_id,omitempty"`
+	CorrectionCount int       `json:"correction_count,omitempty"`
 	DependsOn       []string  `json:"depends_on,omitempty"`
 	CreatedAt       time.Time `json:"created_at"`
 	UpdatedAt       time.Time `json:"updated_at"`
@@ -107,30 +108,31 @@ type Message struct {
 }
 
 type ContextManifest struct {
-	SchemaVersion   int           `json:"schema_version"`
-	MissionID       string        `json:"mission_id"`
-	TaskID          string        `json:"task_id"`
-	SourceTaskID    string        `json:"source_task_id,omitempty"`
-	Team            Team          `json:"team"`
-	Role            string        `json:"role"`
-	AgentID         string        `json:"agent_id"`
-	Provider        string        `json:"provider"`
-	Model           string        `json:"model"`
-	Generation      int           `json:"generation"`
-	TeamProfile     ArtifactRef   `json:"team_profile"`
-	TeamKnowledge   ArtifactRef   `json:"team_knowledge"`
-	CommonKnowledge ArtifactRef   `json:"common_knowledge"`
-	AgentMemo       *ArtifactRef  `json:"agent_memo,omitempty"`
-	Inbox           []ArtifactRef `json:"inbox"`
-	StageInputs     []StageInput  `json:"stage_inputs"`
-	ReviewInputs    []ArtifactRef `json:"review_inputs"`
-	ReviewAuthorID  string        `json:"review_author_id,omitempty"`
-	MessageIDs      []string      `json:"message_ids"`
-	ContractVersion string        `json:"contract_version"`
-	BaseSHA         string        `json:"base_sha,omitempty"`
-	HeadSHA         string        `json:"head_sha,omitempty"`
-	AllowedScope    []string      `json:"allowed_scope"`
-	InputSHA256     string        `json:"input_sha256"`
+	SchemaVersion      int           `json:"schema_version"`
+	MissionID          string        `json:"mission_id"`
+	TaskID             string        `json:"task_id"`
+	SourceTaskID       string        `json:"source_task_id,omitempty"`
+	Team               Team          `json:"team"`
+	Role               string        `json:"role"`
+	AgentID            string        `json:"agent_id"`
+	Provider           string        `json:"provider"`
+	Model              string        `json:"model"`
+	Generation         int           `json:"generation"`
+	TeamProfile        ArtifactRef   `json:"team_profile"`
+	TeamKnowledge      ArtifactRef   `json:"team_knowledge"`
+	CommonKnowledge    ArtifactRef   `json:"common_knowledge"`
+	AgentMemo          *ArtifactRef  `json:"agent_memo,omitempty"`
+	Inbox              []ArtifactRef `json:"inbox"`
+	PreviousAcceptance *ArtifactRef  `json:"previous_acceptance,omitempty"`
+	StageInputs        []StageInput  `json:"stage_inputs"`
+	ReviewInputs       []ArtifactRef `json:"review_inputs"`
+	ReviewAuthorID     string        `json:"review_author_id,omitempty"`
+	MessageIDs         []string      `json:"message_ids"`
+	ContractVersion    string        `json:"contract_version"`
+	BaseSHA            string        `json:"base_sha,omitempty"`
+	HeadSHA            string        `json:"head_sha,omitempty"`
+	AllowedScope       []string      `json:"allowed_scope"`
+	InputSHA256        string        `json:"input_sha256"`
 }
 
 type StageInput struct {
