@@ -8,7 +8,7 @@ tags: [kensan-lab, sense, autonomous-development, audit]
 
 # 結論
 
-**private-ready は未達。** `sense`（192.168.0.113）への SSH が復旧し、2026-09-27 に read-only 棚卸しを実施した。ただし 13:16 UTC にこの作業と別の操作で単一ノード k3s が停止・無効化され、libvirt の導入が始まった。導入対象の前提が変化したため、このスレッドからの sense 変更は保留する。専用 service は未導入で、IPv4/IPv6・既存公開経路の実測も未完了。`private-ready` や v0 完了を宣言しない。Cloudflare・既存公開経路は変更していない。
+**private-ready は未達。** `sense`（192.168.0.113）への SSH が復旧し、2026-09-27 に read-only 棚卸しを実施した。ただし 13:16 UTC にこの作業と別の操作で単一ノード k3s が停止・無効化され、libvirt の導入が始まった。14:55 UTC には `sense-llm`（4 GiB）と `sense-desktop`（6 GiB）の VM が稼働・自動起動設定で、host の available memory は約4.6 GiB。導入対象の前提が変化したため、このスレッドからの sense 変更は保留する。専用 service は未導入で、IPv4/IPv6・既存公開経路の実測も未完了。`private-ready` や v0 完了を宣言しない。Cloudflare・既存公開経路は変更していない。
 
 直近の審査済み host 導入候補に固定した source SHA は `b1743e4`（専用 worktree `feat/sense-autonomous-development`）。manifest `private-bootstrap-candidate-b1743e4.json`（commit `f294e09`）と独立 Astra 判定 `private-bootstrap-review-b1743e4.json` は、その SHA に限って再現 build と固定 hash を確認済み。`code_candidate=allow` だが、`host_install=needs_human`・`execution_authorized=false`。コード審査は host への転送・導入の許可ではない。
 
@@ -16,8 +16,9 @@ tags: [kensan-lab, sense, autonomous-development, audit]
 
 | 選択肢 | 判定 | 理由 |
 |---|---|---|
-| k3s の現状態を変更せず、loopback の host service を計画する | 条件付き採用 | 13:12 UTC は稼働・約11 GiB空き、13:19 UTC は inactive/disabled・約14 GiB空き。別作業の変更を上書きしない |
+| k3s と VM の現状態を変更せず、loopback の host service を計画する | 条件付き採用 | 13:12 UTC は k3s 稼働・約11 GiB available、13:19 UTC は k3s inactive/disabled。14:55 UTC は 2 VM 稼働・約4.6 GiB available。別作業の変更を上書きせず、資源と復旧経路を再評価する |
 | k3s を本件から停止または再起動 | 却下 | 既存 workload と別作業に影響し、所有者・目的が未確定 |
+| `sense-llm` / `sense-desktop` を本件から停止・変更 | 却下 | 両 VM は稼働・自動起動設定。所有者、用途、依存、停止許可を確認していない |
 | 初回 host 導入案 | ローカル審査のみ合格 | source `b1743e4` を独立 Astra reviewer が再buildし、候補 binary の hash 一致。mock/loopback 境界、状態ディレクトリ、既存領域、systemd 実効設定、固定 policy/manifest を確認し `code_candidate=allow`。実機操作は別作業との調整が必要で `host_install=needs_human` |
 | sense を未確認のまま `private-ready` と記録 | 却下 | AC-01/19 の service・待受・既存到達経路に実機証拠がない |
 | 別 tunnel / Cloudflare route で到達性を補う | 却下 | 明示的な公開承認がなく、非公開境界を迂回する |
@@ -27,7 +28,7 @@ tags: [kensan-lab, sense, autonomous-development, audit]
 
 | 領域 / AC | 状態 | 現在の証拠 | private-ready までに必要なもの |
 |---|---|---|---|
-| ● 高: sense 稼働・非公開性（AC-01, 08, 19） | 部分 | SSH 復旧。Ubuntu 24.04.4、4 CPU / 15 GiB RAM、root 空き 146 GiB、`/data` 空き 870 GiB。k3s は 13:12 UTC に Ready、13:19 UTC に inactive/disabled。14:25 UTC の read-only 再確認でも k3s inactive、libvirtd active、controller inactive、8787 待受なし。専用 user/group・`/opt/kensan-dev`・`/var/lib/kensan-dev`・unit は未作成、systemd LoadState は `not-found`。global IPv6 あり。ローカル実 process の mock 配車→SIGTERM→再起動/台帳復元→再配車は race 検査込みで合格。状態ディレクトリの公開権限・symlink・`/` 拒否を試験。listener/実効 unit/MainPID/binary hash の sense smoke は独立コード審査済み、未実行 | 別作業との調整、独立 Gate 再審査、host service 導入、IPv4/IPv6・既存 tunnel/proxy/Ingress/CI の実測、reboot/復旧 E2E |
+| ● 高: sense 稼働・非公開性（AC-01, 08, 19） | 部分 | SSH 復旧。Ubuntu 24.04.4、4 CPU / 15 GiB RAM。14:55 UTC の read-only 再確認で root 空き129 GiB、`/data` 空き870 GiB、k3s inactive/disabled、libvirtd active、`sense-llm` 4 GiB と `sense-desktop` 6 GiB が稼働・自動起動、available memory 約4.6 GiB。controller unit は `not-found`、8787 待受なし。global IPv6 あり。ローカル実 process の mock 配車→SIGTERM→再起動/台帳復元→再配車は race 検査込みで合格。状態ディレクトリの公開権限・symlink・`/` 拒否を試験。listener/実効 unit/MainPID/binary hash の sense smoke は独立コード審査済み、未実行 | VM を含む別作業との調整・資源/復旧経路の再評価、独立 Gate 再審査、host service 導入、IPv4/IPv6・既存 tunnel/proxy/Ingress/CI の実測、reboot/復旧 E2E |
 | ● 高: 実モデル・費用（AC-04, 06, 07） | 未検証 | Claude/Codex の購読専用 adapter と fake CLI/App Server 試験。Mac/sense 同時利用は未試験 | sense で本人が公式ログイン。契約・モデル利用可能性・従量無効を確認後に4工程とMac優先を実走 |
 | ● 高: Release Gate（AC-09, 18） | 部分 | 全 commit の Git scan、途中 commit で追加後に削除した symlink と submodule mode、隔離/worker/verifier/認証境界変更の `needs_human` 判定、対象 SHA/操作に固定した scan artifact、独立 Gate 入力 manifest、mock転用・誤操作・別SHAの拒否試験。publish は intent の dry-run のみ | CI・PR本文/添付・repo可視性・render設定・公開到達経路の実照合、worker/publisher credential 分離、限定 publisher と reconcile |
 | ▲ 中: 独立 context と工程（AC-13〜16） | 部分 | App/Platform の別 profile/knowledge/memo/session、immutable artifact、manifest hash、前工程の成果物配送、依存配車・provider枠・Mac優先・restart試験。App不合格→Platform修正→同一シナリオ再試験をローカル試験で確認 | 実 worker のOS分離、review session の実運転、session消失後の再作成、実モデル/実 repo での再試験 |
@@ -57,12 +58,12 @@ Cloudflare の設定を変更しないことと、既存公開経路が無いこ
 
 ## 次の作業
 
-1. 別作業による k3s 停止・libvirt 導入の目的と host 利用範囲を確認する。このスレッドから k3s を再起動しない。source `b1743e4` の独立コード審査は合格済みだが、実機操作の Gate は直前 baseline・公開経路・期限・固定 artifact を確認して別に判定する。候補期限は 2026-09-29 14:55 UTC で、切れたら再作成・再審査する。
+1. 別作業による k3s 停止・libvirt 導入と、稼働中 VM 2台の目的・所有者・host 利用範囲を確認する。このスレッドから k3s や VM を停止・再起動しない。source `b1743e4` の独立コード審査は合格済みだが、実機操作の Gate は直前 baseline・資源/復旧経路・公開経路・期限・固定 artifact を確認して別に判定する。候補期限は 2026-09-29 14:55 UTC で、切れたら再作成・再審査する。
 2. worker の別OSユーザー隔離、restart時の orphan turn 照合、credential なし verifier、限定 publisher/outbox を完成させる。
 3. loopback service を導入し、実機 listen・継続 event・再起動/復旧・既存到達経路を検証してから `private-ready` を判定する。
 
 ## Yu が決めるべき未決事項
 
-- 同時進行している sense の k3s 停止・libvirt 導入と、本件の host 利用の調整。
+- 同時進行している sense の k3s 停止・libvirt 導入・稼働 VM 2台と、本件の host 利用の調整。
 - 実認証時の Claude upgrade/モデル利用枠、運転時間帯（private-ready の模擬運転には不要）。
 - 日報の宛先、将来の hostname/Access IdP/本人 allowlist（外部公開は別承認）。
