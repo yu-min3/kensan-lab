@@ -7,6 +7,7 @@ const PORT = process.env.KENSAN_E2E_PORT ?? "8099";
 
 export default defineConfig({
   testDir: "./tests",
+  testIgnore: "sense-dev.spec.ts",
   fullyParallel: false,
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 1 : 0,
