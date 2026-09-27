@@ -1,7 +1,7 @@
 import { expect, test } from "@playwright/test";
 import { spawn, execFileSync, ChildProcess } from "node:child_process";
 import { randomBytes } from "node:crypto";
-import { mkdtempSync, writeFileSync, chmodSync, rmSync } from "node:fs";
+import { mkdtempSync, writeFileSync, readFileSync, chmodSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { createServer } from "node:net";
@@ -107,5 +107,30 @@ for (const width of [360, 390, 430]) {
     const sizes = await page.evaluate(() => ({ page: document.documentElement.scrollWidth, viewport: window.innerWidth }));
     expect(sizes.page).toBeLessThanOrEqual(sizes.viewport);
     if (width === 390) await corrected.screenshot({ path: testInfo.outputPath("exchange-card.png") });
+  });
+
+  test(`${width}px で質問への回答と操作判断を記録できる`, async ({ page }) => {
+    await page.setViewportSize({ width, height: 844 });
+    await page.goto(`${baseURL}/login`);
+    await page.getByLabel("管理トークン").fill(token);
+    await page.getByRole("button", { name: "開く" }).click();
+    const prompt = `画面幅 ${width} の契約確認`;
+    const question = page.locator("article").filter({ hasText: prompt });
+    await page.context().setOffline(true);
+    await question.getByLabel("回答").fill(`回答 ${width}`);
+    await expect(question.getByLabel("回答")).toHaveValue(`回答 ${width}`);
+    await page.context().setOffline(false);
+    await page.reload();
+    const restored = page.locator("article").filter({ hasText: prompt });
+    await expect(restored.getByLabel("回答")).toHaveValue(`回答 ${width}`);
+    await restored.getByRole("button", { name: "回答を送る" }).click();
+    await expect(page.locator("article").filter({ hasText: prompt }).getByText(`回答済み：回答 ${width}`)).toBeVisible();
+    const approval = page.locator("article").filter({ hasText: `画面幅 ${width} の判断（模擬）` });
+    await approval.getByRole("button", { name: "承認を記録" }).click();
+    await expect(page.locator("article").filter({ hasText: `画面幅 ${width} の判断（模擬）` }).getByText("approved")).toBeVisible();
+    const state = JSON.parse(readFileSync(join(tempDir, "state", "state.json"), "utf8"));
+    expect(Object.keys(state.intents)).toHaveLength(0);
+    const sizes = await page.evaluate(() => ({ page: document.documentElement.scrollWidth, viewport: window.innerWidth }));
+    expect(sizes.page).toBeLessThanOrEqual(sizes.viewport);
   });
 }
