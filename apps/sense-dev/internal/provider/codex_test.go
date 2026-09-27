@@ -10,14 +10,15 @@ import (
 	"time"
 )
 
-func fakeAppServer(t *testing.T, conn net.Conn, accountType string, usedPercent int) {
+func fakeAppServer(t *testing.T, conn net.Conn, accountType string, usedPercent int, wantSandbox string) {
 	t.Helper()
 	defer conn.Close()
 	scanner := bufio.NewScanner(conn)
 	for scanner.Scan() {
 		var request struct {
-			ID     *int   `json:"id"`
-			Method string `json:"method"`
+			ID     *int            `json:"id"`
+			Method string          `json:"method"`
+			Params json.RawMessage `json:"params"`
 		}
 		if err := json.Unmarshal(scanner.Bytes(), &request); err != nil {
 			t.Error(err)
@@ -25,6 +26,26 @@ func fakeAppServer(t *testing.T, conn net.Conn, accountType string, usedPercent 
 		}
 		if request.ID == nil {
 			continue
+		}
+		if request.Method == "thread/start" || request.Method == "thread/resume" {
+			var params struct {
+				Sandbox string `json:"sandbox"`
+			}
+			if json.Unmarshal(request.Params, &params) != nil || params.Sandbox != wantSandbox {
+				t.Errorf("wrong thread sandbox: %+v", params)
+				return
+			}
+		}
+		if request.Method == "turn/start" {
+			var params struct {
+				SandboxPolicy struct {
+					Type string `json:"type"`
+				} `json:"sandboxPolicy"`
+			}
+			if json.Unmarshal(request.Params, &params) != nil || params.SandboxPolicy.Type != wantSandbox {
+				t.Errorf("wrong turn sandbox: %+v", params)
+				return
+			}
 		}
 		var result any
 		switch request.Method {
@@ -59,23 +80,26 @@ func fakeAppServer(t *testing.T, conn net.Conn, accountType string, usedPercent 
 
 func TestCodexProtocolSubscriptionOnly(t *testing.T) {
 	for _, tc := range []struct {
-		name    string
-		account string
-		usage   int
-		wantErr error
+		name        string
+		model       string
+		account     string
+		usage       int
+		wantSandbox string
+		wantErr     error
 	}{
-		{"pro", "chatgpt", 20, nil},
-		{"api-key-denied", "apiKey", 20, ErrAuthRequired},
-		{"quota-wait", "chatgpt", 80, ErrQuotaWait},
+		{"sol-implementation", "gpt-6-sol", "chatgpt", 20, "workspaceWrite", nil},
+		{"astra-review", "gpt-6-astra", "chatgpt", 20, "readOnly", nil},
+		{"api-key-denied", "gpt-6-sol", "apiKey", 20, "workspaceWrite", ErrAuthRequired},
+		{"quota-wait", "gpt-6-sol", "chatgpt", 80, "workspaceWrite", ErrQuotaWait},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			client, server := net.Pipe()
 			defer client.Close()
-			go fakeAppServer(t, server, tc.account, tc.usage)
+			go fakeAppServer(t, server, tc.account, tc.usage, tc.wantSandbox)
 			ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 			defer cancel()
 			called := false
-			result, err := runCodexProtocol(ctx, client, client, Request{Model: "gpt-6-sol", Workdir: "/tmp/worktree", Prompt: "review", OnSession: func(id string) error {
+			result, err := runCodexProtocol(ctx, client, client, Request{Model: tc.model, Workdir: "/tmp/worktree", Prompt: "review", OnSession: func(id string) error {
 				called = true
 				if id != "thread-123" {
 					t.Fatal(id)

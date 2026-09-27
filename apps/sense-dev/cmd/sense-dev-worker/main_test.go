@@ -20,19 +20,22 @@ func TestPreflightRequiresHiddenStateAndWritableMounts(t *testing.T) {
 		t.Fatal(err)
 	}
 	hidden := filepath.Join(root, "controller-state")
-	if err := checkPreflight(worktree, auth, hidden, binary); err != nil {
+	if err := checkPreflight(worktree, auth, hidden, binary, false); err != nil {
 		t.Fatal(err)
+	}
+	if err := checkPreflight(worktree, auth, hidden, binary, true); err == nil {
+		t.Fatal("writable review worktree accepted")
 	}
 	if err := os.Mkdir(hidden, 0700); err != nil {
 		t.Fatal(err)
 	}
-	if err := checkPreflight(worktree, auth, hidden, binary); err == nil {
+	if err := checkPreflight(worktree, auth, hidden, binary, false); err == nil {
 		t.Fatal("visible controller state accepted")
 	}
-	if err := checkPreflight(worktree, auth, filepath.Join(root, "missing"), filepath.Join(root, "missing-provider")); err == nil {
+	if err := checkPreflight(worktree, auth, filepath.Join(root, "missing"), filepath.Join(root, "missing-provider"), false); err == nil {
 		t.Fatal("missing provider binary accepted")
 	}
-	if err := checkPreflight(worktree, filepath.Join(root, "missing-auth"), filepath.Join(root, "missing"), binary); err == nil {
+	if err := checkPreflight(worktree, filepath.Join(root, "missing-auth"), filepath.Join(root, "missing"), binary, false); err == nil {
 		t.Fatal("unwritable auth mount accepted")
 	}
 }

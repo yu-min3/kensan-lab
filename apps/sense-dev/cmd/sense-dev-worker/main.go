@@ -9,6 +9,7 @@ import (
 	"flag"
 	"io"
 	"os"
+	"syscall"
 
 	"github.com/yu-min3/kensan-lab/apps/sense-dev/internal/provider"
 	"github.com/yu-min3/kensan-lab/apps/sense-dev/internal/workerwire"
@@ -24,6 +25,7 @@ func main() {
 	preflight := flag.Bool("preflight", false, "verify worker mount boundary without running a model")
 	hiddenPath := flag.String("hidden-path", "", "controller state path that must be absent inside the sandbox")
 	preflightProvider := flag.String("provider", "", "provider binary to verify during preflight")
+	readOnlyWorktree := flag.Bool("read-only-worktree", false, "assert worktree cannot be written in this sandbox")
 	flag.Parse()
 	if *preflight {
 		binary := *codex
@@ -32,7 +34,7 @@ func main() {
 		} else if *preflightProvider != "codex" {
 			os.Exit(2)
 		}
-		if err := checkPreflight(workdir, authHome, *hiddenPath, binary); err != nil {
+		if err := checkPreflight(workdir, authHome, *hiddenPath, binary, *readOnlyWorktree); err != nil {
 			os.Exit(1)
 		}
 		_ = json.NewEncoder(os.Stdout).Encode(struct {
@@ -58,20 +60,44 @@ func main() {
 	}
 }
 
-func checkPreflight(worktree, auth, hidden, binary string) error {
+func checkPreflight(worktree, auth, hidden, binary string, readOnlyWorktree bool) error {
 	if hidden == "" || hidden == "/" || binary == "" {
 		return errors.New("preflight paths are incomplete")
 	}
 	if _, err := os.Lstat(hidden); !errors.Is(err, os.ErrNotExist) {
 		return errors.New("controller state path is visible or unverifiable")
 	}
-	for _, dir := range []string{worktree, auth} {
-		file, err := os.CreateTemp(dir, ".worker-preflight-")
-		if err != nil {
-			return errors.New("worker writable mount unavailable")
+	if _, err := os.ReadDir(worktree); err != nil {
+		return errors.New("worktree cannot be read")
+	}
+	authFile, err := os.CreateTemp(auth, ".worker-preflight-")
+	if err != nil {
+		return errors.New("provider auth mount is not writable")
+	}
+	authName := authFile.Name()
+	if err := authFile.Close(); err != nil {
+		return err
+	}
+	if err := os.Remove(authName); err != nil {
+		return err
+	}
+	worktreeFile, err := os.CreateTemp(worktree, ".worker-preflight-")
+	if readOnlyWorktree {
+		if err == nil {
+			name := worktreeFile.Name()
+			_ = worktreeFile.Close()
+			_ = os.Remove(name)
+			return errors.New("review worktree is unexpectedly writable")
 		}
-		name := file.Name()
-		if err := file.Close(); err != nil {
+		if !errors.Is(err, syscall.EROFS) {
+			return errors.New("review worktree read-only mount could not be verified")
+		}
+	} else {
+		if err != nil {
+			return errors.New("implementation worktree is not writable")
+		}
+		name := worktreeFile.Name()
+		if err := worktreeFile.Close(); err != nil {
 			return err
 		}
 		if err := os.Remove(name); err != nil {

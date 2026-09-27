@@ -19,6 +19,7 @@ const MaxOutput = 4 << 20
 type Request struct {
 	Version         int    `json:"version"`
 	AttemptID       string `json:"attempt_id"`
+	Role            string `json:"role"`
 	Provider        string `json:"provider"`
 	Model           string `json:"model"`
 	Prompt          string `json:"prompt"`
@@ -52,8 +53,8 @@ func (r Request) Validate() error {
 	if r.Version != Version || len(r.AttemptID) == 0 || len(r.AttemptID) > 128 || strings.TrimSpace(r.Prompt) == "" || len(r.Prompt) > MaxPrompt || len(r.ExistingSession) > 256 {
 		return errors.New("invalid worker request envelope")
 	}
-	switch r.Provider + ":" + r.Model {
-	case "claude:fable", "claude:opus", "codex:gpt-6-astra", "codex:gpt-6-sol":
+	switch r.Role + ":" + r.Provider + ":" + r.Model {
+	case "requirements:claude:fable", "feedback:claude:fable", "design_review:codex:gpt-6-astra", "release_gate:codex:gpt-6-astra", "implementation:codex:gpt-6-sol", "implementation_review:claude:opus", "app_acceptance:claude:opus":
 		return nil
 	default:
 		return errors.New("unapproved provider/model combination")

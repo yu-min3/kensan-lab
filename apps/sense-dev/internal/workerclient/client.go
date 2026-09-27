@@ -33,16 +33,21 @@ func (r Runner) Preflight(ctx context.Context) error {
 	if r.WorkerProgram == "" || r.Timeout <= 0 {
 		return errors.New("isolated worker configuration incomplete")
 	}
+	claudeReadOnly, codexReadOnly := r.Claude, r.Codex
+	claudeReadOnly.ReadOnlyWorktree, codexReadOnly.ReadOnlyWorktree = true, true
+	codexWritable := r.Codex
+	codexWritable.ReadOnlyWorktree = false
 	for _, item := range []struct {
-		name   string
-		config isolation.Config
-	}{{"claude", r.Claude}, {"codex", r.Codex}} {
+		name     string
+		config   isolation.Config
+		readOnly bool
+	}{{"claude", claudeReadOnly, true}, {"codex", codexReadOnly, true}, {"codex", codexWritable, false}} {
 		statePath, err := filepath.EvalSymlinks(item.config.ControllerState)
 		if err != nil {
 			return fmt.Errorf("%s state path unavailable: %w", item.name, err)
 		}
 		checkCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
-		cmd, err := item.config.Command(checkCtx, r.WorkerProgram, "-preflight", "-hidden-path", statePath, "-provider", item.name)
+		cmd, err := item.config.Command(checkCtx, r.WorkerProgram, "-preflight", "-hidden-path", statePath, "-provider", item.name, fmt.Sprintf("-read-only-worktree=%t", item.readOnly))
 		if err != nil {
 			cancel()
 			return fmt.Errorf("%s isolation configuration rejected: %w", item.name, err)
@@ -68,7 +73,7 @@ func (r Runner) Run(ctx context.Context, dispatch core.Dispatch) (core.RunResult
 	if dispatch.BindSession == nil || r.WorkerProgram == "" || r.Timeout <= 0 {
 		return core.RunResult{}, errors.New("isolated worker configuration incomplete")
 	}
-	request := workerwire.Request{Version: workerwire.Version, AttemptID: dispatch.Attempt.ID, Provider: dispatch.Attempt.Provider, Model: dispatch.Attempt.Model, Prompt: dispatch.Prompt, ExistingSession: dispatch.Attempt.SessionID}
+	request := workerwire.Request{Version: workerwire.Version, AttemptID: dispatch.Attempt.ID, Role: dispatch.Attempt.Role, Provider: dispatch.Attempt.Provider, Model: dispatch.Attempt.Model, Prompt: dispatch.Prompt, ExistingSession: dispatch.Attempt.SessionID}
 	if err := request.Validate(); err != nil {
 		return core.RunResult{}, err
 	}
@@ -76,6 +81,7 @@ func (r Runner) Run(ctx context.Context, dispatch core.Dispatch) (core.RunResult
 	if request.Provider == "claude" {
 		config = r.Claude
 	}
+	config.ReadOnlyWorktree = request.Model != "gpt-6-sol"
 	turnCtx, cancel := context.WithTimeout(ctx, r.Timeout)
 	defer cancel()
 	cmd, err := config.Command(turnCtx, r.WorkerProgram)

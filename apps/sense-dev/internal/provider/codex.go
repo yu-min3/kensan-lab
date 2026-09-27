@@ -2,7 +2,6 @@ package provider
 
 import (
 	"bufio"
-	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -40,6 +39,17 @@ type Codex struct {
 	MaxUsage float64
 }
 
+func codexSandbox(model, workdir string) (string, map[string]any, error) {
+	switch model {
+	case "gpt-6-astra":
+		return "readOnly", map[string]any{"type": "readOnly", "access": map[string]string{"type": "fullAccess"}}, nil
+	case "gpt-6-sol":
+		return "workspaceWrite", map[string]any{"type": "workspaceWrite", "writableRoots": []string{workdir}, "networkAccess": false}, nil
+	default:
+		return "", nil, errors.New("unapproved Codex model for this pipeline")
+	}
+}
+
 func (c Codex) Run(ctx context.Context, req Request) (Result, error) {
 	if c.Binary == "" || c.AuthHome == "" || req.Model == "" || req.Workdir == "" || req.Prompt == "" || req.OnSession == nil {
 		return Result{}, errors.New("Codex binary, auth home, model, workdir, prompt and session callback required")
@@ -60,8 +70,7 @@ func (c Codex) Run(ctx context.Context, req Request) (Result, error) {
 	if err != nil {
 		return Result{}, err
 	}
-	var stderr bytes.Buffer
-	cmd.Stderr = &stderr
+	cmd.Stderr = io.Discard
 	if err := cmd.Start(); err != nil {
 		return Result{}, err
 	}
@@ -87,6 +96,10 @@ type rpcMessage struct {
 }
 
 func runCodexProtocol(ctx context.Context, input io.Writer, output io.Reader, req Request, maxUsage float64) (Result, error) {
+	sandbox, sandboxPolicy, err := codexSandbox(req.Model, req.Workdir)
+	if err != nil {
+		return Result{}, err
+	}
 	scanner := bufio.NewScanner(output)
 	scanner.Buffer(make([]byte, 64*1024), 8*1024*1024)
 	stream := make(chan rpcMessage, 64)
@@ -211,11 +224,11 @@ func runCodexProtocol(ctx context.Context, input io.Writer, output io.Reader, re
 	var threadID string
 	if req.ExistingSession != "" {
 		threadID = req.ExistingSession
-		if err := send(4, "thread/resume", map[string]any{"threadId": threadID, "model": req.Model, "cwd": req.Workdir, "approvalPolicy": "never", "sandbox": "workspaceWrite"}); err != nil {
+		if err := send(4, "thread/resume", map[string]any{"threadId": threadID, "model": req.Model, "cwd": req.Workdir, "approvalPolicy": "never", "sandbox": sandbox}); err != nil {
 			return Result{}, err
 		}
 	} else {
-		if err := send(4, "thread/start", map[string]any{"model": req.Model, "cwd": req.Workdir, "approvalPolicy": "never", "sandbox": "workspaceWrite", "serviceName": "kensan_sense_dev"}); err != nil {
+		if err := send(4, "thread/start", map[string]any{"model": req.Model, "cwd": req.Workdir, "approvalPolicy": "never", "sandbox": sandbox, "serviceName": "kensan_sense_dev"}); err != nil {
 			return Result{}, err
 		}
 	}
@@ -238,7 +251,7 @@ func runCodexProtocol(ctx context.Context, input io.Writer, output io.Reader, re
 	if err := req.OnSession(threadID); err != nil {
 		return Result{}, err
 	}
-	if err := send(5, "turn/start", map[string]any{"threadId": threadID, "input": []map[string]string{{"type": "text", "text": req.Prompt}}, "cwd": req.Workdir, "model": req.Model, "approvalPolicy": "never", "sandboxPolicy": map[string]any{"type": "workspaceWrite", "writableRoots": []string{req.Workdir}, "networkAccess": false}}); err != nil {
+	if err := send(5, "turn/start", map[string]any{"threadId": threadID, "input": []map[string]string{{"type": "text", "text": req.Prompt}}, "cwd": req.Workdir, "model": req.Model, "approvalPolicy": "never", "sandboxPolicy": sandboxPolicy}); err != nil {
 		return Result{}, err
 	}
 	if _, err := wait(5); err != nil {

@@ -17,11 +17,12 @@ import (
 // purpose-built, non-secret rootfs, never the host root. ControllerState is
 // required so accidental overlap with the state/token directory is rejected.
 type Config struct {
-	Bubblewrap      string
-	RuntimeRoot     string
-	Worktree        string
-	AuthHome        string
-	ControllerState string
+	Bubblewrap       string
+	RuntimeRoot      string
+	Worktree         string
+	ReadOnlyWorktree bool
+	AuthHome         string
+	ControllerState  string
 }
 
 // Command returns a command whose filesystem is limited to a read-only
@@ -79,13 +80,17 @@ func (c Config) Command(ctx context.Context, program string, args ...string) (*e
 	if info, err := os.Stat(resolvedBwrap); err != nil || !info.Mode().IsRegular() || info.Mode().Perm()&0111 == 0 {
 		return nil, errors.New("bubblewrap binary must exist and be executable")
 	}
+	worktreeMount := "--bind"
+	if c.ReadOnlyWorktree {
+		worktreeMount = "--ro-bind"
+	}
 	argv := []string{
 		"--unshare-all", "--share-net", "--die-with-parent", "--new-session",
 		"--clearenv", "--setenv", "HOME", "/agent-auth",
 		"--setenv", "PATH", "/usr/local/bin:/usr/bin:/bin",
 		"--ro-bind", resolved[0], "/",
 		"--proc", "/proc", "--dev", "/dev", "--tmpfs", "/tmp",
-		"--bind", resolved[1], "/workspace",
+		worktreeMount, resolved[1], "/workspace",
 		"--bind", resolved[2], "/agent-auth",
 		"--chdir", "/workspace", "--", program,
 	}

@@ -7,7 +7,7 @@ import (
 )
 
 func TestDecodeRequestRejectsUnknownAndTrailingFields(t *testing.T) {
-	valid := Request{Version: Version, AttemptID: "attempt-1", Provider: "codex", Model: "gpt-6-sol", Prompt: "Implement contract"}
+	valid := Request{Version: Version, AttemptID: "attempt-1", Role: "implementation", Provider: "codex", Model: "gpt-6-sol", Prompt: "Implement contract"}
 	b, err := json.Marshal(valid)
 	if err != nil {
 		t.Fatal(err)
@@ -19,6 +19,7 @@ func TestDecodeRequestRejectsUnknownAndTrailingFields(t *testing.T) {
 		`{"version":1,"attempt_id":"a","provider":"claude","model":"opus","prompt":"review","admin_token":"secret"}`,
 		string(b) + ` {}`,
 		`{"version":1,"attempt_id":"a","provider":"codex","model":"unknown","prompt":"review"}`,
+		`{"version":1,"attempt_id":"a","role":"design_review","provider":"codex","model":"gpt-6-sol","prompt":"review"}`,
 		`{"version":1,"attempt_id":"a","provider":"claude","model":"opus","prompt":"` + strings.Repeat("x", MaxPrompt+1) + `"}`,
 	} {
 		if _, err := DecodeRequest(strings.NewReader(payload)); err == nil {

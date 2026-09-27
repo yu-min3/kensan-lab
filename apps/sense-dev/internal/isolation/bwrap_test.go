@@ -131,3 +131,21 @@ func TestRejectsBubblewrapFromWorkerWritablePath(t *testing.T) {
 		t.Fatal("worker-writable bubblewrap binary accepted")
 	}
 }
+
+func TestReadOnlyWorktreeMount(t *testing.T) {
+	c := testConfig(t)
+	c.ReadOnlyWorktree = true
+	cmd, err := c.Command(context.Background(), "/usr/bin/worker")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for i := 0; i+2 < len(cmd.Args); i++ {
+		if cmd.Args[i+2] == "/workspace" {
+			if cmd.Args[i] != "--ro-bind" {
+				t.Fatalf("review worktree is writable: %q", cmd.Args)
+			}
+			return
+		}
+	}
+	t.Fatal("worktree mount missing")
+}

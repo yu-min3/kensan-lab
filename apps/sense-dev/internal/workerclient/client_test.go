@@ -2,14 +2,24 @@ package workerclient
 
 import (
 	"bytes"
+	"context"
 	"errors"
 	"os/exec"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/yu-min3/kensan-lab/apps/sense-dev/internal/core"
 	"github.com/yu-min3/kensan-lab/apps/sense-dev/internal/workerwire"
 )
+
+func TestRunnerRejectsReviewerWithWritableModel(t *testing.T) {
+	runner := Runner{WorkerProgram: "/usr/local/bin/sense-dev-worker", Timeout: time.Minute}
+	_, err := runner.Run(context.Background(), core.Dispatch{Attempt: core.Attempt{ID: "attempt-1", Role: "design_review", Provider: "codex", Model: "gpt-6-sol"}, Prompt: "review", BindSession: func(string) error { return nil }})
+	if err == nil {
+		t.Fatal("review role acquired Sol's writable model")
+	}
+}
 
 func TestReadEventsPersistsSessionBeforeAck(t *testing.T) {
 	events := "{\"version\":1,\"type\":\"session\",\"session_id\":\"thread-1\"}\n{\"version\":1,\"type\":\"result\",\"output\":\"done\"}\n"
@@ -55,7 +65,7 @@ func TestReadEventsClassifiesFailure(t *testing.T) {
 
 func TestRunProcessWaitsForSessionAck(t *testing.T) {
 	cmd := exec.Command("sh", "-c", `read request; printf '%s\n' '{"version":1,"type":"session","session_id":"thread-1"}'; read ack; case "$ack" in *'"type":"continue"'*) printf '%s\n' '{"version":1,"type":"result","output":"done"}' ;; *) exit 3 ;; esac`)
-	request := workerwire.Request{Version: workerwire.Version, AttemptID: "attempt-1", Provider: "codex", Model: "gpt-6-sol", Prompt: "work"}
+	request := workerwire.Request{Version: workerwire.Version, AttemptID: "attempt-1", Role: "implementation", Provider: "codex", Model: "gpt-6-sol", Prompt: "work"}
 	result, err := runProcess(cmd, request, func(id string) error {
 		if id != "thread-1" {
 			t.Fatalf("wrong session: %s", id)
