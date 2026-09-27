@@ -7,9 +7,9 @@ import (
 	"time"
 )
 
-// BindReleaseGateInputs fixes the exact author artifacts and scan that an
-// independent gate session must receive before it can be used for an allow.
-func (s *Store) BindReleaseGateInputs(gateID, authorID string, sourceRefs []ArtifactRef, scanRef ArtifactRef) error {
+// BindReleaseGateInputs fixes the author artifacts, test evidence, scan, and
+// proposed operation before an independent gate session starts.
+func (s *Store) BindReleaseGateInputs(gateID, authorID string, sourceRefs []ArtifactRef, scanRef ArtifactRef, candidate ReleaseCandidate) error {
 	if len(sourceRefs) == 0 || scanRef.ID == "" {
 		return errors.New("release gate needs author artifacts and scan")
 	}
@@ -30,6 +30,18 @@ func (s *Store) BindReleaseGateInputs(gateID, authorID string, sourceRefs []Arti
 	if err := json.Unmarshal(b, &scan); err != nil {
 		return errors.New("invalid release scan")
 	}
+	if err := validateReleaseCandidate(candidate, scan); err != nil {
+		return err
+	}
+	candidateBody, err := json.Marshal(candidate)
+	if err != nil {
+		return err
+	}
+	candidateArtifact, err := s.PutArtifact("system", "release_candidate", candidateBody)
+	if err != nil {
+		return err
+	}
+	candidateRef := artifactRef(candidateArtifact)
 	return s.update(func(st *State) error {
 		gate, okG := st.Agents[gateID]
 		author, okA := st.Agents[authorID]
@@ -57,12 +69,39 @@ func (s *Store) BindReleaseGateInputs(gateID, authorID string, sourceRefs []Arti
 		gt.BaseSHA, gt.HeadSHA, gt.UpdatedAt = at.BaseSHA, at.HeadSHA, time.Now().UTC()
 		st.Tasks[gt.ID] = gt
 		gate.ReviewAuthorID = authorID
-		gate.ReviewInputs = append(append(append([]ArtifactRef{}, sourceRefs...), proof.Verification, proof.QualityReview), scanRef)
+		gate.ReviewInputs = append(append(append([]ArtifactRef{}, sourceRefs...), proof.Verification, proof.QualityReview), scanRef, candidateRef)
 		gate.UpdatedAt = time.Now().UTC()
 		st.Agents[gate.ID] = gate
 		st.Events = append(st.Events, event("release_gate_inputs_bound", gateID, authorID))
 		return nil
 	})
+}
+
+func validateReleaseCandidate(candidate ReleaseCandidate, scan ReleaseScan) error {
+	if candidate.SchemaVersion != 1 || candidate.Operation != scan.Operation || candidate.Repository != scan.Repository || candidate.Ref != scan.Ref || candidate.HeadSHA != scan.HeadSHA || candidate.TargetEnvironment != "github" && candidate.TargetEnvironment != "private-sense" && candidate.TargetEnvironment != "private-canary" || strings.TrimSpace(candidate.Impact) == "" || strings.TrimSpace(candidate.Rollback) == "" || len(candidate.Impact) > 4000 || len(candidate.Rollback) > 4000 || len(candidate.PullRequestSummary) > 4000 {
+		return errors.New("release candidate does not match the scan or lacks impact and rollback")
+	}
+	return nil
+}
+
+func (s *Store) releaseCandidate(gate Agent, scan ReleaseScan) (ReleaseCandidate, ArtifactRef, error) {
+	if len(gate.ReviewInputs) < 2 {
+		return ReleaseCandidate{}, ArtifactRef{}, errors.New("gate candidate input missing")
+	}
+	ref := gate.ReviewInputs[len(gate.ReviewInputs)-1]
+	artifact := s.Snapshot().Artifacts[ref.ID]
+	if artifact.AgentID != "system" || artifact.Kind != "release_candidate" || artifact.Version != ref.Version || artifact.SHA256 != ref.SHA256 {
+		return ReleaseCandidate{}, ArtifactRef{}, errors.New("gate candidate is not controller-owned")
+	}
+	body, err := s.ReadArtifact(ref.ID)
+	if err != nil {
+		return ReleaseCandidate{}, ArtifactRef{}, err
+	}
+	var candidate ReleaseCandidate
+	if err := json.Unmarshal(body, &candidate); err != nil || validateReleaseCandidate(candidate, scan) != nil {
+		return ReleaseCandidate{}, ArtifactRef{}, errors.New("invalid fixed gate candidate")
+	}
+	return candidate, ref, nil
 }
 
 const ReleasePolicyVersion = "private-v1"
@@ -110,6 +149,8 @@ func (s *Store) RecordReleaseDecision(d ReleaseDecision) (ReleaseDecision, error
 	var scan ReleaseScan
 	var gateManifest ContextManifest
 	var proof releaseProof
+	var candidateRef ArtifactRef
+	var gateOutputRef ArtifactRef
 	if d.Verdict == "allow" {
 		if d.ScanRef.ID == "" {
 			return ReleaseDecision{}, errors.New("allow verdict requires controller release scan")
@@ -123,9 +164,18 @@ func (s *Store) RecordReleaseDecision(d ReleaseDecision) (ReleaseDecision, error
 		if err != nil {
 			return ReleaseDecision{}, err
 		}
+		candidate, ref, err := s.releaseCandidate(s.Snapshot().Agents[d.GateAgentID], scan)
+		if err != nil || candidate.Operation != d.Operation || candidate.Repository != d.Repository || candidate.Ref != d.Ref || candidate.HeadSHA != d.HeadSHA || candidate.TargetEnvironment != d.TargetEnvironment {
+			return ReleaseDecision{}, errors.New("gate candidate differs from requested decision")
+		}
+		candidateRef = ref
 		gateManifest, err = s.BuildManifest(d.GateAgentID, []string{"isolated-model-worker"})
-		if err != nil || gateManifest.ReviewAuthorID != d.AuthorAgentID || len(gateManifest.ReviewInputs) != len(d.ArtifactRefs)+3 || !refsEqual(gateManifest.ReviewInputs[:len(d.ArtifactRefs)], d.ArtifactRefs) || gateManifest.ReviewInputs[len(d.ArtifactRefs)] != proof.Verification || gateManifest.ReviewInputs[len(d.ArtifactRefs)+1] != proof.QualityReview || gateManifest.ReviewInputs[len(d.ArtifactRefs)+2] != d.ScanRef {
+		if err != nil || gateManifest.ReviewAuthorID != d.AuthorAgentID || len(gateManifest.ReviewInputs) != len(d.ArtifactRefs)+4 || !refsEqual(gateManifest.ReviewInputs[:len(d.ArtifactRefs)], d.ArtifactRefs) || gateManifest.ReviewInputs[len(d.ArtifactRefs)] != proof.Verification || gateManifest.ReviewInputs[len(d.ArtifactRefs)+1] != proof.QualityReview || gateManifest.ReviewInputs[len(d.ArtifactRefs)+2] != d.ScanRef || gateManifest.ReviewInputs[len(d.ArtifactRefs)+3] != candidateRef {
 			return ReleaseDecision{}, errors.New("release gate manifest lacks exact author and scan inputs")
+		}
+		gateOutputRef, err = s.matchingGateOutput(d, gateManifest, proof, candidateRef)
+		if err != nil {
+			return ReleaseDecision{}, err
 		}
 	}
 	if d.ExpiresAt.IsZero() || d.ExpiresAt.After(time.Now().Add(24*time.Hour)) || !d.ExpiresAt.After(time.Now()) {
@@ -163,6 +213,9 @@ func (s *Store) RecordReleaseDecision(d ReleaseDecision) (ReleaseDecision, error
 		}
 		if d.Verdict == "allow" && !releaseProofStillCurrent(st, author.TaskID, proof) {
 			return errors.New("verification or quality review changed before gate decision")
+		}
+		if d.Verdict == "allow" && !gateOutputStillCurrent(st, gate.ID, gateOutputRef, gateManifest.InputSHA256, d.HeadSHA) {
+			return errors.New("gate result changed before decision")
 		}
 		if st.Tasks[author.TaskID].HeadSHA != d.HeadSHA {
 			return errors.New("decision head differs from current task")
@@ -205,12 +258,26 @@ func (s *Store) PreparePublish(decisionID, operation, repository, ref, sha strin
 		}
 	}
 	var proof releaseProof
+	var gateManifest ContextManifest
+	var gateOutputRef ArtifactRef
 	if d.Verdict == "allow" {
 		scan, err := s.checkReleaseScan(d.ScanRef, d)
 		if err != nil || st.Tasks[st.Agents[d.AuthorAgentID].TaskID].BaseSHA != scan.BaseSHA {
 			return PublishIntent{}, errors.New("release scan no longer matches decision")
 		}
+		candidate, candidateRef, err := s.releaseCandidate(st.Agents[d.GateAgentID], scan)
+		if err != nil || candidate.Operation != d.Operation || candidate.Repository != d.Repository || candidate.Ref != d.Ref || candidate.HeadSHA != d.HeadSHA || candidate.TargetEnvironment != d.TargetEnvironment {
+			return PublishIntent{}, errors.New("release candidate no longer matches decision")
+		}
 		proof, err = s.releaseReady(d.AuthorAgentID, d.ArtifactRefs)
+		if err != nil {
+			return PublishIntent{}, err
+		}
+		gateManifest, err = s.BuildManifest(d.GateAgentID, []string{"isolated-model-worker"})
+		if err != nil || gateManifest.ReviewAuthorID != d.AuthorAgentID || len(gateManifest.ReviewInputs) != len(d.ArtifactRefs)+4 || gateManifest.ReviewInputs[len(gateManifest.ReviewInputs)-1] != candidateRef {
+			return PublishIntent{}, errors.New("gate input manifest changed after decision")
+		}
+		gateOutputRef, err = s.matchingGateOutput(d, gateManifest, proof, candidateRef)
 		if err != nil {
 			return PublishIntent{}, err
 		}
@@ -233,6 +300,9 @@ func (s *Store) PreparePublish(decisionID, operation, repository, ref, sha strin
 		}
 		if !releaseProofStillCurrent(st, st.Agents[d.AuthorAgentID].TaskID, proof) {
 			return errors.New("release readiness changed before publish intent")
+		}
+		if !gateOutputStillCurrent(st, d.GateAgentID, gateOutputRef, gateManifest.InputSHA256, d.HeadSHA) {
+			return errors.New("gate result changed before publish intent")
 		}
 		for _, old := range st.Intents {
 			if old.DecisionID == decisionID {

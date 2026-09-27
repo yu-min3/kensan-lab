@@ -168,6 +168,20 @@ type ReleaseDecision struct {
 	ExpiresAt         time.Time     `json:"expires_at"`
 }
 
+// ReleaseCandidate is operator/controller-supplied proposed action data. It
+// is review input, never an authorization by itself.
+type ReleaseCandidate struct {
+	SchemaVersion      int    `json:"schema_version"`
+	Operation          string `json:"operation"`
+	Repository         string `json:"repository"`
+	Ref                string `json:"ref"`
+	HeadSHA            string `json:"head_sha"`
+	TargetEnvironment  string `json:"target_environment"`
+	Impact             string `json:"impact"`
+	Rollback           string `json:"rollback"`
+	PullRequestSummary string `json:"pull_request_summary,omitempty"`
+}
+
 type ReleaseScan struct {
 	BaseSHA       string    `json:"base_sha"`
 	HeadSHA       string    `json:"head_sha"`

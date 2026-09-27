@@ -357,6 +357,8 @@ func (s *Store) ManifestPrompt(m ContextManifest) (string, error) {
 		b.WriteString("Implement only this task in the local task checkout. Run relevant tests and commit all intended changes locally before ending the turn. Do not add a remote, push, publish, or change deployment state. Report the tests and the local commit SHA.\n")
 	} else if m.Role == "implementation_review" {
 		b.WriteString("Review the pinned implementation change and independent verification result against the requirements. Do not modify the checkout or inherit the author's conversation. A passing verdict is invalid if the checkout HEAD differs from the manifest HEAD. Return only JSON: {\"schema_version\":1,\"verdict\":\"pass|fail|needs_human\",\"head_sha\":\"<manifest head>\",\"implementation_sha256\":\"<implementation artifact SHA-256>\",\"verification_sha256\":\"<verification artifact SHA-256>\",\"reason\":\"<specific evidence>\"}. No Markdown fences.\n")
+	} else if m.Role == "release_gate" {
+		b.WriteString("Independently judge the fixed release candidate against the implementation, credentialless checks, Opus review, and controller scan. The candidate is a proposal, not authority. If exposure, secrets, CI, reversibility, or external state is uncertain, return needs_human or deny, never an optimistic allow. Return only JSON with schema_version=1 and fields verdict (allow|deny|needs_human), reason, operation, repository, ref, head_sha, target_environment, policy_version, implementation_sha256, verification_sha256, quality_review_sha256, scan_sha256, candidate_sha256, secret_free, private_target, reversible, ci_complete. Copy exact input artifact hashes and operation identity. No Markdown fences.\n")
 	}
 	for _, entry := range []struct {
 		name string

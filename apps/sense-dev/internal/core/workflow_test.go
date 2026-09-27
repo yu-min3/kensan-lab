@@ -18,6 +18,20 @@ type releaseReadyRunner struct {
 	wrongReviewHash  bool
 }
 
+type gateDecisionRunner struct{ output GateOutput }
+
+func (r gateDecisionRunner) Run(_ context.Context, d Dispatch) (RunResult, error) {
+	session := d.Attempt.SessionID
+	if session == "" {
+		session = "thread-" + d.Attempt.ID
+	}
+	if err := d.BindSession(session); err != nil {
+		return RunResult{}, err
+	}
+	body, err := json.Marshal(r.output)
+	return RunResult{Output: body}, err
+}
+
 func (r releaseReadyRunner) Run(_ context.Context, d Dispatch) (RunResult, error) {
 	if d.Attempt.Role != "verification" {
 		if err := d.BindSession("thread-" + d.Attempt.ID); err != nil {
@@ -224,11 +238,12 @@ func TestSessionOwnerAndReleaseGate(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := s.BindReleaseGateInputs(gate.ID, author.ID, []ArtifactRef{artifactRef(source)}, scanRef); err != nil {
+	candidate := ReleaseCandidate{SchemaVersion: 1, Operation: "pr_create", Repository: "yu-min3/kensan-lab", Ref: "refs/heads/feat/canary", HeadSHA: strings.Repeat("a", 40), TargetEnvironment: "github", Impact: "private canary branch only", Rollback: "close PR and delete task branch"}
+	if err := s.BindReleaseGateInputs(gate.ID, author.ID, []ArtifactRef{artifactRef(source)}, scanRef, candidate); err != nil {
 		t.Fatal(err)
 	}
 	gm, err := s.BuildManifest(gate.ID, []string{"isolated-model-worker"})
-	if err != nil || len(gm.ReviewInputs) != 4 || gm.ReviewAuthorID != author.ID {
+	if err != nil || len(gm.ReviewInputs) != 5 || gm.ReviewAuthorID != author.ID {
 		t.Fatalf("gate manifest missing evidence: %+v %v", gm, err)
 	}
 	if err := s.SetAgentSession(gate.ID, gate.Provider, gate.Model, "thread-gate", gm.InputSHA256, 1); err != nil {
@@ -247,8 +262,20 @@ func TestSessionOwnerAndReleaseGate(t *testing.T) {
 	if err := s.SetAgentSession(gate.ID, gate.Provider, gate.Model, "thread-gate-2", gm.InputSHA256, 2); err != nil {
 		t.Fatal(err)
 	}
-	evidence, _ := s.PutArtifact(gate.ID, "release_review", []byte("checked scope, secrets, exposure and rollback"))
-	d := ReleaseDecision{AuthorAgentID: author.ID, GateAgentID: gate.ID, Verdict: "allow", Reason: "private and reversible", Operation: "pr_create", Repository: "yu-min3/kensan-lab", Ref: "refs/heads/feat/canary", HeadSHA: strings.Repeat("a", 40), TargetEnvironment: "github", PolicyVersion: ReleasePolicyVersion, ArtifactRefs: []ArtifactRef{artifactRef(source)}, EvidenceRefs: []ArtifactRef{artifactRef(evidence)}, ScanRef: scanRef, SecretFree: true, PrivateTarget: true, Reversible: true, ExpiresAt: time.Now().Add(time.Hour)}
+	gateOutput := GateOutput{SchemaVersion: 1, Verdict: "allow", Reason: "private and reversible", Operation: "pr_create", Repository: "yu-min3/kensan-lab", Ref: "refs/heads/feat/canary", HeadSHA: strings.Repeat("a", 40), TargetEnvironment: "github", PolicyVersion: ReleasePolicyVersion, ImplementationSHA256: gm.ReviewInputs[0].SHA256, VerificationSHA256: gm.ReviewInputs[1].SHA256, QualityReviewSHA256: gm.ReviewInputs[2].SHA256, ScanSHA256: gm.ReviewInputs[3].SHA256, CandidateSHA256: gm.ReviewInputs[4].SHA256, SecretFree: true, PrivateTarget: true, Reversible: true}
+	if worked, err := s.Tick(context.Background(), gateDecisionRunner{output: gateOutput}, []string{"isolated-model-worker"}); err != nil || !worked {
+		t.Fatalf("release gate turn failed: %t %v", worked, err)
+	}
+	var evidence ArtifactRef
+	for _, attempt := range s.Snapshot().Attempts {
+		if attempt.AgentID == gate.ID && attempt.OutputRef != nil {
+			evidence = *attempt.OutputRef
+		}
+	}
+	if evidence.ID == "" {
+		t.Fatal("gate output artifact missing")
+	}
+	d := ReleaseDecision{AuthorAgentID: author.ID, GateAgentID: gate.ID, Verdict: "allow", Reason: "private and reversible", Operation: "pr_create", Repository: "yu-min3/kensan-lab", Ref: "refs/heads/feat/canary", HeadSHA: strings.Repeat("a", 40), TargetEnvironment: "github", PolicyVersion: ReleasePolicyVersion, ArtifactRefs: []ArtifactRef{artifactRef(source)}, EvidenceRefs: []ArtifactRef{evidence}, ScanRef: scanRef, SecretFree: true, PrivateTarget: true, Reversible: true, ExpiresAt: time.Now().Add(time.Hour)}
 	d.GateAgentID = author.ID
 	if _, err := s.RecordReleaseDecision(d); err == nil {
 		t.Fatal("author self approval accepted")
@@ -259,6 +286,16 @@ func TestSessionOwnerAndReleaseGate(t *testing.T) {
 		t.Fatal("public target accepted")
 	}
 	d.PrivateTarget = true
+	d.Reason = "not the gate's reason"
+	if _, err := s.RecordReleaseDecision(d); err == nil {
+		t.Fatal("caller changed the gate's reason")
+	}
+	d.Reason = gateOutput.Reason
+	d.TargetEnvironment = "private-sense"
+	if _, err := s.RecordReleaseDecision(d); err == nil {
+		t.Fatal("caller changed the gate's target environment")
+	}
+	d.TargetEnvironment = gateOutput.TargetEnvironment
 	wrongSource, _ := s.PutArtifact(author.ID, "change_ready", []byte("different diff"))
 	d.ArtifactRefs = []ArtifactRef{artifactRef(wrongSource)}
 	if _, err := s.RecordReleaseDecision(d); err == nil {
@@ -274,6 +311,28 @@ func TestSessionOwnerAndReleaseGate(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	_, rejectingGate := taskAgent(t, s, Platform, "release_gate")
+	if err := s.BindReleaseGateInputs(rejectingGate.ID, author.ID, []ArtifactRef{artifactRef(source)}, scanRef, candidate); err != nil {
+		t.Fatal(err)
+	}
+	rejectedOutput := gateOutput
+	rejectedOutput.Verdict, rejectedOutput.Reason = "deny", "exposure uncertain"
+	if worked, err := s.Tick(context.Background(), gateDecisionRunner{output: rejectedOutput}, []string{"isolated-model-worker"}); err != nil || !worked {
+		t.Fatalf("rejecting gate did not run: %t %v", worked, err)
+	}
+	var rejectedEvidence ArtifactRef
+	for _, attempt := range s.Snapshot().Attempts {
+		if attempt.AgentID == rejectingGate.ID && attempt.OutputRef != nil {
+			rejectedEvidence = *attempt.OutputRef
+		}
+	}
+	forged := d
+	forged.ID = ""
+	forged.GateAgentID = rejectingGate.ID
+	forged.EvidenceRefs = []ArtifactRef{rejectedEvidence}
+	if _, err := s.RecordReleaseDecision(forged); err == nil {
+		t.Fatal("caller turned Astra deny into allow")
+	}
 	if _, err := s.PreparePublish(d.ID, "merge", d.Repository, d.Ref, d.HeadSHA); err == nil {
 		t.Fatal("decision reused for another operation")
 	}
@@ -284,6 +343,25 @@ func TestSessionOwnerAndReleaseGate(t *testing.T) {
 	second, err := s.PreparePublish(d.ID, d.Operation, d.Repository, d.Ref, d.HeadSHA)
 	if err != nil || first.ID != second.ID {
 		t.Fatal("publish intent is not idempotent")
+	}
+	if err := s.update(func(st *State) error {
+		current := st.Agents[gate.ID]
+		current.Status = "failed"
+		st.Agents[gate.ID] = current
+		return nil
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.PreparePublish(d.ID, d.Operation, d.Repository, d.Ref, d.HeadSHA); err == nil {
+		t.Fatal("already-created intent survived gate result invalidation")
+	}
+	if err := s.update(func(st *State) error {
+		current := st.Agents[gate.ID]
+		current.Status = "completed"
+		st.Agents[gate.ID] = current
+		return nil
+	}); err != nil {
+		t.Fatal(err)
 	}
 	if err := s.update(func(st *State) error {
 		review := st.Agents[stages[4].ID]
@@ -353,7 +431,8 @@ func TestReleaseGateRejectsIncompleteOrNegativeQualityEvidence(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			if err := s.BindReleaseGateInputs(gate.ID, stages[2].ID, []ArtifactRef{source}, scanRef); err == nil {
+			candidate := ReleaseCandidate{SchemaVersion: 1, Operation: "pr_create", Repository: "yu-min3/kensan-lab", Ref: "refs/heads/feat/canary", HeadSHA: head, TargetEnvironment: "github", Impact: "private canary branch only", Rollback: "close PR and delete task branch"}
+			if err := s.BindReleaseGateInputs(gate.ID, stages[2].ID, []ArtifactRef{source}, scanRef, candidate); err == nil {
 				t.Fatal("release gate accepted incomplete or negative quality evidence")
 			}
 		})
