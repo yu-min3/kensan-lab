@@ -84,6 +84,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("POST /api/tasks", s.auth(s.createTask, true))
 	mux.HandleFunc("POST /api/questions/{id}/answer", s.auth(s.answerQuestion, true))
 	mux.HandleFunc("POST /api/approvals/{id}/decide", s.auth(s.decideApproval, true))
+	mux.HandleFunc("POST /api/reports/preview", s.auth(s.previewReport, true))
 	mux.HandleFunc("POST /api/mac-priority", s.auth(s.macPriority, true))
 	mux.HandleFunc("POST /api/mac-priority/clear", s.auth(s.macPriorityClear, true))
 	mux.HandleFunc("POST /api/stop", s.auth(s.stop, true))
@@ -223,6 +224,11 @@ func (s *Server) home(w http.ResponseWriter, r *http.Request) {
 		approvals = append(approvals, a)
 	}
 	sort.Slice(approvals, func(i, j int) bool { return approvals[i].CreatedAt.After(approvals[j].CreatedAt) })
+	reports := make([]core.DailyReport, 0, len(st.Reports))
+	for _, report := range st.Reports {
+		reports = append(reports, report)
+	}
+	sort.Slice(reports, func(i, j int) bool { return reports[i].Date > reports[j].Date })
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	_ = page.Execute(w, struct {
 		CSRF        string
@@ -231,10 +237,11 @@ func (s *Server) home(w http.ResponseWriter, r *http.Request) {
 		Agents      []core.Agent
 		Questions   []core.Question
 		Approvals   []core.ApprovalRequest
+		Reports     []core.DailyReport
 		Stopped     bool
 		PausedUntil *time.Time
 		MockMode    bool
-	}{s.csrf(r), tasks, messages, agents, questions, approvals, st.Stopped, st.PausedUntil, s.mockMode})
+	}{s.csrf(r), tasks, messages, agents, questions, approvals, reports, st.Stopped, st.PausedUntil, s.mockMode})
 }
 
 func (s *Server) staticCSS(w http.ResponseWriter, r *http.Request) {
@@ -313,6 +320,14 @@ func (s *Server) decideApproval(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	http.Redirect(w, r, "/#approval-"+r.PathValue("id"), http.StatusSeeOther)
+}
+
+func (s *Server) previewReport(w http.ResponseWriter, r *http.Request) {
+	if _, err := s.store.PreviewDailyReport(time.Now()); err != nil {
+		http.Error(w, "report preview unavailable", http.StatusInternalServerError)
+		return
+	}
+	http.Redirect(w, r, "/#reports", http.StatusSeeOther)
 }
 
 func (s *Server) macPriority(w http.ResponseWriter, r *http.Request) {

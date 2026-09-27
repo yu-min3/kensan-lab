@@ -170,13 +170,21 @@ func TestPrivateWebLoginCSRFAndTask(t *testing.T) {
 	if store.Snapshot().Approvals[approval.ID].Status != "approved" || len(store.Snapshot().Intents) != 0 {
 		t.Fatal("approval not recorded safely")
 	}
+	resp, err = client.PostForm(server.URL+"/api/reports/preview", url.Values{"csrf": {string(csrfMatch[1])}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	resp.Body.Close()
+	if len(store.Snapshot().Reports) != 1 {
+		t.Fatal("daily preview not persisted")
+	}
 	resp, err = client.Get(server.URL + "/")
 	if err != nil {
 		t.Fatal(err)
 	}
 	b, _ = io.ReadAll(resp.Body)
 	resp.Body.Close()
-	if !strings.Contains(string(b), "契約を確認する") || !strings.Contains(string(b), "Platform") || !strings.Contains(string(b), "対象の契約版は？") || !strings.Contains(string(b), "承認を記録") && !strings.Contains(string(b), "approved") {
+	if !strings.Contains(string(b), "契約を確認する") || !strings.Contains(string(b), "Platform") || !strings.Contains(string(b), "対象の契約版は？") || !strings.Contains(string(b), "承認を記録") && !strings.Contains(string(b), "approved") || !strings.Contains(string(b), "not_configured") {
 		t.Fatal("task missing from UI")
 	}
 }

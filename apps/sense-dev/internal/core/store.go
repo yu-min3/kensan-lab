@@ -54,6 +54,9 @@ func Open(root string) (*Store, error) {
 		if s.data.Approvals == nil {
 			s.data.Approvals = map[string]ApprovalRequest{}
 		}
+		if s.data.Reports == nil {
+			s.data.Reports = map[string]DailyReport{}
+		}
 	}
 	return s, nil
 }

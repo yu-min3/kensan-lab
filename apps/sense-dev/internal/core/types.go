@@ -197,6 +197,17 @@ type ApprovalRequest struct {
 	DecidedAt   *time.Time `json:"decided_at,omitempty"`
 }
 
+type DailyReport struct {
+	Date           string     `json:"date"`
+	Status         string     `json:"status"`
+	DeliveryStatus string     `json:"delivery_status"`
+	Summary        string     `json:"summary"`
+	TaskIDs        []string   `json:"task_ids"`
+	PendingIDs     []string   `json:"pending_ids"`
+	CreatedAt      time.Time  `json:"created_at"`
+	SentAt         *time.Time `json:"sent_at,omitempty"`
+}
+
 type State struct {
 	SchemaVersion int                        `json:"schema_version"`
 	Tasks         map[string]Task            `json:"tasks"`
@@ -208,11 +219,12 @@ type State struct {
 	Intents       map[string]PublishIntent   `json:"intents"`
 	Questions     map[string]Question        `json:"questions"`
 	Approvals     map[string]ApprovalRequest `json:"approvals"`
+	Reports       map[string]DailyReport     `json:"reports"`
 	Events        []Event                    `json:"events"`
 	PausedUntil   *time.Time                 `json:"paused_until,omitempty"`
 	Stopped       bool                       `json:"stopped"`
 }
 
 func NewState() State {
-	return State{SchemaVersion: SchemaVersion, Tasks: map[string]Task{}, Agents: map[string]Agent{}, Attempts: map[string]Attempt{}, Artifacts: map[string]Artifact{}, Messages: map[string]Message{}, Decisions: map[string]ReleaseDecision{}, Intents: map[string]PublishIntent{}, Questions: map[string]Question{}, Approvals: map[string]ApprovalRequest{}, Events: []Event{}}
+	return State{SchemaVersion: SchemaVersion, Tasks: map[string]Task{}, Agents: map[string]Agent{}, Attempts: map[string]Attempt{}, Artifacts: map[string]Artifact{}, Messages: map[string]Message{}, Decisions: map[string]ReleaseDecision{}, Intents: map[string]PublishIntent{}, Questions: map[string]Question{}, Approvals: map[string]ApprovalRequest{}, Reports: map[string]DailyReport{}, Events: []Event{}}
 }
