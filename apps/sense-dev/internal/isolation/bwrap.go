@@ -100,6 +100,45 @@ func (c Config) Command(ctx context.Context, program string, args ...string) (*e
 	return cmd, nil
 }
 
+// VerifierCommand runs repository tests without provider credentials or
+// network. The worktree is read-only; tools may write only to private /tmp.
+// The same path checks as a model worker still apply, but AuthHome is never
+// mounted. The caller must supply a trusted, operator-owned test command.
+func (c Config) VerifierCommand(ctx context.Context, cwd, program string, args ...string) (*exec.Cmd, error) {
+	if cwd == "" || filepath.IsAbs(cwd) || cwd == ".." || strings.HasPrefix(filepath.Clean(cwd), ".."+string(filepath.Separator)) {
+		return nil, errors.New("verifier working directory must stay in task checkout")
+	}
+	if _, err := c.Command(ctx, program, args...); err != nil {
+		return nil, err
+	}
+	runtimeRoot, _ := filepath.EvalSymlinks(c.RuntimeRoot)
+	worktree, _ := filepath.EvalSymlinks(c.Worktree)
+	bwrap, _ := filepath.EvalSymlinks(c.Bubblewrap)
+	if entries, err := os.ReadDir(filepath.Join(runtimeRoot, "agent-auth")); err != nil || len(entries) != 0 {
+		return nil, errors.New("verifier rootfs auth mount point must be empty")
+	}
+	argv := []string{
+		"--unshare-all", "--die-with-parent", "--new-session", "--clearenv",
+		"--setenv", "HOME", "/tmp",
+		"--setenv", "PATH", "/usr/local/bin:/usr/bin:/bin",
+		"--setenv", "GOCACHE", "/tmp/go-cache",
+		"--setenv", "GOMODCACHE", "/tmp/go-mod",
+		"--setenv", "GOPROXY", "off",
+		"--setenv", "npm_config_offline", "true",
+		"--setenv", "GIT_CONFIG_GLOBAL", "/dev/null",
+		"--setenv", "GIT_CONFIG_NOSYSTEM", "1",
+		"--setenv", "GIT_TERMINAL_PROMPT", "0",
+		"--ro-bind", runtimeRoot, "/",
+		"--proc", "/proc", "--dev", "/dev", "--tmpfs", "/tmp",
+		"--ro-bind", worktree, "/workspace",
+		"--chdir", filepath.Join("/workspace", cwd), "--", program,
+	}
+	argv = append(argv, args...)
+	cmd := exec.CommandContext(ctx, bwrap, argv...)
+	cmd.Env = []string{"PATH=/usr/bin:/bin"}
+	return cmd, nil
+}
+
 func within(root, path string) bool {
 	if root == path {
 		return true

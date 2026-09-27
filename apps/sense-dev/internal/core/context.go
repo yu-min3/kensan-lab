@@ -80,7 +80,11 @@ func (s *Store) BuildManifest(agentID string, allowedScope []string) (ContextMan
 				result = attempt
 			}
 		}
-		if result.ID == "" || result.ContractVersion != t.ContractVersion || result.BaseSHA != t.BaseSHA || result.HeadSHA != t.HeadSHA {
+		// Requirements and design review are fixed to the contract and base,
+		// before implementation advances the task head. Code-dependent stages
+		// must match the current head exactly.
+		preImplementation := dep.Role == "requirements" || dep.Role == "design_review"
+		if result.ID == "" || result.ContractVersion != t.ContractVersion || result.BaseSHA != t.BaseSHA || !preImplementation && result.HeadSHA != t.HeadSHA {
 			return ContextManifest{}, errors.New("stage dependency result missing or stale")
 		}
 		m.StageInputs = append(m.StageInputs, StageInput{AgentID: dep.ID, Role: dep.Role, Artifact: *result.OutputRef})

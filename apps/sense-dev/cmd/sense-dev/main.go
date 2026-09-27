@@ -18,6 +18,7 @@ import (
 	"github.com/yu-min3/kensan-lab/apps/sense-dev/internal/core"
 	"github.com/yu-min3/kensan-lab/apps/sense-dev/internal/isolation"
 	"github.com/yu-min3/kensan-lab/apps/sense-dev/internal/mock"
+	"github.com/yu-min3/kensan-lab/apps/sense-dev/internal/verifier"
 	"github.com/yu-min3/kensan-lab/apps/sense-dev/internal/web"
 	"github.com/yu-min3/kensan-lab/apps/sense-dev/internal/workerclient"
 	"github.com/yu-min3/kensan-lab/apps/sense-dev/internal/worktree"
@@ -45,6 +46,7 @@ func run() error {
 	codexAuth := flag.String("codex-auth-home", "", "private Codex subscription configuration directory")
 	turnTimeout := flag.Duration("turn-timeout", 45*time.Minute, "maximum duration of one isolated model turn")
 	inferenceWindow := flag.String("inference-window", "", "required JST HH:MM-HH:MM interval for isolated model dispatch")
+	verificationPlan := flag.String("verification-plan", "", "operator-owned JSON plan for credentialless tests")
 	flag.Parse()
 	if *data == "" || *token == "" || *tokensCSS == "" || !filepath.IsAbs(*data) {
 		return errors.New("-data, -admin-token-file and -tokens-css are required; -data must be absolute")
@@ -81,7 +83,7 @@ func run() error {
 		if err := rejectSimulationHistory(store.Snapshot()); err != nil {
 			return err
 		}
-		if *bubblewrap == "" || *runtimeRoot == "" || *worktreeRoot == "" || *sourceRepo == "" || *claudeAuth == "" || *codexAuth == "" || *turnTimeout <= 0 {
+		if *bubblewrap == "" || *runtimeRoot == "" || *worktreeRoot == "" || *sourceRepo == "" || *claudeAuth == "" || *codexAuth == "" || *verificationPlan == "" || *turnTimeout <= 0 {
 			return errors.New("isolated worker paths and positive timeout are required")
 		}
 		window, err := parseRunWindow(*inferenceWindow)
@@ -108,7 +110,15 @@ func run() error {
 		if err := isolated.Preflight(context.Background()); err != nil {
 			return fmt.Errorf("isolated worker disabled: %w", err)
 		}
-		mode, runner, scope = "isolated", isolated, []string{"isolated-model-worker"}
+		plan, err := verifier.LoadPlan(*verificationPlan, *data, *worktreeRoot, *claudeAuth, *codexAuth)
+		if err != nil {
+			return fmt.Errorf("verification plan rejected: %w", err)
+		}
+		checks := verifier.Runner{Sandbox: claudeConfig, Worktrees: worktrees, WorkerProgram: *workerProgram, Plan: plan}
+		if err := checks.Preflight(context.Background()); err != nil {
+			return fmt.Errorf("credentialless verifier disabled: %w", err)
+		}
+		mode, runner, scope = "isolated", stageRunner{models: isolated, checks: checks}, []string{"isolated-model-worker"}
 		allowedNow = window.contains
 	}
 	handler, err := web.New(store, *token, *tokensCSS, mode, allowedNow)
@@ -177,4 +187,16 @@ func run() error {
 		return nil
 	}
 	return err
+}
+
+type stageRunner struct {
+	models workerclient.Runner
+	checks verifier.Runner
+}
+
+func (r stageRunner) Run(ctx context.Context, dispatch core.Dispatch) (core.RunResult, error) {
+	if dispatch.Attempt.Role == "verification" {
+		return r.checks.Run(ctx, dispatch)
+	}
+	return r.models.Run(ctx, dispatch)
 }

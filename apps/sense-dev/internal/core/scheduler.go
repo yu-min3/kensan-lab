@@ -88,7 +88,17 @@ func (s *Store) Tick(ctx context.Context, runner Runner, scope []string) (bool, 
 		} else if kind == "retry_wait" {
 			wait = time.Now().UTC().Add(15 * time.Minute)
 		}
-		if err := s.FailAttempt(a.ID, kind, "provider "+kind, wait); err != nil {
+		var evidence *ArtifactRef
+		if len(result.Output) > 0 {
+			artifact, err := s.PutArtifact(a.AgentID, "failure-"+a.Role, result.Output)
+			if err != nil {
+				_ = s.FailAttempt(a.ID, "failed", "failure evidence could not be persisted", time.Time{})
+				return true, err
+			}
+			ref := artifactRef(artifact)
+			evidence = &ref
+		}
+		if err := s.FailAttemptWithOutput(a.ID, kind, "worker "+kind, wait, evidence); err != nil {
 			return true, err
 		}
 		return true, nil
@@ -267,13 +277,29 @@ func (s *Store) CompleteAttemptAtHead(attemptID string, output ArtifactRef, head
 }
 
 func (s *Store) FailAttempt(attemptID, kind, reason string, retryAfter time.Time) error {
+	return s.FailAttemptWithOutput(attemptID, kind, reason, retryAfter, nil)
+}
+
+func (s *Store) FailAttemptWithOutput(attemptID, kind, reason string, retryAfter time.Time, output *ArtifactRef) error {
 	if kind != "auth_required" && kind != "quota_wait" && kind != "retry_wait" && kind != "failed" && kind != "interrupted" {
 		return errors.New("invalid failure kind")
+	}
+	if output != nil {
+		if err := s.verifyRef(*output); err != nil {
+			return err
+		}
 	}
 	return s.update(func(st *State) error {
 		a, ok := st.Attempts[attemptID]
 		if !ok || a.Status != "running" {
 			return errors.New("attempt is not running")
+		}
+		if output != nil {
+			artifact := st.Artifacts[output.ID]
+			if artifact.AgentID != a.AgentID || artifact.TaskID != a.TaskID {
+				return errors.New("failure evidence belongs to another attempt")
+			}
+			a.OutputRef = output
 		}
 		now := time.Now().UTC()
 		a.Status, a.Reason, a.FinishedAt = kind, reason, &now
@@ -327,7 +353,7 @@ func (s *Store) ManifestPrompt(m ContextManifest) (string, error) {
 	if m.Role == "implementation" {
 		b.WriteString("Implement only this task in the local task checkout. Run relevant tests and commit all intended changes locally before ending the turn. Do not add a remote, push, publish, or change deployment state. Report the tests and the local commit SHA.\n")
 	} else if m.Role == "implementation_review" {
-		b.WriteString("Review the pinned implementation change and its tests against the requirements. Do not modify the checkout or inherit the author's conversation. A passing verdict is invalid if the checkout HEAD differs from the manifest HEAD.\n")
+		b.WriteString("Review the pinned implementation change and independent verification result against the requirements. Do not modify the checkout or inherit the author's conversation. A passing verdict is invalid if the checkout HEAD differs from the manifest HEAD.\n")
 	}
 	for _, entry := range []struct {
 		name string

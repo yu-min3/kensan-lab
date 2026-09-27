@@ -17,6 +17,7 @@ func defaultStages(kind string) ([]stageSpec, error) {
 			{"requirements", "claude", "fable"},
 			{"design_review", "codex", "gpt-6-astra"},
 			{"implementation", "codex", "gpt-6-sol"},
+			{"verification", "system", "local"},
 			{"implementation_review", "claude", "opus"},
 		}, nil
 	case "acceptance":

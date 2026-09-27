@@ -74,3 +74,27 @@ func TestTaskGitPreflightUsesSelfContainedCheckout(t *testing.T) {
 		t.Fatal("task checkout with remote passed preflight")
 	}
 }
+
+func TestVerifierPreflightRejectsVisibleAuthAndWritableCheckout(t *testing.T) {
+	t.Setenv("HOME", "/tmp")
+	root := t.TempDir()
+	worktree, auth := filepath.Join(root, "worktree"), filepath.Join(root, "auth")
+	for _, path := range []string{worktree, auth} {
+		if err := os.Mkdir(path, 0700); err != nil {
+			t.Fatal(err)
+		}
+	}
+	hidden := filepath.Join(root, "hidden")
+	if err := checkVerifierPreflight(worktree, auth, hidden, "host-network-namespace"); err == nil {
+		t.Fatal("writable verifier checkout accepted")
+	}
+	if err := os.WriteFile(filepath.Join(auth, "credential"), []byte("secret"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	if err := checkVerifierPreflight(worktree, auth, hidden, "host-network-namespace"); err == nil {
+		t.Fatal("visible provider auth accepted")
+	}
+	if err := checkVerifierPreflight(worktree, auth, hidden, ""); err == nil {
+		t.Fatal("missing host network namespace identity accepted")
+	}
+}

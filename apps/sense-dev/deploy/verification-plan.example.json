@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "checks": [
+    {
+      "name": "sense-dev-go-tests",
+      "cwd": "apps/sense-dev",
+      "argv": ["/usr/local/go/bin/go", "test", "./..."],
+      "timeout_seconds": 600
+    }
+  ]
+}

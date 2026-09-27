@@ -114,8 +114,8 @@ func TestPrivateWebLoginCSRFAndTask(t *testing.T) {
 	if len(store.Snapshot().Tasks) != 1 {
 		t.Fatal("valid task not persisted")
 	}
-	if len(store.Snapshot().Agents) != 4 {
-		t.Fatal("change task did not receive four independent stage agents")
+	if len(store.Snapshot().Agents) != 5 {
+		t.Fatal("change task did not receive five independent stage agents")
 	}
 	var requirements core.Agent
 	for _, a := range store.Snapshot().Agents {

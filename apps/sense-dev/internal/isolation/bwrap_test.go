@@ -149,3 +149,28 @@ func TestReadOnlyWorktreeMount(t *testing.T) {
 	}
 	t.Fatal("worktree mount missing")
 }
+
+func TestVerifierCommandHasNoNetworkOrAuthAndReadOnlyCheckout(t *testing.T) {
+	c := testConfig(t)
+	cmd, err := c.VerifierCommand(context.Background(), ".", "/usr/bin/worker", "test")
+	if err != nil {
+		t.Fatal(err)
+	}
+	args := strings.Join(cmd.Args, " ")
+	canonicalWorktree, err := filepath.EvalSymlinks(c.Worktree)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(args, "--share-net") || strings.Contains(args, c.AuthHome) || strings.Contains(args, c.ControllerState) || strings.Contains(args, "--bind "+canonicalWorktree) || !strings.Contains(args, "--ro-bind "+canonicalWorktree+" /workspace") || !strings.Contains(args, "GOPROXY off") {
+		t.Fatalf("unsafe verifier sandbox: %s", args)
+	}
+	if _, err := c.VerifierCommand(context.Background(), "../outside", "/usr/bin/worker"); err == nil {
+		t.Fatal("verifier accepted parent directory")
+	}
+	if err := os.WriteFile(filepath.Join(c.RuntimeRoot, "agent-auth", "secret"), []byte("x"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := c.VerifierCommand(context.Background(), ".", "/usr/bin/worker"); err == nil {
+		t.Fatal("nonempty auth mount point accepted")
+	}
+}

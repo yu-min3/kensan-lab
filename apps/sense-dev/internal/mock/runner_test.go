@@ -31,11 +31,11 @@ func TestPlannedTaskRunsToPublishWaitWithoutModel(t *testing.T) {
 	if st.Tasks[task.ID].Status != "publish_wait" {
 		t.Fatalf("task status %s", st.Tasks[task.ID].Status)
 	}
-	if len(st.Attempts) != 4 {
+	if len(st.Attempts) != 5 {
 		t.Fatalf("attempts=%d", len(st.Attempts))
 	}
-	manifest, err := store.BuildManifest(agents[3].ID, nil)
-	if err != nil || len(manifest.StageInputs) != 3 {
+	manifest, err := store.BuildManifest(agents[4].ID, nil)
+	if err != nil || len(manifest.StageInputs) != 4 {
 		t.Fatalf("review did not receive prior stage artifacts: %v %+v", err, manifest.StageInputs)
 	}
 	for i, input := range manifest.StageInputs {

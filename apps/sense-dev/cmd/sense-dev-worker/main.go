@@ -26,10 +26,22 @@ func main() {
 	maxUsage := flag.Float64("max-codex-usage", 80, "maximum accepted subscription usage percent")
 	preflight := flag.Bool("preflight", false, "verify worker mount boundary without running a model")
 	preflightTask := flag.Bool("preflight-task", false, "verify a task checkout inside the sandbox without running a model")
+	preflightVerifier := flag.Bool("preflight-verifier", false, "verify credentialless and offline test boundary")
 	hiddenPath := flag.String("hidden-path", "", "controller state path that must be absent inside the sandbox")
+	hostNetNS := flag.String("host-net-ns", "", "host network namespace identity for verifier preflight")
 	preflightProvider := flag.String("provider", "", "provider binary to verify during preflight")
 	readOnlyWorktree := flag.Bool("read-only-worktree", false, "assert worktree cannot be written in this sandbox")
 	flag.Parse()
+	if *preflightVerifier {
+		if err := checkVerifierPreflight(workdir, authHome, *hiddenPath, *hostNetNS); err != nil {
+			os.Exit(1)
+		}
+		_ = json.NewEncoder(os.Stdout).Encode(struct {
+			Version int    `json:"version"`
+			Type    string `json:"type"`
+		}{workerwire.Version, "verifier_preflight_ok"})
+		return
+	}
 	if *preflight || *preflightTask {
 		binary := *codex
 		if *preflightProvider == "claude" {
@@ -68,6 +80,49 @@ func main() {
 	if err := execute(context.Background(), request, input, os.Stdout, *claude, *codex, *maxUsage); err != nil {
 		os.Exit(1)
 	}
+}
+
+func checkVerifierPreflight(worktree, auth, hidden, hostNetNS string) error {
+	if hidden == "" || hidden == "/" || hostNetNS == "" || os.Getenv("HOME") != "/tmp" {
+		return errors.New("verifier preflight inputs or HOME are invalid")
+	}
+	if _, err := os.Lstat(hidden); !errors.Is(err, os.ErrNotExist) {
+		return errors.New("controller state is visible to verifier")
+	}
+	if entries, err := os.ReadDir(auth); err != nil || len(entries) != 0 {
+		return errors.New("provider auth is visible to verifier")
+	}
+	file, err := os.CreateTemp(worktree, ".verifier-preflight-")
+	if err == nil {
+		name := file.Name()
+		_ = file.Close()
+		_ = os.Remove(name)
+		return errors.New("verifier checkout is writable")
+	}
+	if !errors.Is(err, syscall.EROFS) {
+		return errors.New("verifier checkout read-only mount could not be verified")
+	}
+	file, err = os.CreateTemp("/tmp", ".verifier-preflight-")
+	if err != nil {
+		return errors.New("verifier scratch space is unavailable")
+	}
+	name := file.Name()
+	if err := file.Close(); err != nil {
+		return err
+	}
+	if err := os.Remove(name); err != nil {
+		return err
+	}
+	currentNetNS, err := os.Readlink("/proc/self/ns/net")
+	if err != nil || currentNetNS == hostNetNS {
+		return errors.New("verifier does not have a separate network namespace")
+	}
+	cmd := exec.Command("git", "--version")
+	cmd.Env = []string{"HOME=/tmp", "PATH=" + os.Getenv("PATH"), "GIT_CONFIG_GLOBAL=/dev/null", "GIT_CONFIG_NOSYSTEM=1", "GIT_TERMINAL_PROMPT=0"}
+	if err := cmd.Run(); err != nil {
+		return errors.New("Git is unavailable in verifier rootfs")
+	}
+	return nil
 }
 
 func checkTaskGit(worktree string) error {
