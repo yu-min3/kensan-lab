@@ -10,16 +10,17 @@ tags: [kensan-lab, sense, autonomous-development, operations]
 
 初回は既存 k3s に触れず、`sense` の host systemd に simulation-only controller を `127.0.0.1:8787` で配置する。Cloudflare、K8s、GitHub、ルーターは変更しない。導入操作は独立 Release Gate の初回レビュー記録と固定 SHA-256 の照合後に限る。失敗時は service を停止・自動起動無効化し、台帳と token は削除しない。
 
-**現在は実機変更を保留。** 13:16 UTC に別作業で `k3s` が停止・無効化され、libvirt 関連の導入が始まった。誰の作業かと今後の host 用途が確定するまで、この runbook を sense に適用しない。script・policy・固定 manifest の独立コード審査は `allow` だが、これは実機操作の許可ではない。実機の Release Gate は `needs_human` のまま。
+**現在は実機変更を保留。** 13:16 UTC に別作業で `k3s` が停止・無効化され、14:55 UTC には `sense-llm`（4 GiB）と `sense-desktop`（6 GiB）が稼働・自動起動していた。host の available memory は約4.6 GiB。所有者・用途・資源配分が確定するまで、この runbook を sense に適用しない。固定候補の独立コード審査は `allow` だったが、実機の Release Gate は `needs_human` のまま。
 
-直近の審査済み固定候補は source `b1743e4`、manifest `private-bootstrap-candidate-b1743e4.json`（commit `f294e09`）。独立 Astra reviewer は clean な source archive から Go 1.25.5 / linux-amd64 / CGO 無効 / `-buildvcs=false -trimpath` で再 build し、候補 binary と同じ SHA-256 `6cbbc12fb84faf2dbfee7a83ffc9f1cc39f650ef9f35b93ff01af0e835f3c0b2` を確認した。判定は `private-bootstrap-review-b1743e4.json` に固定した。`code_candidate=allow`、`host_install=needs_human`、`execution_authorized=false`。コード変更時には候補と独立レビューを更新する。旧候補のレビューを現在の source に転用しない。
+直近の審査済み固定候補は source `b1743e4`、manifest `private-bootstrap-candidate-b1743e4.json`（commit `f294e09`）。独立 Astra reviewer は clean な source archive から Go 1.25.5 / linux-amd64 / CGO 無効 / `-buildvcs=false -trimpath` で再 build し、候補 binary と同じ SHA-256 `6cbbc12fb84faf2dbfee7a83ffc9f1cc39f650ef9f35b93ff01af0e835f3c0b2` を確認した。判定は `private-bootstrap-review-b1743e4.json` に固定した。`code_candidate=allow`、`host_install=needs_human`、`execution_authorized=false`。その後 `ac2a137` で rollback を固定 unit/binary の照合後に限定したため、**この候補は現行 source の導入に使えない**。導入前に候補・hash・独立レビューを更新する。
 
 ## 実測前提（2026-09-27）
 
 | 項目 | 観測 | 判断 |
 |---|---|---|
-| OS / 資源 | Ubuntu 24.04.4、x86_64、4 CPU、15 GiB RAM（約 11 GiB available）、root 146 GiB / `/data` 870 GiB 空き | mock controller は共存を試せる。常時負荷は導入後に測る |
+| OS / 資源 | Ubuntu 24.04.4、x86_64、4 CPU、15 GiB RAM。14:55 UTC は約4.6 GiB available、root 129 GiB / `/data` 870 GiB 空き | 初回観測の約11 GiB available を現状の見積りに使わない。VM を含む容量・復旧経路を導入直前に再評価 |
 | k3s | 13:12 UTC は sense 1台の Ready control plane。13:16 UTC に `systemctl disable --now k3s` と `k3s-killall.sh` が実行され、13:19 UTC は inactive / disabled | 本件では停止も再起動もしない。別作業の変更として扱い、導入前に再棚卸しする |
+| libvirt VM | 14:55 UTC に `sense-llm` 4 GiB、`sense-desktop` 6 GiB が `qemu:///system` で稼働・自動起動 | 所有者・用途・依存を確認せず、停止・変更しない。host service 併用の可否を調整する |
 | host port 8787 | 棚卸し時に待受なし | 導入直前にも再確認する |
 | 既存公開経路 | host の cloudflared/nginx/caddy/traefik/tailscale service なし。Ingress なし、HTTPRoute CRD なし | 未確認経路は非公開証明に使わない。service 起動後に実測する |
 | 専用環境 | `kensan-dev` user、`/opt/kensan-dev`、`/var/lib/kensan-dev`、Go/Claude/Codex/bwrap が未配置 | mock-only 初回導入に必要な user・binary・token だけを作る。実推論は別段階 |
@@ -31,7 +32,7 @@ tags: [kensan-lab, sense, autonomous-development, operations]
 | 操作 | 判定 | 理由 |
 |---|---|---|
 | 専用 user/dir、固定 hash の初回 unit 導入 | レビュー後に採用 | G4a の非公開実機検証に必要。専用領域のみ変更 |
-| k3s 停止・Coder 削除 | 却下 | 既存 workload と PVC に影響。資源不足の証拠なし |
+| k3s・VM の停止や削除 | 却下 | 別作業の所有者・依存・資源配分が未確認。データと復旧経路を保持する |
 | `-isolated-worker` や公式 CLI 認証 | 保留 | bwrap/rootfs/CLI/本人認証/課金経路が未準備 |
 | Cloudflare / tunnel / proxy / public bind | 却下 | 公開有効化の承認なし。非公開段階の範囲外 |
 
@@ -39,7 +40,7 @@ tags: [kensan-lab, sense, autonomous-development, operations]
 
 1. clean worktree で `go test -race ./... -count=1` と `go vet ./...`。`GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build -buildvcs=false -trimpath -o <staging-binary> ./cmd/sense-dev` で binary を作る。Go の VCS stamp はこの worktree で別 revision を示したため無効化し、候補 manifest の source SHA と再現 build hash を別に固定する。
 2. 独立 reviewer が `operation/repo/ref/head_sha/target_environment/policy_version/artifact_hashes/expires_at` を持つ固定 manifest、binary・tokens・unit・導入 script の SHA-256、read-only 棚卸し、変更対象、rollback を記録する。現在の `code_candidate=allow` は実機操作を許可しない。並行作業の調整と直前 baseline の後、別の `host_install=allow` 判定が成立するまで実機への copy/install はしない。作者の自己承認は不可。
-3. `ssh sense` で hostname、`systemctl status k3s`、`ss -ltn`、既存 unit/user/dir、空き容量を再確認する。対象が変わったら再レビューする。
+3. `ssh sense` で hostname、k3s/libvirt/VM の状態、available memory、`ss -ltn`、既存 unit/user/dir、空き容量を再確認する。対象が変わったら再レビューする。
 4. 3入力と script を sense の一時 staging へ転送する。script 自体を root 管理の実行経路へコピー後に hash 照合し、その複製を実行する。3入力は script 内で root 専用 staging へコピー後に再照合される。reviewer に固定された値を `install` 引数へ渡す。secret は引数にしない。
 
 ## 導入・検証
@@ -51,10 +52,10 @@ tags: [kensan-lab, sense, autonomous-development, operations]
 
 ## 停止・復旧
 
-`sudo bash private-host-service.sh rollback` は当該 unit のみ停止・自動起動無効化する。token、台帳、binary、unit は保持し、再開前に原因と固定 hash を確認する。`systemctl enable --now kensan-dev-controller.service` は新たな Gate 判断が必要。データ/OS user/cluster の削除はこの runbook の範囲外。
+`sudo bash private-host-service.sh rollback <reviewed-unit-sha256> <reviewed-binary-sha256>` は固定 unit/binary hash と実効 fragment・drop-in・User/Group・ExecStart・Environment が一致する場合だけ当該 unit を停止・自動起動無効化する。不一致なら止めずに調査へ上げる。token、台帳、binary、unit は保持し、再開前に原因と固定 hash を確認する。`systemctl enable --now kensan-dev-controller.service` は新たな Gate 判断が必要。データ/OS user/cluster の削除はこの runbook の範囲外。
 
 ## 未決事項
 
 - 実推論用 rootfs、Claude/Codex 公式 CLI と本人ログイン、subscription 上限・従量無効の実証。
 - 日報宛先、外部入口の hostname/IdP/allowlist。公開有効化は別承認。
-- reboot 検証の時間帯と、既存 Coder 利用者への影響許容。
+- reboot 検証の時間帯と、稼働 VM の利用者・依存への影響許容。

@@ -10,7 +10,7 @@ tags: [kensan-lab, sense, autonomous-development, audit]
 
 **private-ready は未達。** `sense`（192.168.0.113）への SSH が復旧し、2026-09-27 に read-only 棚卸しを実施した。ただし 13:16 UTC にこの作業と別の操作で単一ノード k3s が停止・無効化され、libvirt の導入が始まった。14:55 UTC には `sense-llm`（4 GiB）と `sense-desktop`（6 GiB）の VM が稼働・自動起動設定で、host の available memory は約4.6 GiB。導入対象の前提が変化したため、このスレッドからの sense 変更は保留する。専用 service は未導入で、IPv4/IPv6・既存公開経路の実測も未完了。`private-ready` や v0 完了を宣言しない。Cloudflare・既存公開経路は変更していない。
 
-直近の審査済み host 導入候補に固定した source SHA は `b1743e4`（専用 worktree `feat/sense-autonomous-development`）。manifest `private-bootstrap-candidate-b1743e4.json`（commit `f294e09`）と独立 Astra 判定 `private-bootstrap-review-b1743e4.json` は、その SHA に限って再現 build と固定 hash を確認済み。`code_candidate=allow` だが、`host_install=needs_human`・`execution_authorized=false`。コード審査は host への転送・導入の許可ではない。
+直近の審査済み host 導入候補に固定した source SHA は `b1743e4`（専用 worktree `feat/sense-autonomous-development`）。manifest `private-bootstrap-candidate-b1743e4.json`（commit `f294e09`）と独立 Astra 判定 `private-bootstrap-review-b1743e4.json` は、その SHA に限って再現 build と固定 hash を確認済み。`code_candidate=allow` だが、`host_install=needs_human`・`execution_authorized=false`。後続の `ac2a137` で rollback の停止対象照合を追加したため、**この候補は現行 source の導入に使えない**。新候補・hash・独立レビューが必要。
 
 ## 今回の判断
 
@@ -19,7 +19,7 @@ tags: [kensan-lab, sense, autonomous-development, audit]
 | k3s と VM の現状態を変更せず、loopback の host service を計画する | 条件付き採用 | 13:12 UTC は k3s 稼働・約11 GiB available、13:19 UTC は k3s inactive/disabled。14:55 UTC は 2 VM 稼働・約4.6 GiB available。別作業の変更を上書きせず、資源と復旧経路を再評価する |
 | k3s を本件から停止または再起動 | 却下 | 既存 workload と別作業に影響し、所有者・目的が未確定 |
 | `sense-llm` / `sense-desktop` を本件から停止・変更 | 却下 | 両 VM は稼働・自動起動設定。所有者、用途、依存、停止許可を確認していない |
-| 初回 host 導入案 | ローカル審査のみ合格 | source `b1743e4` を独立 Astra reviewer が再buildし、候補 binary の hash 一致。mock/loopback 境界、状態ディレクトリ、既存領域、systemd 実効設定、固定 policy/manifest を確認し `code_candidate=allow`。実機操作は別作業との調整が必要で `host_install=needs_human` |
+| 初回 host 導入案 | 旧候補のコードのみ合格 | source `b1743e4` を独立 Astra reviewer が再buildし、候補 binary の hash 一致。mock/loopback 境界、状態ディレクトリ、既存領域、systemd 実効設定、固定 policy/manifest を確認し `code_candidate=allow`。後続 rollback 変更は未審査であり、実機操作は `host_install=needs_human` |
 | sense を未確認のまま `private-ready` と記録 | 却下 | AC-01/19 の service・待受・既存到達経路に実機証拠がない |
 | 別 tunnel / Cloudflare route で到達性を補う | 却下 | 明示的な公開承認がなく、非公開境界を迂回する |
 | GitHub push/PR/merge を現時点で実行 | 保留 | scan は一次検査に過ぎず、独立 Gate の実推論・CI/可視性/配備影響の照合と限定 publisher が未完成 |
@@ -58,7 +58,7 @@ Cloudflare の設定を変更しないことと、既存公開経路が無いこ
 
 ## 次の作業
 
-1. 別作業による k3s 停止・libvirt 導入と、稼働中 VM 2台の目的・所有者・host 利用範囲を確認する。このスレッドから k3s や VM を停止・再起動しない。source `b1743e4` の独立コード審査は合格済みだが、実機操作の Gate は直前 baseline・資源/復旧経路・公開経路・期限・固定 artifact を確認して別に判定する。候補期限は 2026-09-29 14:55 UTC で、切れたら再作成・再審査する。
+1. 別作業による k3s 停止・libvirt 導入と、稼働中 VM 2台の目的・所有者・host 利用範囲を確認する。このスレッドから k3s や VM を停止・再起動しない。source `b1743e4` の独立コード審査は旧版に限り合格済み。実機操作の Gate は現行 source から新候補を固定し、直前 baseline・資源/復旧経路・公開経路・期限・artifact を確認して別に判定する。旧候補期限は 2026-09-29 14:55 UTC だが、現在は source 変更で失効済み。
 2. worker の別OSユーザー隔離、restart時の orphan turn 照合、credential なし verifier、限定 publisher/outbox を完成させる。
 3. loopback service を導入し、実機 listen・継続 event・再起動/復旧・既存到達経路を検証してから `private-ready` を判定する。
 
