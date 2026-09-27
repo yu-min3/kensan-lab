@@ -32,7 +32,7 @@ tags: [kensan-lab, sense, autonomous-development, audit]
 | ● 高: Release Gate（AC-09, 18） | 部分 | 全 commit の Git scan、途中 commit で追加後に削除した symlink と submodule mode の `needs_human` 判定、対象 SHA/操作に固定した scan artifact、独立 Gate 入力 manifest、mock転用・誤操作・別SHAの拒否試験。publish は intent の dry-run のみ | CI・PR本文/添付・repo可視性・render設定・公開到達経路の実照合、worker/publisher credential 分離、限定 publisher と reconcile |
 | ▲ 中: 独立 context と工程（AC-13〜16） | 部分 | App/Platform の別 profile/knowledge/memo/session、immutable artifact、manifest hash、前工程の成果物配送、依存配車・provider枠・Mac優先・restart試験。App不合格→Platform修正→同一シナリオ再試験をローカル試験で確認 | 実 worker のOS分離、review session の実運転、session消失後の再作成、実モデル/実 repo での再試験 |
 | ▲ 中: モバイル UI（AC-03, 17） | 部分 | Chrome Playwright 360/390/430px で依頼・Mac優先・停止・日報previewと、模擬 App/Platform 交換4通の方向・返信元・taskリンク・成果物の種類/版/hashを確認。詳細展開後も横はみ出しなし。質問/回答/承認はHTTP試験 | 実機 Safari/Chrome、切断・Access再認証、回答草稿/再送、実際の差し戻し→修正→再試験を通したブラウザ E2E。模擬交換を実運転証拠にしない |
-| ▲ 中: 日報（AC-11） | preview のみ | JST日付で1件の未配信原本と判断リンク。送信結果は `not_configured` | 宛先確定、timer/outbox、送信不明の照合、2日連続の到達確認 |
+| ▲ 中: 日報（AC-11） | outbox のみ | 仮時刻20:00 JST以降の最初の稼働時に当日分を1件固定する timer と未配信原本・判断リンク。再起動時の送信不明と停止日の欠測を区別し、同日再実行では原本を変更しない。送信先は未設定 | Yu の宛先・時刻確定、実 sender、送信不明の外部照合、2日連続の到達確認 |
 | ▲ 中: canary/pilot（AC-05, 10, 12） | 部分 | Golden Path と既存 app の契約は実装 goal に定義済み。AC-05 の成果物配送・差し戻し・修正・再試験は固定 SHA のローカル試験まで | 対象・rollback固定、実 App feedback/再試験、GitOps後の利用者経路、48時間pilot |
 | ● 高: 外出先入口（AC-02） | 意図的保留 | loopbackのみ、Cloudflare未変更 | Yu の hostname/IdP/本人allowlist承認後に専用 Access/JWT/route を有効化して実機検証。private-ready の条件には含めない |
 

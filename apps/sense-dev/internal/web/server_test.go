@@ -62,7 +62,9 @@ func TestLinkedAppWaitReason(t *testing.T) {
 	}
 	app.Status = "decision_wait"
 	state.Tasks["app"] = app
-	if got := agentWaitReason(state, agent, "mock", true, time.Now()); got != "受入証拠の確認待ち" { t.Fatalf("corrupt acceptance wait: %s", got) }
+	if got := agentWaitReason(state, agent, "mock", true, time.Now()); got != "受入証拠の確認待ち" {
+		t.Fatalf("corrupt acceptance wait: %s", got)
+	}
 }
 
 func TestCreateLinkedAppAcceptanceFromForm(t *testing.T) {
@@ -129,7 +131,7 @@ func TestPrivateWebLoginCSRFAndTask(t *testing.T) {
 	if err := store.SeedKnowledge(); err != nil {
 		t.Fatal(err)
 	}
-	if _, created, err := store.QueueDailyReport(time.Date(2026, 9, 27, 15, 5, 0, 0, time.UTC)); err != nil || !created {
+	if _, created, err := store.QueueDailyReport(time.Date(2026, 9, 27, 11, 0, 0, 0, time.UTC)); err != nil || !created {
 		t.Fatalf("scheduled report setup failed: %t %v", created, err)
 	}
 	tokenFile := filepath.Join(dir, "admin-token")

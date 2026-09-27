@@ -19,7 +19,7 @@
 <tr><td>● Release Gate<br><small>AC-09/18</small></td><td class="status part">部分</td><td>全commit scan、途中追加・削除のsymlinkとsubmodule modeをneeds_human判定、Gate入力固定、mock/別SHA/別操作拒否、dry-run intent</td><td>CI・PR本文/添付・公開経路・可視性・render設定の実照合、限定publisher</td></tr>
 <tr><td>▲ 独立 context<br><small>AC-13〜16</small></td><td class="status part">部分</td><td>別profile/knowledge/session、版付き成果物、依存配車、restart試験。App不合格→Platform修正→同一シナリオ再試験はローカル試験まで</td><td>OS隔離、実session復元、実モデル/実repoでの再試験</td></tr>
 <tr><td>▲ モバイル UI<br><small>AC-03/17</small></td><td class="status part">部分</td><td>Chrome 360/390/430pxで依頼・停止・Mac優先・日報previewと、模擬4通のteam方向・返信元・task・成果物種類/版/hashを確認。詳細展開後も横はみ出しなし</td><td>実機 Safari/Chrome、切断・再認証、実際の差し戻し→修正→再試験のブラウザE2E</td></tr>
-<tr><td>▲ 日報<br><small>AC-11</small></td><td class="status part">preview</td><td>JST 1日1件の未配信原本・判断リンク</td><td>宛先、timer/outbox、2日連続の到達確認</td></tr>
+<tr><td>▲ 日報<br><small>AC-11</small></td><td class="status part">outboxのみ</td><td>仮時刻20:00 JST以降の最初の稼働時に当日分を1件固定。送信不明・停止日の欠測を区別し、同日の原本を変更しない</td><td>Yuの宛先・時刻確定、実sender、送信不明の照合、2日連続の到達確認</td></tr>
 <tr><td>▲ canary/pilot<br><small>AC-05/10/12</small></td><td class="status part">部分</td><td>AC-05 の固定SHA成果物配送・差し戻し・修正・再試験はローカル試験まで</td><td>対象とrollback固定、実App再試験、GitOps後の利用経路、48時間pilot</td></tr>
 <tr><td>● 外出先入口<br><small>AC-02</small></td><td class="status no">意図的保留</td><td>loopbackのみ、Cloudflare未変更</td><td>別途承認後にAccess/JWT/routeと実機回線試験。private-readyには含めない</td></tr>
 </tbody></table></div>

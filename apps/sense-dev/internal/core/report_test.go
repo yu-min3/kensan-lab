@@ -35,7 +35,7 @@ func TestDailyPreviewIsJSTIdempotentAndNotSent(t *testing.T) {
 
 func TestScheduledOutboxIsSeparateFromPreviewAndJSTIdempotent(t *testing.T) {
 	s := testStore(t)
-	before := time.Date(2026, 9, 27, 15, 4, 0, 0, time.UTC) // 09/28 00:04 JST
+	before := time.Date(2026, 9, 27, 10, 59, 0, 0, time.UTC) // 09/27 19:59 JST
 	if _, created, err := s.QueueDailyReport(before); err != nil || created {
 		t.Fatalf("report queued before cutoff: %t %v", created, err)
 	}
@@ -45,18 +45,28 @@ func TestScheduledOutboxIsSeparateFromPreviewAndJSTIdempotent(t *testing.T) {
 		t.Fatalf("scheduled report not queued: %+v %t %v", entry, created, err)
 	}
 	preview, err := s.PreviewDailyReport(now)
-	if err != nil || preview.Date != "2026-09-28" || len(s.Snapshot().ReportOutbox) != 1 || len(s.Snapshot().Reports) != 1 {
+	if err != nil || preview.Date != "2026-09-27" || len(s.Snapshot().ReportOutbox) != 1 || len(s.Snapshot().Reports) != 1 {
 		t.Fatal("scheduled report and manual preview were conflated")
 	}
+	if _, err := s.CreateTask("mission", App, "analysis", "after cutoff", "v1"); err != nil {
+		t.Fatal(err)
+	}
 	again, created, err := s.QueueDailyReport(now.Add(time.Hour))
-	if err != nil || created || again.CreatedAt != entry.CreatedAt {
-		t.Fatal("scheduled report duplicated")
+	if err != nil || created || again.CreatedAt != entry.CreatedAt || len(again.TaskIDs) != 0 {
+		t.Fatal("scheduled report duplicated or changed after cutoff")
+	}
+	if _, created, err := s.QueueDailyReport(now.Add(24*time.Hour - time.Minute)); err != nil || created {
+		t.Fatalf("next report queued before 20:00 JST: %t %v", created, err)
+	}
+	next, created, err := s.QueueDailyReport(now.Add(24 * time.Hour))
+	if err != nil || !created || next.Date != "2026-09-28" {
+		t.Fatalf("next JST report was not queued at 20:00: %+v %t %v", next, created, err)
 	}
 }
 
 func TestReportDeliveryUnknownAfterRestartNeverBlindlyRetries(t *testing.T) {
 	s := testStore(t)
-	now := time.Date(2026, 9, 27, 15, 5, 0, 0, time.UTC)
+	now := time.Date(2026, 9, 27, 11, 0, 0, 0, time.UTC)
 	entry, _, err := s.QueueDailyReport(now)
 	if err != nil {
 		t.Fatal(err)
@@ -108,7 +118,7 @@ func TestReportDeliveryUnknownAfterRestartNeverBlindlyRetries(t *testing.T) {
 
 func TestReportDeliveryReceiptAndMissedGap(t *testing.T) {
 	s := testStore(t)
-	first := time.Date(2026, 9, 27, 15, 5, 0, 0, time.UTC)
+	first := time.Date(2026, 9, 27, 11, 0, 0, 0, time.UTC)
 	entry, _, err := s.QueueDailyReport(first)
 	if err != nil {
 		t.Fatal(err)

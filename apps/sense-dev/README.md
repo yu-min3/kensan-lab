@@ -46,7 +46,7 @@ sense-dev -listen 127.0.0.1:8787 -data /var/lib/kensan-dev -admin-token-file /va
 - UI の loopback bind、管理 token login、HttpOnly cookie、CSRF、停止・Mac優先。provider の自動推論はまだ起動しない。
 - UI から質問への回答と、Release Gate が `needs_human` とした操作の判断を記録。契約/SHA/操作/期限と再送IDを照合し、同じ送信は冪等、古いカードは拒否する。承認記録だけでは publisher は起動せず、独立 Gate の新しい `allow` が必要。
 - 回答草稿は同じブラウザタブの `sessionStorage` で再読込・再認証から復元。送信が確定した質問の草稿は削除する。保存できないブラウザでも通常フォームは利用可能。
-- JST日付で日報 preview を1日1件だけ保存。別の独立 timer が毎日 00:05 以降に前日分を immutable な outbox 原本へ固定し、宛先待ち・送信中・送信済み・送信不明・欠測を区別する。再起動時の送信中は `unknown` に移して自動再送しない。宛先未設定のため実送信はまだない。
+- JST日付で日報 preview を1日1件だけ保存。独立 timer が仮時刻の毎日20:00 JST以降に当日分を immutable な outbox 原本へ固定し、宛先待ち・送信中・送信済み・送信不明・欠測を区別する。停止中に過ぎた日は現在の状態から捏造せず `missed` とする。再起動時の送信中は `unknown` に移して自動再送しない。宛先未設定のため実送信はまだない。
 - 既存 Playwright 基盤で 360/390/430 CSS px の依頼・Mac優先・停止・日報previewと横はみ出しを Chrome で確認。Agent は工程順に並べ、依存待ち・未設定などの理由を表示。実機 Safari/Chrome と外出先経路は未検証。
 
 ## 未完了と再開点

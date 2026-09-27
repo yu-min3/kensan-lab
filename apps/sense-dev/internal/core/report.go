@@ -62,14 +62,15 @@ func (s *Store) PreviewDailyReport(now time.Time) (DailyReport, error) {
 	return out, err
 }
 
-// QueueDailyReport freezes yesterday's JST report after 00:05. It never
-// contacts a destination. A prior preview stays separate and immutable.
+// QueueDailyReport freezes the current JST day's report at or after the
+// provisional 20:00 cutoff. It never contacts a destination. A prior preview
+// stays separate and immutable.
 func (s *Store) QueueDailyReport(now time.Time) (ReportOutboxEntry, bool, error) {
 	local := now.In(jst)
-	if local.Hour() == 0 && local.Minute() < 5 {
+	if local.Hour() < 20 {
 		return ReportOutboxEntry{}, false, nil
 	}
-	date := local.AddDate(0, 0, -1).Format("2006-01-02")
+	date := local.Format("2006-01-02")
 	s.mu.Lock()
 	old, exists := s.data.ReportOutbox[date]
 	s.mu.Unlock()
