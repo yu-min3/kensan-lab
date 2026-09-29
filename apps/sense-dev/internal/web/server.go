@@ -193,6 +193,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("POST /login", s.login)
 	mux.HandleFunc("POST /logout", s.auth(s.logout, true))
 	mux.HandleFunc("GET /", s.auth(s.home, false))
+	mux.HandleFunc("GET /tasks/{id}", s.auth(s.taskDetail, false))
 	mux.HandleFunc("GET /static/app.css", s.staticCSS)
 	mux.HandleFunc("GET /static/tokens.css", s.tokens)
 	mux.HandleFunc("GET /static/app.js", s.staticJS)
@@ -391,6 +392,80 @@ func (s *Server) home(w http.ResponseWriter, r *http.Request) {
 		WorkerMode  string
 		WindowOpen  bool
 	}{s.csrf(r), tasks, messages, agents, questions, approvals, reports, outbox, st.Stopped, st.PausedUntil, s.workerMode, s.allowedNow == nil || s.allowedNow(time.Now())})
+}
+
+func (s *Server) taskDetail(w http.ResponseWriter, r *http.Request) {
+	st := s.store.Snapshot()
+	task, ok := st.Tasks[r.PathValue("id")]
+	if !ok {
+		http.NotFound(w, r)
+		return
+	}
+	agents := make([]agentView, 0)
+	for _, a := range st.Agents {
+		if a.TaskID == task.ID {
+			allowed := s.allowedNow == nil || s.allowedNow(time.Now())
+			agents = append(agents, agentView{Agent: a, WaitReason: agentWaitReason(st, a, s.workerMode, allowed, time.Now())})
+		}
+	}
+	sort.Slice(agents, func(i, j int) bool {
+		if agentOrder(agents[i].Agent.Role) != agentOrder(agents[j].Agent.Role) {
+			return agentOrder(agents[i].Agent.Role) < agentOrder(agents[j].Agent.Role)
+		}
+		return agents[i].Agent.ID < agents[j].Agent.ID
+	})
+	messages := make([]messageView, 0)
+	for _, m := range st.Messages {
+		if m.SourceTask != task.ID && m.TargetTask != task.ID {
+			continue
+		}
+		view := messageView{Message: m, FromTeam: st.Agents[m.FromAgent].Team, ToTeam: st.Agents[m.ToAgent].Team}
+		for _, ref := range m.ArtifactRefs {
+			artifact, exists := st.Artifacts[ref.ID]
+			valid := exists && artifact.Version == ref.Version && artifact.SHA256 == ref.SHA256
+			kind := "参照不一致・要確認"
+			if valid {
+				kind = artifact.Kind
+			}
+			view.Artifacts = append(view.Artifacts, messageArtifactView{ID: ref.ID, Kind: kind, Version: ref.Version, SHA256: ref.SHA256, Valid: valid})
+		}
+		messages = append(messages, view)
+	}
+	sort.Slice(messages, func(i, j int) bool { return messages[i].Message.CreatedAt.Before(messages[j].Message.CreatedAt) })
+	questions := make([]core.Question, 0)
+	for _, q := range st.Questions {
+		if q.TaskID == task.ID {
+			questions = append(questions, q)
+		}
+	}
+	sort.Slice(questions, func(i, j int) bool { return questions[i].CreatedAt.After(questions[j].CreatedAt) })
+	approvals := make([]core.ApprovalRequest, 0)
+	for _, approval := range st.Approvals {
+		decision, exists := st.Decisions[approval.DecisionID]
+		if exists && st.Agents[decision.AuthorAgentID].TaskID == task.ID {
+			approvals = append(approvals, approval)
+		}
+	}
+	sort.Slice(approvals, func(i, j int) bool { return approvals[i].CreatedAt.After(approvals[j].CreatedAt) })
+	b, err := static.ReadFile("static/task.html")
+	if err != nil {
+		http.Error(w, "template unavailable", http.StatusInternalServerError)
+		return
+	}
+	page, err := template.New("task").Funcs(template.FuncMap{"teamLabel": teamLabel}).Parse(string(b))
+	if err != nil {
+		http.Error(w, "template unavailable", http.StatusInternalServerError)
+		return
+	}
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	_ = page.Execute(w, struct {
+		CSRF      string
+		Task      core.Task
+		Agents    []agentView
+		Messages  []messageView
+		Questions []core.Question
+		Approvals []core.ApprovalRequest
+	}{s.csrf(r), task, agents, messages, questions, approvals})
 }
 
 func (s *Server) staticCSS(w http.ResponseWriter, r *http.Request) {

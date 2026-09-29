@@ -278,6 +278,23 @@ func TestPrivateWebLoginCSRFAndTask(t *testing.T) {
 	if store.Snapshot().Approvals[approval.ID].Status != "approved" || len(store.Snapshot().Intents) != 0 {
 		t.Fatal("approval not recorded safely")
 	}
+	resp, err = client.Get(server.URL + "/tasks/" + task.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	detail, _ := io.ReadAll(resp.Body)
+	resp.Body.Close()
+	if resp.StatusCode != http.StatusOK || !strings.Contains(string(detail), task.Title) || !strings.Contains(string(detail), question.Prompt) || !strings.Contains(string(detail), approval.Reason) || !strings.Contains(string(detail), "担当と待機理由") {
+		t.Fatalf("task detail is incomplete: %d", resp.StatusCode)
+	}
+	resp, err = client.Get(server.URL + "/tasks/missing")
+	if err != nil {
+		t.Fatal(err)
+	}
+	resp.Body.Close()
+	if resp.StatusCode != http.StatusNotFound {
+		t.Fatalf("unknown task detail: %d", resp.StatusCode)
+	}
 	resp, err = client.PostForm(server.URL+"/api/reports/preview", url.Values{"csrf": {string(csrfMatch[1])}})
 	if err != nil {
 		t.Fatal(err)
