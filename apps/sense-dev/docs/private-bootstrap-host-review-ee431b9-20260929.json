@@ -1,0 +1,88 @@
+{
+  "schema_version": 1,
+  "kind": "independent_host_release_gate_review",
+  "reviewed_at": "2026-09-29T10:43:42Z",
+  "reviewer": {
+    "agent_session": "/root/bootstrap_host_gate_20260929",
+    "role": "independent_host_release_gate_reviewer",
+    "authored_implementation": false,
+    "host_mutations_performed": false,
+    "remote_mutations_performed": false
+  },
+  "scope": {
+    "operation": "host_service_first_install",
+    "repo": "yu-min3/kensan-lab",
+    "ref": "feat/sense-autonomous-development",
+    "head_sha": "ee431b9c37669c0771cff8fab09eed97e324a602",
+    "source_commit": "ee431b9c37669c0771cff8fab09eed97e324a602",
+    "candidate_manifest_commit": "83c52d2f7c5a2baefa144f93e56d7a54aececa68",
+    "candidate_manifest_path": "apps/sense-dev/docs/private-bootstrap-candidate-ee431b9.json",
+    "candidate_manifest_sha256": "9e2a12f68768fcf4d9ab36c62e09c7c24a2d6636a524349873a27494d9128ff5",
+    "target_environment": "sense-private-host",
+    "policy_version": "private-bootstrap-v1",
+    "policy_hash": "b6158fdc6b87bcf2636e80b77889bbb0e6bce367d7f323459106e79d81b43c66",
+    "expires_at": "2026-09-29T15:00:00Z",
+    "artifact_hashes": {
+      "linux_amd64_binary": "6cbbc12fb84faf2dbfee7a83ffc9f1cc39f650ef9f35b93ff01af0e835f3c0b2",
+      "install_script": "43469054f1e80b170e09cd4d1799b058c289f07702ece6c8eb7694109eb8d938",
+      "systemd_unit": "6c8e4d444fd0b2262f2ed0895883fa6208ca103bca0c84b79e464fe11ae73017",
+      "tokens_css": "bda4b1d91adb4ccf048cc8e50c33621f970ae991a3c422712c3b9bd5f614c011"
+    }
+  },
+  "decisions": {
+    "host_install": "allow",
+    "transfer_authorized": true,
+    "execution_authorized": true,
+    "verification_only": true,
+    "private_ready": false,
+    "v0_complete": false
+  },
+  "authorization_basis": [
+    "Yu identified both VMs as separately commissioned omarkey workloads and conditionally authorized non-disruptive host coexistence if resources suffice.",
+    "Independent live checks showed current capacity for the fixed mock-only controller; no existing workload needs stopping.",
+    "private-bootstrap-v1 permits verification-only installation while public-route facts remain uncertain, but not private-ready.",
+    "The independent code review and host reviewer verified the same fixed source, manifest, policy and four artifact hashes."
+  ],
+  "host_baseline": {
+    "observed_at": "2026-09-29T10:43:25Z",
+    "followup_at": "2026-09-29T10:43:40Z",
+    "host": "sense",
+    "architecture": "x86_64",
+    "logical_cpus": 4,
+    "memory_total_bytes": 16717795328,
+    "memory_available_bytes": 8532582400,
+    "swap_bytes": 0,
+    "load_average": [0.01, 0.02, 0.00],
+    "root_available_bytes": 136599097344,
+    "data_available_bytes": 933323075584,
+    "k3s": "inactive/disabled",
+    "libvirtd": "active/enabled",
+    "sense_llm": "running/autostart, 2 vCPU, 4 GiB assigned",
+    "sense_desktop": "running/autostart, 2 vCPU, 6 GiB assigned",
+    "dedicated_identity_paths_unit_dropins": "absent",
+    "tcp_8787": "unused",
+    "ssh_and_passwordless_sudo": "working",
+    "resource_sampling": "99-100% CPU idle, zero swap and no blocked processes"
+  },
+  "resource_limitations": [
+    "Capacity finding applies only to the fixed mock controller, not real inference, builds, GPU work or unrestricted agent workloads.",
+    "The reviewed unit has no explicit CPU or memory cap; measure service RSS/CPU and host memory after starting while keeping both VMs unchanged."
+  ],
+  "exposure_limitations": [
+    "No current TCP listener on 8787 or matching host tunnel/proxy process/service was observed; global IPv6 exists.",
+    "UDP 8472 and Cilium remnants persist despite stopped k3s; no 8787 forwarding rule was displayed in read-only nftables/iptables inspection.",
+    "Cloudflare dashboard, upstream router and all existing routes remain unproven; installation is verification-only and private-ready stays false."
+  ],
+  "execution_requirements": [
+    "Transfer only fixed binary, installer, unit and tokens to sense; no credentials, personal files or source tree.",
+    "Immediately before execution recheck decision scope, expiry, four hashes and dedicated identity/path/unit/drop-ins/port and resource/workload baseline; material changes require a new independent decision.",
+    "Copy installer to a root-managed path, verify that copy against the fixed script hash and execute only the verified copy.",
+    "Do not modify or stop VMs, libvirt, k3s, SSH, network, firewall, routes, Cloudflare, existing services or data; do not reboot or enable real models, GitHub or notifications.",
+    "On failure stop/disable only the identity-verified dedicated service and retain state, token, binary and unit."
+  ],
+  "post_install_evidence_required": [
+    "Verify installed artifact hashes, effective systemd settings, filesystem permissions, MainPID and localhost listener without printing token values.",
+    "Measure IPv4/IPv6 direct refusal from another host and assess existing ingress/tunnel/proxy/router/BPF/CI/GitOps paths; unknown routes keep private-ready false.",
+    "Record mock task/event continuity after initiating SSH ends, stop/restoration with retained state, and service CPU/RSS, host memory and both VMs still running/autostart."
+  ]
+}
