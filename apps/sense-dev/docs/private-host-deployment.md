@@ -10,7 +10,7 @@ tags: [kensan-lab, sense, autonomous-development, operations]
 
 初回は既存 k3s に触れず、`sense` の host systemd に simulation-only controller を `127.0.0.1:8787` で配置する。Cloudflare、K8s、GitHub、ルーターは変更しない。導入操作は独立 Release Gate の初回レビュー記録と固定 SHA-256 の照合後に限る。失敗時は service を停止・自動起動無効化し、台帳と token は削除しない。
 
-**現在は実機変更を保留。** 13:16 UTC に別作業で `k3s` が停止・無効化され、14:55 UTC には `sense-llm`（4 GiB）と `sense-desktop`（6 GiB）が稼働・自動起動していた。host の available memory は約4.6 GiB。所有者・用途・資源配分が確定するまで、この runbook を sense に適用しない。固定候補の独立コード審査は `allow` だったが、実機の Release Gate は `needs_human` のまま。
+**現在は実機変更を保留。** 別作業で `k3s` が停止・無効化され、`sense-llm`（4 GiB）と `sense-desktop`（6 GiB）が稼働・自動起動している。Yu は 9/29 に両 VM が omarkey 用と確認した。host の available memory は 9/29 10:35 UTC に約7.9 GiB。VM を維持したまま本件を併用する判断と直前の資源確認まで、この runbook を sense に適用しない。固定候補の独立コード審査は `allow` だが、実機の Release Gate は `needs_human` のまま。判断範囲は [併用判断資料](host-coexistence-decision.md) に整理した。
 
 直近の審査済み固定候補は source `ee431b9`、manifest `private-bootstrap-candidate-ee431b9.json`（commit `83c52d2`）。独立 Astra reviewer は clean な source archive から Go 1.25.5 / linux-amd64 / CGO 無効 / `-buildvcs=false -trimpath` で再 build し、候補 binary と同じ SHA-256 `6cbbc12fb84faf2dbfee7a83ffc9f1cc39f650ef9f35b93ff01af0e835f3c0b2` を確認した。変更した rollback 分岐は隔離 fixture の正常系1件・拒否系9件で検査した。判定は `private-bootstrap-review-ee431b9.json` に固定した。`code_candidate=allow`、`host_install=needs_human`、`execution_authorized=false`。後続のコード変更、期限切れ、実機環境の変化には候補と独立レビューを更新する。
 
@@ -20,7 +20,7 @@ tags: [kensan-lab, sense, autonomous-development, operations]
 |---|---|---|
 | OS / 資源 | Ubuntu 24.04.4、x86_64、4 CPU、15 GiB RAM。14:55 UTC は約4.6 GiB available、root 129 GiB / `/data` 870 GiB 空き | 初回観測の約11 GiB available を現状の見積りに使わない。VM を含む容量・復旧経路を導入直前に再評価 |
 | k3s | 13:12 UTC は sense 1台の Ready control plane。13:16 UTC に `systemctl disable --now k3s` と `k3s-killall.sh` が実行され、13:19 UTC は inactive / disabled | 本件では停止も再起動もしない。別作業の変更として扱い、導入前に再棚卸しする |
-| libvirt VM | 14:55 UTC に `sense-llm` 4 GiB、`sense-desktop` 6 GiB が `qemu:///system` で稼働・自動起動 | 所有者・用途・依存を確認せず、停止・変更しない。host service 併用の可否を調整する |
+| libvirt VM | `sense-llm` 4 GiB、`sense-desktop` 6 GiB が `qemu:///system` で稼働・自動起動。Yu が omarkey 用と確認 | 停止・変更しない。host service 併用の可否を Yu と確認する |
 | host port 8787 | 棚卸し時に待受なし | 導入直前にも再確認する |
 | 既存公開経路 | host の cloudflared/nginx/caddy/traefik/tailscale service なし。Ingress なし、HTTPRoute CRD なし | 未確認経路は非公開証明に使わない。service 起動後に実測する |
 | 専用環境 | `kensan-dev` user、`/opt/kensan-dev`、`/var/lib/kensan-dev`、Go/Claude/Codex/bwrap が未配置 | mock-only 初回導入に必要な user・binary・token だけを作る。実推論は別段階 |
@@ -32,7 +32,7 @@ tags: [kensan-lab, sense, autonomous-development, operations]
 | 操作 | 判定 | 理由 |
 |---|---|---|
 | 専用 user/dir、固定 hash の初回 unit 導入 | レビュー後に採用 | G4a の非公開実機検証に必要。専用領域のみ変更 |
-| k3s・VM の停止や削除 | 却下 | 別作業の所有者・依存・資源配分が未確認。データと復旧経路を保持する |
+| k3s・VM の停止や削除 | 却下 | VM は omarkey 用と判明したが、停止・削除は今回の許可範囲外。データと復旧経路を保持する |
 | `-isolated-worker` や公式 CLI 認証 | 保留 | bwrap/rootfs/CLI/本人認証/課金経路が未準備 |
 | Cloudflare / tunnel / proxy / public bind | 却下 | 公開有効化の承認なし。非公開段階の範囲外 |
 
@@ -58,4 +58,4 @@ tags: [kensan-lab, sense, autonomous-development, operations]
 
 - 実推論用 rootfs、Claude/Codex 公式 CLI と本人ログイン、subscription 上限・従量無効の実証。
 - 日報宛先、外部入口の hostname/IdP/allowlist。公開有効化は別承認。
-- reboot 検証の時間帯と、稼働 VM の利用者・依存への影響許容。
+- reboot 検証の時間帯と、omarkey VM の利用者・依存への影響許容（今回の条件付き導入には含めない）。
