@@ -1,8 +1,8 @@
 ---
 title: "sense private host service — 初回導入・復旧手順"
-status: draft
+status: active
 created: 2026-09-27
-updated: 2026-09-27
+updated: 2026-09-29
 tags: [kensan-lab, sense, autonomous-development, operations]
 ---
 
@@ -10,9 +10,9 @@ tags: [kensan-lab, sense, autonomous-development, operations]
 
 初回は既存 k3s に触れず、`sense` の host systemd に simulation-only controller を `127.0.0.1:8787` で配置する。Cloudflare、K8s、GitHub、ルーターは変更しない。導入操作は独立 Release Gate の初回レビュー記録と固定 SHA-256 の照合後に限る。失敗時は service を停止・自動起動無効化し、台帳と token は削除しない。
 
-**現在は実機変更を保留。** 別作業で `k3s` が停止・無効化され、`sense-llm`（4 GiB）と `sense-desktop`（6 GiB）が稼働・自動起動している。Yu は 9/29 に両 VM が omarkey 用と確認した。host の available memory は 9/29 10:35 UTC に約7.9 GiB。VM を維持したまま本件を併用する判断と直前の資源確認まで、この runbook を sense に適用しない。固定候補の独立コード審査は `allow` だが、実機の Release Gate は `needs_human` のまま。判断範囲は [併用判断資料](host-coexistence-decision.md) に整理した。
+**mock-only の初回導入は実施済み。** Yu は VM を維持した host 併用を条件付きで許可し、独立 host Gate が `host_install=allow` と判定した。導入直前 available memory は約8.0 GiB、導入後も約7.9 GiB。`k3s` は inactive/disabled、`sense-llm`（4 GiB）と `sense-desktop`（6 GiB）は稼働・自動起動のまま。service は `127.0.0.1:8787 -mock-worker` のみ。unit/binary hash、実効設定、mock task/event、stop→start 後の台帳保持を確認した。LAN IPv4 は direct refused、global IPv6 は no-route で未知のため private-ready は未達。判断範囲は [併用判断資料](host-coexistence-decision.md) に整理した。
 
-直近の審査済み固定候補は source `ee431b9`、manifest `private-bootstrap-candidate-ee431b9.json`（commit `83c52d2`）。独立 Astra reviewer は clean な source archive から Go 1.25.5 / linux-amd64 / CGO 無効 / `-buildvcs=false -trimpath` で再 build し、候補 binary と同じ SHA-256 `6cbbc12fb84faf2dbfee7a83ffc9f1cc39f650ef9f35b93ff01af0e835f3c0b2` を確認した。変更した rollback 分岐は隔離 fixture の正常系1件・拒否系9件で検査した。判定は `private-bootstrap-review-ee431b9.json` に固定した。`code_candidate=allow`、`host_install=needs_human`、`execution_authorized=false`。後続のコード変更、期限切れ、実機環境の変化には候補と独立レビューを更新する。
+直近の審査済み固定候補は source `ee431b9`、manifest `private-bootstrap-candidate-ee431b9.json`（commit `83c52d2`）。独立 Astra reviewer は clean な source archive から Go 1.25.5 / linux-amd64 / CGO 無効 / `-buildvcs=false -trimpath` で再 build し、候補 binary と同じ SHA-256 `6cbbc12fb84faf2dbfee7a83ffc9f1cc39f650ef9f35b93ff01af0e835f3c0b2` を確認した。変更した rollback 分岐は隔離 fixture の正常系1件・拒否系9件で検査した。判定は `private-bootstrap-review-ee431b9.json` と独立 host Gate `private-bootstrap-host-review-ee431b9-20260929.json` に固定した。`code_candidate=allow`、`host_install=allow`、`execution_authorized=true`（verification-only）。後続のコード変更、期限切れ、実機環境の変化には候補と独立レビューを更新する。
 
 ## 実測前提（2026-09-27）
 
@@ -39,7 +39,7 @@ tags: [kensan-lab, sense, autonomous-development, operations]
 ## 実行前チェック
 
 1. clean worktree で `go test -race ./... -count=1` と `go vet ./...`。`GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build -buildvcs=false -trimpath -o <staging-binary> ./cmd/sense-dev` で binary を作る。Go の VCS stamp はこの worktree で別 revision を示したため無効化し、候補 manifest の source SHA と再現 build hash を別に固定する。
-2. 独立 reviewer が `operation/repo/ref/head_sha/target_environment/policy_version/artifact_hashes/expires_at` を持つ固定 manifest、binary・tokens・unit・導入 script の SHA-256、read-only 棚卸し、変更対象、rollback を記録する。現在の `code_candidate=allow` は実機操作を許可しない。並行作業の調整と直前 baseline の後、別の `host_install=allow` 判定が成立するまで実機への copy/install はしない。作者の自己承認は不可。
+2. 独立 reviewer が `operation/repo/ref/head_sha/target_environment/policy_version/artifact_hashes/expires_at` を持つ固定 manifest、binary・tokens・unit・導入 script の SHA-256、read-only 棚卸し、変更対象、rollback を記録する。`code_candidate=allow` だけでは実機操作を許可しない。並行作業の調整と直前 baseline の後、別の `host_install=allow` 判定を得てから copy/install する。作者の自己承認は不可（今回の判定記録は保存済み）。
 3. `ssh sense` で hostname、k3s/libvirt/VM の状態、available memory、`ss -ltn`、既存 unit/user/dir、空き容量を再確認する。対象が変わったら再レビューする。
 4. 3入力と script を sense の一時 staging へ転送する。script 自体を root 管理の実行経路へコピー後に hash 照合し、その複製を実行する。3入力は script 内で root 専用 staging へコピー後に再照合される。reviewer に固定された値を `install` 引数へ渡す。secret は引数にしない。
 

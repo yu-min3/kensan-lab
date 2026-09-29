@@ -1,33 +1,33 @@
 ---
 title: "sense 自動開発基盤 — omarkey VM との併用判断"
-status: review
+status: accepted-with-scope
 created: 2026-09-29
 updated: 2026-09-29
 tags: [kensan-lab, sense, autonomous-development, decision]
 ---
 
-# 結論と Yu への依頼
+# 結論
 
-**止まっているのは実機への初回配置だけ。** `sense-llm` と `sense-desktop` は Yu が依頼した omarkey 用 VM と判明した。自動開発チームの一部ではない。App/Platform の独立 context・版付き成果物交換と、独立 Release Gate のローカル実装・試験は進んでいるが、sense に controller はまだ存在せず、実モデルの自動開発は一度も始めていない。
+**Yu の条件付き許可に基づき、mock-only の host service を導入した。** `sense-llm` と `sense-desktop` は omarkey 用 VM で、自動開発チームの一部ではない。App/Platform の独立 context・版付き成果物交換と独立 Release Gate は実装・試験済み。今回 sense に配置したのは `127.0.0.1:8787` の mock controller だけで、実モデルの自動開発は一度も始めていない。
 
-**推奨判断: 条件付きで host の併用を許可する。** omarkey の両 VM と k3s の現状態を一切変更せず、`kensan-dev-controller.service` を host systemd に新設する。最初は `127.0.0.1:8787` の **mock-only**。モデル推論、GitHub、Cloudflare、外部公開、日報送信は起動しない。直前の read-only 棚卸しと、コード審査とは別の独立 `host_install=allow` 判定が通らなければ転送・導入しない。予想外の競合・資源不足なら `needs_human` へ戻す。
+**許可範囲: VM と k3s を変更せず host の mock-only service を併用する。** 独立 `host_install=allow` 判定後、固定 hash の候補を導入した。モデル推論、GitHub、Cloudflare、外部公開、日報送信は起動しない。予想外の競合・資源不足が見つかった場合は専用 service だけを停止し、VM/k3s は変更しない。
 
-Yu が同意する場合は、次の範囲に対して「**VM を止めずに、条件付き host 併用で進めてよい**」と回答してほしい。これは reboot、VM 設定変更、k3s 再起動、実モデル運転、公開、GitHub 操作の承認ではない。
+Yu は「**VM を止めずに、資源が足りれば条件付き host 併用で進めてよい**」と判断した。これは reboot、VM 設定変更、k3s 再起動、実モデル運転、公開、GitHub 操作の承認ではない。
 
 ## なぜ止まったか
 
-2026-09-27 に、この作業とは別に k3s が停止・無効化され、libvirt と VM 2台が稼働し始めた。当時は用途・所有者が不明だったので、固定ポリシー `private-bootstrap-v1` の「並行作業と host 利用を調整する」必要条件を満たせず、`host_install=needs_human` で止めた。今回、**所有者・用途は判明**したが、「VM を動かしたまま host service を併用してよいか」はまだ明示されていない。これは僕の確認の切り方が曖昧だった点でもある。
+2026-09-27 に、この作業とは別に k3s が停止・無効化され、libvirt と VM 2台が稼働し始めた。当時は用途・所有者が不明だったので、固定ポリシー `private-bootstrap-v1` の「並行作業と host 利用を調整する」必要条件を満たせず、`host_install=needs_human` で止めた。その後、**所有者・用途が判明し、Yu の条件付き判断と独立 Gate allow を得たため導入へ進んだ**。確認の切り方が曖昧だった点は記録しておく。
 
 ## 現在地（2026-09-29 10:35 UTC、read-only）
 
 | 領域 | 確認できた事実 | 判定 |
 |---|---|---|
-| sense host | 4 CPU / 15 GiB。available memory 約7.9 GiB。`sense-llm` と `sense-desktop` が稼働 | 共存可能性はあるが、負荷時の余裕は未実測 |
+| sense host | 4 CPU / 15 GiB。導入直前 available memory 約8.0 GiB、導入後も約7.9 GiB。`sense-llm` と `sense-desktop` が稼働 | 固定 mock controller の共存は確認。実推論・build の余力を保証しない |
 | omarkey VM | `sense-llm` 4 GiB、`sense-desktop` 6 GiB。両方自動起動設定 | 変更・停止しない |
-| k3s / controller | k3s は inactive/disabled。`kensan-dev-controller.service` は `not-found`、8787 待受なし | 既存 controller はない。k3s には触れない |
-| コード候補 | source `ee431b9` の binary・script・unit・CSS を独立 Astra reviewer が再現検証。`code_candidate=allow`、`host_install=needs_human` | コード合格は実機操作の許可ではない |
+| k3s / controller | k3s は inactive/disabled。導入後 controller は専用 systemd のみ、8787 は loopback | 既存 k3s は変更しない |
+| コード候補 | source `ee431b9` の binary・script・unit・CSS を独立 Astra reviewer が再現検証。独立 host Gate は `host_install=allow` | 固定候補以外は導入しない |
 | 候補期限 | 2026-09-29 15:00 UTC（JST 9/30 00:00） | 期限を過ぎたら候補・hash・独立レビューを再作成 |
-| 非公開性 | 固定 unit は loopback/mock-only。既存 tunnel/proxy/IPv6/ルーター経路の否定証拠と実機試験は未完 | `private-ready=false` |
+| 非公開性 | Mac から LAN IPv4:8787 は `direct_refused`。global IPv6:8787 は `no_route` で未知。既存 tunnel/proxy/Cloudflare/router は未証明 | `private-ready=false` |
 
 ## 選択肢
 
@@ -49,10 +49,16 @@ Yu が同意する場合は、次の範囲に対して「**VM を止めずに、
 
 App/Platform は **別 profile・知識・メモ・session を持つ論理 agent**で、controller が版付き成果物を配送する。Fable→Astra→Sol→Opus の工程配車もローカル模擬試験まで。今回の最初の host 配置は mock-only で、**実モデルで動く常駐チームの開始ではない**。実モデル運転には sense の本人ログイン、subscription/従量無効、隔離 worker と OS 境界、Mac 併用試験を別に満たす必要がある。
 
+## 実施済みの検証
+
+- `kensan-dev-controller.service` の active/enabled、unit/binary hash、effective user/group/ExecStart、MainPID、loopback listener、`/login` HTTP 200 を確認。
+- token を表示せず mock task を作成し、attempt/event が増えることを確認。
+- 専用 service の stop→start 後に task/attempts を保持し、VM 2台と k3s の状態が変わらないことを確認。
+- Mac から `192.168.0.113:8787` は `direct_refused`。global IPv6 は Mac 側 `no_route` で、拒否成功には数えていない。
+
 ## 未決事項
 
-- Yu: omarkey VM 2台を稼働・自動起動のまま維持し、本件の mock-only host service を条件付きで併用してよいか。
-- 運用: 直前 baseline と別の `host_install=allow`、既存公開経路の調査、実機停止・復元の証拠。
+- 運用: global IPv6 を別到達点から再試験し、Cloudflare dashboard・router・既存公開経路を read-only で照合する。
 - 後段: 実モデル認証・費用条件、日報宛先、外部入口は今回の承認外。
 
 詳細: [private-ready 判定台帳](private-ready-audit.md)、[導入・復旧手順](private-host-deployment.md)、実装契約 `projects/kensan-lab/docs/goal.md`。
