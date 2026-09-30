@@ -163,6 +163,13 @@ func run() error {
 					if allowedNow != nil && !allowedNow(time.Now()) {
 						continue
 					}
+					// 固まった worker が provider を握ったままにならないよう、
+					// 配車の前に lease 切れを回収する。再実行はしない。
+					if n, err := store.ExpireLeases(time.Now()); err != nil {
+						log.Print("lease expiry needs operator inspection")
+					} else if n > 0 {
+						log.Printf("released %d expired attempt lease(s); inspect worker output before retry", n)
+					}
 					if mode == "isolated" {
 						if err := prepareReadyWorktrees(ctx, store, worktrees); err != nil {
 							log.Print("task worktree preparation needs operator inspection")
