@@ -68,6 +68,9 @@ type Attempt struct {
 	OutputRef       *ArtifactRef `json:"output_ref,omitempty"`
 	StartedAt       time.Time    `json:"started_at"`
 	FinishedAt      *time.Time   `json:"finished_at,omitempty"`
+	// LeaseExpiresAt を過ぎた running は ExpireLeases が interrupted にして
+	// provider を解放する。生きている worker は RenewLease で伸ばす。
+	LeaseExpiresAt *time.Time `json:"lease_expires_at,omitempty"`
 }
 
 type Artifact struct {

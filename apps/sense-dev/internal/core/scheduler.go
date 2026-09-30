@@ -162,7 +162,7 @@ func (s *Store) claimNext(now time.Time, requireBase bool) (Attempt, bool, error
 			if a.Role == "release_gate" && a.ReviewAuthorID == "" {
 				continue
 			}
-			if a.RetryAfter != nil && now.Before(*a.RetryAfter) || a.AttemptCount >= 3 || busyProviders[a.Provider] || busyTasks[a.TaskID] {
+			if a.RetryAfter != nil && now.Before(*a.RetryAfter) || a.AttemptCount >= MaxAttempts || busyProviders[a.Provider] || busyTasks[a.TaskID] {
 				continue
 			}
 			t, ok := st.Tasks[a.TaskID]
@@ -202,7 +202,8 @@ func (s *Store) claimNext(now time.Time, requireBase bool) (Attempt, bool, error
 		t := st.Tasks[a.TaskID]
 		a.Status, a.RetryAfter, a.AttemptCount, a.UpdatedAt = "running", nil, a.AttemptCount+1, now
 		st.Agents[a.ID] = a
-		claimed = Attempt{ID: id, AgentID: a.ID, TaskID: t.ID, MissionID: t.MissionID, Team: t.Team, Role: a.Role, Provider: a.Provider, Model: a.Model, SessionID: a.SessionID, Generation: a.SessionGeneration, ContractVersion: t.ContractVersion, BaseSHA: t.BaseSHA, HeadSHA: t.HeadSHA, Status: "running", StartedAt: now}
+		lease := now.UTC().Add(LeaseTTL)
+		claimed = Attempt{ID: id, AgentID: a.ID, TaskID: t.ID, MissionID: t.MissionID, Team: t.Team, Role: a.Role, Provider: a.Provider, Model: a.Model, SessionID: a.SessionID, Generation: a.SessionGeneration, ContractVersion: t.ContractVersion, BaseSHA: t.BaseSHA, HeadSHA: t.HeadSHA, Status: "running", StartedAt: now, LeaseExpiresAt: &lease}
 		st.Attempts[id] = claimed
 		st.Events = append(st.Events, event("attempt_started", id, a.ID))
 		return nil
@@ -350,7 +351,7 @@ func (s *Store) FailAttemptWithOutput(attemptID, kind, reason string, retryAfter
 		st.Attempts[attemptID] = a
 		agent := st.Agents[a.AgentID]
 		agent.Status, agent.UpdatedAt = kind, now
-		if !retryAfter.IsZero() && agent.AttemptCount < 3 {
+		if !retryAfter.IsZero() && agent.AttemptCount < MaxAttempts {
 			r := retryAfter.UTC()
 			agent.RetryAfter = &r
 		} else if kind == "retry_wait" || kind == "quota_wait" {
