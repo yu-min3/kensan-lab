@@ -46,14 +46,14 @@ sense-dev -listen 127.0.0.1:8787 -data /var/lib/kensan-dev -admin-token-file /va
 - UI の loopback bind、管理 token login、HttpOnly cookie、CSRF、停止・Mac優先。provider の自動推論はまだ起動しない。
 - UI から質問への回答と、Release Gate が `needs_human` とした操作の判断を記録。契約/SHA/操作/期限と再送IDを照合し、同じ送信は冪等、古いカードは拒否する。承認記録だけでは publisher は起動せず、独立 Gate の新しい `allow` が必要。
 - 回答草稿は同じブラウザタブの `sessionStorage` で再読込・再認証から復元。送信が確定した質問の草稿は削除する。保存できないブラウザでも通常フォームは利用可能。
-- JST日付で日報 preview を1日1件だけ保存。独立 timer が仮時刻の毎日20:00 JST以降に当日分を immutable な outbox 原本へ固定し、宛先待ち・送信中・送信済み・送信不明・欠測を区別する。停止中に過ぎた日は現在の状態から捏造せず `missed` とする。再起動時の送信中は `unknown` に移して自動再送しない。宛先未設定のため実送信はまだない。
+- JST日付で日報 preview を1日1件だけ保存。独立 timer が仮時刻の毎日20:00 JST以降に当日分を immutable な outbox 原本へ固定し、宛先待ち・送信中・送信済み・送信不明・欠測を区別する。停止中に過ぎた日は現在の状態から捏造せず `missed` とする。再起動時の送信中は `unknown` に移して自動再送しない。Slack 配送 adapter と UI 照合/再試行は [report-delivery.md](docs/report-delivery.md) に実装済み。宛先未設定のため実送信はまだない。
 - 既存 Playwright 基盤で 360/390/430 CSS px の依頼・Mac優先・停止・日報previewと横はみ出しを Chrome で確認。Agent は工程順に並べ、依存待ち・未設定などの理由を表示。実機 Safari/Chrome と外出先経路は未検証。
 
 ## 未完了と再開点
 
 1. 専用 rootfs と canary に対応する固定検証計画を用意し、sense で bubblewrap/user namespace の fail-closed preflight、state/token不可視、credentialless verifier のネットワーク/認証遮断、実プロセス kill と再起動照合を通す。auth待機と中断照合・再開、実検証器の運転証拠は未完了。現 service unit は fake runner 専用。Claude の書込系 tool は隔離 worker が完成するまで解放しない。
 2. Release Gate の CI/PR本文/添付/公開経路/配備影響/可視性を実状態に照らす。限定 publisher の branch push / draft PR と remote reconcile は [publisher.md](docs/publisher.md) に実装済みだが、実モデル Gate と実 GitHub 操作は未実証。現行 mock-only service は送信しない。
-3. 管理画面に案件詳細を追加し、360/390/430 px と実機幅、切断復旧を検証する。App 差し戻し→Platform 修正→新 SHA の再試験は controller/作業ツリーのローカル試験までで、実モデル・sense 実機・既存 app の同一シナリオは未検証。質問/回答・SHA-bound 承認・日報 preview は HTTP テストまでで、実スマホ未検証。日報の宛先/送信 adapter と送信不明の実照合は未実装。timer/outbox はローカル試験のみ。
+3. 管理画面に案件詳細を追加し、360/390/430 px と実機幅、切断復旧を検証する。App 差し戻し→Platform 修正→新 SHA の再試験は controller/作業ツリーのローカル試験までで、実モデル・sense 実機・既存 app の同一シナリオは未検証。質問/回答・SHA-bound 承認・日報 preview は HTTP テストまでで、実スマホ未検証。日報の Slack adapter はローカル試験のみで、実宛先と送信不明の実照合は未実施。
 4. sense への SSH は復旧し、CPU/RAM/ディスクと単一ノード k3s 等を read-only 棚卸し済み。ただし別作業で k3s が停止・libvirt が導入されたため、この作業からの host 変更は調整待ち。bootstrap code/manifest と導入後 listener smoke は独立レビュー済みだが、実機導入・IPv4/IPv6/Cloudflare dashboard 等の公開経路・host reboot は未検証で `private-ready` 未達。詳細は `docs/private-ready-audit.md`。
 5. 本人の初回認証と subscription 費用経路を確認後、実モデルの4工程と独立検証を接続する。Cloudflare は公開承認まで inactive。
 

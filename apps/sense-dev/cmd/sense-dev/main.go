@@ -18,6 +18,7 @@ import (
 	"github.com/yu-min3/kensan-lab/apps/sense-dev/internal/core"
 	"github.com/yu-min3/kensan-lab/apps/sense-dev/internal/isolation"
 	"github.com/yu-min3/kensan-lab/apps/sense-dev/internal/mock"
+	"github.com/yu-min3/kensan-lab/apps/sense-dev/internal/reportdelivery"
 	"github.com/yu-min3/kensan-lab/apps/sense-dev/internal/verifier"
 	"github.com/yu-min3/kensan-lab/apps/sense-dev/internal/web"
 	"github.com/yu-min3/kensan-lab/apps/sense-dev/internal/workerclient"
@@ -47,6 +48,9 @@ func run() error {
 	turnTimeout := flag.Duration("turn-timeout", 45*time.Minute, "maximum duration of one isolated model turn")
 	inferenceWindow := flag.String("inference-window", "", "required JST HH:MM-HH:MM interval for isolated model dispatch")
 	verificationPlan := flag.String("verification-plan", "", "operator-owned JSON plan for credentialless tests")
+	reportChannel := flag.String("report-slack-channel", "", "fixed Slack channel ID for daily report")
+	reportToken := flag.String("report-slack-token-file", "", "mode 0600 Slack bot token file")
+	reportBaseURL := flag.String("report-base-url", "", "HTTPS mobile link base for daily report")
 	flag.Parse()
 	if *data == "" || *token == "" || *tokensCSS == "" || !filepath.IsAbs(*data) {
 		return errors.New("-data, -admin-token-file and -tokens-css are required; -data must be absolute")
@@ -56,6 +60,16 @@ func run() error {
 	}
 	if *mockWorker && *isolatedWorker {
 		return errors.New("mock and isolated workers are mutually exclusive")
+	}
+	reportConfigured := *reportChannel != "" || *reportToken != "" || *reportBaseURL != ""
+	reportSender := reportdelivery.Slack{TokenFile: *reportToken, BaseURL: *reportBaseURL}
+	if reportConfigured {
+		if *reportChannel == "" || *reportToken == "" || *reportBaseURL == "" {
+			return errors.New("Slack report channel, token file and HTTPS base URL are required together")
+		}
+		if err := reportSender.Validate(); err != nil {
+			return err
+		}
 	}
 	store, err := core.Open(*data)
 	if err != nil {
@@ -135,8 +149,31 @@ func run() error {
 	defer stop()
 	go func() {
 		queue := func() {
-			if _, _, err := store.QueueDailyReport(time.Now()); err != nil {
+			entry, _, err := store.QueueDailyReport(time.Now())
+			if err != nil {
 				log.Print("daily report outbox needs operator inspection")
+				return
+			}
+			if !reportConfigured || entry.Date == "" {
+				return
+			}
+			if entry.Status == "waiting_destination" {
+				if err := store.ConfigureReportDestination(entry.Date, *reportChannel); err != nil {
+					log.Print("daily report destination rejected")
+					return
+				}
+				entry = store.Snapshot().ReportOutbox[entry.Date]
+			}
+			if entry.Status == "queued" {
+				if entry.Destination != *reportChannel {
+					log.Print("daily report destination differs from configured channel; inspect outbox")
+					return
+				}
+				ctx, cancel := context.WithTimeout(ctx, 20*time.Second)
+				defer cancel()
+				if err := store.DeliverQueuedReport(ctx, entry.Date, reportSender, time.Now()); err != nil {
+					log.Print("daily report delivery unknown; inspect outbox before retry")
+				}
 			}
 		}
 		queue()

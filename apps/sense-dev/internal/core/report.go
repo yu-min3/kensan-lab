@@ -1,12 +1,56 @@
 package core
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"regexp"
 	"sort"
 	"time"
 )
+
+type ReportSender interface {
+	Send(context.Context, ReportOutboxEntry) (externalID string, err error)
+}
+
+// DeliverQueuedReport is the only sending path. A timeout or sender error is
+// ambiguous and is never retried automatically.
+func (s *Store) DeliverQueuedReport(ctx context.Context, date string, sender ReportSender, now time.Time) error {
+	if sender == nil {
+		return errors.New("report sender required")
+	}
+	entry, err := s.BeginReportDelivery(date, now)
+	if err != nil {
+		return err
+	}
+	externalID, err := sender.Send(ctx, entry)
+	if err != nil || externalID == "" {
+		_ = s.FinishReportDelivery(date, entry.AttemptID, "unknown", "", time.Now())
+		if err == nil {
+			return errors.New("report sender returned no receipt")
+		}
+		return err
+	}
+	return s.FinishReportDelivery(date, entry.AttemptID, "sent", externalID, time.Now())
+}
+
+// RequeueFailedReport requires an explicit operator action after confirmed
+// non-delivery. Unknown sends must first be reconciled as failed.
+func (s *Store) RequeueFailedReport(date, attemptID, evidence string) error {
+	if len(evidence) == 0 || len(evidence) > 512 {
+		return errors.New("retry evidence required")
+	}
+	return s.update(func(st *State) error {
+		entry, ok := st.ReportOutbox[date]
+		if !ok || entry.Status != "failed" || entry.AttemptID != attemptID || entry.Destination == "" {
+			return errors.New("only confirmed failed delivery can be retried")
+		}
+		entry.Status, entry.ReconciliationEvidence, entry.AttemptID, entry.UpdatedAt = "queued", evidence, "", time.Now().UTC()
+		st.ReportOutbox[date] = entry
+		st.Events = append(st.Events, event("daily_report_requeued", date, "operator confirmed non-delivery"))
+		return nil
+	})
+}
 
 var jst = time.FixedZone("JST", 9*60*60)
 var reportDestination = regexp.MustCompile(`^[A-Za-z0-9_-]{1,128}$`)

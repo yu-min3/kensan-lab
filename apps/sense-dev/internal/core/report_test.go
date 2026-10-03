@@ -1,10 +1,64 @@
 package core
 
 import (
+	"context"
+	"errors"
 	"strings"
 	"testing"
 	"time"
 )
+
+type testReportSender struct {
+	calls int
+	fail  bool
+}
+
+func (s *testReportSender) Send(context.Context, ReportOutboxEntry) (string, error) {
+	s.calls++
+	if s.fail {
+		return "", errors.New("timeout")
+	}
+	return "slack-ts-2", nil
+}
+
+func TestReportDeliveryRequiresReconciliationBeforeRetry(t *testing.T) {
+	s := testStore(t)
+	now := time.Date(2026, 9, 27, 11, 0, 0, 0, time.UTC)
+	entry, _, err := s.QueueDailyReport(now)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := s.ConfigureReportDestination(entry.Date, "C123456789"); err != nil {
+		t.Fatal(err)
+	}
+	sender := &testReportSender{fail: true}
+	if err := s.DeliverQueuedReport(context.Background(), entry.Date, sender, now); err == nil {
+		t.Fatal("timeout was reported as success")
+	}
+	unknown := s.Snapshot().ReportOutbox[entry.Date]
+	if unknown.Status != "unknown" || sender.calls != 1 {
+		t.Fatalf("timeout was not held for reconciliation: %+v", unknown)
+	}
+	if err := s.RequeueFailedReport(entry.Date, unknown.AttemptID, "checked Slack history"); err == nil {
+		t.Fatal("unknown delivery retried blindly")
+	}
+	if err := s.ReconcileUnknownReport(entry.Date, unknown.AttemptID, "failed", "", "checked Slack history: no message", now); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.RequeueFailedReport(entry.Date, "old-attempt", "checked Slack history"); err == nil {
+		t.Fatal("stale retry card accepted")
+	}
+	if err := s.RequeueFailedReport(entry.Date, unknown.AttemptID, "checked Slack history"); err != nil {
+		t.Fatal(err)
+	}
+	sender.fail = false
+	if err := s.DeliverQueuedReport(context.Background(), entry.Date, sender, now); err != nil {
+		t.Fatal(err)
+	}
+	if got := s.Snapshot().ReportOutbox[entry.Date]; got.Status != "sent" || got.ExternalID != "slack-ts-2" || got.AttemptID == unknown.AttemptID || sender.calls != 2 {
+		t.Fatalf("confirmed retry failed: %+v", got)
+	}
+}
 
 func TestDailyPreviewIsJSTIdempotentAndNotSent(t *testing.T) {
 	s := testStore(t)

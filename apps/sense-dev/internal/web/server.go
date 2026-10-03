@@ -204,6 +204,8 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("POST /api/questions/{id}/answer", s.auth(s.answerQuestion, true))
 	mux.HandleFunc("POST /api/approvals/{id}/decide", s.auth(s.decideApproval, true))
 	mux.HandleFunc("POST /api/reports/preview", s.auth(s.previewReport, true))
+	mux.HandleFunc("POST /api/reports/{date}/reconcile", s.auth(s.reconcileReport, true))
+	mux.HandleFunc("POST /api/reports/{date}/retry", s.auth(s.retryReport, true))
 	mux.HandleFunc("POST /api/mac-priority", s.auth(s.macPriority, true))
 	mux.HandleFunc("POST /api/mac-priority/clear", s.auth(s.macPriorityClear, true))
 	mux.HandleFunc("POST /api/stop", s.auth(s.stop, true))
@@ -591,6 +593,31 @@ func (s *Server) previewReport(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	http.Redirect(w, r, "/#reports", http.StatusSeeOther)
+}
+
+func (s *Server) reconcileReport(w http.ResponseWriter, r *http.Request) {
+	if err := r.ParseForm(); err != nil {
+		http.Error(w, "invalid form", http.StatusBadRequest)
+		return
+	}
+	err := s.store.ReconcileUnknownReport(r.PathValue("date"), r.Form.Get("attempt_id"), r.Form.Get("status"), r.Form.Get("external_id"), r.Form.Get("evidence"), time.Now())
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusConflict)
+		return
+	}
+	http.Redirect(w, r, "/#daily-"+r.PathValue("date"), http.StatusSeeOther)
+}
+
+func (s *Server) retryReport(w http.ResponseWriter, r *http.Request) {
+	if err := r.ParseForm(); err != nil {
+		http.Error(w, "invalid form", http.StatusBadRequest)
+		return
+	}
+	if err := s.store.RequeueFailedReport(r.PathValue("date"), r.Form.Get("attempt_id"), r.Form.Get("evidence")); err != nil {
+		http.Error(w, err.Error(), http.StatusConflict)
+		return
+	}
+	http.Redirect(w, r, "/#daily-"+r.PathValue("date"), http.StatusSeeOther)
 }
 
 func (s *Server) macPriority(w http.ResponseWriter, r *http.Request) {
