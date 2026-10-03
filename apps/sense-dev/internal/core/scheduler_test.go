@@ -2,6 +2,7 @@ package core
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"strings"
 	"sync"
@@ -363,5 +364,38 @@ func TestBoundedStructuredOutcomesFailClosed(t *testing.T) {
 	}
 	if pass, err := boundedOutcomePass([]byte(`{"model_output":"{\"verdict\":\"blocked\"}"}`), "implementation"); err != nil || pass {
 		t.Fatalf("blocked implementation ignored: %v", err)
+	}
+}
+
+func TestAttemptPersistsPinnedInputManifestBeforeProviderRuns(t *testing.T) {
+	s := testStore(t)
+	if _, _, err := s.CreatePlannedTask("durable", App, "analysis", "feedback", "v1"); err != nil {
+		t.Fatal(err)
+	}
+	runner := &fakeRunner{}
+	if worked, err := s.Tick(context.Background(), runner, nil); err != nil || !worked {
+		t.Fatalf("tick %v %v", worked, err)
+	}
+	var saved ContextManifest
+	found := false
+	for _, a := range s.Snapshot().Artifacts {
+		if a.Kind != "input-manifest-feedback" {
+			continue
+		}
+		body, err := s.ReadArtifact(a.ID)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err = json.Unmarshal(body, &saved); err != nil {
+			t.Fatal(err)
+		}
+		found = true
+	}
+	if !found || len(runner.seen) != 1 {
+		t.Fatal("durable input or dispatch missing")
+	}
+	sent := runner.seen[0]
+	if saved.InputSHA256 != sent.Attempt.InputHash || saved.AgentID != sent.Attempt.AgentID || saved.Team != App || saved.Generation != sent.Attempt.Generation || saved.TeamProfile != sent.Manifest.TeamProfile {
+		t.Fatal("saved manifest differs from provider input")
 	}
 }

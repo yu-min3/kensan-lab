@@ -78,6 +78,14 @@ func (s *Store) TickBounded(ctx context.Context, runner Runner, scope []string, 
 		_ = s.FailAttempt(a.ID, "interrupted", "input changed since provider session; reconcile before new generation", time.Time{})
 		return true, errors.New("provider session input changed before retry")
 	}
+	manifestBody, err := json.Marshal(m)
+	if err != nil {
+		return true, err
+	}
+	if _, err := s.PutArtifact(a.AgentID, "input-manifest-"+a.Role, manifestBody); err != nil {
+		_ = s.FailAttempt(a.ID, "failed", "input manifest could not be persisted", time.Time{})
+		return true, err
+	}
 	if err := s.SetAttemptInput(a.ID, m.InputSHA256); err != nil {
 		_ = s.FailAttempt(a.ID, "failed", "input manifest could not be saved", time.Time{})
 		return true, err
