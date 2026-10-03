@@ -178,3 +178,54 @@ for (const width of [360, 390, 430]) {
     expect(sizes.page).toBeLessThanOrEqual(sizes.viewport);
   });
 }
+
+test("390px の模擬依頼から判断・停止・日報復帰まで一巡する", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto(`${baseURL}/login`);
+  await page.getByLabel("管理トークン").fill(token);
+  await page.getByRole("button", { name: "開く" }).click();
+  await page.getByLabel("依頼内容").fill("模擬 canary の確認");
+  await page.getByRole("button", { name: "依頼を登録" }).click();
+  await expect(page.getByRole("heading", { name: "模擬 canary の確認" })).toBeVisible();
+
+  const question = page.locator("article").filter({ hasText: "一巡確認の契約質問" });
+  await question.getByLabel("回答").fill("契約版を確認済み");
+  await question.getByRole("button", { name: "回答を送る" }).click();
+  await expect(page.locator("article").filter({ hasText: "一巡確認の契約質問" }).getByText(/回答済み/)).toBeVisible();
+
+  await page.getByRole("heading", { name: "Golden Path 契約の修正" }).getByRole("link").click();
+  await expect(page.getByText("acceptance_failed", { exact: true })).toBeVisible();
+  await expect(page.getByText("acceptance_passed", { exact: true })).toBeVisible();
+  await page.getByText("成果物 1 件を確認").first().click();
+  await expect(page.getByText(/SHA-256 [a-f0-9]{64}/).first()).toBeVisible();
+  await page.getByRole("link", { name: "開発の現在地へ戻る" }).click();
+
+  const approval = page.locator("article").filter({ hasText: "一巡確認 の判断（模擬）" });
+  const action = await approval.locator("form.decision-form").getAttribute("action");
+  const stale = await page.context().request.post(baseURL + action, { form: {
+    csrf: await approval.locator('input[name="csrf"]').inputValue(),
+    action_id: await approval.locator('input[name="action_id"]').inputValue(),
+    operation: await approval.locator('input[name="operation"]').inputValue(),
+    sha: "stale-sha", verdict: "approved",
+  } });
+  expect(stale.status()).toBe(409);
+  await expect(approval.getByRole("button", { name: "承認を記録" })).toBeVisible();
+  await approval.getByRole("button", { name: "承認を記録" }).click();
+  await expect(page.locator("article").filter({ hasText: "一巡確認 の判断（模擬）" }).getByText("approved")).toBeVisible();
+  const returned = page.locator("article").filter({ hasText: "一巡差し戻し の判断（模擬）" });
+  await returned.getByRole("button", { name: "却下" }).click();
+  await expect(page.locator("article").filter({ hasText: "一巡差し戻し の判断（模擬）" }).getByText("denied")).toBeVisible();
+
+  await page.getByRole("button", { name: "Mac 優先を2時間" }).click();
+  await expect(page.getByText(/Mac 優先：/)).toBeVisible();
+  await page.getByRole("button", { name: "Mac 優先を解除" }).click();
+  await page.getByRole("button", { name: "新規実行を停止" }).click();
+  await expect(page.getByText("新規実行を停止中")).toBeVisible();
+  await page.getByRole("button", { name: "新規実行を再開" }).click();
+  const unknownReport = page.locator("#daily-2026-09-27");
+  await expect(unknownReport.getByText("unknown")).toBeVisible();
+  await expect(unknownReport.getByText(/送信結果が不明/)).toBeVisible();
+  await unknownReport.getByRole("link").first().click();
+  await expect(page).toHaveURL(/#task-/);
+  await expect(page.locator(page.url().split("#")[1].replace(/^/, "#"))).toBeVisible();
+});

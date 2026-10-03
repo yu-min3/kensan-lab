@@ -77,6 +77,9 @@ func main() {
 			log.Fatal(err)
 		}
 	}
+	if _, err := store.AskQuestion(appAgent.ID, "一巡確認の契約質問"); err != nil {
+		log.Fatal(err)
+	}
 	sha := strings.Repeat("a", 40)
 	if err := store.SetHeadSHA(platform.ID, sha); err != nil {
 		log.Fatal(err)
@@ -102,12 +105,12 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	for _, width := range []int{360, 390, 430} {
+	for _, label := range []string{"画面幅 360", "画面幅 390", "画面幅 430", "一巡確認", "一巡差し戻し"} {
 		decision, err := store.RecordReleaseDecision(core.ReleaseDecision{
 			AuthorAgentID:     platformAgent.ID,
 			GateAgentID:       gate.ID,
 			Verdict:           "needs_human",
-			Reason:            fmt.Sprintf("画面幅 %d の判断（模擬）", width),
+			Reason:            label + " の判断（模擬）",
 			Operation:         "merge",
 			Repository:        "yu-min3/kensan-lab",
 			Ref:               "refs/heads/fixture/mobile",
@@ -124,5 +127,21 @@ func main() {
 		if _, err := store.RequestApproval(decision.ID); err != nil {
 			log.Fatal(err)
 		}
+	}
+	// A simulated unknown outbox result exercises the UI without sending anything.
+	reportAt := time.Date(2026, 9, 27, 11, 0, 0, 0, time.UTC) // JST 20:00
+	report, created, err := store.QueueDailyReport(reportAt)
+	if err != nil || !created {
+		log.Fatalf("queue fixture report: created=%t err=%v", created, err)
+	}
+	if err := store.ConfigureReportDestination(report.Date, "fixture-inbox"); err != nil {
+		log.Fatal(err)
+	}
+	sending, err := store.BeginReportDelivery(report.Date, reportAt)
+	if err != nil {
+		log.Fatal(err)
+	}
+	if err := store.FinishReportDelivery(report.Date, sending.AttemptID, "unknown", "", reportAt); err != nil {
+		log.Fatal(err)
 	}
 }
