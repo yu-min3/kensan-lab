@@ -7,10 +7,15 @@ claude=${3:?verified Claude binary required}
 codex=${4:?verified Codex binary required}
 claude_sha=${5:?Claude manifest SHA-256 required}
 codex_sha=${6:?Codex binary SHA-256 required}
+codex_package=${7:?verified full Codex package archive required}
+package_sha=${8:?Codex package SHA-256 required}
 [[ $EUID == 0 && $rootfs == /* && $rootfs != / && ! -e $rootfs ]] || exit 1
 for binary in "$worker" "$claude" "$codex"; do
   [[ $binary == /* && -f $binary && ! -L $binary ]] || exit 1
 done
+[[ $codex_package == /* && -f $codex_package && ! -L $codex_package ]] || exit 1
+[[ $package_sha =~ ^[a-f0-9]{64}$ ]] || exit 1
+printf '%s  %s\n' "$package_sha" "$codex_package" | sha256sum -c -
 [[ $claude_sha =~ ^[a-f0-9]{64}$ && $codex_sha =~ ^[a-f0-9]{64}$ ]] || exit 1
 printf '%s  %s\n%s  %s\n' "$claude_sha" "$claude" "$codex_sha" "$codex" | sha256sum -c -
 mkdir -p "$rootfs"/{workspace,agent-auth,proc,dev,tmp,etc/ssl/certs,usr/local/bin,usr/bin,bin}
@@ -39,6 +44,13 @@ for name in worker claude codex; do
   install -m 0755 "$binary" "$rootfs/usr/local/bin/$destination"
   copy_dependencies "$binary"
 done
+# Preserve the official package layout: Codex discovers sibling resources and
+# sandbox helpers relative to its executable. A thin binary is insufficient.
+mkdir -p "$rootfs/opt/codex"
+tar --extract --gzip --file "$codex_package" --directory "$rootfs/opt/codex" --no-same-owner
+printf '%s  %s\n' "$codex_sha" "$rootfs/opt/codex/bin/codex" | sha256sum -c -
+[[ -x $rootfs/opt/codex/codex-resources/bwrap && -x $rootfs/opt/codex/codex-path/rg ]] || exit 1
+ln -sf ../../../opt/codex/bin/codex "$rootfs/usr/local/bin/codex"
 # Git helpers and CA certificates contain no user configuration or auth.
 git_exec=$(git --exec-path)
 cp --parents -r -L "$git_exec" "$rootfs"
