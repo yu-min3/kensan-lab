@@ -28,8 +28,8 @@ func (c Claude) Run(ctx context.Context, req Request) (Result, error) {
 	if c.Binary == "" || c.AuthHome == "" || req.Workdir == "" || req.Prompt == "" || req.OnSession == nil {
 		return Result{}, errors.New("Claude binary, auth home, workdir, prompt and session callback required")
 	}
-	if req.Model != "fable" && req.Model != "opus" {
-		return Result{}, errors.New("Claude model must be the configured Fable or Opus stage")
+	if req.Model != "claude-opus-5-5" && req.Model != "opus" {
+		return Result{}, errors.New("Claude model must be the configured Opus 5.5 requirements or Opus review stage")
 	}
 	if err := c.checkSettings(); err != nil {
 		return Result{}, err

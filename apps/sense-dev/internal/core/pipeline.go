@@ -14,7 +14,7 @@ func defaultStages(kind string) ([]stageSpec, error) {
 	switch kind {
 	case "change":
 		return []stageSpec{
-			{"requirements", "claude", "fable"},
+			{"requirements", "claude", "claude-opus-5-5"},
 			{"design_review", "codex", "gpt-6-astra"},
 			{"implementation", "codex", "gpt-6-sol"},
 			{"verification", "system", "local"},
@@ -23,7 +23,7 @@ func defaultStages(kind string) ([]stageSpec, error) {
 	case "acceptance":
 		return []stageSpec{{"app_acceptance", "claude", "opus"}}, nil
 	case "analysis":
-		return []stageSpec{{"feedback", "claude", "fable"}}, nil
+		return []stageSpec{{"feedback", "claude", "claude-opus-5-5"}}, nil
 	default:
 		return nil, errors.New("unsupported task kind")
 	}

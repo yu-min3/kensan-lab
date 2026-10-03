@@ -21,7 +21,7 @@ func TestPlannedPipelineHasIndependentStages(t *testing.T) {
 		t.Fatalf("stages=%d", len(stages))
 	}
 	wantRoles := []string{"requirements", "design_review", "implementation", "verification", "implementation_review"}
-	wantModels := []string{"fable", "gpt-6-astra", "gpt-6-sol", "local", "opus"}
+	wantModels := []string{"claude-opus-5-5", "gpt-6-astra", "gpt-6-sol", "local", "opus"}
 	for i, a := range stages {
 		if a.Role != wantRoles[i] || a.Model != wantModels[i] || a.TaskID != platform.ID || a.SessionID != "" {
 			t.Fatalf("wrong stage %d: %+v", i, a)

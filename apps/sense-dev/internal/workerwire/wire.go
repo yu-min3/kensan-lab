@@ -54,7 +54,7 @@ func (r Request) Validate() error {
 		return errors.New("invalid worker request envelope")
 	}
 	switch r.Role + ":" + r.Provider + ":" + r.Model {
-	case "requirements:claude:fable", "feedback:claude:fable", "design_review:codex:gpt-6-astra", "release_gate:codex:gpt-6-astra", "implementation:codex:gpt-6-sol", "implementation_review:claude:opus", "app_acceptance:claude:opus":
+	case "requirements:claude:claude-opus-5-5", "feedback:claude:claude-opus-5-5", "design_review:codex:gpt-6-astra", "release_gate:codex:gpt-6-astra", "implementation:codex:gpt-6-sol", "implementation_review:claude:opus", "app_acceptance:claude:opus":
 		return nil
 	default:
 		return errors.New("unapproved provider/model combination")

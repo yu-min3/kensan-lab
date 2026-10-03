@@ -45,29 +45,38 @@ if [ -n "${ANTHROPIC_API_KEY:-}" ]; then exit 8; fi
 case "$*" in *secret-from-prompt*) exit 9;; esac
 read -r line
 case "$line" in *secret-from-prompt*) ;; *) exit 10;; esac
-printf '%s\n' '{"type":"result","subtype":"success","is_error":false,"result":"requirements","session_id":"12345678-1234-4234-8234-123456789abc","modelUsage":{"claude-fable-5":{}}}'
+printf '%s\n' '{"type":"result","subtype":"success","is_error":false,"result":"requirements","session_id":"12345678-1234-4234-8234-123456789abc","modelUsage":{"claude-opus-5-5":{}}}'
 `
 	if err := os.WriteFile(script, []byte(content), 0700); err != nil {
 		t.Fatal(err)
 	}
 	t.Setenv("ANTHROPIC_API_KEY", "test-key-must-not-reach-child")
 	bound := false
-	result, err := (Claude{Binary: script, AuthHome: dir}).Run(context.Background(), Request{Model: "fable", Workdir: dir, Prompt: "secret-from-prompt", ExistingSession: session, OnSession: func(id string) error { bound = id == session; return nil }})
+	result, err := (Claude{Binary: script, AuthHome: dir}).Run(context.Background(), Request{Model: "claude-opus-5-5", Workdir: dir, Prompt: "secret-from-prompt", ExistingSession: session, OnSession: func(id string) error { bound = id == session; return nil }})
 	if err != nil || !bound || result.Text != "requirements" || result.SessionID != session {
 		t.Fatalf("result=%+v bound=%t err=%v", result, bound, err)
 	}
 }
 
 func TestClaudeResultFailsClosedOnReroute(t *testing.T) {
-	_, err := parseClaudeResult([]byte(`{"type":"result","subtype":"success","result":"ok","session_id":"id","modelUsage":{"claude-sonnet-5":{}}}`), "id", "fable")
+	_, err := parseClaudeResult([]byte(`{"type":"result","subtype":"success","result":"ok","session_id":"id","modelUsage":{"claude-sonnet-5":{}}}`), "id", "claude-opus-5-5")
 	if !errors.Is(err, ErrModelChanged) {
 		t.Fatalf("expected model mismatch, got %v", err)
 	}
-	_, err = parseClaudeResult([]byte(`{"type":"result","subtype":"success","result":"ok","session_id":"id"}`), "id", "fable")
+	_, err = parseClaudeResult([]byte(`{"type":"result","subtype":"success","result":"ok","session_id":"id"}`), "id", "claude-opus-5-5")
 	if !errors.Is(err, ErrModelChanged) {
 		t.Fatalf("missing model usage accepted: %v", err)
 	}
 	if !strings.Contains(classifyClaudeFailure(errors.New("exit 1"), "usage limit reached").Error(), "quota") {
 		t.Fatal("quota not classified")
+	}
+}
+
+func TestClaudeRequirementsRejectsOtherOpusVersions(t *testing.T) {
+	for _, model := range []string{"claude-opus-5", "claude-opus-4-8"} {
+		payload := []byte(`{"type":"result","subtype":"success","result":"ok","session_id":"id","modelUsage":{"` + model + `":{}}}`)
+		if _, err := parseClaudeResult(payload, "id", "claude-opus-5-5"); !errors.Is(err, ErrModelChanged) {
+			t.Fatalf("accepted wrong Opus version %s: %v", model, err)
+		}
 	}
 }

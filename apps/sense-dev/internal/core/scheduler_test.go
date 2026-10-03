@@ -38,7 +38,7 @@ func TestSchedulerIndependentTeamsAndDependencies(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	p1, err := s.AddAgent(platform.ID, "requirements", "claude", "fable")
+	p1, err := s.AddAgent(platform.ID, "requirements", "claude", "claude-opus-5-5")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -46,7 +46,7 @@ func TestSchedulerIndependentTeamsAndDependencies(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	appAgent, err := s.AddAgent(app.ID, "app_feedback", "claude", "fable")
+	appAgent, err := s.AddAgent(app.ID, "app_feedback", "claude", "claude-opus-5-5")
 	if err != nil {
 		t.Fatal(err)
 	}
