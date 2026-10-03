@@ -75,6 +75,19 @@ func TestTaskGitPreflightUsesSelfContainedCheckout(t *testing.T) {
 	}
 }
 
+func TestTaskGitPreflightRejectsMissingMetadataBeforeModelStarts(t *testing.T) {
+	path := t.TempDir()
+	if err := checkTaskGit(path); err == nil {
+		t.Fatal("missing task Git metadata passed model preflight")
+	}
+	if err := os.WriteFile(filepath.Join(path, ".git"), []byte("gitdir: /outside\n"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	if err := checkTaskGit(path); err == nil {
+		t.Fatal("external Git metadata passed model preflight")
+	}
+}
+
 func TestVerifierPreflightRejectsVisibleAuthAndWritableCheckout(t *testing.T) {
 	t.Setenv("HOME", "/tmp")
 	root := t.TempDir()
