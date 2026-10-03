@@ -62,6 +62,50 @@ test.afterAll(async () => {
 });
 
 for (const width of [360, 390, 430]) {
+  test(`${width}px の案件詳細は拡大・再接続後も操作できる`, async ({ page }, testInfo) => {
+    await page.setViewportSize({ width, height: 844 });
+    await page.goto(`${baseURL}/login`);
+    await page.emulateMedia({ colorScheme: "dark" });
+    await expect.poll(() => page.locator("html").getAttribute("class")).toContain("dark");
+    await page.emulateMedia({ colorScheme: "light" });
+    await page.getByLabel("管理トークン").fill(token);
+    await page.getByRole("button", { name: "開く" }).click();
+    await page.getByRole("heading", { name: "Golden Path 契約の修正" }).getByRole("link").click();
+    await expect(page.getByRole("heading", { name: "会話と成果物" })).toBeVisible();
+    await expect(page.getByText("acceptance_failed", { exact: true })).toBeVisible();
+    await expect(page.getByText("acceptance_passed", { exact: true })).toBeVisible();
+    const link = page.getByRole("link", { name: "開発の現在地へ戻る" });
+    const linkBox = await link.boundingBox();
+    expect(linkBox?.height).toBeGreaterThanOrEqual(44);
+    for (const button of await page.getByRole("button").all()) {
+      if (!(await button.isVisible())) continue;
+      expect((await button.boundingBox())?.height).toBeGreaterThanOrEqual(44);
+    }
+    await page.emulateMedia({ colorScheme: "dark" });
+    await expect.poll(() => page.locator("html").getAttribute("class")).toContain("dark");
+    const darkBackground = await page.locator("body").evaluate((body) => getComputedStyle(body).backgroundColor);
+    await page.emulateMedia({ colorScheme: "light" });
+    await expect.poll(() => page.locator("html").getAttribute("class")).not.toContain("dark");
+    const lightBackground = await page.locator("body").evaluate((body) => getComputedStyle(body).backgroundColor);
+    expect(darkBackground).not.toBe(lightBackground);
+    await page.evaluate(() => { document.body.style.fontSize = "32px"; });
+    const enlarged = await page.evaluate(() => ({ page: document.documentElement.scrollWidth, viewport: window.innerWidth }));
+    const overflow = await page.evaluate(() => [...document.querySelectorAll('body *')]
+      .filter((element) => element.getBoundingClientRect().right > window.innerWidth + 1)
+      .slice(0, 8).map((element) => ({ tag: element.tagName, className: element.className, text: element.textContent?.trim().slice(0, 40) })));
+    expect(enlarged.page, JSON.stringify(overflow)).toBeLessThanOrEqual(enlarged.viewport);
+    await page.screenshot({ path: testInfo.outputPath("detail-200-percent.png"), fullPage: true });
+    await page.evaluate(() => { document.body.style.fontSize = ""; });
+    await page.context().setOffline(true);
+    await page.reload().catch(() => {});
+    await page.context().setOffline(false);
+    await page.reload();
+    await expect(page.getByRole("heading", { name: "会話と成果物" })).toBeVisible();
+    await link.focus();
+    const outline = await link.evaluate((element) => getComputedStyle(element).outlineStyle);
+    expect(outline).not.toBe("none");
+  });
+
   test(`${width}px で依頼・停止・日報プレビューが横にはみ出さない`, async ({ page }, testInfo) => {
     await page.setViewportSize({ width, height: 844 });
     await page.goto(`${baseURL}/login`);
