@@ -57,7 +57,7 @@ func (c Codex) Run(ctx context.Context, req Request) (Result, error) {
 	if c.MaxUsage <= 0 || c.MaxUsage > 100 {
 		return Result{}, errors.New("Codex quota threshold required")
 	}
-	cmd := exec.CommandContext(ctx, c.Binary, "app-server")
+	cmd := exec.CommandContext(ctx, c.Binary, "--disable", "shell_snapshot", "app-server")
 	cmd.Dir = req.Workdir
 	// No API key can reach the child. CODEX_HOME must be a dedicated directory
 	// authenticated by the user with the official ChatGPT flow.
