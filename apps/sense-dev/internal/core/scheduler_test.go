@@ -351,3 +351,17 @@ func TestBoundedRunStopsOnHumanVerdict(t *testing.T) {
 		t.Fatal("extra claim after human verdict")
 	}
 }
+
+func TestBoundedStructuredOutcomesFailClosed(t *testing.T) {
+	for _, body := range []string{`{"verdict":"blocked"}`, "{\"verdict\":\n\"fail\"}", `{"verdict":"needs_human"}`, `{"verdict":"deny"}`, `{broken`, `{"verdict":"unknown"}`, `{}`} {
+		if pass, err := boundedOutcomePass([]byte(body), "design_review"); pass {
+			t.Fatalf("unsafe verdict accepted %s %v", body, err)
+		}
+	}
+	if pass, err := boundedOutcomePass([]byte("{\"verdict\":\n\"pass\"}"), "design_review"); err != nil || !pass {
+		t.Fatalf("valid whitespace rejected: %v", err)
+	}
+	if pass, err := boundedOutcomePass([]byte(`{"model_output":"{\"verdict\":\"blocked\"}"}`), "implementation"); err != nil || pass {
+		t.Fatalf("blocked implementation ignored: %v", err)
+	}
+}
