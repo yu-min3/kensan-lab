@@ -83,8 +83,15 @@ func (s *Store) releaseReady(authorID string, sourceRefs []ArtifactRef) (release
 			return releaseProof{}, errors.New("completed release stage lacks a pinned result")
 		}
 	}
-	reviewManifest, err := s.BuildManifest(roles["implementation_review"].ID, []string{"isolated-model-worker"})
-	if err != nil || roles["implementation_review"].InputHash != reviewManifest.InputSHA256 || resultAttempt["implementation_review"].InputHash != reviewManifest.InputSHA256 {
+	manifestMatches := false
+	for _, scope := range [][]string{{"isolated-model-worker"}, {"isolated-model-worker", "bounded-integration"}} {
+		reviewManifest, err := s.BuildManifest(roles["implementation_review"].ID, scope)
+		if err == nil && roles["implementation_review"].InputHash == reviewManifest.InputSHA256 && resultAttempt["implementation_review"].InputHash == reviewManifest.InputSHA256 {
+			manifestMatches = true
+			break
+		}
+	}
+	if !manifestMatches {
 		return releaseProof{}, errors.New("Opus did not review the current fixed input manifest")
 	}
 	implementation := result["implementation"]

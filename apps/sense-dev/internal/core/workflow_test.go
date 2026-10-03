@@ -494,3 +494,36 @@ func TestMockReleaseCannotAuthorizePublish(t *testing.T) {
 		t.Fatal("simulation authorized release")
 	}
 }
+
+func TestReviewedHandoffAcceptsPinnedBoundedManifestOnly(t *testing.T) {
+	for _, scope := range [][]string{{"isolated-model-worker", "bounded-integration"}, {"isolated-model-worker", "unapproved-scope"}} {
+		t.Run(scope[1], func(t *testing.T) {
+			s := testStore(t)
+			task, stages, err := s.CreatePlannedTask("bounded", Platform, "change", "canary", "v1")
+			if err != nil {
+				t.Fatal(err)
+			}
+			if err = s.SetBaseSHA(task.ID, strings.Repeat("b", 40)); err != nil {
+				t.Fatal(err)
+			}
+			if _, _, err = s.CreateLinkedAcceptanceTask(task.ID, "consumer"); err != nil {
+				t.Fatal(err)
+			}
+			for range stages {
+				if worked, err := s.Tick(context.Background(), releaseReadyRunner{base: strings.Repeat("b", 40), head: strings.Repeat("a", 40)}, scope); err != nil || !worked {
+					t.Fatalf("stage %v %v", worked, err)
+				}
+			}
+			want := 0
+			if scope[1] == "bounded-integration" {
+				want = 1
+			}
+			if n, err := s.ReconcileReviewedHandoffs(); err != nil || n != want {
+				t.Fatalf("handoff %d wanted%d: %v", n, want, err)
+			}
+			if n, err := s.ReconcileReviewedHandoffs(); err != nil || n != 0 {
+				t.Fatalf("duplicate handoff %d %v", n, err)
+			}
+		})
+	}
+}
