@@ -260,6 +260,7 @@ func (s *Store) PreparePublish(decisionID, operation, repository, ref, sha strin
 	var proof releaseProof
 	var gateManifest ContextManifest
 	var gateOutputRef ArtifactRef
+	var pullRequestSummary string
 	if d.Verdict == "allow" {
 		scan, err := s.checkReleaseScan(d.ScanRef, d)
 		if err != nil || st.Tasks[st.Agents[d.AuthorAgentID].TaskID].BaseSHA != scan.BaseSHA {
@@ -269,6 +270,7 @@ func (s *Store) PreparePublish(decisionID, operation, repository, ref, sha strin
 		if err != nil || candidate.Operation != d.Operation || candidate.Repository != d.Repository || candidate.Ref != d.Ref || candidate.HeadSHA != d.HeadSHA || candidate.TargetEnvironment != d.TargetEnvironment {
 			return PublishIntent{}, errors.New("release candidate no longer matches decision")
 		}
+		pullRequestSummary = candidate.PullRequestSummary
 		proof, err = s.releaseReady(d.AuthorAgentID, d.ArtifactRefs)
 		if err != nil {
 			return PublishIntent{}, err
@@ -310,7 +312,7 @@ func (s *Store) PreparePublish(decisionID, operation, repository, ref, sha strin
 				return nil
 			}
 		}
-		intent = PublishIntent{ID: id, DecisionID: decisionID, Operation: operation, Repository: repository, Ref: ref, HeadSHA: sha, Status: "pending_reconcile", CreatedAt: time.Now().UTC()}
+		intent = PublishIntent{ID: id, DecisionID: decisionID, Operation: operation, Repository: repository, Ref: ref, HeadSHA: sha, PullRequestSummary: pullRequestSummary, Status: "pending_reconcile", CreatedAt: time.Now().UTC()}
 		st.Intents[id] = intent
 		st.Events = append(st.Events, event("publish_intent", id, operation))
 		return nil

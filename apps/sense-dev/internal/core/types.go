@@ -205,14 +205,17 @@ type ReleaseScan struct {
 }
 
 type PublishIntent struct {
-	ID         string    `json:"id"`
-	DecisionID string    `json:"decision_id"`
-	Operation  string    `json:"operation"`
-	Repository string    `json:"repository"`
-	Ref        string    `json:"ref"`
-	HeadSHA    string    `json:"head_sha"`
-	Status     string    `json:"status"`
-	CreatedAt  time.Time `json:"created_at"`
+	ID                 string    `json:"id"`
+	DecisionID         string    `json:"decision_id"`
+	Operation          string    `json:"operation"`
+	Repository         string    `json:"repository"`
+	Ref                string    `json:"ref"`
+	HeadSHA            string    `json:"head_sha"`
+	Status             string    `json:"status"`
+	ExternalID         string    `json:"external_id,omitempty"`
+	PullRequestSummary string    `json:"pull_request_summary,omitempty"`
+	UpdatedAt          time.Time `json:"updated_at,omitempty"`
+	CreatedAt          time.Time `json:"created_at"`
 }
 
 type Question struct {

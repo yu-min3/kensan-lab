@@ -52,7 +52,7 @@ sense-dev -listen 127.0.0.1:8787 -data /var/lib/kensan-dev -admin-token-file /va
 ## 未完了と再開点
 
 1. 専用 rootfs と canary に対応する固定検証計画を用意し、sense で bubblewrap/user namespace の fail-closed preflight、state/token不可視、credentialless verifier のネットワーク/認証遮断、実プロセス kill と再起動照合を通す。auth待機と中断照合・再開、実検証器の運転証拠は未完了。現 service unit は fake runner 専用。Claude の書込系 tool は隔離 worker が完成するまで解放しない。
-2. Release Gate の CI/PR本文/添付/公開経路/配備影響/可視性を実状態に照らし、限定 publisher と外部操作の reconcile を実装する。構造化判定との一致はローカル試験のみで、実モデル判定の品質証拠はない。現時点の Git scan は一次スクリーニング、`PublishIntent` は dry-run 台帳だけで、GitHub へは送らない。
+2. Release Gate の CI/PR本文/添付/公開経路/配備影響/可視性を実状態に照らす。限定 publisher の branch push / draft PR と remote reconcile は [publisher.md](docs/publisher.md) に実装済みだが、実モデル Gate と実 GitHub 操作は未実証。現行 mock-only service は送信しない。
 3. 管理画面に案件詳細を追加し、360/390/430 px と実機幅、切断復旧を検証する。App 差し戻し→Platform 修正→新 SHA の再試験は controller/作業ツリーのローカル試験までで、実モデル・sense 実機・既存 app の同一シナリオは未検証。質問/回答・SHA-bound 承認・日報 preview は HTTP テストまでで、実スマホ未検証。日報の宛先/送信 adapter と送信不明の実照合は未実装。timer/outbox はローカル試験のみ。
 4. sense への SSH は復旧し、CPU/RAM/ディスクと単一ノード k3s 等を read-only 棚卸し済み。ただし別作業で k3s が停止・libvirt が導入されたため、この作業からの host 変更は調整待ち。bootstrap code/manifest と導入後 listener smoke は独立レビュー済みだが、実機導入・IPv4/IPv6/Cloudflare dashboard 等の公開経路・host reboot は未検証で `private-ready` 未達。詳細は `docs/private-ready-audit.md`。
 5. 本人の初回認証と subscription 費用経路を確認後、実モデルの4工程と独立検証を接続する。Cloudflare は公開承認まで inactive。

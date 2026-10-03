@@ -344,6 +344,14 @@ func TestSessionOwnerAndReleaseGate(t *testing.T) {
 	if err != nil || first.ID != second.ID {
 		t.Fatal("publish intent is not idempotent")
 	}
+	publisher := &fakePublishTransport{}
+	published, err := s.RunPublish(context.Background(), d.ID, publisher)
+	if err != nil || published.Status != "sent" || published.ExternalID != "external-pr-1" || publisher.executions != 1 {
+		t.Fatalf("approved publisher did not execute once: %+v %v", published, err)
+	}
+	if _, err := s.RunPublish(context.Background(), d.ID, publisher); err != nil || publisher.executions != 1 {
+		t.Fatal("completed publish was executed twice")
+	}
 	if err := s.update(func(st *State) error {
 		current := st.Agents[gate.ID]
 		current.Status = "failed"
@@ -388,6 +396,17 @@ func TestSessionOwnerAndReleaseGate(t *testing.T) {
 	if _, err := s.PreparePublish(d.ID, d.Operation, d.Repository, d.Ref, d.HeadSHA); err == nil {
 		t.Fatal("old decision authorized changed head")
 	}
+}
+
+type fakePublishTransport struct{ executions int }
+
+func (*fakePublishTransport) Inspect(context.Context, PublishIntent) (string, bool, error) {
+	return "", false, nil
+}
+
+func (f *fakePublishTransport) Execute(context.Context, PublishIntent) (string, error) {
+	f.executions++
+	return "external-pr-1", nil
 }
 
 func TestReleaseGateRejectsIncompleteOrNegativeQualityEvidence(t *testing.T) {
