@@ -16,6 +16,7 @@ profile sense_codex_fixture /opt/kensan-dev/sandbox-fixture/bwrap flags=(attach_
   allow pivot_root,
   allow dbus,
   allow ix /opt/codex/bin/codex,
+  allow px /opt/codex/bin/codex-code-mode-host -> sense_codex_fixture//&sense_fixture_code_mode,
   allow ix /usr/local/bin/sense-dev-worker,
   allow px /opt/codex/codex-resources/bwrap -> sense_codex_fixture//&sense_fixture_nested,
   allow px /usr/bin/** -> sense_codex_fixture//&sense_fixture_tool,
@@ -51,4 +52,23 @@ profile sense_fixture_tool flags=(attach_disconnected) {
   audit deny capability,
   audit deny userns,
   allow pix /** -> &sense_fixture_tool,
+}
+
+# Local code-mode IPC uses stdio pipes; it needs no network permission.
+profile sense_fixture_code_mode flags=(attach_disconnected) {
+  allow file rwlkm /{**,},
+  audit deny /agent-auth{,/**} rwlkm,
+  audit deny /var/lib/kensan-dev{,/**} rwlkm,
+  audit deny network inet,
+  audit deny network inet6,
+  audit deny network netlink,
+  audit deny network packet,
+  # Tokio signal delivery needs an unnamed socketpair, not external IPC.
+  allow unix (create,shutdown,getopt,setopt) type=stream,
+  allow unix (send,receive) type=stream peer=(label="sense_codex_fixture//&sense_fixture_code_mode"),
+  audit deny capability,
+  audit deny userns,
+  allow signal,
+  allow io_uring,
+  allow pix /** -> &sense_fixture_code_mode,
 }

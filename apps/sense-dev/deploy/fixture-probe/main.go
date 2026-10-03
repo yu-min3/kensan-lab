@@ -30,6 +30,25 @@ func main() {
 			conn.Close()
 		}
 	}
+	conn, unixErr := net.DialTimeout("unix", "@sense-fixture-sentinel", time.Second)
+	checks["no_external_unix"] = unixErr != nil
+	if conn != nil {
+		conn.Close()
+	}
+	status, statusErr := os.ReadFile("/proc/self/status")
+	checks["status_readable"] = statusErr == nil
+	for _, line := range strings.Split(string(status), "\n") {
+		parts := strings.Fields(line)
+		if len(parts) != 2 {
+			continue
+		}
+		switch parts[0] {
+		case "CapEff:", "CapPrm:", "CapBnd:":
+			checks[parts[0]] = parts[1] == "0000000000000000"
+		case "NoNewPrivs:":
+			checks[parts[0]] = parts[1] == "1"
+		}
+	}
 	for _, name := range []string{"ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN", "OPENAI_API_KEY", "KENSAN_ADMIN_TOKEN"} {
 		_, exists := os.LookupEnv(name)
 		checks["no_env:"+name] = !exists
