@@ -150,6 +150,41 @@ func TestReadOnlyWorktreeMount(t *testing.T) {
 	t.Fatal("worktree mount missing")
 }
 
+func TestWritableSourceKeepsGitAndConfigurationReadOnly(t *testing.T) {
+	c := testConfig(t)
+	for _, name := range []string{".git", ".agents", ".codex", ".aws"} {
+		if err := os.Mkdir(filepath.Join(c.Worktree, name), 0700); err != nil {
+			t.Fatal(err)
+		}
+	}
+	cmd, err := c.Command(context.Background(), "/usr/bin/worker")
+	if err != nil {
+		t.Fatal(err)
+	}
+	root, err := filepath.EvalSymlinks(c.Worktree)
+	if err != nil {
+		t.Fatal(err)
+	}
+	args := strings.Join(cmd.Args, " ")
+	if !strings.Contains(args, "--bind "+root+" /workspace") {
+		t.Fatal("source mount is missing")
+	}
+	for _, name := range []string{".git", ".agents", ".codex", ".aws"} {
+		if !strings.Contains(args, "--ro-bind "+filepath.Join(root, name)+" /workspace/"+name) {
+			t.Fatalf("model can change protected metadata: %s", name)
+		}
+	}
+	if err := os.Remove(filepath.Join(c.Worktree, ".git")); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(c.ControllerState, filepath.Join(c.Worktree, ".git")); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := c.Command(context.Background(), "/usr/bin/worker"); err == nil {
+		t.Fatal("metadata link to controller state accepted")
+	}
+}
+
 func TestVerifierCommandHasNoNetworkOrAuthAndReadOnlyCheckout(t *testing.T) {
 	c := testConfig(t)
 	cmd, err := c.VerifierCommand(context.Background(), ".", "/usr/bin/worker", "test")

@@ -91,9 +91,23 @@ func (c Config) Command(ctx context.Context, program string, args ...string) (*e
 		"--ro-bind", resolved[0], "/",
 		"--proc", "/proc", "--dev", "/dev", "--tmpfs", "/tmp",
 		worktreeMount, resolved[1], "/workspace",
-		"--bind", resolved[2], "/agent-auth",
-		"--chdir", "/workspace", "--", program,
 	}
+	// The provider may edit source, but only the supervisor may change Git
+	// metadata. Protect configuration directories before any CLI or tool runs.
+	if !c.ReadOnlyWorktree {
+		for _, name := range []string{".git", ".agents", ".codex", ".aws"} {
+			path := filepath.Join(resolved[1], name)
+			info, err := os.Lstat(path)
+			if errors.Is(err, os.ErrNotExist) {
+				continue
+			}
+			if err != nil || !info.IsDir() || info.Mode()&os.ModeSymlink != 0 {
+				return nil, errors.New("protected worker metadata must be a real directory")
+			}
+			argv = append(argv, "--ro-bind", path, "/workspace/"+name)
+		}
+	}
+	argv = append(argv, "--bind", resolved[2], "/agent-auth", "--chdir", "/workspace", "--", program)
 	argv = append(argv, args...)
 	cmd := exec.CommandContext(ctx, resolvedBwrap, argv...)
 	cmd.Env = []string{"PATH=/usr/bin:/bin"}
@@ -120,6 +134,7 @@ func (c Config) VerifierCommand(ctx context.Context, cwd, program string, args .
 	argv := []string{
 		"--unshare-all", "--die-with-parent", "--new-session", "--clearenv",
 		"--setenv", "HOME", "/tmp",
+		"--setenv", "PYTHONDONTWRITEBYTECODE", "1",
 		"--setenv", "PATH", "/usr/local/bin:/usr/bin:/bin",
 		"--setenv", "GOCACHE", "/tmp/go-cache",
 		"--setenv", "GOMODCACHE", "/tmp/go-mod",

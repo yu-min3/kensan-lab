@@ -396,7 +396,7 @@ func (s *Store) ManifestPrompt(m ContextManifest) (string, error) {
 	fmt.Fprintf(&b, "Mission %s; task %s; team %s; role %s; contract %s; input manifest SHA-256 %s.\n", m.MissionID, m.TaskID, m.Team, m.Role, m.ContractVersion, m.InputSHA256)
 	fmt.Fprintf(&b, "Task: %s (%s). Base SHA: %s. Head SHA: %s. Allowed scope: %s.\n", t.Title, t.Kind, m.BaseSHA, m.HeadSHA, strings.Join(m.AllowedScope, ", "))
 	if m.Role == "implementation" {
-		b.WriteString("Implement only this task in the local task checkout. Run relevant tests and commit all intended changes locally before ending the turn. Do not add a remote, push, publish, or change deployment state. Report the tests and the local commit SHA.\n")
+		b.WriteString("Edit source only for this task in the local task checkout. Git metadata and configuration directories are read-only. Do not commit or run tests with provider credentials: the supervisor will capture and commit the candidate, then the credentialless verifier will run tests. Do not add a remote, push, publish, or change deployment state. Report changed files and blockers.\n")
 		if m.Generation > 1 {
 			b.WriteString("This is a correction generation. Address the received App acceptance failure on the same task branch; preserve the approved contract unless Yu decides otherwise.\n")
 		}

@@ -39,7 +39,9 @@ func run() error {
 	mockWorker := flag.Bool("mock-worker", false, "run simulation-only worker; never invokes models or publishes")
 	isolatedWorker := flag.Bool("isolated-worker", false, "opt in to sandboxed subscription model turns; requires host preflight")
 	bubblewrap := flag.String("bwrap", "", "absolute bubblewrap binary path")
+	codexBubblewrap := flag.String("codex-bwrap", "", "optional separately confined Codex bubblewrap launcher")
 	runtimeRoot := flag.String("worker-rootfs", "", "dedicated non-secret Linux worker rootfs")
+	verifierRoot := flag.String("verifier-rootfs", "", "separate credentialless test rootfs")
 	workerProgram := flag.String("worker-program", "/usr/local/bin/sense-dev-worker", "worker binary path inside rootfs")
 	worktreeRoot := flag.String("worker-worktree-root", "", "private root for task-scoped Git worktrees")
 	sourceRepo := flag.String("source-repo", "", "local trusted Git repository used to create task worktrees")
@@ -97,7 +99,7 @@ func run() error {
 		if err := rejectSimulationHistory(store.Snapshot()); err != nil {
 			return err
 		}
-		if *bubblewrap == "" || *runtimeRoot == "" || *worktreeRoot == "" || *sourceRepo == "" || *claudeAuth == "" || *codexAuth == "" || *verificationPlan == "" || *turnTimeout <= 0 {
+		if *bubblewrap == "" || *runtimeRoot == "" || *verifierRoot == "" || *worktreeRoot == "" || *sourceRepo == "" || *claudeAuth == "" || *codexAuth == "" || *verificationPlan == "" || *turnTimeout <= 0 {
 			return errors.New("isolated worker paths and positive timeout are required")
 		}
 		window, err := parseRunWindow(*inferenceWindow)
@@ -120,6 +122,9 @@ func run() error {
 		base := isolation.Config{Bubblewrap: *bubblewrap, RuntimeRoot: *runtimeRoot, Worktree: *worktreeRoot, ControllerState: *data}
 		claudeConfig, codexConfig := base, base
 		claudeConfig.AuthHome, codexConfig.AuthHome = *claudeAuth, *codexAuth
+		if *codexBubblewrap != "" {
+			codexConfig.Bubblewrap = *codexBubblewrap
+		}
 		isolated := workerclient.Runner{Claude: claudeConfig, Codex: codexConfig, WorkerProgram: *workerProgram, Timeout: *turnTimeout, Worktrees: worktrees}
 		if err := isolated.Preflight(context.Background()); err != nil {
 			return fmt.Errorf("isolated worker disabled: %w", err)
@@ -128,7 +133,9 @@ func run() error {
 		if err != nil {
 			return fmt.Errorf("verification plan rejected: %w", err)
 		}
-		checks := verifier.Runner{Sandbox: claudeConfig, Worktrees: worktrees, WorkerProgram: *workerProgram, Plan: plan}
+		verifierConfig := claudeConfig
+		verifierConfig.RuntimeRoot = *verifierRoot
+		checks := verifier.Runner{Sandbox: verifierConfig, Worktrees: worktrees, WorkerProgram: *workerProgram, Plan: plan}
 		if err := checks.Preflight(context.Background()); err != nil {
 			return fmt.Errorf("credentialless verifier disabled: %w", err)
 		}

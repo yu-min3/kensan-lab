@@ -35,6 +35,9 @@ func (r Runner) Preflight(ctx context.Context) error {
 	if r.WorkerProgram == "" || r.Timeout <= 0 {
 		return errors.New("isolated worker configuration incomplete")
 	}
+	if err := worktree.PrepareSandboxMetadata(r.Codex.Worktree); err != nil {
+		return fmt.Errorf("Codex sandbox mount targets unavailable: %w", err)
+	}
 	claudeReadOnly, codexReadOnly := r.Claude, r.Codex
 	claudeReadOnly.ReadOnlyWorktree, codexReadOnly.ReadOnlyWorktree = true, true
 	codexWritable := r.Codex
@@ -101,6 +104,11 @@ func (r Runner) Run(ctx context.Context, dispatch core.Dispatch) (core.RunResult
 	}
 	config.ReadOnlyWorktree = request.Model != "gpt-6-sol"
 	config.Worktree = taskWorktree
+	if !config.ReadOnlyWorktree {
+		if err := worktree.PrepareSandboxMetadata(taskWorktree); err != nil {
+			return core.RunResult{}, err
+		}
+	}
 	if err := r.preflightTask(ctx, config, request.Provider); err != nil {
 		return core.RunResult{}, err
 	}
@@ -124,12 +132,12 @@ func (r Runner) Run(ctx context.Context, dispatch core.Dispatch) (core.RunResult
 		if _, _, err := r.Worktrees.Ensure(ctx, dispatch.Attempt.TaskID, dispatch.Attempt.BaseSHA); err != nil {
 			return core.RunResult{}, errors.New("task checkout changed identity after implementation")
 		}
-		change, err := worktree.Capture(ctx, taskWorktree, dispatch.Attempt.BaseSHA)
+		change, err := worktree.CommitImplementation(ctx, taskWorktree, dispatch.Attempt.BaseSHA)
 		if err != nil {
 			return core.RunResult{}, fmt.Errorf("implementation change could not be captured: %w", err)
 		}
 		if !change.Clean || change.HeadSHA == change.BaseSHA {
-			return core.RunResult{}, errors.New("implementation must commit all intended changes locally before review")
+			return core.RunResult{}, errors.New("supervisor could not fix a clean implementation candidate before review")
 		}
 		body, err := json.Marshal(struct {
 			SchemaVersion int               `json:"schema_version"`
