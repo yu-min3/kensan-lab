@@ -42,9 +42,9 @@ type Codex struct {
 func codexSandbox(model, workdir string) (string, map[string]any, error) {
 	switch model {
 	case "gpt-6-astra":
-		return "readOnly", map[string]any{"type": "readOnly", "access": map[string]string{"type": "fullAccess"}}, nil
+		return "read-only", map[string]any{"type": "readOnly", "access": map[string]string{"type": "fullAccess"}}, nil
 	case "gpt-6-sol":
-		return "workspaceWrite", map[string]any{"type": "workspaceWrite", "writableRoots": []string{workdir}, "networkAccess": false}, nil
+		return "workspace-write", map[string]any{"type": "workspaceWrite", "writableRoots": []string{workdir}, "networkAccess": false}, nil
 	default:
 		return "", nil, errors.New("unapproved Codex model for this pipeline")
 	}

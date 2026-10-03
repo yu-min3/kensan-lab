@@ -31,7 +31,7 @@ func fakeAppServer(t *testing.T, conn net.Conn, accountType string, usedPercent 
 			var params struct {
 				Sandbox string `json:"sandbox"`
 			}
-			if json.Unmarshal(request.Params, &params) != nil || params.Sandbox != wantSandbox {
+			if json.Unmarshal(request.Params, &params) != nil || params.Sandbox != map[string]string{"readOnly": "read-only", "workspaceWrite": "workspace-write"}[wantSandbox] {
 				t.Errorf("wrong thread sandbox: %+v", params)
 				return
 			}
