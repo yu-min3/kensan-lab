@@ -142,7 +142,7 @@ func (g GitHub) Inspect(ctx context.Context, i core.PublishIntent) (string, bool
 			SHA string `json:"sha"`
 		} `json:"head"`
 	}
-	_, err = g.request(ctx, http.MethodGet, "/repos/"+repository+"/pulls?state=open&head=yu-min3:"+url.QueryEscape(branch), nil, &pulls)
+	_, err = g.request(ctx, http.MethodGet, "/repos/"+repository+"/pulls?state=all&head=yu-min3:"+url.QueryEscape(branch), nil, &pulls)
 	if err != nil {
 		return "", false, err
 	}

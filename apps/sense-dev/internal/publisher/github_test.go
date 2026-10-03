@@ -24,6 +24,9 @@ func TestGitHubPRRequiresExactRemoteSHAAndCreatesDraft(t *testing.T) {
 		case strings.HasPrefix(r.URL.Path, "/repos/yu-min3/kensan-lab/git/ref/heads/"):
 			_, _ = w.Write([]byte(`{"object":{"sha":"` + remoteSHA + `"}}`))
 		case r.URL.Path == "/repos/yu-min3/kensan-lab/pulls" && r.Method == http.MethodGet:
+			if r.URL.Query().Get("state") != "all" {
+				t.Error("closed PR was omitted from reconciliation")
+			}
 			_, _ = w.Write([]byte(`[]`))
 		case r.URL.Path == "/repos/yu-min3/kensan-lab/pulls" && r.Method == http.MethodPost:
 			created++
