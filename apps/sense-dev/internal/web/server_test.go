@@ -1,6 +1,7 @@
 package web
 
 import (
+	"fmt"
 	"io"
 	"net/http"
 	"net/http/cookiejar"
@@ -64,6 +65,92 @@ func TestLinkedAppWaitReason(t *testing.T) {
 	state.Tasks["app"] = app
 	if got := agentWaitReason(state, agent, "mock", true, time.Now()); got != "受入証拠の確認待ち" {
 		t.Fatalf("corrupt acceptance wait: %s", got)
+	}
+}
+
+func TestResumeAgentFromTaskDetailRejectsStaleCard(t *testing.T) {
+	dir := t.TempDir()
+	store, err := core.Open(filepath.Join(dir, "state"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer store.Close()
+	task, _, err := store.CreatePlannedTask("m1", core.Platform, "change", "復旧案件", "v1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	attempt, _, err := store.ClaimNext(time.Now())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := store.FailAttempt(attempt.ID, "auth_required", "login needed", time.Time{}); err != nil {
+		t.Fatal(err)
+	}
+	tokenFile := filepath.Join(dir, "token")
+	cssFile := filepath.Join(dir, "tokens.css")
+	if err := os.WriteFile(tokenFile, []byte(strings.Repeat("t", 64)), 0600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(cssFile, []byte(":root{}"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	s, err := New(store, tokenFile, cssFile, "off", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	server := httptest.NewServer(s.Handler())
+	defer server.Close()
+	jar, _ := cookiejar.New(nil)
+	client := &http.Client{Jar: jar}
+	resp, err := client.PostForm(server.URL+"/login", url.Values{"token": {strings.Repeat("t", 64)}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	resp.Body.Close()
+	resp, err = client.Get(server.URL + "/tasks/" + task.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	page, _ := io.ReadAll(resp.Body)
+	resp.Body.Close()
+	if !strings.Contains(string(page), "この Agent を再開") || !strings.Contains(string(page), "auth_required") {
+		t.Fatal("resume action missing from task detail")
+	}
+	csrf := regexp.MustCompile(`name="csrf" value="([a-f0-9]+)"`).FindSubmatch(page)
+	if len(csrf) != 2 {
+		t.Fatal("CSRF missing")
+	}
+	agent := store.Snapshot().Agents[attempt.AgentID]
+	form := url.Values{"csrf": {string(csrf[1])}, "status": {"auth_required"}, "generation": {"0"}, "reason": {"本人が再認証を確認"}}
+	form.Set("generation", fmt.Sprint(agent.SessionGeneration))
+	resp, err = client.PostForm(server.URL+"/api/agents/"+agent.ID+"/resume", form)
+	if err != nil {
+		t.Fatal(err)
+	}
+	resp.Body.Close()
+	resumed := store.Snapshot().Agents[agent.ID]
+	if resumed.Status != "ready" || resumed.SessionGeneration != agent.SessionGeneration+1 {
+		t.Fatalf("resume state: %s generation %d", resumed.Status, resumed.SessionGeneration)
+	}
+	seenReason := false
+	for _, event := range store.Snapshot().Events {
+		if event.Type == "agent_resumed" && event.Subject == agent.ID && event.Detail == form.Get("reason") {
+			seenReason = true
+		}
+	}
+	if !seenReason {
+		t.Fatal("resume reason missing from event")
+	}
+	resp, err = client.PostForm(server.URL+"/api/agents/"+agent.ID+"/resume", form)
+	if err != nil {
+		t.Fatal(err)
+	}
+	resp.Body.Close()
+	if resp.StatusCode != http.StatusConflict {
+		t.Fatalf("stale card: %d", resp.StatusCode)
+	}
+	if store.Snapshot().Agents[agent.ID].SessionGeneration != resumed.SessionGeneration {
+		t.Fatal("stale card resumed twice")
 	}
 }
 

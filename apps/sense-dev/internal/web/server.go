@@ -13,6 +13,7 @@ import (
 	"net/http"
 	"os"
 	"sort"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -199,6 +200,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /static/app.js", s.staticJS)
 	mux.HandleFunc("GET /api/state", s.auth(s.state, false))
 	mux.HandleFunc("POST /api/tasks", s.auth(s.createTask, true))
+	mux.HandleFunc("POST /api/agents/{id}/resume", s.auth(s.resumeAgent, true))
 	mux.HandleFunc("POST /api/questions/{id}/answer", s.auth(s.answerQuestion, true))
 	mux.HandleFunc("POST /api/approvals/{id}/decide", s.auth(s.decideApproval, true))
 	mux.HandleFunc("POST /api/reports/preview", s.auth(s.previewReport, true))
@@ -532,6 +534,29 @@ func (s *Server) createTask(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	http.Redirect(w, r, "/", http.StatusSeeOther)
+}
+
+func (s *Server) resumeAgent(w http.ResponseWriter, r *http.Request) {
+	if err := r.ParseForm(); err != nil {
+		http.Error(w, "invalid form", http.StatusBadRequest)
+		return
+	}
+	reason := strings.TrimSpace(r.Form.Get("reason"))
+	if reason == "" || len(reason) > 300 {
+		http.Error(w, "resume reason must be 1-300 bytes", http.StatusBadRequest)
+		return
+	}
+	agent, ok := s.store.Snapshot().Agents[r.PathValue("id")]
+	if !ok || (agent.Status != "auth_required" && agent.Status != "interrupted") ||
+		r.Form.Get("status") != agent.Status || r.Form.Get("generation") != strconv.Itoa(agent.SessionGeneration) {
+		http.Error(w, "agent resume card is stale", http.StatusConflict)
+		return
+	}
+	if err := s.store.ResumeAgent(agent.ID, reason); err != nil {
+		http.Error(w, "agent resume failed", http.StatusConflict)
+		return
+	}
+	http.Redirect(w, r, "/tasks/"+agent.TaskID, http.StatusSeeOther)
 }
 
 func (s *Server) answerQuestion(w http.ResponseWriter, r *http.Request) {
