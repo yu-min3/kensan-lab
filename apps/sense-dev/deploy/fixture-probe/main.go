@@ -3,15 +3,29 @@ package main
 
 import (
 	"encoding/json"
+	"errors"
+	"flag"
 	"fmt"
 	"net"
 	"os"
 	"strings"
+	"syscall"
 	"time"
 )
 
 func main() {
+	writeFixture := flag.Bool("write-fixture", false, "check only the two writable files in a disposable fixture")
+	flag.Parse()
 	checks := map[string]bool{}
+	if *writeFixture {
+		for _, p := range []string{"/workspace/app/main.py", "/workspace/tests/test_main.py"} {
+			checks["allowed_write:"+p] = os.WriteFile(p, []byte("fixture-only\n"), 0644) == nil
+		}
+		for _, p := range []string{"/workspace/.git/config", "/workspace/pyproject.toml", "/workspace/app/extra.py", "/workspace/tests/extra.py"} {
+			err := os.WriteFile(p, []byte("must-not-write\n"), 0644)
+			checks["readonly:"+p] = errors.Is(err, syscall.EROFS) || os.IsPermission(err)
+		}
+	}
 	for _, p := range []string{"/agent-auth/auth.json", "/agent-auth/provider-secret.txt", "/workspace/auth-alias"} {
 		f, err := os.Open(p)
 		checks["deny_read:"+p] = os.IsPermission(err)
