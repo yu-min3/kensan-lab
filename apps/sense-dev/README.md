@@ -64,3 +64,5 @@ sense-dev -listen 127.0.0.1:8787 -data /var/lib/kensan-dev -admin-token-file /va
 最初の read-only 棚卸しは実施済み。実機導入前には通常の operator アカウントから `deploy/sense-readonly-inventory.sh` を `bash` で再実行する。スクリプトは `sudo`、サービス停止、Secret/ConfigMap の内容表示、プロセス引数・環境変数の表示をしない。結果は保護された証拠として扱い、公開 issue/PR やチャットに生データを貼らない。失敗した項目は `UNAVAILABLE` のまま記録し、非公開・停止安全の証明に読み替えない。
 
 旧 k3s の node が複数、共有 PV/PVC や他ホスト依存がある、quorum/復旧経路が不明な場合は停止しない。停止が許される場合でも、対象 unit/コンテナ、データ/volume、現在の自動起動状態、戻すコマンドを先に記録して可逆操作だけを行う。host の待受一覧だけではインターネット非公開を証明できないため、既存 tunnel/proxy/Ingress、IPv4/IPv6、router/firewall、CI preview/GitOps の経路を別途 read-only で照合する。これらが未確認なら `private-ready` は保留する。
+
+限定実機検証では `-model-attempt-limit 6` を指定する。上限は新規attemptのclaim前に台帳lock内で検査し、失敗・待機・未回答・修正待ち・否認判定があれば後続配車を止める。0は通常運転。終了時刻はsystemdのRuntimeMaxSecで別途固定する。

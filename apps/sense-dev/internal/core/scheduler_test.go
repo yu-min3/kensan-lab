@@ -281,3 +281,73 @@ func TestSessionIDCannotCrossAgents(t *testing.T) {
 		t.Fatal("historical session reused across team boundary")
 	}
 }
+
+func TestBoundedRunStopsBeforeClaimingBeyondBudget(t *testing.T) {
+	s := testStore(t)
+	for _, title := range []string{"first", "second"} {
+		if _, _, err := s.CreatePlannedTask("bounded", App, "analysis", title, "v1"); err != nil {
+			t.Fatal(err)
+		}
+	}
+	runner := &fakeRunner{}
+	if worked, err := s.TickBounded(context.Background(), runner, nil, 1); err != nil || !worked {
+		t.Fatalf("first tick: %v %v", worked, err)
+	}
+	for i := 0; i < 3; i++ {
+		if worked, err := s.TickBounded(context.Background(), runner, nil, 1); err != nil || worked {
+			t.Fatalf("budget exceeded: %v %v", worked, err)
+		}
+	}
+	if len(s.Snapshot().Attempts) != 1 || len(runner.seen) != 1 {
+		t.Fatal("budget allowed an extra claim or inference")
+	}
+}
+
+func TestBoundedRunStopsAfterFailureBeforeOtherTeamDispatch(t *testing.T) {
+	for _, kind := range []string{"failed", "quota_wait", "retry_wait", "auth_required", "interrupted"} {
+		t.Run(kind, func(t *testing.T) {
+			s := testStore(t)
+			for _, title := range []string{"first", "second"} {
+				if _, _, err := s.CreatePlannedTask("bounded", App, "analysis", title, "v1"); err != nil {
+					t.Fatal(err)
+				}
+			}
+			runner := &fakeRunner{failKind: kind}
+			if worked, err := s.TickBounded(context.Background(), runner, nil, 6); err != nil || !worked {
+				t.Fatalf("first tick: %v %v", worked, err)
+			}
+			if worked, err := s.TickBounded(context.Background(), runner, nil, 6); err != nil || worked {
+				t.Fatalf("dispatched after failure: %v %v", worked, err)
+			}
+			if len(s.Snapshot().Attempts) != 1 {
+				t.Fatal("extra attempt after failure")
+			}
+		})
+	}
+}
+
+type boundedVerdictRunner struct{ fakeRunner }
+
+func (r *boundedVerdictRunner) Run(ctx context.Context, d Dispatch) (RunResult, error) {
+	result, err := r.fakeRunner.Run(ctx, d)
+	result.Output = []byte(`{"verdict":"needs_human"}`)
+	return result, err
+}
+func TestBoundedRunStopsOnHumanVerdict(t *testing.T) {
+	s := testStore(t)
+	for _, title := range []string{"first", "second"} {
+		if _, _, err := s.CreatePlannedTask("bounded", App, "analysis", title, "v1"); err != nil {
+			t.Fatal(err)
+		}
+	}
+	runner := &boundedVerdictRunner{}
+	if worked, err := s.TickBounded(context.Background(), runner, nil, 6); err != nil || !worked {
+		t.Fatalf("first %v %v", worked, err)
+	}
+	if worked, err := s.TickBounded(context.Background(), runner, nil, 6); err != nil || worked {
+		t.Fatalf("ignored verdict %v %v", worked, err)
+	}
+	if len(s.Snapshot().Attempts) != 1 {
+		t.Fatal("extra claim after human verdict")
+	}
+}

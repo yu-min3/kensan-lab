@@ -50,10 +50,14 @@ func run() error {
 	turnTimeout := flag.Duration("turn-timeout", 45*time.Minute, "maximum duration of one isolated model turn")
 	inferenceWindow := flag.String("inference-window", "", "required JST HH:MM-HH:MM interval for isolated model dispatch")
 	verificationPlan := flag.String("verification-plan", "", "operator-owned JSON plan for credentialless tests")
+	modelLimit := flag.Int("model-attempt-limit", 0, "optional finite-run model budget; stops on failures and decisions")
 	reportChannel := flag.String("report-slack-channel", "", "fixed Slack channel ID for daily report")
 	reportToken := flag.String("report-slack-token-file", "", "mode 0600 Slack bot token file")
 	reportBaseURL := flag.String("report-base-url", "", "HTTPS mobile link base for daily report")
 	flag.Parse()
+	if *modelLimit < 0 {
+		return errors.New("model-attempt-limit must not be negative")
+	}
 	if *data == "" || *token == "" || *tokensCSS == "" || !filepath.IsAbs(*data) {
 		return errors.New("-data, -admin-token-file and -tokens-css are required; -data must be absolute")
 	}
@@ -219,7 +223,7 @@ func run() error {
 							log.Print("task worktree preparation needs operator inspection")
 						}
 					}
-					if _, err := store.Tick(ctx, runner, scope); err != nil && !errors.Is(err, context.Canceled) {
+					if _, err := store.TickBounded(ctx, runner, scope, *modelLimit); err != nil && !errors.Is(err, context.Canceled) {
 						log.Print("worker dispatch needs operator inspection")
 					}
 				}

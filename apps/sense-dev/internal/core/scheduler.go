@@ -38,11 +38,35 @@ func (e RunError) Unwrap() error { return e.Err }
 // Tick executes at most one ready agent. Multiple Tick callers may run at
 // once; ClaimNext atomically enforces one active turn per provider and task.
 func (s *Store) Tick(ctx context.Context, runner Runner, scope []string) (bool, error) {
+	return s.TickBounded(ctx, runner, scope, 0)
+}
+
+// TickBounded applies an optional finite-run model budget before claiming work.
+// A positive limit also stops on failures or pending human decisions.
+func (s *Store) TickBounded(ctx context.Context, runner Runner, scope []string, modelLimit int) (bool, error) {
+	if modelLimit < 0 {
+		return false, errors.New("negative model attempt limit")
+	}
 	if _, err := s.ReconcileReviewedHandoffs(); err != nil {
 		return false, err
 	}
 	if _, err := s.ReconcileAcceptanceOutcomes(); err != nil {
 		return false, err
+	}
+	if modelLimit > 0 {
+		for _, attempt := range s.Snapshot().Attempts {
+			if attempt.OutputRef == nil || attempt.Status != "completed" {
+				continue
+			}
+			body, err := s.ReadArtifact(attempt.OutputRef.ID)
+			if err != nil {
+				return false, err
+			}
+			output := strings.ToLower(strings.TrimSpace(string(body)))
+			if strings.Contains(output, "needs_human") || strings.HasPrefix(output, "fail") || strings.HasPrefix(output, "blocked") || strings.Contains(output, `"verdict":"fail"`) || strings.Contains(strings.ReplaceAll(output, " ", ""), `"verdict":"fail"`) {
+				return false, nil
+			}
+		}
 	}
 	requireBase := false
 	for _, item := range scope {
@@ -50,7 +74,7 @@ func (s *Store) Tick(ctx context.Context, runner Runner, scope []string) (bool, 
 			requireBase = true
 		}
 	}
-	a, ok, err := s.claimNext(time.Now().UTC(), requireBase)
+	a, ok, err := s.claimNext(time.Now().UTC(), requireBase, modelLimit)
 	if err != nil || !ok {
 		return false, err
 	}
@@ -133,10 +157,10 @@ func (s *Store) Tick(ctx context.Context, runner Runner, scope []string) (bool, 
 }
 
 func (s *Store) ClaimNext(now time.Time) (Attempt, bool, error) {
-	return s.claimNext(now, false)
+	return s.claimNext(now, false, 0)
 }
 
-func (s *Store) claimNext(now time.Time, requireBase bool) (Attempt, bool, error) {
+func (s *Store) claimNext(now time.Time, requireBase bool, modelLimit int) (Attempt, bool, error) {
 	id, err := newID()
 	if err != nil {
 		return Attempt{}, false, err
@@ -145,6 +169,35 @@ func (s *Store) claimNext(now time.Time, requireBase bool) (Attempt, bool, error
 	err = s.update(func(st *State) error {
 		if st.Stopped || st.PausedUntil != nil && now.Before(*st.PausedUntil) {
 			return nil
+		}
+		if modelLimit > 0 {
+			count := 0
+			for _, attempt := range st.Attempts {
+				if attempt.Provider != "system" {
+					count++
+				}
+				if attempt.Status != "running" && attempt.Status != "completed" {
+					return nil
+				}
+			}
+			if count >= modelLimit {
+				return nil
+			}
+			for _, task := range st.Tasks {
+				if task.Status == "failed" || task.Status == "decision_wait" || task.Status == "revision_wait" {
+					return nil
+				}
+			}
+			for _, question := range st.Questions {
+				if question.Status != "answered" {
+					return nil
+				}
+			}
+			for _, decision := range st.Decisions {
+				if decision.Verdict != "allow" {
+					return nil
+				}
+			}
 		}
 		busyProviders := map[string]bool{}
 		busyTasks := map[string]bool{}
