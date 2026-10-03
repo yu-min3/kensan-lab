@@ -16,6 +16,7 @@ profile sense_codex_fixture /opt/kensan-dev/sandbox-fixture/bwrap flags=(attach_
   allow pivot_root,
   allow dbus,
   allow ix /opt/codex/bin/codex,
+  allow ix /usr/local/bin/sense-dev-worker,
   allow px /opt/codex/codex-resources/bwrap -> sense_codex_fixture//&sense_fixture_nested,
   allow px /usr/bin/** -> sense_codex_fixture//&sense_fixture_tool,
   allow px /bin/** -> sense_codex_fixture//&sense_fixture_tool,
@@ -37,6 +38,8 @@ profile sense_fixture_nested flags=(attach_disconnected) {
   allow px /** -> sense_fixture_nested//&sense_fixture_tool,
 }
 profile sense_fixture_tool flags=(attach_disconnected) {
+  # Tools may not access provider configuration or authentication material.
+  audit deny /agent-auth{,/**} rwlkm,
   allow file rwlkm /{**,},
   allow network,
   allow unix,
