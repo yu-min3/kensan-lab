@@ -100,7 +100,11 @@ func (r proofRunner) Run(_ context.Context, d core.Dispatch) (core.RunResult, er
 func TestKillProofRejectsOrdinaryFailures(t *testing.T) {
 	for _, mode := range []string{"missing", "wrong-exit", "verified"} {
 		t.Run(mode, func(t *testing.T) {
-			store, err := core.Open(t.TempDir())
+			root := t.TempDir()
+			if err := os.Chmod(root, 0700); err != nil {
+				t.Fatal(err)
+			}
+			store, err := core.Open(root)
 			if err != nil {
 				t.Fatal(err)
 			}
