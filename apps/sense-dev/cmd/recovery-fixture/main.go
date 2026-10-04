@@ -31,12 +31,6 @@ const mission = "t022-recovery-fixture-v1"
 var scope = []string{"isolated-model-worker", "operator-recovery-fixture"}
 
 func main() {
-	if filepath.Base(os.Args[0]) == "sense-recovery-relay" {
-		if err := relay(); err != nil {
-			os.Exit(1)
-		}
-		return
-	}
 	if err := run(); err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
@@ -47,10 +41,6 @@ func main() {
 // relay forwards session+ack and waits for a genuine terminal result. Only
 // then does it SIGKILL itself without forwarding that result to the controller.
 // No provider failure is converted to success and no model output is fabricated.
-func relay() error {
-	return relayCommand(exec.Command("/usr/local/bin/sense-dev-worker", os.Args[1:]...), len(os.Args) > 1)
-}
-
 func relayCommand(child *exec.Cmd, preflight bool) error {
 	child.Stderr = io.Discard
 	if preflight {
@@ -146,7 +136,7 @@ func relayCommand(child *exec.Cmd, preflight bool) error {
 }
 
 func run() error {
-	phase := flag.String("phase", "", "init, kill-turn, resume, recovery-turn, audit")
+	phase := flag.String("phase", "", "init, kill-turn, resume, recovery-turn, audit, host-relay")
 	state := flag.String("state", "", "dedicated fixture state root")
 	source := flag.String("source", "", "immutable source checkout")
 	work := flag.String("worktrees", "", "dedicated fixture task root")
@@ -158,6 +148,19 @@ func run() error {
 	if *phase == "" || !filepath.IsAbs(*state) {
 		return errors.New("phase and absolute state required")
 	}
+	if *phase == "host-relay" {
+		// This trusted supervisor runs OUTSIDE the sandbox. Only its official
+		// worker child enters the already approved model sandbox/profile.
+		config := isolation.Config{Bubblewrap: *bwrap, RuntimeRoot: *runtime, AuthHome: *auth, ControllerState: *state, Worktree: *work, ReadOnlyWorktree: true}
+		ctx, cancel := context.WithTimeout(context.Background(), 120*time.Second)
+		defer cancel()
+		child, err := config.Command(ctx, "/usr/local/bin/sense-dev-worker")
+		if err != nil {
+			return err
+		}
+		return relayCommand(child, false)
+	}
+
 	if *phase == "init" {
 		if _, err := os.Lstat(filepath.Join(*state, "state.json")); !os.IsNotExist(err) {
 			return errors.New("init requires fresh state")
@@ -423,10 +426,12 @@ func (r faultRunner) Run(ctx context.Context, d core.Dispatch) (core.RunResult, 
 	}
 	turnCtx, cancel := context.WithTimeout(ctx, r.Timeout)
 	defer cancel()
-	cmd, err := config.Command(turnCtx, "/usr/local/bin/sense-recovery-relay")
+	program, err := os.Executable()
 	if err != nil {
 		return core.RunResult{}, err
 	}
+	cmd := exec.CommandContext(turnCtx, program, "-phase", "host-relay", "-state", config.ControllerState, "-worktrees", config.Worktree, "-runtime", config.RuntimeRoot, "-auth", config.AuthHome, "-bwrap", config.Bubblewrap)
+	cmd.Env = []string{"PATH=/usr/bin:/bin"}
 	input, err := cmd.StdinPipe()
 	if err != nil {
 		return core.RunResult{}, err
