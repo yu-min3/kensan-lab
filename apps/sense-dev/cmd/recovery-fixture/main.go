@@ -5,6 +5,8 @@ package main
 import (
 	"bufio"
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"flag"
@@ -91,6 +93,7 @@ func relayCommand(child *exec.Cmd, preflight bool) error {
 	scanner := bufio.NewScanner(output)
 	scanner.Buffer(make([]byte, 65536), workerwire.MaxOutput+4096)
 	bound := false
+	sessionID := ""
 	for scanner.Scan() {
 		var event workerwire.Event
 		if err = json.Unmarshal(scanner.Bytes(), &event); err != nil {
@@ -104,6 +107,10 @@ func relayCommand(child *exec.Cmd, preflight bool) error {
 				return errors.New("cannot inject kill without real bound result")
 			}
 			if err = child.Wait(); err != nil {
+				return err
+			}
+			sum := sha256.Sum256([]byte(event.Output))
+			if err := json.NewEncoder(os.Stdout).Encode(faultProof{Version: 1, Type: "fault_injected", SessionID: sessionID, ResultSHA256: hex.EncodeToString(sum[:]), ResultBytes: len(event.Output), ChildExit: 0}); err != nil {
 				return err
 			}
 			if err := syscall.Kill(os.Getpid(), syscall.SIGKILL); err != nil {
@@ -129,6 +136,7 @@ func relayCommand(child *exec.Cmd, preflight bool) error {
 				return err
 			}
 			bound = true
+			sessionID = event.SessionID
 		}
 	}
 	if err = scanner.Err(); err != nil {
@@ -204,6 +212,9 @@ func run() error {
 		if len(st.Attempts) != 2 {
 			return errors.New("two original attempts required")
 		}
+		if err := verifyKillProofs(s); err != nil {
+			return err
+		}
 		for _, a := range st.Agents {
 			if a.Status != "failed" || a.SessionGeneration != 1 || a.SessionID == "" {
 				return errors.New("both old sessions must be failed and bound")
@@ -233,9 +244,16 @@ func run() error {
 				return errors.New("unexpected phase state")
 			}
 		}
+		if err := verifyKillProofs(s); err != nil {
+			return err
+		}
 		config := isolation.Config{Bubblewrap: *bwrap, RuntimeRoot: *runtime, AuthHome: *auth, ControllerState: *state, Worktree: *source, ReadOnlyWorktree: true}
 		runner := workerclient.Runner{Claude: config, Codex: config, WorkerProgram: program, Timeout: 120 * time.Second, Worktrees: worktree.Manager{Source: *source, Root: *work}}
-		worked, err := s.Tick(context.Background(), runner, scope)
+		var selected core.Runner = runner
+		if *phase == "kill-turn" {
+			selected = faultRunner{Runner: runner}
+		}
+		worked, err := s.Tick(context.Background(), selected, scope)
 		if err != nil {
 			return err
 		}
@@ -250,6 +268,9 @@ func run() error {
 			if _, old := st.Attempts[id]; !old && (a.Status != wantStatus || a.SessionID == "" || a.Generation != generation) {
 				return errors.New("unexpected turn outcome; stop without retry")
 			}
+		}
+		if err := verifyKillProofs(s); err != nil {
+			return err
 		}
 	case "audit":
 		if err = audit(s); err != nil {
@@ -334,4 +355,155 @@ func audit(s *core.Store) error {
 		}
 	}
 	return nil
+}
+
+type faultProof struct {
+	Version      int    `json:"version"`
+	Type         string `json:"type"`
+	SessionID    string `json:"session_id"`
+	ResultSHA256 string `json:"result_sha256"`
+	ResultBytes  int    `json:"result_bytes"`
+	ChildExit    int    `json:"child_exit"`
+	RelayExit    string `json:"relay_exit"`
+}
+
+func verifyKillProofs(s *core.Store) error {
+	for _, a := range s.Snapshot().Attempts {
+		if a.Generation != 1 {
+			continue
+		}
+		if a.Status != "failed" || a.OutputRef == nil {
+			return errors.New("old kill attempt lacks terminal proof; no further turn allowed")
+		}
+		body, err := s.ReadArtifact(a.OutputRef.ID)
+		if err != nil {
+			return err
+		}
+		var proof faultProof
+		if json.Unmarshal(body, &proof) != nil || proof.Version != 1 || proof.Type != "fault_injected" || proof.SessionID != a.SessionID || len(proof.ResultSHA256) != 64 || proof.ResultBytes <= 0 || proof.ChildExit != 0 || proof.RelayExit != "SIGKILL" {
+			return errors.New("kill proof invalid; stop without retry")
+		}
+	}
+	return nil
+}
+
+// faultRunner is used ONLY with the immutable fixture relay. Unlike the normal
+// worker protocol, it requires explicit terminal fault proof AND process death.
+type faultRunner struct{ workerclient.Runner }
+
+func (r faultRunner) Run(ctx context.Context, d core.Dispatch) (core.RunResult, error) {
+	path, base, err := r.Worktrees.Ensure(ctx, d.Attempt.TaskID, d.Attempt.BaseSHA)
+	if err != nil || base != d.Attempt.BaseSHA {
+		return core.RunResult{}, errors.New("fixture checkout identity mismatch")
+	}
+	config := r.Claude
+	config.Worktree = path
+	config.ReadOnlyWorktree = true
+	hidden, err := filepath.EvalSymlinks(config.ControllerState)
+	if err != nil {
+		return core.RunResult{}, err
+	}
+	checkCtx, cancelCheck := context.WithTimeout(ctx, 10*time.Second)
+	defer cancelCheck()
+	check, err := config.Command(checkCtx, "/usr/local/bin/sense-dev-worker", "-preflight-task", "-hidden-path", hidden, "-provider", "claude", "-read-only-worktree=true")
+	if err != nil {
+		return core.RunResult{}, err
+	}
+	check.Stderr = io.Discard
+	output, err := check.Output()
+	if err != nil || len(output) > 128 {
+		return core.RunResult{}, errors.New("fixture preflight failed")
+	}
+	var preflight struct {
+		Version int    `json:"version"`
+		Type    string `json:"type"`
+	}
+	if json.Unmarshal(output, &preflight) != nil || preflight.Version != 1 || preflight.Type != "task_git_ok" {
+		return core.RunResult{}, errors.New("fixture preflight invalid")
+	}
+	turnCtx, cancel := context.WithTimeout(ctx, r.Timeout)
+	defer cancel()
+	cmd, err := config.Command(turnCtx, "/usr/local/bin/sense-recovery-relay")
+	if err != nil {
+		return core.RunResult{}, err
+	}
+	input, err := cmd.StdinPipe()
+	if err != nil {
+		return core.RunResult{}, err
+	}
+	stream, err := cmd.StdoutPipe()
+	if err != nil {
+		return core.RunResult{}, err
+	}
+	cmd.Stderr = io.Discard
+	if err = cmd.Start(); err != nil {
+		return core.RunResult{}, err
+	}
+	reaped := false
+	defer func() {
+		input.Close()
+		if !reaped {
+			cmd.Process.Kill()
+			cmd.Wait()
+		}
+	}()
+	req := workerwire.Request{Version: 1, AttemptID: d.Attempt.ID, Role: d.Attempt.Role, Provider: d.Attempt.Provider, Model: d.Attempt.Model, Prompt: d.Prompt}
+	if err = req.Validate(); err != nil {
+		return core.RunResult{}, err
+	}
+	if err = json.NewEncoder(input).Encode(req); err != nil {
+		return core.RunResult{}, err
+	}
+	scanner := bufio.NewScanner(stream)
+	scanner.Buffer(make([]byte, 65536), workerwire.MaxOutput+4096)
+	session := ""
+	var proof *faultProof
+	for scanner.Scan() {
+		var event faultProof
+		if json.Unmarshal(scanner.Bytes(), &event) != nil {
+			return core.RunResult{}, errors.New("invalid relay JSON")
+		}
+		if proof != nil {
+			return core.RunResult{}, errors.New("data after fault proof")
+		}
+		if event.Type == "session" {
+			var binding workerwire.Event
+			if json.Unmarshal(scanner.Bytes(), &binding) != nil || binding.Validate() != nil || session != "" {
+				return core.RunResult{}, errors.New("invalid relay session")
+			}
+			session = binding.SessionID
+			if err = d.BindSession(session); err != nil {
+				return core.RunResult{}, err
+			}
+			if err = json.NewEncoder(input).Encode(workerwire.Ack{Version: 1, Type: "continue", SessionID: session}); err != nil {
+				return core.RunResult{}, err
+			}
+		} else if event.Type == "fault_injected" && session != "" && event.SessionID == session && event.Version == 1 && event.ResultBytes > 0 && len(event.ResultSHA256) == 64 && event.ChildExit == 0 {
+			proof = &event
+		} else {
+			return core.RunResult{}, errors.New("unexpected relay failure; halt")
+		}
+	}
+	if err = scanner.Err(); err != nil {
+		return core.RunResult{}, err
+	}
+	waitErr := cmd.Wait()
+	reaped = true
+	if turnCtx.Err() != nil || proof == nil {
+		return core.RunResult{}, errors.New("relay stopped without proven result loss")
+	}
+	exit, ok := waitErr.(*exec.ExitError)
+	if !ok {
+		return core.RunResult{}, errors.New("relay did not die by SIGKILL")
+	}
+	status, ok := exit.Sys().(syscall.WaitStatus)
+	if !ok || !((status.Signaled() && status.Signal() == syscall.SIGKILL) || exit.ExitCode() == 128+int(syscall.SIGKILL)) {
+		return core.RunResult{}, errors.New("relay exit was not SIGKILL")
+	}
+	proof.RelayExit = "SIGKILL"
+	body, err := json.Marshal(proof)
+	if err != nil {
+		return core.RunResult{}, err
+	}
+	return core.RunResult{Output: body}, core.RunError{Kind: "failed", Err: errors.New("verified fixture-only result loss and SIGKILL")}
 }

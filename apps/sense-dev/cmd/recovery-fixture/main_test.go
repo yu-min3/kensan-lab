@@ -2,13 +2,16 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
+	"errors"
 	"os"
 	"os/exec"
 	"strings"
 	"syscall"
 	"testing"
 
+	"github.com/yu-min3/kensan-lab/apps/sense-dev/internal/core"
 	"github.com/yu-min3/kensan-lab/apps/sense-dev/internal/workerwire"
 )
 
@@ -31,6 +34,9 @@ func TestRelayKillsOnlyAfterRealBoundResult(t *testing.T) {
 				status, ok := failure.Sys().(syscall.WaitStatus)
 				if !ok || !status.Signaled() || status.Signal() != syscall.SIGKILL {
 					t.Fatalf("wrong exit: %v", failure)
+				}
+				if !strings.Contains(string(output), `"type":"fault_injected"`) {
+					t.Fatal("trusted fault proof missing")
 				}
 				if strings.Contains(string(output), "must-not-reach-controller") || strings.Contains(string(output), `"type":"result"`) {
 					t.Fatal("terminal result was forwarded")
@@ -81,4 +87,46 @@ func TestRelayHelper(t *testing.T) {
 	}
 	json.NewEncoder(os.Stdout).Encode(event)
 	os.Exit(0)
+}
+
+type proofRunner struct{ body []byte }
+
+func (r proofRunner) Run(_ context.Context, d core.Dispatch) (core.RunResult, error) {
+	if err := d.BindSession("fixture-old-session"); err != nil {
+		return core.RunResult{}, err
+	}
+	return core.RunResult{Output: r.body}, core.RunError{Kind: "failed", Err: errors.New("offline injected failure")}
+}
+func TestKillProofRejectsOrdinaryFailures(t *testing.T) {
+	for _, mode := range []string{"missing", "wrong-exit", "verified"} {
+		t.Run(mode, func(t *testing.T) {
+			store, err := core.Open(t.TempDir())
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer store.Close()
+			if err = store.SeedKnowledge(); err != nil {
+				t.Fatal(err)
+			}
+			_, _, err = store.CreatePlannedTask(mission, core.Platform, "analysis", "offline proof audit", "recovery-v1")
+			if err != nil {
+				t.Fatal(err)
+			}
+			var body []byte
+			if mode != "missing" {
+				proof := faultProof{Version: 1, Type: "fault_injected", SessionID: "fixture-old-session", ResultSHA256: strings.Repeat("a", 64), ResultBytes: 1, ChildExit: 0, RelayExit: "SIGKILL"}
+				if mode == "wrong-exit" {
+					proof.RelayExit = "exit-1"
+				}
+				body, _ = json.Marshal(proof)
+			}
+			if worked, err := store.Tick(context.Background(), proofRunner{body: body}, nil); err != nil || !worked {
+				t.Fatalf("tick %v %v", worked, err)
+			}
+			err = verifyKillProofs(store)
+			if (err == nil) != (mode == "verified") {
+				t.Fatalf("%s verification: %v", mode, err)
+			}
+		})
+	}
 }
