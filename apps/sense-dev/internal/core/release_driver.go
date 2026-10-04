@@ -523,3 +523,27 @@ func (d *ReleaseDriver) PublishReady(ctx context.Context, transport PublishTrans
 	}
 	return errors.Join(failures...)
 }
+
+// ReconcileUnknown performs only remote reads, including outside inference
+// admission. RunPublish cannot execute or prepare sending/unknown intents.
+func (d *ReleaseDriver) ReconcileUnknown(ctx context.Context, transport PublishTransport) error {
+	if transport == nil {
+		return errors.New("publisher transport required")
+	}
+	st := d.Store.Snapshot()
+	var ids []string
+	for id, i := range st.Intents {
+		task := st.Tasks[st.Agents[st.Decisions[i.DecisionID].AuthorAgentID].TaskID]
+		if (i.Status == "unknown" || i.Status == "sending") && task.MissionID == d.Plan.MissionID {
+			ids = append(ids, id)
+		}
+	}
+	sort.Strings(ids)
+	var failures []error
+	for _, id := range ids {
+		if _, err := d.Store.RunPublish(ctx, st.Intents[id].DecisionID, transport); err != nil {
+			failures = append(failures, err)
+		}
+	}
+	return errors.Join(failures...)
+}

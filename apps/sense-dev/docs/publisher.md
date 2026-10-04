@@ -45,6 +45,7 @@ Unix socket は原則0600。別host user間では専用groupの0660を明示し�
 - strict required checksとadmin enforcementが取得・確認できなければ停止。実際のrepo設定は未検証。
 - 操作直前の期限切れ、CI待ち、別SHA、保護設定不足は外部操作を行わない。
 - `sending` / `unknown` は照合のみ。結果がない場合も自動再送しない。
+- 送信直前の許可時刻 `authorized_at` を固定する。host観測とunknown照合は推論時間帯・billing admissionの外で継続し、期限後も当時の許可と固定入力を照合する。新しい操作には引き続きlive期限が必要。旧stateのsent intentに許可時刻が無い場合はreceiptを拒否する。
 
 ## 起動設定の組
 

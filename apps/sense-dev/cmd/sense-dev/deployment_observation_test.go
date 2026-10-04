@@ -36,8 +36,8 @@ func TestHostObservationRecordsOnceAndRejectsChangedIdentity(t *testing.T) {
 			revision := strings.Repeat("b", 40)
 			st.Tasks["task"] = core.Task{ID: "task", Kind: "change", Team: core.App, MissionID: "mission", HeadSHA: head, Status: "publish_wait"}
 			st.Agents["author"] = core.Agent{ID: "author", TaskID: "task", Team: core.App}
-			st.Decisions["decision"] = core.ReleaseDecision{ID: "decision", AuthorAgentID: "author", Verdict: "allow", Operation: "merge", HeadSHA: head, TargetEnvironment: "private-canary", PolicyVersion: core.ReleasePolicyVersion, ExpiresAt: time.Now().Add(time.Hour)}
-			st.Intents["intent"] = core.PublishIntent{ID: "intent", DecisionID: "decision", Operation: "merge", HeadSHA: head, Status: "sent", ExternalID: revision}
+			st.Decisions["decision"] = core.ReleaseDecision{ID: "decision", AuthorAgentID: "author", Repository: "yu-min3/kensan-lab", Ref: "refs/heads/sense-dev/fixture", Verdict: "allow", Operation: "merge", HeadSHA: head, TargetEnvironment: "private-canary", PolicyVersion: core.ReleasePolicyVersion, ExpiresAt: time.Now().Add(time.Hour)}
+			st.Intents["intent"] = core.PublishIntent{ID: "intent", DecisionID: "decision", Operation: "merge", HeadSHA: head, Status: "sent", ExternalID: revision, AuthorizedAt: time.Now().Add(-time.Second), ExpiresAt: time.Now().Add(time.Minute), Repository: "yu-min3/kensan-lab", Ref: "refs/heads/sense-dev/fixture", TargetEnvironment: "private-canary", PolicyVersion: core.ReleasePolicyVersion}
 			b, _ := json.Marshal(st)
 			if err := os.WriteFile(filepath.Join(dir, "state.json"), b, 0600); err != nil {
 				t.Fatal(err)

@@ -78,7 +78,7 @@ func (s *Store) RecordImageRelease(r ImageReleaseRecord) error {
 		source, ok := st.Tasks[r.SourceTaskID]
 		d, okD := st.Decisions[r.DecisionID]
 		i, okI := st.Intents[r.IntentID]
-		if !ok || !okD || !okI || source.Team != App || source.Kind != "change" || source.Status != "publish_wait" || source.ImageSourceTaskID != "" || source.HeadSHA != r.Image.SourceSHA || d.Verdict != "allow" || d.Operation != "image_publish" || d.PolicyVersion != ReleasePolicyVersion || st.Agents[d.AuthorAgentID].TaskID != source.ID || i.DecisionID != d.ID || i.Status != "sent" || i.Operation != "image_publish" || i.HeadSHA != source.HeadSHA || i.TargetEnvironment != "private-canary" || !imageReleasesEqual(i.ImageRelease, d.ImageRelease) || i.ImageRelease == nil {
+		if !ok || !okD || !okI || source.Team != App || source.Kind != "change" || source.Status != "publish_wait" || source.ImageSourceTaskID != "" || source.HeadSHA != r.Image.SourceSHA || d.Verdict != "allow" || d.Operation != "image_publish" || d.PolicyVersion != ReleasePolicyVersion || st.Agents[d.AuthorAgentID].TaskID != source.ID || i.DecisionID != d.ID || i.Status != "sent" || !publishAuthorizationMatches(*st, i, d) || i.Operation != "image_publish" || i.HeadSHA != source.HeadSHA || i.TargetEnvironment != "private-canary" || !imageReleasesEqual(i.ImageRelease, d.ImageRelease) || i.ImageRelease == nil {
 			return errors.New("image is not the source task's sent gated operation")
 		}
 		p := i.ImageRelease

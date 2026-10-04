@@ -42,7 +42,11 @@ func (p preparedPublisher) Prepare(ctx context.Context, intent core.PublishInten
 
 // importMergedCommits makes the verified graph reachable in the credentialless
 // controller source before Platform improvements ask for that exact merge base.
-func importMergedCommits(ctx context.Context, store *core.Store, client publisherbridge.Client, sourceRepo, mission string) error {
+type mergedCommitClient interface {
+	ExportMerged(context.Context, core.PublishIntent, string) (committransfer.Bundle, error)
+}
+
+func importMergedCommits(ctx context.Context, store *core.Store, client mergedCommitClient, sourceRepo, mission string) error {
 	st := store.Snapshot()
 	var ids []string
 	for id, intent := range st.Intents {

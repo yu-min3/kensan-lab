@@ -242,6 +242,16 @@ func run() error {
 				case <-ctx.Done():
 					return
 				case <-ticker.C:
+					// Host reads reconcile already-authorized operations even when
+					// model inference and new mutations are not admitted.
+					if releaseDriver != nil && *publisherSocket != "" && !time.Now().Before(nextObservation) {
+						nextObservation = time.Now().Add(time.Minute)
+						client := publisherbridge.Client{Socket: *publisherSocket, AuthFile: *publisherAuth}
+						if err := reconcileHostObservations(ctx, store, releaseDriver, client, *sourceRepo); err != nil {
+							log.Print("host reconciliation incomplete; retain immutable operation")
+						}
+					}
+
 					if (allowedNow != nil && !allowedNow(time.Now())) || (usage != nil && usage.Check(ctx) != nil) {
 						continue
 					}
@@ -272,19 +282,6 @@ func run() error {
 						}
 					}
 
-					if releaseDriver != nil && *publisherSocket != "" && !time.Now().Before(nextObservation) {
-						nextObservation = time.Now().Add(time.Minute)
-						if err := observeImages(ctx, store, publisherbridge.Client{Socket: *publisherSocket, AuthFile: *publisherAuth}, releaseDriver.Plan.MissionID); err != nil {
-							log.Print("image CI observation incomplete; GitOps remains waiting")
-						}
-						if err := importMergedCommits(ctx, store, publisherbridge.Client{Socket: *publisherSocket, AuthFile: *publisherAuth}, *sourceRepo, releaseDriver.Plan.MissionID); err != nil {
-							log.Print("verified merged commit transfer incomplete; Platform improvement remains waiting")
-						}
-
-						if err := observeDeployments(ctx, store, publisherbridge.Client{Socket: *publisherSocket, AuthFile: *publisherAuth}, releaseDriver.Plan.MissionID); err != nil {
-							log.Print("deployment observation incomplete; App acceptance remains waiting")
-						}
-					}
 					if _, err := store.TickBounded(ctx, runner, scope, *modelLimit); err != nil && !errors.Is(err, context.Canceled) {
 						log.Print("worker dispatch needs operator inspection")
 					}

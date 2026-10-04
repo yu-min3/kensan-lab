@@ -238,6 +238,8 @@ type ReleaseScan struct {
 }
 
 type PublishIntent struct {
+	// AuthorizedAt records the live authorization check before mutation.
+	AuthorizedAt       time.Time            `json:"authorized_at,omitempty"`
 	ImageDeployment    *ImageDeploymentSpec `json:"image_deployment,omitempty"`
 	ImageRelease       *ImageReleaseSpec    `json:"image_release,omitempty"`
 	ExpiresAt          time.Time            `json:"expires_at,omitempty"`

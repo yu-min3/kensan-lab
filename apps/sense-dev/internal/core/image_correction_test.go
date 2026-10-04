@@ -16,8 +16,8 @@ func imageCorrectionState() (State, Task, Task) {
 	st.Tasks[root.ID], st.Tasks[child.ID], st.Tasks[acceptance.ID] = root, child, acceptance
 	st.ImageReleases[root.ID] = ImageReleaseRecord{SourceTaskID: root.ID, DeploymentTaskID: child.ID, Image: ImageDeploymentSpec{SourceSHA: a}}
 	st.Agents["author"] = Agent{ID: "author", TaskID: child.ID, Team: App}
-	st.Decisions["decision"] = ReleaseDecision{ID: "decision", AuthorAgentID: "author", Verdict: "allow", HeadSHA: b, Operation: "merge", TargetEnvironment: "private-canary", PolicyVersion: ReleasePolicyVersion, ExpiresAt: now.Add(time.Hour)}
-	st.Intents["intent"] = PublishIntent{ID: "intent", DecisionID: "decision", HeadSHA: b, Status: "sent", Operation: "merge", ExternalID: c}
+	st.Decisions["decision"] = ReleaseDecision{ID: "decision", AuthorAgentID: "author", Repository: "yu-min3/kensan-lab", Ref: "refs/heads/sense-dev/fixture", Verdict: "allow", HeadSHA: b, Operation: "merge", TargetEnvironment: "private-canary", PolicyVersion: ReleasePolicyVersion, ExpiresAt: now.Add(time.Hour)}
+	st.Intents["intent"] = PublishIntent{ID: "intent", DecisionID: "decision", HeadSHA: b, Status: "sent", Operation: "merge", ExternalID: c, AuthorizedAt: now, ExpiresAt: now.Add(time.Minute), Repository: "yu-min3/kensan-lab", Ref: "refs/heads/sense-dev/fixture", TargetEnvironment: "private-canary", PolicyVersion: ReleasePolicyVersion}
 	st.Deployments[child.ID] = DeploymentReceipt{TaskID: child.ID, DecisionID: "decision", IntentID: "intent", HeadSHA: b, Revision: c, ImageSourceSHA: c, ObservedRelease: "v2", Status: "healthy", Environment: "private-canary", RecordedAt: now}
 	return st, child, acceptance
 }

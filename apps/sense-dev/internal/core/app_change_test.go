@@ -298,8 +298,8 @@ func seedAppDeployment(t *testing.T, s *Store, task Task) {
 			}
 		}
 		now := time.Now().UTC()
-		st.Decisions[decisionID] = ReleaseDecision{ID: decisionID, AuthorAgentID: author.ID, Verdict: "allow", Operation: "deploy", HeadSHA: task.HeadSHA, TargetEnvironment: "private-canary", PolicyVersion: ReleasePolicyVersion, ExpiresAt: now.Add(time.Hour)}
-		st.Intents[intentID] = PublishIntent{ID: intentID, DecisionID: decisionID, Operation: "deploy", HeadSHA: task.HeadSHA, ExternalID: strings.Repeat("e", 40), Status: "sent"}
+		st.Decisions[decisionID] = ReleaseDecision{ID: decisionID, AuthorAgentID: author.ID, Repository: "yu-min3/kensan-lab", Ref: "refs/heads/sense-dev/fixture", Verdict: "allow", Operation: "deploy", HeadSHA: task.HeadSHA, TargetEnvironment: "private-canary", PolicyVersion: ReleasePolicyVersion, ExpiresAt: now.Add(time.Hour)}
+		st.Intents[intentID] = PublishIntent{ID: intentID, DecisionID: decisionID, Operation: "deploy", HeadSHA: task.HeadSHA, ExternalID: strings.Repeat("e", 40), Status: "sent", AuthorizedAt: now, ExpiresAt: now.Add(time.Minute), Repository: "yu-min3/kensan-lab", Ref: "refs/heads/sense-dev/fixture", TargetEnvironment: "private-canary", PolicyVersion: ReleasePolicyVersion}
 		st.Deployments[task.ID] = DeploymentReceipt{ObservedRelease: "v2", TaskID: task.ID, DecisionID: decisionID, IntentID: intentID, HeadSHA: task.HeadSHA, Revision: strings.Repeat("e", 40), ImageSourceSHA: strings.Repeat("e", 40), ImageDigest: "sha256:" + strings.Repeat("d", 64), Environment: "private-canary", Status: "healthy", UserPath: "private user route", EvidenceRef: artifactRef(artifact), RecordedAt: now}
 		return nil
 	}); err != nil {

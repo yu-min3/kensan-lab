@@ -8,9 +8,13 @@ import (
 )
 
 func approvalMatches(st State, d ReleaseDecision, scan ReleaseScan, candidateHash string) bool {
+	return approvalMatchesAt(st, d, scan, candidateHash, time.Now())
+}
+
+func approvalMatchesAt(st State, d ReleaseDecision, scan ReleaseScan, candidateHash string, at time.Time) bool {
 	r, ok := st.Approvals[d.ApprovalID]
 	origin, exists := st.Decisions[r.DecisionID]
-	if !ok || !exists || r.Status != "approved" || r.DecidedAt == nil || r.ActionID == "" || !time.Now().Before(r.ExpiresAt) || !time.Now().Before(origin.ExpiresAt) || r.PolicyVersion != ReleasePolicyVersion || origin.Verdict != "needs_human" || scan.Status == "deny" || d.GateAgentID == origin.GateAgentID {
+	if !ok || !exists || r.Status != "approved" || r.DecidedAt == nil || r.ActionID == "" || !at.Before(r.ExpiresAt) || !at.Before(origin.ExpiresAt) || r.DecidedAt.After(at) || r.PolicyVersion != ReleasePolicyVersion || origin.Verdict != "needs_human" || scan.Status == "deny" || d.GateAgentID == origin.GateAgentID {
 		return false
 	}
 	if origin.PolicyVersion != r.PolicyVersion || origin.Operation != r.Operation || origin.Repository != r.Repository || origin.Ref != r.Ref || origin.HeadSHA != r.HeadSHA || origin.TargetEnvironment != r.Environment || r.ExpiresAt.After(origin.ExpiresAt) || !reflect.DeepEqual(origin.HumanCategories, r.HumanCategories) || !reflect.DeepEqual(origin.HumanReasons, r.HumanReasons) {

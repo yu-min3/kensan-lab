@@ -37,7 +37,7 @@ func TestDeploymentReceiptRequiresActualApprovedDelivery(t *testing.T) {
 		t.Fatal("receipt accepted without gate and delivery")
 	}
 	if err := s.update(func(st *State) error {
-		st.Decisions[r.DecisionID] = ReleaseDecision{ID: r.DecisionID, AuthorAgentID: agents[2].ID, Verdict: "allow", HeadSHA: head, Operation: "pr_create", TargetEnvironment: r.Environment, PolicyVersion: ReleasePolicyVersion, ExpiresAt: time.Now().Add(time.Hour)}
+		st.Decisions[r.DecisionID] = ReleaseDecision{ID: r.DecisionID, AuthorAgentID: agents[2].ID, Repository: "yu-min3/kensan-lab", Ref: "refs/heads/sense-dev/fixture", Verdict: "allow", HeadSHA: head, Operation: "pr_create", TargetEnvironment: r.Environment, PolicyVersion: ReleasePolicyVersion, ExpiresAt: time.Now().Add(time.Hour)}
 		st.Intents[r.IntentID] = PublishIntent{ID: r.IntentID, DecisionID: r.DecisionID, Status: "sent", HeadSHA: head, Operation: "pr_create"}
 		return nil
 	}); err != nil {
@@ -66,6 +66,12 @@ func TestDeploymentReceiptRequiresActualApprovedDelivery(t *testing.T) {
 	if err := s.update(func(st *State) error {
 		i := st.Intents[r.IntentID]
 		i.Status = "sent"
+		i.AuthorizedAt = time.Now().Add(-time.Second)
+		i.ExpiresAt = time.Now().Add(time.Minute)
+		i.Repository = "yu-min3/kensan-lab"
+		i.Ref = "refs/heads/sense-dev/fixture"
+		i.TargetEnvironment = r.Environment
+		i.PolicyVersion = ReleasePolicyVersion
 		i.ExternalID = r.Revision
 		st.Intents[i.ID] = i
 		return nil

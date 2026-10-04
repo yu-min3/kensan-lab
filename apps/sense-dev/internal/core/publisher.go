@@ -3,6 +3,7 @@ package core
 import (
 	"context"
 	"errors"
+	"strings"
 	"time"
 )
 
@@ -81,7 +82,8 @@ func (s *Store) RunPublish(ctx context.Context, decisionID string, transport Pub
 	err = s.update(func(st *State) error {
 		current := st.Intents[intent.ID]
 		decision := st.Decisions[decisionID]
-		if current.Status != "pending_reconcile" || decision.Verdict != "allow" || !time.Now().Before(decision.ExpiresAt) || current.ExpiresAt.IsZero() || !time.Now().Before(current.ExpiresAt) || current.ExpiresAt.After(decision.ExpiresAt) || decision.HeadSHA != intent.HeadSHA || st.Tasks[st.Agents[decision.AuthorAgentID].TaskID].HeadSHA != intent.HeadSHA || current.Operation != decision.Operation || current.Repository != decision.Repository || current.Ref != decision.Ref || current.HeadSHA != decision.HeadSHA || current.BaseSHA != scan.BaseSHA || current.TargetEnvironment != decision.TargetEnvironment || current.PolicyVersion != decision.PolicyVersion {
+		authorizationTime := time.Now().UTC()
+		if current.Status != "pending_reconcile" || decision.Verdict != "allow" || !authorizationTime.Before(decision.ExpiresAt) || current.ExpiresAt.IsZero() || !authorizationTime.Before(current.ExpiresAt) || current.ExpiresAt.After(decision.ExpiresAt) || decision.HeadSHA != intent.HeadSHA || st.Tasks[st.Agents[decision.AuthorAgentID].TaskID].HeadSHA != intent.HeadSHA || current.Operation != decision.Operation || current.Repository != decision.Repository || current.Ref != decision.Ref || current.HeadSHA != decision.HeadSHA || current.BaseSHA != scan.BaseSHA || current.TargetEnvironment != decision.TargetEnvironment || current.PolicyVersion != decision.PolicyVersion {
 			return errors.New("publish authorization changed before execution")
 		}
 		if !imageReleasesEqual(current.ImageRelease, decision.ImageRelease) || !imageDeploymentsEqual(current.ImageDeployment, decision.ImageDeployment) {
@@ -92,11 +94,12 @@ func (s *Store) RunPublish(ctx context.Context, decisionID string, transport Pub
 			return errors.New("release ownership changed before execution")
 		}
 		if len(decision.HumanCategories) > 0 {
-			if len(gate.ReviewInputs) == 0 || !approvalMatches(*st, decision, scan, gate.ReviewInputs[len(gate.ReviewInputs)-1].SHA256) {
+			if len(gate.ReviewInputs) == 0 || !approvalMatchesAt(*st, decision, scan, gate.ReviewInputs[len(gate.ReviewInputs)-1].SHA256, authorizationTime) {
 				return errors.New("human approval changed or expired before execution")
 			}
 		}
-		current.Status, current.UpdatedAt = "sending", time.Now().UTC()
+		current.AuthorizedAt = authorizationTime
+		current.Status, current.UpdatedAt = "sending", current.AuthorizedAt
 		st.Intents[intent.ID] = current
 		intent = current
 		st.Events = append(st.Events, event("publish_sending", intent.ID, intent.Operation))
@@ -123,6 +126,16 @@ func (s *Store) finishPublish(id, status, externalID string) (PublishIntent, err
 		if !ok || intent.Status != "sending" && intent.Status != "unknown" && intent.Status != "pending_reconcile" {
 			return errors.New("publish intent state changed")
 		}
+		if status == "sent" {
+			// A previously existing exact remote result can be accepted by a live Gate;
+			// ambiguous prior executions may only retain their original authorization.
+			if intent.Status == "pending_reconcile" && intent.AuthorizedAt.IsZero() {
+				intent.AuthorizedAt = time.Now().UTC()
+			}
+			if !publishAuthorizationMatches(*st, intent, st.Decisions[intent.DecisionID]) {
+				return errors.New("sent operation lacks fixed timely authorization")
+			}
+		}
 		if status == "sent" && intent.Operation == "image_publish" && (intent.ImageRelease == nil || externalID != intent.ImageRelease.DispatchID) {
 			return errors.New("image dispatch identifier differs from fixed intent")
 		}
@@ -136,4 +149,28 @@ func (s *Store) finishPublish(id, status, externalID string) (PublishIntent, err
 		return nil
 	})
 	return out, err
+}
+
+// This historical proof admits read-only observations after expiry without
+// granting a new mutation. Missing legacy proof, future timestamps and any
+// changed task/decision/intent identity fail closed.
+func publishAuthorizationMatches(st State, i PublishIntent, d ReleaseDecision) bool {
+	if i.AuthorizedAt.IsZero() || i.AuthorizedAt.After(time.Now()) || i.ExpiresAt.IsZero() || !i.AuthorizedAt.Before(i.ExpiresAt) || !i.AuthorizedAt.Before(d.ExpiresAt) || i.ExpiresAt.After(d.ExpiresAt) {
+		return false
+	}
+	if i.Repository != "yu-min3/kensan-lab" || !strings.HasPrefix(i.Ref, "refs/heads/") || i.TargetEnvironment == "" || d.Verdict != "allow" || i.DecisionID != d.ID || i.Operation != d.Operation || i.Repository != d.Repository || i.Ref != d.Ref || i.HeadSHA != d.HeadSHA || i.TargetEnvironment != d.TargetEnvironment || i.PolicyVersion != d.PolicyVersion || d.PolicyVersion != ReleasePolicyVersion {
+		return false
+	}
+	author, ok := st.Agents[d.AuthorAgentID]
+	task, exists := st.Tasks[author.TaskID]
+	if !ok || !exists || task.HeadSHA != i.HeadSHA || !imageReleasesEqual(i.ImageRelease, d.ImageRelease) || !imageDeploymentsEqual(i.ImageDeployment, d.ImageDeployment) {
+		return false
+	}
+	if len(d.HumanCategories) > 0 {
+		inputs := st.Agents[d.GateAgentID].ReviewInputs
+		if len(inputs) == 0 || !approvalMatchesAt(st, d, ReleaseScan{Status: "candidate"}, inputs[len(inputs)-1].SHA256, i.AuthorizedAt) {
+			return false
+		}
+	}
+	return true
 }
