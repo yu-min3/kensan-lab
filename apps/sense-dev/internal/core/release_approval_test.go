@@ -11,11 +11,15 @@ import (
 func classifiedReleaseFixture(t *testing.T, operationOverride ...string) (*Store, ReleaseDecision, ReleaseCandidate, ApprovalRequest) {
 	t.Helper()
 	operation, environment := "pr_create", "github"
+	team := Platform
 	if len(operationOverride) > 0 {
 		operation, environment = operationOverride[0], "private-canary"
 	}
+	if operation == "image_publish" {
+		team = App
+	}
 	s := testStore(t)
-	task, stages, err := s.CreatePlannedTask("golden-path", Platform, "change", "canary", "contract-v1")
+	task, stages, err := s.CreatePlannedTask("golden-path", team, "change", "canary", "contract-v1")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -35,11 +39,14 @@ func classifiedReleaseFixture(t *testing.T, operationOverride ...string) (*Store
 			source = *attempt.OutputRef
 		}
 	}
-	scanRef, err := s.recordReleaseScan(ReleaseScan{Team: Platform, BaseSHA: base, HeadSHA: head, Repository: "yu-min3/kensan-lab", Ref: "refs/heads/feat/canary", Operation: operation, PolicyVersion: ReleasePolicyVersion, Status: "needs_human", HumanCategories: []string{"auth"}, HumanReasons: []string{"authentication policy change"}, CommitCount: 1, DiffSHA256: strings.Repeat("c", 64), ScannedAt: time.Now().UTC()})
+	scanRef, err := s.recordReleaseScan(ReleaseScan{Team: team, BaseSHA: base, HeadSHA: head, Repository: "yu-min3/kensan-lab", Ref: "refs/heads/feat/canary", Operation: operation, PolicyVersion: ReleasePolicyVersion, SourceAppTreeSHA: strings.Repeat("e", 40), Status: "needs_human", HumanCategories: []string{"auth"}, HumanReasons: []string{"authentication policy change"}, CommitCount: 1, DiffSHA256: strings.Repeat("c", 64), ScannedAt: time.Now().UTC()})
 	if err != nil {
 		t.Fatal(err)
 	}
 	candidate := ReleaseCandidate{SchemaVersion: 1, Operation: operation, Repository: "yu-min3/kensan-lab", Ref: "refs/heads/feat/canary", HeadSHA: head, TargetEnvironment: environment, Impact: "private configuration correction", Rollback: "revert change"}
+	if operation == "image_publish" {
+		candidate.ImageRelease = testImageReleaseSpec(head, strings.Repeat("e", 40))
+	}
 	_, gate := taskAgent(t, s, Platform, "release_gate")
 	if err := s.BindReleaseGateInputs(gate.ID, author.ID, []ArtifactRef{source}, scanRef, candidate); err != nil {
 		t.Fatal(err)

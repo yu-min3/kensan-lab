@@ -13,13 +13,17 @@ App が開発し、Platform の独立 Gate を通した操作だけを別プロ�
 
 ## 通常経路
 
-1. operator-owned `-release-plan` が対象 mission・private-canary・影響・rollback・PR要約を固定する。
-2. App/Platform の change が独立4工程と credentialless verifier を完了すると、controller が SHA・操作ごとに scan と Platform Gate を生成する。
-3. `branch_push` → `pr_create` → `merge` は、それぞれ別 Gate。承認は操作間で転用しない。
-4. 認証/secret/公開/統制/破壊に関わる分類は Yu 承認後にも fresh Gate が必要。秘密実値、公開の有効化、所有範囲外は承認でも許可しない。
-5. controller が `RunPublish` の直前検査を行い、認証付き private Unix socket で publisher に渡す。GitHub と Yu の早い方の期限を publisher でも確認する。
-6. `merge` / `deploy` は GitOps の PR merge API に固定。直接 cluster を変更しない。実 merge commit の二親が reviewed base / head と一致するか確認する。
-7. publisher 側の GET-only observer が Argo・private CI artifact・GHCR index/architecture digest・Pod・利用者経路を照合し、controller が system artifact と receipt を記録する。配備証拠のない App 受入は進まない。
+1. operator-owned `-release-plan` がmission、private-canary、影響、rollback、PR要約とimage workflowの固定tag ref・commit W・file SHA-256を指定する。live publisherではworkflow指定必須。
+2. App source Aが独立4工程＋credentialless verifierを完了。`branch_push` と `image_publish` は別のPlatform Gateを通す。
+3. branch push直前にcontrollerが作者checkoutのobjectだけをcredentiallessに読み、base..Aの固定ref bundleを作る。hash・size・base・headを照合してpublisher trusted repoへ取り込み、worker Git config/hooksをcredential processで実行しない。
+4. publisherは既存private GHCR package、unused tag、remote A/tree、workflow W/ref/hashを確認して固定workflowをdispatch。曖昧な結果はdispatch IDで照合し、再送しない。
+5. CI artifactに加え、registry index・両CPUのmanifest/config実体とsource/workflow labelsを照合してdigest Dを記録する。dispatch受理だけでは配備へ進まない。
+6. controllerがAをseedに、original main baseを保持するvalues-only App子task Bを作る。新しい5工程でdigestだけを固定し、Bの `branch_push` → `pr_create` → `merge` は各fresh Gateを通す。
+7. GitOps merge Cはreviewed base/Bの二親と照合。host observerが App tree(A)=tree(B)=tree(C)、values(C).digest=D、Argo revision=C、実Pod image/runtime=D、`/api/release`を確認する。
+8. App受入passでBと元のsource Aを完了する。failはCをbaseとする新source A2へ戻し、imageの再発行と再Gateを行う。元の依頼全体で修正は最大2回。
+9. verified merge graphをbundleでcontroller trusted sourceへ返す。Platform改善と次のApp依頼はその配備済みCをbaseにし、source HEADを手動で進める必要はない。Platform改善でApp treeとDが不変なら証拠を固定してimageを再利用する。
+
+認証/secret/公開/統制/破壊の分類はYu承認後もfresh Gateが必要。秘密実値・公開有効化・所有範囲外は承認でもdeny。`image_publish`にはsource A/tree・workflow ref/SHA/hash・一意tag/dispatch IDを固定し、BへのAの承認転用は許さない。
 
 ## プロセス境界
 
@@ -28,7 +32,7 @@ App が開発し、Platform の独立 Gate を通した操作だけを別プロ�
 | controller | state、限定 bridge auth、release plan | Gate配車、固定policy検査、台帳更新 |
 | model worker | 自team context、task checkout、当該providerの購読認証 | 開発・レビュー。publisher socket/管理tokenへのアクセス不可 |
 | verifier | task checkout、operator固定test plan | credentialなしの隔離検証 |
-| publisher daemon | repo限定GitHub token、専用askpass、bridge auth | 固定repoへの許可済みpush/PR/merge |
+| publisher daemon | repo限定GitHub token、専用askpass、bridge auth | 固定repoへの許可済みpush/PR/merge、固定private image dispatch |
 | host observer（daemon内） | GET-only kubeconfig/GitHub/GHCR token、固定観測plan | private canaryの観測 |
 
 Unix socket は原則0600。別host user間では専用groupの0660を明示し、親directoryはgroup/world writableにしない。bridge secretは両processへそれぞれ0600のfileで配置し、modelのmountから除外する。daemonは一般web listenerを作らない。既存socketが残る場合は所有者を照合し、稼働daemonのsocketを自動で削除しない。
@@ -50,12 +54,17 @@ daemonは `-serve-socket <socket> -controller-auth-file <publisher-copy> -repo <
 
 従来の単発CLIはcontroller停止中のみに使う。稼働controllerと同じstateを開けばsingle-writer lockで拒否される。通常経路はdaemon bridgeを使う。
 
-## 未完の接続
+## 観測先と導入前提
 
-| タスク | 残り | 現在の挙動 |
-|---|---|---|
-| T057 | Gate固定image発行→digestをvaluesへ固定→再Gate | 手動workflow_dispatchが必要。mergeだけでimage成功と扱わない |
-| T058 | reviewed commit graph移送、verified mergeのtrusted source反映 | publisher repoに作者commitがなければpush拒否。改善baseのmergedcommitがなければcheckout拒否 |
-| T037 / T027 / T052 | 正規Backstage生成、private配布、Argo実配備、一巡の実測 | 実証なし。local fixtureを代用しない |
+`-observer-plan` の固定 `probe_ip` は従来互換。自律rolloutではoperatorがprivate Pod subnetの `probe_cidr` を固定し、`probe_ip` と排他で使う。hostはnamespace・image@digest・runtime digestをすべて照合済みのready PodだけからCIDR内IPを選ぶ。固定port/path/release marker、proxy禁止、redirect禁止は維持する。CIDRはIPv4 RFC1918内に完全包含し、public・0/0・曖昧prefix・IPv6を拒否する。CIDR境界の実設定は導入審査対象。
 
-現在のchartはtag形式のため、immutable digestを要求するobserverの成功条件にはまだ到達しない。image source、reviewed App head、GitOps merge revisionを混同せず、次のimage経路ではApp treeの同一性まで検証する。
+| 必要な前提 | 欠けたとき |
+|---|---|
+| 実canary source/values・locked test plan | checkout / verifierが進まない |
+| main上のcanary check、strict required checks/admin enforcement | mergeを拒否 |
+| protected tagのworkflow Wとfile hash、既存private GHCR package | image dispatchを拒否。初回package作成を自動で補わない |
+| daemon `-commit-transfer`、private bridge、限定GitHub credential | branch push / merge返却を拒否 |
+| GET-only observer credential、実Argo/cluster、固定CIDR/marker | host receiptとApp受入を待つ |
+| モデル追加使用OFFのfresh確認、JST inference window | 推論開始を待つ |
+
+この接続はlocalの実Git・fake外部transport・hash付きfixtureで検証する。実GitHub image公開、実Argo配備、実モデルGateの証拠はT037/T027/T052で記録し、local成功を代用しない。

@@ -6,7 +6,6 @@ import (
 	"errors"
 	"io"
 	"reflect"
-	"regexp"
 	"strings"
 
 	"gopkg.in/yaml.v3"
@@ -146,8 +145,6 @@ func appValuesChange(before, after []byte) error {
 	return nil
 }
 
-var imageValuePattern = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._/:@-]*$`)
-
 func validAppImage(value any) error {
 	image, ok := value.(map[string]any)
 	if !ok || len(image) == 0 {
@@ -155,11 +152,22 @@ func validAppImage(value any) error {
 	}
 	for key, value := range image {
 		s, ok := value.(string)
-		if !ok || !imageValuePattern.MatchString(s) || len(s) > 512 {
+		if !ok || len(s) > 512 {
 			return errors.New("invalid image field")
 		}
 		switch key {
-		case "repository", "tag":
+		case "repository":
+			if s != CanaryImageRepository {
+				return errors.New("App image repository outside fixed private canary")
+			}
+		case "tag":
+			if s != "" && !imageTagPattern.MatchString(s) {
+				return errors.New("invalid image tag")
+			}
+		case "digest":
+			if s != "" && !imageDigestPattern.MatchString(s) {
+				return errors.New("invalid image digest")
+			}
 		case "pullPolicy":
 			if s != "Always" && s != "IfNotPresent" && s != "Never" {
 				return errors.New("invalid pull policy")
@@ -168,8 +176,10 @@ func validAppImage(value any) error {
 			return errors.New("unknown image key")
 		}
 	}
-	if image["repository"] == nil || image["tag"] == nil {
-		return errors.New("image repository and tag required")
+	tag, _ := image["tag"].(string)
+	digest, _ := image["digest"].(string)
+	if image["repository"] == nil || (tag == "") == (digest == "") {
+		return errors.New("image repository and exactly one tag or digest required")
 	}
 	return nil
 }

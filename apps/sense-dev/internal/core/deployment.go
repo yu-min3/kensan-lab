@@ -10,7 +10,7 @@ import (
 // RecordDeploymentReceipt is a trusted host/operator entry point. Worker outputs
 // cannot create this system-owned observation of the actual deployment.
 func (s *Store) RecordDeploymentReceipt(r DeploymentReceipt) error {
-	if !validReleaseMarker(r.ObservedRelease) || !fullSHA(r.HeadSHA) || !fullSHA(r.Revision) || r.ImageSourceSHA != r.Revision || r.Environment != "private-canary" || r.Status != "healthy" || strings.TrimSpace(r.UserPath) == "" || !strings.HasPrefix(r.ImageDigest, "sha256:") || len(r.ImageDigest) != 71 {
+	if !validReleaseMarker(r.ObservedRelease) || !fullSHA(r.HeadSHA) || !fullSHA(r.Revision) || !fullSHA(r.ImageSourceSHA) || r.Environment != "private-canary" || r.Status != "healthy" || strings.TrimSpace(r.UserPath) == "" || !strings.HasPrefix(r.ImageDigest, "sha256:") || len(r.ImageDigest) != 71 {
 		return errors.New("deployment needs pinned revision, digest, private environment and healthy user path")
 	}
 	for _, ch := range r.ImageDigest[7:] {
@@ -40,6 +40,9 @@ func (s *Store) RecordDeploymentReceipt(r DeploymentReceipt) error {
 		if !ok || task.Kind != "change" || task.HeadSHA != r.HeadSHA || task.Status != "publish_wait" || !okD || !okI || d.Verdict != "allow" || d.TargetEnvironment != r.Environment || d.HeadSHA != r.HeadSHA || d.Operation != "deploy" && d.Operation != "merge" || !d.ExpiresAt.After(time.Now()) || d.PolicyVersion != ReleasePolicyVersion || st.Agents[d.AuthorAgentID].TaskID != task.ID || intent.DecisionID != d.ID || intent.Status != "sent" || intent.HeadSHA != r.HeadSHA || intent.Operation != d.Operation || intent.ExternalID != r.Revision {
 			return errors.New("deployment is not a sent, approved current task operation")
 		}
+		if !receiptImageMatches(intent, d, r) {
+			return errors.New("deployment image differs from approved provenance")
+		}
 		if old, exists := st.Deployments[r.TaskID]; exists && old.HeadSHA == r.HeadSHA {
 			if old.DecisionID == r.DecisionID && old.ImageDigest == r.ImageDigest && old.EvidenceRef == r.EvidenceRef {
 				return nil
@@ -57,7 +60,7 @@ func appDeploymentReady(st State, task Task) bool {
 	r, ok := st.Deployments[task.ID]
 	d, okD := st.Decisions[r.DecisionID]
 	intent, okI := st.Intents[r.IntentID]
-	return ok && okD && okI && validReleaseMarker(r.ObservedRelease) && r.HeadSHA == task.HeadSHA && fullSHA(r.Revision) && r.ImageSourceSHA == r.Revision && intent.ExternalID == r.Revision && r.Status == "healthy" && r.Environment == "private-canary" && r.RecordedAt.Before(d.ExpiresAt) && d.Verdict == "allow" && d.HeadSHA == task.HeadSHA && d.PolicyVersion == ReleasePolicyVersion && d.TargetEnvironment == r.Environment && (d.Operation == "deploy" || d.Operation == "merge") && st.Agents[d.AuthorAgentID].TaskID == task.ID && intent.DecisionID == d.ID && intent.Status == "sent" && intent.HeadSHA == task.HeadSHA && intent.Operation == d.Operation
+	return ok && okD && okI && validReleaseMarker(r.ObservedRelease) && r.HeadSHA == task.HeadSHA && fullSHA(r.Revision) && receiptImageMatches(intent, d, r) && intent.ExternalID == r.Revision && r.Status == "healthy" && r.Environment == "private-canary" && r.RecordedAt.Before(d.ExpiresAt) && d.Verdict == "allow" && d.HeadSHA == task.HeadSHA && d.PolicyVersion == ReleasePolicyVersion && d.TargetEnvironment == r.Environment && (d.Operation == "deploy" || d.Operation == "merge") && st.Agents[d.AuthorAgentID].TaskID == task.ID && intent.DecisionID == d.ID && intent.Status == "sent" && intent.HeadSHA == task.HeadSHA && intent.Operation == d.Operation
 }
 
 func validReleaseMarker(value string) bool {
@@ -70,4 +73,12 @@ func validReleaseMarker(value string) bool {
 		}
 	}
 	return true
+}
+
+func receiptImageMatches(i PublishIntent, d ReleaseDecision, r DeploymentReceipt) bool {
+	if i.ImageDeployment == nil {
+		return d.ImageDeployment == nil && r.ImageSourceSHA == r.Revision
+	}
+	p := i.ImageDeployment
+	return ValidateImageDeploymentSpec(*p) == nil && imageDeploymentsEqual(p, d.ImageDeployment) && r.ImageSourceSHA == p.SourceSHA && r.ImageDigest == p.Digest
 }

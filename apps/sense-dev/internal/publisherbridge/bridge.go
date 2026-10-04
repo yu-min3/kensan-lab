@@ -18,6 +18,7 @@ import (
 	"time"
 
 	"github.com/yu-min3/kensan-lab/apps/sense-dev/internal/core"
+	"github.com/yu-min3/kensan-lab/apps/sense-dev/internal/publisher"
 )
 
 type Client struct{ Socket, AuthFile string }
@@ -27,9 +28,10 @@ type request struct {
 	Intent core.PublishIntent `json:"intent"`
 }
 type response struct {
-	ExternalID  string                  `json:"external_id"`
-	Exists      bool                    `json:"exists"`
-	Observation *core.DeploymentReceipt `json:"observation,omitempty"`
+	ExternalID    string                   `json:"external_id"`
+	Exists        bool                     `json:"exists"`
+	Observation   *core.DeploymentReceipt  `json:"observation,omitempty"`
+	ImageEvidence *publisher.ImageEvidence `json:"image_evidence,omitempty"`
 }
 
 func readAuth(path string) (string, error) {
@@ -118,7 +120,7 @@ func (c Client) Execute(ctx context.Context, i core.PublishIntent) (string, erro
 	return r.ExternalID, e
 }
 
-type ObservationFunc func(context.Context, string, string) (core.DeploymentReceipt, error)
+type ObservationFunc func(context.Context, string, string, core.ImageDeploymentSpec) (core.DeploymentReceipt, error)
 
 // Observe receives host evidence only through the authenticated publisher socket.
 func (c Client) Observe(ctx context.Context, i core.PublishIntent, taskID string) (core.DeploymentReceipt, error) {
@@ -139,6 +141,12 @@ func Handler(authFile string, transport core.PublishTransport) (http.Handler, er
 }
 
 func HandlerWithObserver(authFile string, transport core.PublishTransport, observe ObservationFunc) (http.Handler, error) {
+	return HandlerWithImageEvidence(authFile, transport, observe, nil)
+}
+
+type ImageEvidenceFunc func(context.Context, core.PublishIntent) (publisher.ImageEvidence, error)
+
+func HandlerWithImageEvidence(authFile string, transport core.PublishTransport, observe ObservationFunc, imageEvidence ImageEvidenceFunc) (http.Handler, error) {
 	auth, err := readAuth(authFile)
 	if err != nil {
 		return nil, err
@@ -165,7 +173,7 @@ func HandlerWithObserver(authFile string, transport core.PublishTransport, obser
 			return
 		}
 		i := input.Intent
-		if input.Action != "inspect" && input.Action != "execute" && input.Action != "observe" || i.ID == "" || i.DecisionID == "" || i.Repository != "yu-min3/kensan-lab" || i.PolicyVersion != core.ReleasePolicyVersion || !strings.HasPrefix(i.Ref, "refs/heads/") || i.HeadSHA == "" || (i.Operation != "branch_push" && i.Operation != "pr_create" && i.Operation != "merge" && i.Operation != "deploy") {
+		if input.Action != "inspect" && input.Action != "execute" && input.Action != "observe" && input.Action != "image_evidence" || i.ID == "" || i.DecisionID == "" || i.Repository != "yu-min3/kensan-lab" || i.PolicyVersion != core.ReleasePolicyVersion || !strings.HasPrefix(i.Ref, "refs/heads/") || i.HeadSHA == "" || (i.Operation != "branch_push" && i.Operation != "pr_create" && i.Operation != "merge" && i.Operation != "deploy" && i.Operation != "image_publish") {
 			reject(http.StatusForbidden)
 			return
 		}
@@ -175,8 +183,19 @@ func HandlerWithObserver(authFile string, transport core.PublishTransport, obser
 		}
 		var result response
 		var err error
-		if input.Action == "observe" {
-			if observe == nil || input.TaskID == "" || i.Status != "sent" || (i.Operation != "merge" && i.Operation != "deploy") || i.ExternalID == "" {
+		if input.Action == "image_evidence" {
+			if imageEvidence == nil || i.Status != "sent" || i.Operation != "image_publish" || i.ImageRelease == nil || core.ValidateImageReleaseSpec(*i.ImageRelease) != nil || i.ImageRelease.SourceSHA != i.HeadSHA || i.ExternalID != i.ImageRelease.DispatchID || i.TargetEnvironment != "private-canary" {
+				reject(http.StatusForbidden)
+				return
+			}
+			evidence, e := imageEvidence(r.Context(), i)
+			if e != nil || !imageEvidenceMatches(i, evidence) {
+				reject(http.StatusBadGateway)
+				return
+			}
+			result.ImageEvidence = &evidence
+		} else if input.Action == "observe" {
+			if observe == nil || i.ImageDeployment == nil || core.ValidateImageDeploymentSpec(*i.ImageDeployment) != nil || input.TaskID == "" || i.Status != "sent" || (i.Operation != "merge" && i.Operation != "deploy") || i.ExternalID == "" {
 				reject(http.StatusForbidden)
 				return
 			}
@@ -185,7 +204,7 @@ func HandlerWithObserver(authFile string, transport core.PublishTransport, obser
 				reject(http.StatusBadGateway)
 				return
 			}
-			receipt, e := observe(r.Context(), i.HeadSHA, revision)
+			receipt, e := observe(r.Context(), i.HeadSHA, revision, *i.ImageDeployment)
 			if e != nil {
 				reject(http.StatusBadGateway)
 				return

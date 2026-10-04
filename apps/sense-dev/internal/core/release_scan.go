@@ -93,6 +93,9 @@ func ScanGitRangeForTeam(repoPath, baseSHA, headSHA, operation, ref string, team
 	if team != App && team != Platform {
 		return ReleaseScan{}, errors.New("unknown release author team")
 	}
+	if operation == "image_publish" && team != App {
+		return ReleaseScan{}, errors.New("image publish belongs to App team")
+	}
 	if !fullSHA(baseSHA) || !fullSHA(headSHA) || !allowedOperations[operation] || !strings.HasPrefix(ref, "refs/heads/") {
 		return ReleaseScan{}, errors.New("invalid release scan target")
 	}
@@ -213,6 +216,20 @@ func ScanGitRangeForTeam(repoPath, baseSHA, headSHA, operation, ref string, team
 		}
 	}
 	report := ReleaseScan{Team: team, BaseSHA: baseSHA, HeadSHA: headSHA, Repository: "yu-min3/kensan-lab", Ref: ref, Operation: operation, PolicyVersion: ReleasePolicyVersion, CommitCount: len(commits), DiffSHA256: hex.EncodeToString(hash.Sum(nil)), ScannedAt: time.Now().UTC()}
+	if operation == "image_publish" {
+		if team != App {
+			return ReleaseScan{}, errors.New("image publish belongs to App team")
+		}
+		tree, err := gitEvidence(ctx, root, "rev-parse", "--verify", headSHA+":apps/canary")
+		if err != nil || !fullSHA(strings.TrimSpace(string(tree))) {
+			return ReleaseScan{}, errors.New("image source lacks canary App tree")
+		}
+		kind, err := gitEvidence(ctx, root, "cat-file", "-t", strings.TrimSpace(string(tree)))
+		if err != nil || strings.TrimSpace(string(kind)) != "tree" {
+			return ReleaseScan{}, errors.New("image source App entry is not a tree")
+		}
+		report.SourceAppTreeSHA = strings.TrimSpace(string(tree))
+	}
 	for path := range paths {
 		report.ChangedPaths = append(report.ChangedPaths, path)
 	}
@@ -284,6 +301,9 @@ func (s *Store) ScanAndRecordReleaseForTeam(repoPath, baseSHA, headSHA, operatio
 }
 
 func (s *Store) recordReleaseScan(scan ReleaseScan) (ArtifactRef, error) {
+	if scan.Operation == "image_publish" && (scan.Team != App || !githubCommitPattern.MatchString(scan.SourceAppTreeSHA)) {
+		return ArtifactRef{}, errors.New("image scan needs controller-owned App tree identity")
+	}
 	if !fullSHA(scan.BaseSHA) || !fullSHA(scan.HeadSHA) || scan.Repository != "yu-min3/kensan-lab" || scan.PolicyVersion != ReleasePolicyVersion || scan.DiffSHA256 == "" || scan.CommitCount < 1 || scan.ScannedAt.IsZero() {
 		return ArtifactRef{}, errors.New("incomplete release scan")
 	}

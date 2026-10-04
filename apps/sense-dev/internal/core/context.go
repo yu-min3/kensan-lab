@@ -66,6 +66,24 @@ func (s *Store) BuildManifest(agentID string, allowedScope []string) (ContextMan
 		return ContextManifest{}, errors.New("team knowledge is not seeded")
 	}
 	m := ContextManifest{SchemaVersion: SchemaVersion, MissionID: t.MissionID, TaskID: t.ID, SourceTaskID: t.SourceTaskID, CheckoutSourceTaskID: t.CheckoutSourceTaskID, Team: a.Team, Role: a.Role, AgentID: a.ID, Provider: a.Provider, Model: a.Model, Generation: a.SessionGeneration, TeamProfile: artifactRef(profile), TeamKnowledge: artifactRef(knowledge), CommonKnowledge: artifactRef(common), Inbox: []ArtifactRef{}, StageInputs: []StageInput{}, ReviewInputs: append([]ArtifactRef{}, a.ReviewInputs...), ReviewAuthorID: a.ReviewAuthorID, MessageIDs: []string{}, ContractVersion: t.ContractVersion, BaseSHA: t.BaseSHA, HeadSHA: t.HeadSHA, AllowedScope: append([]string(nil), allowedScope...)}
+	if t.ImageSourceTaskID != "" {
+		r, ok := st.ImageReleases[t.ImageSourceTaskID]
+		source := st.Tasks[t.ImageSourceTaskID]
+		if !ok || t.Team != App || t.Kind != "change" || t.SourceTaskID != "" || t.CheckoutSourceTaskID != "" || r.DeploymentTaskID != t.ID || source.HeadSHA != r.Image.SourceSHA || source.BaseSHA != t.BaseSHA || source.MissionID != t.MissionID || source.ContractVersion != t.ContractVersion || ValidateImageDeploymentSpec(r.Image) != nil {
+			return ContextManifest{}, errors.New("image deployment lacks current host image evidence")
+		}
+		if err := s.verifyRef(r.EvidenceRef); err != nil {
+			return ContextManifest{}, err
+		}
+		artifact := st.Artifacts[r.EvidenceRef.ID]
+		if artifact.AgentID != "system" || artifact.Kind != "image_release_observation" {
+			return ContextManifest{}, errors.New("image evidence is not host owned")
+		}
+		ref := r.EvidenceRef
+		m.ImageEvidence = &ref
+		m.ImageSourceTaskID = source.ID
+		m.ImageSourceSHA = r.Image.SourceSHA
+	}
 	if t.CheckoutSourceTaskID != "" {
 		source, ok := st.Tasks[t.CheckoutSourceTaskID]
 		if !ok || t.Team != Platform || t.Kind != "change" || t.SourceTaskID != "" || source.Team != App || source.Kind != "change" || !appDeploymentReady(st, source) || t.BaseSHA != st.Deployments[source.ID].Revision || t.MissionID != source.MissionID || t.ContractVersion != source.ContractVersion {

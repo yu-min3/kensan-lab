@@ -1,0 +1,157 @@
+name: Private canary image
+run-name: sense-image-${{ inputs.dispatch_id }}
+
+on:
+  workflow_dispatch:
+    inputs:
+      source_sha:
+        description: Gate-reviewed App commit SHA
+        required: true
+        type: string
+      source_app_tree_sha:
+        description: Gate-reviewed apps/canary Git tree SHA
+        required: true
+        type: string
+      image_tag:
+        description: Immutable sense tag for this dispatch
+        required: true
+        type: string
+      dispatch_id:
+        description: Gate-pinned 32-digit hexadecimal dispatch ID
+        required: true
+        type: string
+      expected_workflow_sha:
+        description: Gate-reviewed commit containing this workflow
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: canary-image-private
+  cancel-in-progress: false
+
+env:
+  IMAGE: ghcr.io/yu-min3/kensan-lab/canary
+  SOURCE_SHA: ${{ inputs.source_sha }}
+  SOURCE_TREE_SHA: ${{ inputs.source_app_tree_sha }}
+  IMAGE_TAG: ${{ inputs.image_tag }}
+  DISPATCH_ID: ${{ inputs.dispatch_id }}
+  WORKFLOW_SHA: ${{ inputs.expected_workflow_sha }}
+
+jobs:
+  image:
+    if: github.event_name == 'workflow_dispatch' && github.repository == 'yu-min3/kensan-lab'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - name: Bind trusted workflow and reviewed App source
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ "$SOURCE_SHA" =~ ^[0-9a-f]{40}$ ]]
+          [[ "$SOURCE_TREE_SHA" =~ ^[0-9a-f]{40}$ ]]
+          [[ "$WORKFLOW_SHA" =~ ^[0-9a-f]{40}$ ]]
+          [[ "$DISPATCH_ID" =~ ^[0-9a-f]{32}$ ]]
+          [[ "$IMAGE_TAG" == "sense-${SOURCE_SHA}-${DISPATCH_ID}" ]]
+          [[ "$GITHUB_SHA" == "$WORKFLOW_SHA" ]]
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          repository: yu-min3/kensan-lab
+          ref: ${{ inputs.source_sha }}
+          path: source
+          persist-credentials: false
+          fetch-depth: 1
+      - name: Prove source commit and canary subtree before build
+        shell: bash
+        working-directory: source
+        run: |
+          set -euo pipefail
+          [[ "$(git rev-parse HEAD)" == "$SOURCE_SHA" ]]
+          [[ "$(git rev-parse HEAD:apps/canary)" == "$SOURCE_TREE_SHA" ]]
+          test -f apps/canary/Dockerfile
+      - name: Verify existing private package and unused immutable tag
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          python3 - <<'PY'
+          import json, os, urllib.request
+          opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
+          url = 'https://api.github.com/users/yu-min3/packages/container/kensan-lab%2Fcanary'
+          headers = {'Authorization': 'Bearer ' + os.environ['GH_TOKEN'], 'Accept': 'application/vnd.github+json', 'X-GitHub-Api-Version': '2022-11-28'}
+          def get(address):
+              with opener.open(urllib.request.Request(address, headers=headers), timeout=20) as response:
+                  return json.load(response)
+          package = get(url)  # No bootstrap path: 404 is a hard failure.
+          if package.get('visibility') != 'private' or package.get('repository', {}).get('full_name') != 'yu-min3/kensan-lab':
+              raise SystemExit('Existing GHCR package is not private and repo-bound')
+          for page in range(1, 11):
+              versions = get(url + '/versions?per_page=100&page=' + str(page))
+              if any(os.environ['IMAGE_TAG'] in v.get('metadata', {}).get('container', {}).get('tags', []) for v in versions):
+                  raise SystemExit('Immutable image tag already exists')
+              if len(versions) < 100:
+                  break
+          else:
+              raise SystemExit('Complete tag history could not be checked')
+          PY
+      - uses: docker/setup-qemu-action@c7c53464625b32c7a7e944ae62b3e17d2b600130 # v3
+      - uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
+      - name: Test both release architectures without publishing
+        run: docker buildx build --platform linux/amd64,linux/arm64 --target test source/apps/canary
+      - uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6
+        id: publish
+        with:
+          context: source/apps/canary
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ${{ env.IMAGE }}:${{ env.IMAGE_TAG }}
+          labels: |
+            org.opencontainers.image.source=https://github.com/yu-min3/kensan-lab
+            org.opencontainers.image.revision=${{ inputs.source_sha }}
+            dev.kensan.workflow-sha=${{ inputs.expected_workflow_sha }}
+      - name: Verify private package and write source-bound digest artifact
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          IMAGE_DIGEST: ${{ steps.publish.outputs.digest }}
+        run: |
+          python3 - <<'PY'
+          import json, os, re, urllib.request
+          opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
+          url = 'https://api.github.com/users/yu-min3/packages/container/kensan-lab%2Fcanary'
+          headers = {'Authorization': 'Bearer ' + os.environ['GH_TOKEN'], 'Accept': 'application/vnd.github+json', 'X-GitHub-Api-Version': '2022-11-28'}
+          with opener.open(urllib.request.Request(url, headers=headers), timeout=20) as response:
+              package = json.load(response)
+          if package.get('visibility') != 'private' or package.get('repository', {}).get('full_name') != 'yu-min3/kensan-lab':
+              raise SystemExit('Private GHCR package changed after publish')
+          digest = os.environ['IMAGE_DIGEST']
+          if not re.fullmatch(r'sha256:[0-9a-f]{64}', digest):
+              raise SystemExit('Build did not return an immutable digest')
+          record = {
+              'repository': 'yu-min3/kensan-lab',
+              'image': os.environ['IMAGE'],
+              'source_sha': os.environ['SOURCE_SHA'],
+              'source_app_tree_sha': os.environ['SOURCE_TREE_SHA'],
+              'tag': os.environ['IMAGE_TAG'],
+              'digest': digest,
+              'visibility': 'private',
+              'dispatch_id': os.environ['DISPATCH_ID'],
+              'workflow_sha': os.environ['WORKFLOW_SHA'],
+          }
+          with open('canary-image.json', 'x') as output:
+              json.dump(record, output, sort_keys=True)
+          PY
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: canary-image-${{ inputs.dispatch_id }}
+          path: canary-image.json
+          if-no-files-found: error
+          retention-days: 14

@@ -62,7 +62,19 @@ func prepareReadyWorktrees(ctx context.Context, store *core.Store, manager workt
 			if task.BaseSHA != "" {
 				continue
 			}
-			_, base, err = manager.Ensure(ctx, task.ID, "")
+			pinned := ""
+			if task.Kind == "change" {
+				var latest time.Time
+				for sourceID, r := range state.Deployments {
+					source := state.Tasks[sourceID]
+					intent := state.Intents[r.IntentID]
+					if source.MissionID == task.MissionID && r.Status == "healthy" && r.Environment == "private-canary" && intent.Status == "sent" && intent.ExternalID == r.Revision && intent.ImageDeployment != nil && r.RecordedAt.After(latest) {
+						pinned = r.Revision
+						latest = r.RecordedAt
+					}
+				}
+			}
+			_, base, err = manager.Ensure(ctx, task.ID, pinned)
 			if err == nil {
 				err = store.SetBaseSHA(task.ID, base)
 			}

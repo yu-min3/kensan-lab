@@ -113,6 +113,9 @@ func run() error {
 		if err != nil {
 			return err
 		}
+		if *publisherSocket != "" && plan.ImageWorkflow == nil {
+			return errors.New("live publisher requires a pinned private image workflow plan")
+		}
 		releaseDriver = &core.ReleaseDriver{Store: store, Plan: plan, WorktreeRoot: *worktreeRoot}
 	}
 	mode := "off"
@@ -255,19 +258,29 @@ func run() error {
 						}
 					}
 					if releaseDriver != nil {
+						if _, err := store.ReconcileImageDeployments(releaseDriver.Plan.MissionID); err != nil {
+							log.Print("image deployment planning needs inspection")
+						}
 						if _, err := releaseDriver.Reconcile(ctx); err != nil {
 							log.Print("release flow requires operator inspection")
 						}
 					}
 					if releaseDriver != nil && *publisherSocket != "" && !time.Now().Before(nextPublish) {
 						nextPublish = time.Now().Add(time.Minute)
-						if err := releaseDriver.PublishReady(ctx, publisherbridge.Client{Socket: *publisherSocket, AuthFile: *publisherAuth}); err != nil {
+						if err := releaseDriver.PublishReady(ctx, preparedPublisher{Client: publisherbridge.Client{Socket: *publisherSocket, AuthFile: *publisherAuth}, Store: store, WorktreeRoot: *worktreeRoot}); err != nil {
 							log.Print("publisher reconciliation needs operator inspection")
 						}
 					}
 
 					if releaseDriver != nil && *publisherSocket != "" && !time.Now().Before(nextObservation) {
 						nextObservation = time.Now().Add(time.Minute)
+						if err := observeImages(ctx, store, publisherbridge.Client{Socket: *publisherSocket, AuthFile: *publisherAuth}, releaseDriver.Plan.MissionID); err != nil {
+							log.Print("image CI observation incomplete; GitOps remains waiting")
+						}
+						if err := importMergedCommits(ctx, store, publisherbridge.Client{Socket: *publisherSocket, AuthFile: *publisherAuth}, *sourceRepo, releaseDriver.Plan.MissionID); err != nil {
+							log.Print("verified merged commit transfer incomplete; Platform improvement remains waiting")
+						}
+
 						if err := observeDeployments(ctx, store, publisherbridge.Client{Socket: *publisherSocket, AuthFile: *publisherAuth}, releaseDriver.Plan.MissionID); err != nil {
 							log.Print("deployment observation incomplete; App acceptance remains waiting")
 						}

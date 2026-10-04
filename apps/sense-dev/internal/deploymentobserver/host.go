@@ -25,7 +25,7 @@ type HostSources struct {
 	ReleaseSource ReleaseSource
 }
 type ReleaseSource interface {
-	Release(context.Context, Plan, string) (ReleaseProof, error)
+	Release(context.Context, Plan, ImageSpec, string, string) (ReleaseProof, error)
 }
 
 func (h HostSources) Application(ctx context.Context, p Plan) (ApplicationState, error) {
@@ -34,11 +34,11 @@ func (h HostSources) Application(ctx context.Context, p Plan) (ApplicationState,
 func (h HostSources) Pods(ctx context.Context, p Plan) ([]PodState, error) {
 	return h.Kube.Pods(ctx, p)
 }
-func (h HostSources) Release(ctx context.Context, p Plan, revision string) (ReleaseProof, error) {
+func (h HostSources) Release(ctx context.Context, p Plan, spec ImageSpec, reviewed, revision string) (ReleaseProof, error) {
 	if h.ReleaseSource == nil {
 		return ReleaseProof{}, errors.New("trusted CI and registry proof source unavailable")
 	}
-	return h.ReleaseSource.Release(ctx, p, revision)
+	return h.ReleaseSource.Release(ctx, p, spec, reviewed, revision)
 }
 func (h HostSources) Probe(ctx context.Context, p Plan) (UserPathState, error) {
 	return HTTPProbe(ctx, p)
@@ -163,6 +163,9 @@ func (k KubeCLI) Pods(ctx context.Context, p Plan) ([]PodState, error) {
 func HTTPProbe(ctx context.Context, p Plan) (UserPathState, error) {
 	if err := p.validate(); err != nil {
 		return UserPathState{}, err
+	}
+	if !p.ProbeIP.IsValid() || p.ProbeCIDR.IsValid() {
+		return UserPathState{}, errors.New("probe CIDR must first resolve to a host-verified Pod IP")
 	}
 	address := net.JoinHostPort(p.ProbeIP.String(), strconv.Itoa(int(p.ProbePort)))
 	dialer := &net.Dialer{Timeout: 5 * time.Second}

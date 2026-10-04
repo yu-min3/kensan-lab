@@ -14,6 +14,12 @@ type PublishTransport interface {
 	Execute(context.Context, PublishIntent) (externalID string, err error)
 }
 
+// PublishPreparer transfers validated local inputs without publishing. A
+// failed preparation leaves a pending intent retryable and never ambiguous.
+type PublishPreparer interface {
+	Prepare(context.Context, PublishIntent) error
+}
+
 // RunPublish accepts only a freshly prepared, live allow intent. A recovered
 // sending/unknown attempt can be inspected, but never automatically retried.
 func (s *Store) RunPublish(ctx context.Context, decisionID string, transport PublishTransport) (PublishIntent, error) {
@@ -22,7 +28,7 @@ func (s *Store) RunPublish(ctx context.Context, decisionID string, transport Pub
 	}
 	st := s.Snapshot()
 	d, ok := st.Decisions[decisionID]
-	if !ok || d.Operation != "branch_push" && d.Operation != "pr_create" && d.Operation != "merge" && d.Operation != "deploy" {
+	if !ok || d.Operation != "branch_push" && d.Operation != "pr_create" && d.Operation != "merge" && d.Operation != "deploy" && d.Operation != "image_publish" {
 		return PublishIntent{}, errors.New("unsupported publisher operation")
 	}
 	var intent PublishIntent
@@ -65,6 +71,11 @@ func (s *Store) RunPublish(ctx context.Context, decisionID string, transport Pub
 	if err != nil {
 		return PublishIntent{}, err
 	}
+	if preparer, ok := transport.(PublishPreparer); ok {
+		if err := preparer.Prepare(ctx, intent); err != nil {
+			return PublishIntent{}, err
+		}
+	}
 	// The decision may expire during remote inspection. Recheck it under the
 	// single writer lock immediately before the external operation.
 	err = s.update(func(st *State) error {
@@ -72,6 +83,9 @@ func (s *Store) RunPublish(ctx context.Context, decisionID string, transport Pub
 		decision := st.Decisions[decisionID]
 		if current.Status != "pending_reconcile" || decision.Verdict != "allow" || !time.Now().Before(decision.ExpiresAt) || current.ExpiresAt.IsZero() || !time.Now().Before(current.ExpiresAt) || current.ExpiresAt.After(decision.ExpiresAt) || decision.HeadSHA != intent.HeadSHA || st.Tasks[st.Agents[decision.AuthorAgentID].TaskID].HeadSHA != intent.HeadSHA || current.Operation != decision.Operation || current.Repository != decision.Repository || current.Ref != decision.Ref || current.HeadSHA != decision.HeadSHA || current.BaseSHA != scan.BaseSHA || current.TargetEnvironment != decision.TargetEnvironment || current.PolicyVersion != decision.PolicyVersion {
 			return errors.New("publish authorization changed before execution")
+		}
+		if !imageReleasesEqual(current.ImageRelease, decision.ImageRelease) || !imageDeploymentsEqual(current.ImageDeployment, decision.ImageDeployment) {
+			return errors.New("image release inputs changed before execution")
 		}
 		author, gate := st.Agents[decision.AuthorAgentID], st.Agents[decision.GateAgentID]
 		if !scanMatchesAuthorTeam(scan, author, st.Tasks[author.TaskID]) || author.Team == App && (gate.Team != Platform || st.Tasks[gate.TaskID].Team != Platform) {
@@ -108,6 +122,9 @@ func (s *Store) finishPublish(id, status, externalID string) (PublishIntent, err
 		intent, ok := st.Intents[id]
 		if !ok || intent.Status != "sending" && intent.Status != "unknown" && intent.Status != "pending_reconcile" {
 			return errors.New("publish intent state changed")
+		}
+		if status == "sent" && intent.Operation == "image_publish" && (intent.ImageRelease == nil || externalID != intent.ImageRelease.DispatchID) {
+			return errors.New("image dispatch identifier differs from fixed intent")
 		}
 		if status == "sent" && externalID == "" || status != "sent" && externalID != "" {
 			return errors.New("invalid publish result")

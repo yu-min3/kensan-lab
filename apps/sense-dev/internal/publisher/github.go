@@ -26,16 +26,23 @@ var commitSHA = regexp.MustCompile(`^[0-9a-f]{40}$`)
 // GitHub has no controller or worker credential. It runs only in the separate
 // publisher process with a repo-scoped token file and a dedicated askpass.
 type GitHub struct {
-	RepoPath  string
-	TokenFile string
-	Askpass   string
-	Client    *http.Client
-	API       string // test override; production must use api.github.com
+	RepoPath    string
+	TokenFile   string
+	Askpass     string
+	Client      *http.Client
+	API         string // test override; production must use api.github.com
+	RegistryAPI string // loopback-only test override; production uses ghcr.io
 }
 
 func (g GitHub) validate(i core.PublishIntent) (string, error) {
-	if i.Repository != repository || !strings.HasPrefix(i.Ref, "refs/heads/") || i.Ref == "refs/heads/main" || i.Ref == "refs/heads/master" || !commitSHA.MatchString(i.HeadSHA) || i.Operation != "branch_push" && i.Operation != "pr_create" && i.Operation != "merge" && i.Operation != "deploy" {
+	if i.Repository != repository || !strings.HasPrefix(i.Ref, "refs/heads/") || i.Ref == "refs/heads/main" || i.Ref == "refs/heads/master" || !commitSHA.MatchString(i.HeadSHA) || i.Operation != "branch_push" && i.Operation != "pr_create" && i.Operation != "merge" && i.Operation != "deploy" && i.Operation != "image_publish" {
 		return "", errors.New("publish target outside limited GitHub scope")
+	}
+	if i.Operation == "image_publish" && (i.ImageRelease == nil || i.TargetEnvironment != "private-canary" || i.PolicyVersion != core.ReleasePolicyVersion || i.ExpiresAt.IsZero() || i.ImageRelease.SourceSHA != i.HeadSHA || core.ValidateImageReleaseSpec(*i.ImageRelease) != nil) {
+		return "", errors.New("image publication outside fixed private source/workflow scope")
+	}
+	if i.Operation != "image_publish" && i.ImageRelease != nil {
+		return "", errors.New("image spec supplied for another publisher operation")
 	}
 	if (i.Operation == "merge" || i.Operation == "deploy") && (i.TargetEnvironment != "private-canary" || i.PolicyVersion != core.ReleasePolicyVersion || !commitSHA.MatchString(i.BaseSHA) || i.BaseSHA == i.HeadSHA || i.ExpiresAt.IsZero()) {
 		return "", errors.New("GitOps merge needs fixed private environment, policy and base SHA")
@@ -135,6 +142,9 @@ func (g GitHub) Inspect(ctx context.Context, i core.PublishIntent) (string, bool
 	if i.Operation == "merge" || i.Operation == "deploy" {
 		return g.inspectMerge(ctx, i, branch)
 	}
+	if i.Operation == "image_publish" {
+		return g.inspectImage(ctx, i)
+	}
 	sha, exists, err := g.remoteHead(ctx, branch)
 	if err != nil {
 		return "", false, err
@@ -180,6 +190,9 @@ func (g GitHub) Execute(ctx context.Context, i core.PublishIntent) (string, erro
 	}
 	if i.Operation == "merge" || i.Operation == "deploy" {
 		return g.executeMerge(ctx, i, branch)
+	}
+	if i.Operation == "image_publish" {
+		return g.executeImage(ctx, i, branch)
 	}
 	if i.Operation == "pr_create" {
 		if strings.TrimSpace(i.PullRequestSummary) == "" {

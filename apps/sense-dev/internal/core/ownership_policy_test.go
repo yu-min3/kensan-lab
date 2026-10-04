@@ -8,7 +8,7 @@ import (
 )
 
 const canaryValues = `image:
-  repository: ghcr.io/yu-min3/canary
+  repository: ghcr.io/yu-min3/kensan-lab/canary
   tag: first
 replicas: 1
 env:
@@ -34,7 +34,7 @@ func TestAppValuesStructuralOwnership(t *testing.T) {
 		{"unknown", canaryValues + "futurePublicKey: true\n", false},
 		{"unknown image nested", strings.Replace(canaryValues, "tag: first", "tag: first\n  registryAuth: none", 1), false},
 		{"remove image nested", strings.Replace(canaryValues, "  tag: first\n", "", 1), false},
-		{"image scalar", strings.Replace(canaryValues, "image:\n  repository: ghcr.io/yu-min3/canary\n  tag: first", "image: null", 1), false},
+		{"image scalar", strings.Replace(canaryValues, "image:\n  repository: ghcr.io/yu-min3/kensan-lab/canary\n  tag: first", "image: null", 1), false},
 		{"env secret", strings.Replace(canaryValues, "APP_MESSAGE", "DATABASE_PASSWORD", 1), false},
 		{"env unknown", strings.Replace(canaryValues, "APP_MESSAGE", "APP_TOKEN", 1), false},
 		{"env load", strings.Replace(canaryValues, "APP_MESSAGE", "DEMO_LOAD_ENABLED", 1), false},

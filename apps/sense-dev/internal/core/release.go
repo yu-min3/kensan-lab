@@ -33,6 +33,9 @@ func (s *Store) BindReleaseGateInputs(gateID, authorID string, sourceRefs []Arti
 	if err := validateReleaseCandidate(candidate, scan); err != nil {
 		return err
 	}
+	if err := s.validateDeploymentCandidate(s.Snapshot().Tasks[s.Snapshot().Agents[authorID].TaskID], candidate, scan); err != nil {
+		return err
+	}
 	candidateBody, err := json.Marshal(candidate)
 	if err != nil {
 		return err
@@ -109,7 +112,7 @@ func validateReleaseCandidate(candidate ReleaseCandidate, scan ReleaseScan) erro
 	if candidate.SchemaVersion != 1 || candidate.Operation != scan.Operation || candidate.Repository != scan.Repository || candidate.Ref != scan.Ref || candidate.HeadSHA != scan.HeadSHA || candidate.TargetEnvironment != "github" && candidate.TargetEnvironment != "private-sense" && candidate.TargetEnvironment != "private-canary" || strings.TrimSpace(candidate.Impact) == "" || strings.TrimSpace(candidate.Rollback) == "" || len(candidate.Impact) > 4000 || len(candidate.Rollback) > 4000 || len(candidate.PullRequestSummary) > 4000 {
 		return errors.New("release candidate does not match the scan or lacks impact and rollback")
 	}
-	return nil
+	return validateCandidateImage(candidate, scan)
 }
 
 func (s *Store) releaseCandidate(gate Agent, scan ReleaseScan) (ReleaseCandidate, ArtifactRef, error) {
@@ -129,18 +132,22 @@ func (s *Store) releaseCandidate(gate Agent, scan ReleaseScan) (ReleaseCandidate
 	if err := json.Unmarshal(body, &candidate); err != nil || validateReleaseCandidate(candidate, scan) != nil {
 		return ReleaseCandidate{}, ArtifactRef{}, errors.New("invalid fixed gate candidate")
 	}
+	if err := s.validateDeploymentCandidate(s.Snapshot().Tasks[s.Snapshot().Agents[gate.ReviewAuthorID].TaskID], candidate, scan); err != nil {
+		return ReleaseCandidate{}, ArtifactRef{}, err
+	}
 	return candidate, ref, nil
 }
 
-const ReleasePolicyVersion = "private-v3-human-review"
+const ReleasePolicyVersion = "private-v4-image-release"
 
 var allowedOperations = map[string]bool{
-	"branch_push": true,
-	"pr_create":   true,
-	"pr_update":   true,
-	"merge":       true,
-	"deploy":      true,
-	"rollback":    true,
+	"branch_push":   true,
+	"pr_create":     true,
+	"pr_update":     true,
+	"merge":         true,
+	"deploy":        true,
+	"rollback":      true,
+	"image_publish": true,
 }
 
 func (s *Store) RecordReleaseDecision(d ReleaseDecision) (ReleaseDecision, error) {
@@ -188,6 +195,14 @@ func (s *Store) RecordReleaseDecision(d ReleaseDecision) (ReleaseDecision, error
 		if err != nil {
 			return ReleaseDecision{}, err
 		}
+		if d.ImageRelease != nil && !imageReleasesEqual(d.ImageRelease, candidate.ImageRelease) {
+			return ReleaseDecision{}, errors.New("decision image spec differs from fixed gate candidate")
+		}
+		if d.ImageDeployment != nil && !imageDeploymentsEqual(d.ImageDeployment, candidate.ImageDeployment) {
+			return ReleaseDecision{}, errors.New("decision deployment image differs from fixed candidate")
+		}
+		d.ImageDeployment = cloneImageDeployment(candidate.ImageDeployment)
+		d.ImageRelease = cloneImageRelease(candidate.ImageRelease)
 		loaded = candidateClassification(loaded, candidate)
 		d.HumanCategories, d.HumanReasons = loaded.HumanCategories, loaded.HumanReasons
 		if loaded.Status == "deny" {
@@ -200,6 +215,9 @@ func (s *Store) RecordReleaseDecision(d ReleaseDecision) (ReleaseDecision, error
 			d.Verdict = "needs_human"
 		}
 	} else {
+		if d.Operation == "image_publish" || d.ImageRelease != nil || d.ImageDeployment != nil {
+			return ReleaseDecision{}, errors.New("image publish requires fixed controller scan and candidate")
+		}
 		d.HumanCategories, d.HumanReasons = nil, nil
 	}
 	if d.Verdict == "allow" {
@@ -303,6 +321,8 @@ func (s *Store) RecordReleaseDecision(d ReleaseDecision) (ReleaseDecision, error
 		st.Events = append(st.Events, event("release_decided", d.ID, d.Verdict))
 		return nil
 	})
+	d.ImageRelease = cloneImageRelease(d.ImageRelease)
+	d.ImageDeployment = cloneImageDeployment(d.ImageDeployment)
 	return d, err
 }
 
@@ -332,7 +352,7 @@ func (s *Store) PreparePublish(decisionID, operation, repository, ref, sha strin
 			return PublishIntent{}, errors.New("release scan no longer matches decision")
 		}
 		candidate, candidateRef, err := s.releaseCandidate(st.Agents[d.GateAgentID], scan)
-		if err != nil || candidate.Operation != d.Operation || candidate.Repository != d.Repository || candidate.Ref != d.Ref || candidate.HeadSHA != d.HeadSHA || candidate.TargetEnvironment != d.TargetEnvironment {
+		if err != nil || candidate.Operation != d.Operation || candidate.Repository != d.Repository || candidate.Ref != d.Ref || candidate.HeadSHA != d.HeadSHA || candidate.TargetEnvironment != d.TargetEnvironment || !imageReleasesEqual(d.ImageRelease, candidate.ImageRelease) || !imageDeploymentsEqual(d.ImageDeployment, candidate.ImageDeployment) {
 			return PublishIntent{}, errors.New("release candidate no longer matches decision")
 		}
 		pullRequestSummary = candidate.PullRequestSummary
@@ -387,6 +407,9 @@ func (s *Store) PreparePublish(decisionID, operation, repository, ref, sha strin
 		}
 		for _, old := range st.Intents {
 			if old.DecisionID == decisionID {
+				if !imageReleasesEqual(old.ImageRelease, d.ImageRelease) || !imageDeploymentsEqual(old.ImageDeployment, d.ImageDeployment) {
+					return errors.New("image intent differs from fixed release decision")
+				}
 				intent = old
 				return nil
 			}
@@ -395,10 +418,12 @@ func (s *Store) PreparePublish(decisionID, operation, repository, ref, sha strin
 		if d.ApprovalID != "" && st.Approvals[d.ApprovalID].ExpiresAt.Before(deadline) {
 			deadline = st.Approvals[d.ApprovalID].ExpiresAt
 		}
-		intent = PublishIntent{ID: id, DecisionID: decisionID, Operation: operation, Repository: repository, Ref: ref, HeadSHA: sha, BaseSHA: scan.BaseSHA, TargetEnvironment: d.TargetEnvironment, PolicyVersion: d.PolicyVersion, ExpiresAt: deadline, PullRequestSummary: pullRequestSummary, Status: "pending_reconcile", CreatedAt: time.Now().UTC()}
+		intent = PublishIntent{ID: id, DecisionID: decisionID, Operation: operation, Repository: repository, Ref: ref, HeadSHA: sha, BaseSHA: scan.BaseSHA, TargetEnvironment: d.TargetEnvironment, PolicyVersion: d.PolicyVersion, ExpiresAt: deadline, ImageRelease: cloneImageRelease(d.ImageRelease), ImageDeployment: cloneImageDeployment(d.ImageDeployment), PullRequestSummary: pullRequestSummary, Status: "pending_reconcile", CreatedAt: time.Now().UTC()}
 		st.Intents[id] = intent
 		st.Events = append(st.Events, event("publish_intent", id, operation))
 		return nil
 	})
+	intent.ImageRelease = cloneImageRelease(intent.ImageRelease)
+	intent.ImageDeployment = cloneImageDeployment(intent.ImageDeployment)
 	return intent, err
 }

@@ -12,6 +12,8 @@ const (
 )
 
 type Task struct {
+	AppRootTaskID        string    `json:"app_root_task_id,omitempty"`
+	ImageSourceTaskID    string    `json:"image_source_task_id,omitempty"`
 	ID                   string    `json:"id"`
 	MissionID            string    `json:"mission_id"`
 	Team                 Team      `json:"team"`
@@ -113,6 +115,9 @@ type Message struct {
 }
 
 type ContextManifest struct {
+	ImageSourceSHA       string        `json:"image_source_sha,omitempty"`
+	ImageSourceTaskID    string        `json:"image_source_task_id,omitempty"`
+	ImageEvidence        *ArtifactRef  `json:"image_evidence,omitempty"`
 	SchemaVersion        int           `json:"schema_version"`
 	MissionID            string        `json:"mission_id"`
 	TaskID               string        `json:"task_id"`
@@ -157,79 +162,99 @@ type Event struct {
 }
 
 type ReleaseDecision struct {
-	HumanCategories   []string      `json:"human_categories,omitempty"`
-	HumanReasons      []string      `json:"human_reasons,omitempty"`
-	ApprovalID        string        `json:"approval_id,omitempty"`
-	ID                string        `json:"id"`
-	AuthorAgentID     string        `json:"author_agent_id"`
-	GateAgentID       string        `json:"gate_agent_id"`
-	Verdict           string        `json:"verdict"`
-	Reason            string        `json:"reason"`
-	Operation         string        `json:"operation"`
-	Repository        string        `json:"repository"`
-	Ref               string        `json:"ref"`
-	HeadSHA           string        `json:"head_sha"`
-	TargetEnvironment string        `json:"target_environment"`
-	PolicyVersion     string        `json:"policy_version"`
-	ArtifactRefs      []ArtifactRef `json:"artifact_refs"`
-	EvidenceRefs      []ArtifactRef `json:"evidence_refs"`
-	ScanRef           ArtifactRef   `json:"scan_ref"`
-	SecretFree        bool          `json:"secret_free"`
-	PrivateTarget     bool          `json:"private_target"`
-	Reversible        bool          `json:"reversible"`
-	CIComplete        bool          `json:"ci_complete"`
-	CreatedAt         time.Time     `json:"created_at"`
-	ExpiresAt         time.Time     `json:"expires_at"`
+	ImageDeployment   *ImageDeploymentSpec `json:"image_deployment,omitempty"`
+	ImageRelease      *ImageReleaseSpec    `json:"image_release,omitempty"`
+	HumanCategories   []string             `json:"human_categories,omitempty"`
+	HumanReasons      []string             `json:"human_reasons,omitempty"`
+	ApprovalID        string               `json:"approval_id,omitempty"`
+	ID                string               `json:"id"`
+	AuthorAgentID     string               `json:"author_agent_id"`
+	GateAgentID       string               `json:"gate_agent_id"`
+	Verdict           string               `json:"verdict"`
+	Reason            string               `json:"reason"`
+	Operation         string               `json:"operation"`
+	Repository        string               `json:"repository"`
+	Ref               string               `json:"ref"`
+	HeadSHA           string               `json:"head_sha"`
+	TargetEnvironment string               `json:"target_environment"`
+	PolicyVersion     string               `json:"policy_version"`
+	ArtifactRefs      []ArtifactRef        `json:"artifact_refs"`
+	EvidenceRefs      []ArtifactRef        `json:"evidence_refs"`
+	ScanRef           ArtifactRef          `json:"scan_ref"`
+	SecretFree        bool                 `json:"secret_free"`
+	PrivateTarget     bool                 `json:"private_target"`
+	Reversible        bool                 `json:"reversible"`
+	CIComplete        bool                 `json:"ci_complete"`
+	CreatedAt         time.Time            `json:"created_at"`
+	ExpiresAt         time.Time            `json:"expires_at"`
 }
 
 // ReleaseCandidate is operator/controller-supplied proposed action data. It
 // is review input, never an authorization by itself.
+type ImageReleaseSpec struct {
+	SourceSHA        string `json:"source_sha"`
+	SourceAppTreeSHA string `json:"source_app_tree_sha"`
+	ImageTag         string `json:"image_tag"`
+	WorkflowRef      string `json:"workflow_ref"`
+	WorkflowSHA      string `json:"workflow_sha"`
+	WorkflowPath     string `json:"workflow_path"`
+	WorkflowSHA256   string `json:"workflow_sha256"`
+	DispatchID       string `json:"dispatch_id"`
+}
+
 type ReleaseCandidate struct {
-	SchemaVersion      int    `json:"schema_version"`
-	Operation          string `json:"operation"`
-	Repository         string `json:"repository"`
-	Ref                string `json:"ref"`
-	HeadSHA            string `json:"head_sha"`
-	TargetEnvironment  string `json:"target_environment"`
-	Impact             string `json:"impact"`
-	Rollback           string `json:"rollback"`
-	PullRequestSummary string `json:"pull_request_summary,omitempty"`
+	ImageDeployment    *ImageDeploymentSpec `json:"image_deployment,omitempty"`
+	ImageRelease       *ImageReleaseSpec    `json:"image_release,omitempty"`
+	SchemaVersion      int                  `json:"schema_version"`
+	Operation          string               `json:"operation"`
+	Repository         string               `json:"repository"`
+	Ref                string               `json:"ref"`
+	HeadSHA            string               `json:"head_sha"`
+	TargetEnvironment  string               `json:"target_environment"`
+	Impact             string               `json:"impact"`
+	Rollback           string               `json:"rollback"`
+	PullRequestSummary string               `json:"pull_request_summary,omitempty"`
 }
 
 type ReleaseScan struct {
-	HumanCategories []string  `json:"human_categories,omitempty"`
-	HumanReasons    []string  `json:"human_reasons,omitempty"`
-	Team            Team      `json:"team,omitempty"`
-	BaseSHA         string    `json:"base_sha"`
-	HeadSHA         string    `json:"head_sha"`
-	Repository      string    `json:"repository"`
-	Ref             string    `json:"ref"`
-	Operation       string    `json:"operation"`
-	PolicyVersion   string    `json:"policy_version"`
-	Status          string    `json:"status"`
-	CommitCount     int       `json:"commit_count"`
-	ChangedPaths    []string  `json:"changed_paths"`
-	Findings        []string  `json:"findings"`
-	DiffSHA256      string    `json:"diff_sha256"`
-	ScannedAt       time.Time `json:"scanned_at"`
+	ImageDigest      string    `json:"image_digest,omitempty"`
+	ImageValuesOnly  bool      `json:"image_values_only,omitempty"`
+	SourceAppTreeSHA string    `json:"source_app_tree_sha,omitempty"`
+	HumanCategories  []string  `json:"human_categories,omitempty"`
+	HumanReasons     []string  `json:"human_reasons,omitempty"`
+	Team             Team      `json:"team,omitempty"`
+	BaseSHA          string    `json:"base_sha"`
+	HeadSHA          string    `json:"head_sha"`
+	Repository       string    `json:"repository"`
+	Ref              string    `json:"ref"`
+	Operation        string    `json:"operation"`
+	PolicyVersion    string    `json:"policy_version"`
+	Status           string    `json:"status"`
+	CommitCount      int       `json:"commit_count"`
+	ChangedPaths     []string  `json:"changed_paths"`
+	Findings         []string  `json:"findings"`
+	DiffSHA256       string    `json:"diff_sha256"`
+	ScannedAt        time.Time `json:"scanned_at"`
 }
 
 type PublishIntent struct {
-	ExpiresAt          time.Time `json:"expires_at,omitempty"`
-	BaseSHA            string    `json:"base_sha,omitempty"`
-	TargetEnvironment  string    `json:"target_environment,omitempty"`
-	PolicyVersion      string    `json:"policy_version,omitempty"`
-	ID                 string    `json:"id"`
-	DecisionID         string    `json:"decision_id"`
-	Operation          string    `json:"operation"`
-	Repository         string    `json:"repository"`
-	Ref                string    `json:"ref"`
-	HeadSHA            string    `json:"head_sha"`
-	Status             string    `json:"status"`
-	ExternalID         string    `json:"external_id,omitempty"`
-	PullRequestSummary string    `json:"pull_request_summary,omitempty"`
-	UpdatedAt          time.Time `json:"updated_at,omitempty"`
-	CreatedAt          time.Time `json:"created_at"`
+	ImageDeployment    *ImageDeploymentSpec `json:"image_deployment,omitempty"`
+	ImageRelease       *ImageReleaseSpec    `json:"image_release,omitempty"`
+	ExpiresAt          time.Time            `json:"expires_at,omitempty"`
+	BaseSHA            string               `json:"base_sha,omitempty"`
+	TargetEnvironment  string               `json:"target_environment,omitempty"`
+	PolicyVersion      string               `json:"policy_version,omitempty"`
+	ID                 string               `json:"id"`
+	DecisionID         string               `json:"decision_id"`
+	Operation          string               `json:"operation"`
+	Repository         string               `json:"repository"`
+	Ref                string               `json:"ref"`
+	HeadSHA            string               `json:"head_sha"`
+	Status             string               `json:"status"`
+	ExternalID         string               `json:"external_id,omitempty"`
+	PullRequestSummary string               `json:"pull_request_summary,omitempty"`
+	UpdatedAt          time.Time            `json:"updated_at,omitempty"`
+	CreatedAt          time.Time            `json:"created_at"`
 }
 
 type Question struct {
@@ -324,26 +349,27 @@ type FeedbackLoop struct {
 }
 
 type State struct {
-	ReleaseFlows  map[string]ReleaseFlow       `json:"release_flows"`
-	Deployments   map[string]DeploymentReceipt `json:"deployments"`
-	FeedbackLoops map[string]FeedbackLoop      `json:"feedback_loops"`
-	SchemaVersion int                          `json:"schema_version"`
-	Tasks         map[string]Task              `json:"tasks"`
-	Agents        map[string]Agent             `json:"agents"`
-	Attempts      map[string]Attempt           `json:"attempts"`
-	Artifacts     map[string]Artifact          `json:"artifacts"`
-	Messages      map[string]Message           `json:"messages"`
-	Decisions     map[string]ReleaseDecision   `json:"decisions"`
-	Intents       map[string]PublishIntent     `json:"intents"`
-	Questions     map[string]Question          `json:"questions"`
-	Approvals     map[string]ApprovalRequest   `json:"approvals"`
-	Reports       map[string]DailyReport       `json:"reports"`
-	ReportOutbox  map[string]ReportOutboxEntry `json:"report_outbox"`
-	Events        []Event                      `json:"events"`
-	PausedUntil   *time.Time                   `json:"paused_until,omitempty"`
-	Stopped       bool                         `json:"stopped"`
+	ImageReleases map[string]ImageReleaseRecord `json:"image_releases"`
+	ReleaseFlows  map[string]ReleaseFlow        `json:"release_flows"`
+	Deployments   map[string]DeploymentReceipt  `json:"deployments"`
+	FeedbackLoops map[string]FeedbackLoop       `json:"feedback_loops"`
+	SchemaVersion int                           `json:"schema_version"`
+	Tasks         map[string]Task               `json:"tasks"`
+	Agents        map[string]Agent              `json:"agents"`
+	Attempts      map[string]Attempt            `json:"attempts"`
+	Artifacts     map[string]Artifact           `json:"artifacts"`
+	Messages      map[string]Message            `json:"messages"`
+	Decisions     map[string]ReleaseDecision    `json:"decisions"`
+	Intents       map[string]PublishIntent      `json:"intents"`
+	Questions     map[string]Question           `json:"questions"`
+	Approvals     map[string]ApprovalRequest    `json:"approvals"`
+	Reports       map[string]DailyReport        `json:"reports"`
+	ReportOutbox  map[string]ReportOutboxEntry  `json:"report_outbox"`
+	Events        []Event                       `json:"events"`
+	PausedUntil   *time.Time                    `json:"paused_until,omitempty"`
+	Stopped       bool                          `json:"stopped"`
 }
 
 func NewState() State {
-	return State{SchemaVersion: SchemaVersion, ReleaseFlows: map[string]ReleaseFlow{}, Deployments: map[string]DeploymentReceipt{}, FeedbackLoops: map[string]FeedbackLoop{}, Tasks: map[string]Task{}, Agents: map[string]Agent{}, Attempts: map[string]Attempt{}, Artifacts: map[string]Artifact{}, Messages: map[string]Message{}, Decisions: map[string]ReleaseDecision{}, Intents: map[string]PublishIntent{}, Questions: map[string]Question{}, Approvals: map[string]ApprovalRequest{}, Reports: map[string]DailyReport{}, ReportOutbox: map[string]ReportOutboxEntry{}, Events: []Event{}}
+	return State{ImageReleases: map[string]ImageReleaseRecord{}, SchemaVersion: SchemaVersion, ReleaseFlows: map[string]ReleaseFlow{}, Deployments: map[string]DeploymentReceipt{}, FeedbackLoops: map[string]FeedbackLoop{}, Tasks: map[string]Task{}, Agents: map[string]Agent{}, Attempts: map[string]Attempt{}, Artifacts: map[string]Artifact{}, Messages: map[string]Message{}, Decisions: map[string]ReleaseDecision{}, Intents: map[string]PublishIntent{}, Questions: map[string]Question{}, Approvals: map[string]ApprovalRequest{}, Reports: map[string]DailyReport{}, ReportOutbox: map[string]ReportOutboxEntry{}, Events: []Event{}}
 }

@@ -17,14 +17,21 @@ import (
 
 // ReleasePlan is operator-owned intent, never worker output or authorization.
 // Each operation still needs a fresh, independent Gate for its fixed inputs.
+type ImageWorkflowPlan struct {
+	Ref    string `json:"ref"`
+	SHA    string `json:"sha"`
+	SHA256 string `json:"sha256"`
+}
+
 type ReleasePlan struct {
-	SchemaVersion      int    `json:"schema_version"`
-	MissionID          string `json:"mission_id"`
-	Repository         string `json:"repository"`
-	TargetEnvironment  string `json:"target_environment"`
-	Impact             string `json:"impact"`
-	Rollback           string `json:"rollback"`
-	PullRequestSummary string `json:"pull_request_summary"`
+	ImageWorkflow      *ImageWorkflowPlan `json:"image_workflow,omitempty"`
+	SchemaVersion      int                `json:"schema_version"`
+	MissionID          string             `json:"mission_id"`
+	Repository         string             `json:"repository"`
+	TargetEnvironment  string             `json:"target_environment"`
+	Impact             string             `json:"impact"`
+	Rollback           string             `json:"rollback"`
+	PullRequestSummary string             `json:"pull_request_summary"`
 }
 
 type ReleaseFlow struct {
@@ -73,6 +80,9 @@ func LoadReleasePlan(path string) (ReleasePlan, error) {
 }
 
 func (p ReleasePlan) validate() error {
+	if p.ImageWorkflow != nil && (!workflowRefPattern.MatchString(p.ImageWorkflow.Ref) || !githubCommitPattern.MatchString(p.ImageWorkflow.SHA) || !fullDigest(p.ImageWorkflow.SHA256)) {
+		return errors.New("release plan must pin trusted image workflow ref, commit and file hash")
+	}
 	if p.SchemaVersion != 1 || strings.TrimSpace(p.MissionID) == "" || p.Repository != "yu-min3/kensan-lab" || p.TargetEnvironment != "private-canary" || strings.TrimSpace(p.Impact) == "" || strings.TrimSpace(p.Rollback) == "" || strings.TrimSpace(p.PullRequestSummary) == "" || len(p.Impact) > 3000 || len(p.Rollback) > 4000 || len(p.PullRequestSummary) > 4000 {
 		return errors.New("release plan requires a fixed mission, private canary, impact, rollback and PR summary")
 	}
@@ -161,7 +171,11 @@ func (d *ReleaseDriver) Reconcile(ctx context.Context) (int, error) {
 		if err != nil {
 			continue
 		} // Simulation and rejected stages are never promoted.
-		for _, operation := range []string{"branch_push", "pr_create", "merge"} {
+		operations := []string{"branch_push", "pr_create", "merge"}
+		if d.Plan.ImageWorkflow != nil && task.Team == App && task.ImageSourceTaskID == "" {
+			operations = []string{"branch_push", "image_publish"}
+		}
+		for _, operation := range operations {
 			id := releaseFlowID(task.ID, task.HeadSHA, operation, planHash)
 			st = d.Store.Snapshot()
 			flow, exists := st.ReleaseFlows[id]
@@ -196,12 +210,29 @@ func (d *ReleaseDriver) candidate(task Task, operation string) ReleaseCandidate 
 	if operation == "merge" {
 		impact += " Merge targets main and triggers the private canary GitOps deployment; CI and current PR head must be checked before merge."
 	}
-	return ReleaseCandidate{SchemaVersion: 1, Operation: operation, Repository: d.Plan.Repository, Ref: "refs/heads/sense-dev/" + task.ID, HeadSHA: task.HeadSHA, TargetEnvironment: d.Plan.TargetEnvironment, Impact: impact, Rollback: d.Plan.Rollback, PullRequestSummary: d.Plan.PullRequestSummary}
+	candidate := ReleaseCandidate{SchemaVersion: 1, Operation: operation, Repository: d.Plan.Repository, Ref: "refs/heads/sense-dev/" + task.ID, HeadSHA: task.HeadSHA, TargetEnvironment: d.Plan.TargetEnvironment, Impact: impact, Rollback: d.Plan.Rollback, PullRequestSummary: d.Plan.PullRequestSummary}
+	if operation == "image_publish" && d.Plan.ImageWorkflow != nil {
+		planBody, _ := json.Marshal(d.Plan)
+		id := releaseFlowID(task.ID, task.HeadSHA, operation, digest(planBody))
+		flow := d.Store.Snapshot().ReleaseFlows[id]
+		body, _ := d.Store.ReadArtifact(flow.ScanRef.ID)
+		var scan ReleaseScan
+		_ = json.Unmarshal(body, &scan)
+		dispatch := id[:32]
+		w := d.Plan.ImageWorkflow
+		candidate.ImageRelease = &ImageReleaseSpec{SourceSHA: task.HeadSHA, SourceAppTreeSHA: scan.SourceAppTreeSHA, ImageTag: "sense-" + task.HeadSHA + "-" + dispatch, WorkflowRef: w.Ref, WorkflowSHA: w.SHA, WorkflowPath: CanaryImageWorkflowPath, WorkflowSHA256: w.SHA256, DispatchID: dispatch}
+	} else {
+		candidate.ImageDeployment = deploymentImageForTask(d.Store.Snapshot(), task)
+	}
+	return candidate
 }
 
 func (d *ReleaseDriver) createFlow(task Task, proof releaseProof, operation, planHash string) error {
 	scan, err := ScanGitRangeForTeam(filepath.Join(d.WorktreeRoot, task.ID), task.BaseSHA, task.HeadSHA, operation, "refs/heads/sense-dev/"+task.ID, task.Team)
 	if err != nil {
+		return err
+	}
+	if err := d.enrichImageScan(task, &scan); err != nil {
 		return err
 	}
 	scanRef, err := d.Store.recordReleaseScan(scan)
@@ -333,7 +364,7 @@ func (d *ReleaseDriver) advanceFlow(flow ReleaseFlow, proof releaseProof) (int, 
 			return 0, errors.New("release Gate output trailing data")
 		}
 		candidate := d.candidate(task, flow.Operation)
-		decision := ReleaseDecision{AuthorAgentID: flow.AuthorAgentID, GateAgentID: gate.ID, Verdict: output.Verdict, Reason: output.Reason, Operation: flow.Operation, Repository: candidate.Repository, Ref: candidate.Ref, HeadSHA: flow.HeadSHA, TargetEnvironment: candidate.TargetEnvironment, PolicyVersion: flow.PolicyVersion, ArtifactRefs: []ArtifactRef{proof.Implementation}, EvidenceRefs: []ArtifactRef{*result.OutputRef}, ScanRef: flow.ScanRef, SecretFree: output.SecretFree, PrivateTarget: output.PrivateTarget, Reversible: output.Reversible, CIComplete: output.CIComplete, ExpiresAt: flow.GateExpiresAt}
+		decision := ReleaseDecision{ImageRelease: cloneImageRelease(candidate.ImageRelease), ImageDeployment: cloneImageDeployment(candidate.ImageDeployment), AuthorAgentID: flow.AuthorAgentID, GateAgentID: gate.ID, Verdict: output.Verdict, Reason: output.Reason, Operation: flow.Operation, Repository: candidate.Repository, Ref: candidate.Ref, HeadSHA: flow.HeadSHA, TargetEnvironment: candidate.TargetEnvironment, PolicyVersion: flow.PolicyVersion, ArtifactRefs: []ArtifactRef{proof.Implementation}, EvidenceRefs: []ArtifactRef{*result.OutputRef}, ScanRef: flow.ScanRef, SecretFree: output.SecretFree, PrivateTarget: output.PrivateTarget, Reversible: output.Reversible, CIComplete: output.CIComplete, ExpiresAt: flow.GateExpiresAt}
 		manifest, err := d.Store.BuildManifest(gate.ID, []string{"isolated-model-worker"})
 		if err != nil {
 			return 0, err
@@ -419,6 +450,9 @@ func (d *ReleaseDriver) refreshGate(flow ReleaseFlow, proof releaseProof) error 
 		task := d.Store.Snapshot().Tasks[flow.AuthorTaskID]
 		scan, err = ScanGitRangeForTeam(filepath.Join(d.WorktreeRoot, task.ID), task.BaseSHA, task.HeadSHA, flow.Operation, "refs/heads/sense-dev/"+task.ID, task.Team)
 		if err != nil {
+			return err
+		}
+		if err := d.enrichImageScan(task, &scan); err != nil {
 			return err
 		}
 		flow.ScanRef, err = d.Store.recordReleaseScan(scan)

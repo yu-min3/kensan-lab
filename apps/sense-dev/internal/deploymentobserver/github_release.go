@@ -13,32 +13,33 @@ import (
 	"net/http"
 	"net/url"
 	"os"
-	"path/filepath"
 	"strings"
 	"time"
 )
 
-// GitHubRelease reads a successful, merge-pinned workflow artifact, verifies
-// the package remains private, then obtains the immutable GHCR index children.
+// GitHubRelease reads the successful trusted workflow W and its source-A image
+// artifact, then independently checks Git trees at A/B/C and GHCR index leaves.
 // Its token belongs only to the host observer process.
 type GitHubRelease struct{ TokenFile string }
 
-func (g GitHubRelease) Release(ctx context.Context, p Plan, revision string) (ReleaseProof, error) {
+func (g GitHubRelease) Release(ctx context.Context, p Plan, spec ImageSpec, reviewed, revision string) (ReleaseProof, error) {
 	if err := p.validate(); err != nil {
 		return ReleaseProof{}, err
 	}
-	if !shaPattern.MatchString(revision) {
-		return ReleaseProof{}, errors.New("merge revision is not a full SHA")
+	if !shaPattern.MatchString(reviewed) || !shaPattern.MatchString(revision) || spec.Digest == "" || spec.WorkflowRunID <= 0 {
+		return ReleaseProof{}, errors.New("reviewed, merge or image identity missing")
 	}
 	token, err := g.token()
 	if err != nil {
 		return ReleaseProof{}, err
 	}
-	runID, err := g.successfulRun(ctx, token, revision)
-	if err != nil {
+	if err := g.successfulRun(ctx, token, spec); err != nil {
 		return ReleaseProof{}, err
 	}
-	artifactID, err := g.releaseArtifact(ctx, token, runID, revision)
+	if err := workflowHashAt(ctx, token, spec.WorkflowSHA, spec.WorkflowSHA256); err != nil {
+		return ReleaseProof{}, err
+	}
+	artifactID, err := g.releaseArtifact(ctx, token, spec.WorkflowRunID, spec.DispatchID)
 	if err != nil {
 		return ReleaseProof{}, err
 	}
@@ -46,18 +47,27 @@ func (g GitHubRelease) Release(ctx context.Context, p Plan, revision string) (Re
 	if err != nil {
 		return ReleaseProof{}, err
 	}
-	if record.Repository != repository || record.HeadSHA != revision || record.Image != image || record.Visibility != "private" || !digestPattern.MatchString(record.Digest) || !strings.HasPrefix(record.Tag, "v") {
-		return ReleaseProof{}, errors.New("CI release record does not bind private image to merge revision")
+	if record.Repository != repository || record.Image != image || record.SourceSHA != spec.SourceSHA || record.SourceAppTreeSHA != spec.SourceAppTreeSHA || record.Tag != spec.ImageTag || record.Digest != spec.Digest || record.Visibility != "private" || record.DispatchID != spec.DispatchID || record.WorkflowSHA != spec.WorkflowSHA {
+		return ReleaseProof{}, errors.New("CI image artifact differs from approved source and workflow")
+	}
+	for _, commit := range []string{spec.SourceSHA, reviewed, revision} {
+		tree, err := appTreeAt(ctx, token, commit)
+		if err != nil || tree != spec.SourceAppTreeSHA {
+			return ReleaseProof{}, errors.New("App tree changed between image source, review and merge")
+		}
+	}
+	if err := imageValuesAt(ctx, token, revision, spec.Digest); err != nil {
+		return ReleaseProof{}, err
 	}
 	private, err := g.packagePrivate(ctx, token)
 	if err != nil || !private {
 		return ReleaseProof{}, errors.New("current GHCR package privacy could not be verified")
 	}
-	children, err := g.registryChildren(ctx, token, record.Digest)
+	children, err := g.registryChildren(ctx, token, spec.Digest)
 	if err != nil {
 		return ReleaseProof{}, err
 	}
-	return ReleaseProof{Repository: repository, Image: image, SourceSHA: revision, Digest: record.Digest, Visibility: "private", ChildDigests: children, Succeeded: true}, nil
+	return ReleaseProof{Repository: repository, Image: image, SourceSHA: spec.SourceSHA, SourceAppTreeSHA: spec.SourceAppTreeSHA, ImageTag: spec.ImageTag, Digest: spec.Digest, WorkflowRef: spec.WorkflowRef, WorkflowSHA: spec.WorkflowSHA, WorkflowSHA256: spec.WorkflowSHA256, WorkflowRunID: spec.WorkflowRunID, DispatchID: spec.DispatchID, Visibility: "private", ChildDigests: children, Succeeded: true}, nil
 }
 
 func (g GitHubRelease) token() (string, error) {
@@ -96,39 +106,32 @@ func githubGET(ctx context.Context, token, path string, out any) error {
 	return json.NewDecoder(io.LimitReader(response.Body, 1<<20)).Decode(out)
 }
 
-func (g GitHubRelease) successfulRun(ctx context.Context, token, revision string) (int64, error) {
-	var result struct {
-		TotalCount int `json:"total_count"`
-		Runs       []struct {
-			ID         int64
-			HeadSHA    string `json:"head_sha"`
-			Event      string
-			Conclusion string
-		} `json:"workflow_runs"`
-	}
-	path := "/repos/" + repository + "/actions/workflows/canary-ci.yml/runs?head_sha=" + revision + "&status=completed&per_page=100"
-	if err := githubGET(ctx, token, path, &result); err != nil {
-		return 0, err
-	}
-	if result.TotalCount > 100 {
-		return 0, errors.New("CI run list is incomplete")
-	}
-	var id int64
-	for _, run := range result.Runs {
-		if run.HeadSHA == revision && run.Event == "workflow_dispatch" && run.Conclusion == "success" {
-			if id != 0 {
-				return 0, errors.New("multiple successful release runs for revision")
-			}
-			id = run.ID
+func (g GitHubRelease) successfulRun(ctx context.Context, token string, spec ImageSpec) error {
+	var run struct {
+		ID                              int64
+		RunAttempt                      int    `json:"run_attempt"`
+		HeadSHA                         string `json:"head_sha"`
+		DisplayTitle                    string `json:"display_title"`
+		Path, Event, Conclusion, Status string
+		Repository                      struct {
+			FullName string `json:"full_name"`
 		}
 	}
-	if id == 0 {
-		return 0, errors.New("successful private release workflow absent")
+	if err := githubGET(ctx, token, fmt.Sprintf("/repos/%s/actions/runs/%d", repository, spec.WorkflowRunID), &run); err != nil {
+		return err
 	}
-	return id, nil
+	if run.ID != spec.WorkflowRunID || run.RunAttempt != 1 || run.HeadSHA != spec.WorkflowSHA || run.DisplayTitle != "sense-image-"+spec.DispatchID || !validWorkflowRunPath(run.Path, spec.WorkflowRef) || run.Event != "workflow_dispatch" || run.Status != "completed" || run.Conclusion != "success" || run.Repository.FullName != repository {
+		return errors.New("CI run is not the successful trusted image workflow")
+	}
+	return nil
 }
 
-func (g GitHubRelease) releaseArtifact(ctx context.Context, token string, runID int64, revision string) (int64, error) {
+func validWorkflowRunPath(path, ref string) bool {
+	const fixed = ".github/workflows/canary-image.yml"
+	return path == fixed || path == fixed+"@"+ref || path == repository+"/"+fixed+"@"+ref
+}
+
+func (g GitHubRelease) releaseArtifact(ctx context.Context, token string, runID int64, dispatchID string) (int64, error) {
 	var result struct {
 		TotalCount int `json:"total_count"`
 		Artifacts  []struct {
@@ -145,7 +148,7 @@ func (g GitHubRelease) releaseArtifact(ctx context.Context, token string, runID 
 	}
 	var id int64
 	for _, a := range result.Artifacts {
-		if a.Name == "canary-release-"+revision && !a.Expired {
+		if a.Name == "canary-image-"+dispatchID && !a.Expired {
 			if id != 0 {
 				return 0, errors.New("duplicate release artifacts")
 			}
@@ -159,9 +162,11 @@ func (g GitHubRelease) releaseArtifact(ctx context.Context, token string, runID 
 }
 
 type releaseRecord struct {
-	Repository                     string `json:"repository"`
-	HeadSHA                        string `json:"head_sha"`
-	Image, Tag, Digest, Visibility string
+	Repository, Image, Tag, Digest, Visibility string
+	SourceSHA                                  string `json:"source_sha"`
+	SourceAppTreeSHA                           string `json:"source_app_tree_sha"`
+	DispatchID                                 string `json:"dispatch_id"`
+	WorkflowSHA                                string `json:"workflow_sha"`
 }
 
 func (g GitHubRelease) downloadRecord(ctx context.Context, token string, artifactID int64) (releaseRecord, error) {
@@ -201,7 +206,7 @@ func (g GitHubRelease) downloadRecord(ctx context.Context, token string, artifac
 		return releaseRecord{}, errors.New("CI artifact is too large")
 	}
 	z, err := zip.NewReader(bytes.NewReader(archive), int64(len(archive)))
-	if err != nil || len(z.File) != 1 || filepath.Base(z.File[0].Name) != "canary-release.json" || z.File[0].UncompressedSize64 > 16<<10 {
+	if err != nil || len(z.File) != 1 || z.File[0].Name != "canary-image.json" || z.File[0].UncompressedSize64 > 16<<10 {
 		return releaseRecord{}, errors.New("CI release archive shape invalid")
 	}
 	file, err := z.File[0].Open()
@@ -209,9 +214,19 @@ func (g GitHubRelease) downloadRecord(ctx context.Context, token string, artifac
 		return releaseRecord{}, err
 	}
 	defer file.Close()
+	decoded, err := io.ReadAll(io.LimitReader(file, 16<<10+1))
+	if err != nil || len(decoded) > 16<<10 {
+		return releaseRecord{}, errors.New("CI image record is too large")
+	}
 	var record releaseRecord
-	if err := json.NewDecoder(io.LimitReader(file, 16<<10)).Decode(&record); err != nil {
+	decoder := json.NewDecoder(bytes.NewReader(decoded))
+	decoder.DisallowUnknownFields()
+	if err := decoder.Decode(&record); err != nil {
 		return releaseRecord{}, err
+	}
+	var extra any
+	if err := decoder.Decode(&extra); err != io.EOF {
+		return releaseRecord{}, errors.New("CI image record has trailing data")
 	}
 	return record, nil
 }

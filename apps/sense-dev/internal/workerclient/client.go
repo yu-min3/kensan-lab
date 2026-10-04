@@ -96,6 +96,11 @@ func (r Runner) Run(ctx context.Context, dispatch core.Dispatch) (core.RunResult
 			return core.RunResult{}, errors.New("linked consumer revision is not a pinned App acceptance or independent Platform Gate")
 		}
 		taskWorktree, pinnedBase, err = r.Worktrees.EnsureFromTask(ctx, dispatch.Attempt.TaskID, dispatch.Manifest.SourceTaskID, dispatch.Attempt.HeadSHA)
+	} else if dispatch.Manifest.ImageSourceTaskID != "" {
+		if dispatch.Manifest.Team != core.App || dispatch.Manifest.ImageEvidence == nil {
+			return core.RunResult{}, errors.New("image deployment requires pinned App CI evidence")
+		}
+		taskWorktree, pinnedBase, err = r.Worktrees.EnsureImageDeployment(ctx, dispatch.Attempt.TaskID, dispatch.Manifest.ImageSourceTaskID, dispatch.Attempt.BaseSHA, dispatch.Manifest.ImageSourceSHA, true)
 	} else if dispatch.Manifest.CheckoutSourceTaskID != "" {
 		if dispatch.Manifest.Team != core.Platform || dispatch.Attempt.BaseSHA == "" {
 			return core.RunResult{}, errors.New("derived checkout requires a pinned Platform task")
@@ -150,7 +155,11 @@ func (r Runner) Run(ctx context.Context, dispatch core.Dispatch) (core.RunResult
 	}
 	if request.Role == "implementation" {
 		var verifyErr error
-		_, _, verifyErr = r.Worktrees.Ensure(ctx, dispatch.Attempt.TaskID, dispatch.Attempt.BaseSHA)
+		if dispatch.Manifest.ImageSourceTaskID != "" {
+			_, _, verifyErr = r.Worktrees.EnsureImageDeployment(ctx, dispatch.Attempt.TaskID, dispatch.Manifest.ImageSourceTaskID, dispatch.Attempt.BaseSHA, dispatch.Manifest.ImageSourceSHA, false)
+		} else {
+			_, _, verifyErr = r.Worktrees.Ensure(ctx, dispatch.Attempt.TaskID, dispatch.Attempt.BaseSHA)
+		}
 		if verifyErr != nil {
 			return core.RunResult{}, errors.New("task checkout changed identity after implementation")
 		}

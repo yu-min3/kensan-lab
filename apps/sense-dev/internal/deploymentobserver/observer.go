@@ -32,15 +32,18 @@ var (
 // Plan is operator supplied and deliberately bound to one private canary. The
 // endpoint must be a numeric RFC1918 address; discovery data cannot redirect it.
 type Plan struct {
-	SchemaVersion   int        `json:"schema_version"`
-	Namespace       string     `json:"namespace"`
-	Application     string     `json:"application"`
-	Repository      string     `json:"repository"`
-	Image           string     `json:"image"`
-	ProbeIP         netip.Addr `json:"probe_ip"`
-	ProbePort       uint16     `json:"probe_port"`
-	ProbePath       string     `json:"probe_path"`
-	ExpectedRelease string     `json:"expected_release"`
+	SchemaVersion int        `json:"schema_version"`
+	Namespace     string     `json:"namespace"`
+	Application   string     `json:"application"`
+	Repository    string     `json:"repository"`
+	Image         string     `json:"image"`
+	ProbeIP       netip.Addr `json:"probe_ip,omitempty"`
+	// ProbeCIDR is an operator-reviewed private Pod network boundary. The host
+	// selects only already-verified canary Pods; workers cannot supply URLs.
+	ProbeCIDR       netip.Prefix `json:"probe_cidr,omitempty"`
+	ProbePort       uint16       `json:"probe_port"`
+	ProbePath       string       `json:"probe_path"`
+	ExpectedRelease string       `json:"expected_release"`
 }
 
 // LoadPlan accepts only an operator-owned, bounded JSON file. Neither model
@@ -71,10 +74,29 @@ func LoadPlan(path string) (Plan, error) {
 }
 
 func (p Plan) validate() error {
-	if p.SchemaVersion != 1 || p.Namespace != namespace || p.Application != application || p.Repository != repository || p.Image != image || !p.ProbeIP.Is4() || !p.ProbeIP.IsPrivate() || p.ProbePort == 0 || p.ProbePath != "/api/release" || !releasePattern.MatchString(p.ExpectedRelease) {
+	if p.SchemaVersion != 1 || p.Namespace != namespace || p.Application != application || p.Repository != repository || p.Image != image || !p.validProbeBoundary() || p.ProbePort == 0 || p.ProbePath != "/api/release" || !releasePattern.MatchString(p.ExpectedRelease) {
 		return errors.New("observer plan is outside the fixed private canary")
 	}
 	return nil
+}
+
+func (p Plan) validProbeBoundary() bool {
+	if p.ProbeIP.IsValid() == p.ProbeCIDR.IsValid() {
+		return false
+	}
+	if p.ProbeIP.IsValid() {
+		return p.ProbeIP.Is4() && p.ProbeIP.IsPrivate()
+	}
+	prefix := p.ProbeCIDR
+	if !prefix.Addr().Is4() || prefix != prefix.Masked() {
+		return false
+	}
+	for _, block := range []netip.Prefix{netip.MustParsePrefix("10.0.0.0/8"), netip.MustParsePrefix("172.16.0.0/12"), netip.MustParsePrefix("192.168.0.0/16")} {
+		if prefix.Bits() >= block.Bits() && block.Contains(prefix.Addr()) {
+			return true
+		}
+	}
+	return false
 }
 
 type ApplicationState struct {
@@ -91,10 +113,12 @@ type PodState struct {
 // ChildDigests are verified platform manifests under the registry's immutable
 // multi-architecture index digest, not values asserted by the model or CI JSON.
 type ReleaseProof struct {
-	Repository, Image, SourceSHA, Digest, Visibility string
-	ChildDigests                                     []string
-	Succeeded                                        bool
+	Repository, Image, SourceSHA, SourceAppTreeSHA, ImageTag, Digest, Visibility, WorkflowRef, WorkflowSHA, WorkflowSHA256, DispatchID string
+	WorkflowRunID                                                                                                                      int64
+	ChildDigests                                                                                                                       []string
+	Succeeded                                                                                                                          bool
 }
+type ImageSpec = core.ImageDeploymentSpec
 type UserPathState struct {
 	StatusCode      int
 	Path            string
@@ -104,7 +128,7 @@ type UserPathState struct {
 type Sources interface {
 	Application(context.Context, Plan) (ApplicationState, error)
 	Pods(context.Context, Plan) ([]PodState, error)
-	Release(context.Context, Plan, string) (ReleaseProof, error)
+	Release(context.Context, Plan, ImageSpec, string, string) (ReleaseProof, error)
 	Probe(context.Context, Plan) (UserPathState, error)
 }
 
@@ -112,11 +136,11 @@ type Observer struct{ Sources Sources }
 
 // Observe requires four independent host observations for the same merge
 // revision and immutable image digest. A healthy Argo status alone is not enough.
-func (o Observer) Observe(ctx context.Context, p Plan, reviewedHead, revision string) (core.DeploymentReceipt, error) {
+func (o Observer) Observe(ctx context.Context, p Plan, reviewedHead, revision string, spec ImageSpec) (core.DeploymentReceipt, error) {
 	if err := p.validate(); err != nil {
 		return core.DeploymentReceipt{}, err
 	}
-	if !shaPattern.MatchString(reviewedHead) || !shaPattern.MatchString(revision) || o.Sources == nil {
+	if !shaPattern.MatchString(reviewedHead) || !shaPattern.MatchString(revision) || o.Sources == nil || core.ValidateImageDeploymentSpec(spec) != nil {
 		return core.DeploymentReceipt{}, errors.New("reviewed head, merge revision or observer source missing")
 	}
 	app, err := o.Sources.Application(ctx, p)
@@ -126,11 +150,11 @@ func (o Observer) Observe(ctx context.Context, p Plan, reviewedHead, revision st
 	if !validArgoSources(app.Sources, revision) || app.Sync != "Synced" || app.Health != "Healthy" {
 		return core.DeploymentReceipt{}, errors.New("Argo is not synced and healthy at the sent merge revision")
 	}
-	proof, err := o.Sources.Release(ctx, p, revision)
+	proof, err := o.Sources.Release(ctx, p, spec, reviewedHead, revision)
 	if err != nil {
 		return core.DeploymentReceipt{}, fmt.Errorf("CI release observation: %w", err)
 	}
-	if !proof.Succeeded || proof.Repository != repository || proof.Image != image || proof.SourceSHA != revision || proof.Visibility != "private" || !digestPattern.MatchString(proof.Digest) {
+	if !proof.Succeeded || proof.Repository != repository || proof.Image != image || proof.SourceSHA != spec.SourceSHA || proof.SourceAppTreeSHA != spec.SourceAppTreeSHA || proof.ImageTag != spec.ImageTag || proof.Digest != spec.Digest || proof.WorkflowRef != spec.WorkflowRef || proof.WorkflowSHA != spec.WorkflowSHA || proof.WorkflowSHA256 != spec.WorkflowSHA256 || proof.WorkflowRunID != spec.WorkflowRunID || proof.DispatchID != spec.DispatchID || proof.Visibility != "private" {
 		return core.DeploymentReceipt{}, errors.New("CI release provenance does not bind private image to merge revision")
 	}
 	pods, err := o.Sources.Pods(ctx, p)
@@ -150,27 +174,34 @@ func (o Observer) Observe(ctx context.Context, p Plan, reviewedHead, revision st
 	if len(children) == 0 {
 		return core.DeploymentReceipt{}, errors.New("registry manifest children are unavailable")
 	}
-	matchedPod := false
+	selectedIP := netip.Addr{}
 	for _, pod := range pods {
 		runtimeDigest, ok := runtimeImageDigest(pod.ImageID)
 		if !pod.Ready || !pod.PodIP.Is4() || !pod.PodIP.IsPrivate() || pod.Image != image+"@"+proof.Digest || !ok || !children[runtimeDigest] {
 			return core.DeploymentReceipt{}, errors.New("canary pod is not ready at proven image digest")
 		}
-		if pod.PodIP == p.ProbeIP {
-			matchedPod = true
+		if pod.PodIP == p.ProbeIP || p.ProbeCIDR.IsValid() && p.ProbeCIDR.Contains(pod.PodIP) {
+			if !selectedIP.IsValid() || pod.PodIP.Compare(selectedIP) < 0 {
+				selectedIP = pod.PodIP
+			}
 		}
 	}
-	if !matchedPod {
+	if !selectedIP.IsValid() {
 		return core.DeploymentReceipt{}, errors.New("private probe does not target a verified canary pod")
 	}
-	user, err := o.Sources.Probe(ctx, p)
+	// Resolve the reviewed CIDR to a verified numeric Pod IP, then reuse the
+	// static HTTP boundary. The operator plan remains unchanged across rollouts.
+	probePlan := p
+	probePlan.ProbeIP = selectedIP
+	probePlan.ProbeCIDR = netip.Prefix{}
+	user, err := o.Sources.Probe(ctx, probePlan)
 	if err != nil {
 		return core.DeploymentReceipt{}, fmt.Errorf("private user path: %w", err)
 	}
 	if user.Path != p.ProbePath || user.StatusCode < 200 || user.StatusCode >= 300 || user.ObservedRelease != p.ExpectedRelease {
 		return core.DeploymentReceipt{}, errors.New("private user path did not pass")
 	}
-	return core.DeploymentReceipt{HeadSHA: reviewedHead, Revision: revision, ImageSourceSHA: revision, ImageDigest: proof.Digest, Environment: "private-canary", Status: "healthy", UserPath: p.ProbePath, ObservedRelease: user.ObservedRelease}, nil
+	return core.DeploymentReceipt{HeadSHA: reviewedHead, Revision: revision, ImageSourceSHA: spec.SourceSHA, ImageDigest: proof.Digest, Environment: "private-canary", Status: "healthy", UserPath: p.ProbePath, ObservedRelease: user.ObservedRelease}, nil
 }
 
 func validArgoSources(sources []ArgoSource, revision string) bool {
@@ -221,7 +252,14 @@ func (o Observer) Record(ctx context.Context, s *core.Store, p Plan, taskID, dec
 	if s == nil || taskID == "" || decisionID == "" || intentID == "" {
 		return errors.New("deployment identity is incomplete")
 	}
-	r, err := o.Observe(ctx, p, reviewedHead, revision)
+	st := s.Snapshot()
+	intent, ok := st.Intents[intentID]
+	if !ok || intent.ImageDeployment == nil {
+		return errors.New("sent image deployment spec is missing")
+	}
+	input := intent.ImageDeployment
+	spec := *input
+	r, err := o.Observe(ctx, p, reviewedHead, revision, spec)
 	if err != nil {
 		return err
 	}

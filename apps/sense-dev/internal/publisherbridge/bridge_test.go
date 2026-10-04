@@ -144,7 +144,7 @@ func (m *mergedTransport) Inspect(context.Context, core.PublishIntent) (string, 
 func TestObservationRequiresAuthenticatedSentMatchingMerge(t *testing.T) {
 	m := &mergedTransport{revision: strings.Repeat("b", 40)}
 	var observations atomic.Int32
-	h, err := HandlerWithObserver(bridgeAuth(t), m, func(_ context.Context, head, rev string) (core.DeploymentReceipt, error) {
+	h, err := HandlerWithObserver(bridgeAuth(t), m, func(_ context.Context, head, rev string, spec core.ImageDeploymentSpec) (core.DeploymentReceipt, error) {
 		observations.Add(1)
 		return core.DeploymentReceipt{HeadSHA: head, Revision: rev}, nil
 	})
@@ -154,6 +154,7 @@ func TestObservationRequiresAuthenticatedSentMatchingMerge(t *testing.T) {
 	for _, valid := range []bool{false, true} {
 		i := bridgeIntent()
 		i.Status = "sent"
+		i.ImageDeployment = validBridgeImageDeployment()
 		i.ExternalID = m.revision
 		if !valid {
 			i.ExternalID = strings.Repeat("c", 40)

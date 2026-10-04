@@ -12,6 +12,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/yu-min3/kensan-lab/apps/sense-dev/internal/committransfer"
 	"github.com/yu-min3/kensan-lab/apps/sense-dev/internal/core"
 	"github.com/yu-min3/kensan-lab/apps/sense-dev/internal/deploymentobserver"
 	"github.com/yu-min3/kensan-lab/apps/sense-dev/internal/publisher"
@@ -26,6 +27,7 @@ func main() {
 	askpass := flag.String("askpass", "", "trusted Git askpass executable for branch push")
 	socket := flag.String("serve-socket", "", "private Unix socket for authenticated controller; owns no state lock")
 	bridgeAuth := flag.String("controller-auth-file", "", "publisher copy of dedicated bridge authentication secret")
+	bundleTransfer := flag.Bool("commit-transfer", false, "accept fixed credentialless bundles and return verified merged graphs")
 	socketGroup := flag.Int("socket-group", -1, "optional shared controller/publisher Unix group ID")
 	observerPlan := flag.String("observer-plan", "", "fixed private canary observation plan")
 	observerKubeconfig := flag.String("observer-kubeconfig", "", "dedicated read-only mode0600 kubeconfig")
@@ -46,11 +48,20 @@ func main() {
 				log.Fatal(err)
 			}
 			observer := deploymentobserver.Observer{Sources: deploymentobserver.HostSources{Kube: deploymentobserver.KubeCLI{Binary: *observerKubectl, Kubeconfig: *observerKubeconfig}, ReleaseSource: deploymentobserver.GitHubRelease{TokenFile: *observerToken}}}
-			observe = func(ctx context.Context, head, revision string) (core.DeploymentReceipt, error) {
-				return observer.Observe(ctx, plan, head, revision)
+			observe = func(ctx context.Context, head, revision string, spec core.ImageDeploymentSpec) (core.DeploymentReceipt, error) {
+				return observer.Observe(ctx, plan, head, revision, spec)
 			}
 		}
-		handler, err := publisherbridge.HandlerWithObserver(*bridgeAuth, publisher.GitHub{RepoPath: *repo, TokenFile: *token, Askpass: *askpass}, observe)
+		var transfers publisherbridge.Transfers
+		if *bundleTransfer {
+			if *repo == "" || *askpass == "" {
+				log.Fatal("commit transfer requires fixed trusted repository and askpass")
+			}
+			transfers = publisherbridge.Transfers{RepoPath: *repo, Export: func(ctx context.Context, task, base, revision string) (committransfer.Bundle, error) {
+				return committransfer.FetchMerged(ctx, task, base, revision, *askpass)
+			}}
+		}
+		handler, err := publisherbridge.HandlerWithTransfers(*bridgeAuth, publisher.GitHub{RepoPath: *repo, TokenFile: *token, Askpass: *askpass}, observe, transfers, publisher.GitHub{RepoPath: *repo, TokenFile: *token, Askpass: *askpass}.ImageEvidence)
 		if err != nil {
 			log.Fatal(err)
 		}
@@ -73,7 +84,7 @@ func main() {
 		}
 		return
 	}
-	if *bridgeAuth != "" || *socketGroup != -1 || *observerPlan != "" || *observerKubeconfig != "" || *observerToken != "" {
+	if *bundleTransfer || *bridgeAuth != "" || *socketGroup != -1 || *observerPlan != "" || *observerKubeconfig != "" || *observerToken != "" {
 		log.Fatal("bridge options require serve-socket")
 	}
 	if *data == "" || *decision == "" || *token == "" {

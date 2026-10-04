@@ -140,13 +140,20 @@ func (s *Store) ReconcileAcceptanceOutcomes() (int, error) {
 				source.Status, source.UpdatedAt = "done", now
 				current.Tasks[source.ID] = source
 				current.Events = append(current.Events, event("app_change_completed", source.ID, messageID))
+				if source.ImageSourceTaskID != "" {
+					completeImageSource(current, source, messageID, now)
+				}
 			}
 			if result.Verdict == "fail" || kind == "acceptance_stale" {
 				target.Status, target.UpdatedAt = "revision_wait", now
 				current.Tasks[target.ID] = target
 			}
 			if result.Verdict == "fail" {
-				if source.Status == "publish_wait" && source.HeadSHA == result.HeadSHA {
+				if source.Status == "publish_wait" && source.HeadSHA == result.HeadSHA && source.ImageSourceTaskID != "" {
+					if err := startImageCorrection(current, source, target, agent.ID, messageID, *attempt.OutputRef, now); err != nil {
+						return err
+					}
+				} else if source.Status == "publish_wait" && source.HeadSHA == result.HeadSHA {
 					if source.CorrectionCount >= 2 {
 						source.Status = "decision_wait"
 						current.Events = append(current.Events, event("correction_limit_reached", source.ID, messageID))
