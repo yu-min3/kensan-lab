@@ -1,0 +1,8 @@
+site_name: 'canary'
+site_description: 'Private sense acceptance canary'
+
+nav:
+  - Home: index.md
+
+plugins:
+  - techdocs-core

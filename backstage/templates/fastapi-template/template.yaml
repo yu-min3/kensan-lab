@@ -20,6 +20,13 @@ spec:
         - owner
         - repoUrl
       properties:
+        deploymentMode:
+          title: Generation mode
+          type: string
+          default: public
+          enum: [public, private-canary]
+          enumNames: [Public application, Private canary preview]
+          description: Private canary is generated in Template Editor dry-run only. No repository, PR, catalog entry or public route is created; publish requires the independent sense Release Gate.
         name:
           title: Application Name
           type: string
@@ -66,6 +73,19 @@ spec:
               - github.com
             allowedOwners:
               - yu-min3
+
+      allOf:
+        - if:
+            required: [deploymentMode]
+            properties:
+              deploymentMode:
+                const: private-canary
+          then:
+            properties:
+              name:
+                const: canary
+              repoUrl:
+                const: github.com?repo=kensan-lab&owner=yu-min3
 
     - title: How it looks
       required:
@@ -142,6 +162,7 @@ spec:
     # Step 1: Fetch template skeleton
     - id: fetch-base
       name: Fetch Base Template
+      if: ${{ parameters.deploymentMode != "private-canary" }}
       action: fetch:template
       input:
         url: ./skeleton
@@ -181,6 +202,7 @@ spec:
 
     # Step 2: Create the application repository.
     - id: publish
+      if: ${{ parameters.deploymentMode != "private-canary" }}
       name: Publish to GitHub
       action: publish:github
       input:
@@ -200,6 +222,7 @@ spec:
     # expression engine, which is what makes the per-app paths possible — and
     # lets the whole change stay in one pull request.
     - id: rename-platform-paths
+      if: ${{ parameters.deploymentMode != "private-canary" }}
       name: Name the platform files after the service
       action: fs:rename
       input:
@@ -210,6 +233,7 @@ spec:
             to: .backstage/kubernetes/auth/oauth2-proxy/resources/referencegrant-app-${{ parameters.name }}.yaml
 
     - id: create-platform-pr
+      if: ${{ parameters.deploymentMode != "private-canary" }}
       name: Open the platform pull request
       action: publish:github:pull-request
       input:
@@ -249,16 +273,88 @@ spec:
 
     # Step 4: Register component in Backstage catalog.
     - id: register
+      if: ${{ parameters.deploymentMode != "private-canary" }}
       name: Register Component
       action: catalog:register
       input:
         repoContentsUrl: ${{ steps.publish.output.repoContentsUrl }}
         catalogInfoPath: '/catalog-info.yaml'
 
+    # Generation only. Use Template Editor dry-run to obtain the files. The
+    # sense publisher handles reviewed branch/PR operations after its Gate.
+    - id: fetch-canary
+      if: ${{ parameters.deploymentMode == "private-canary" }}
+      name: Generate the bounded private canary
+      action: fetch:template
+      input:
+        url: ./skeleton
+        targetPath: canary-output/apps/canary
+        values:
+          description: ${{ parameters.description }}
+          owner: ${{ parameters.owner }}
+          ownerSlug: ${{ parameters.owner | replace("group:default/", "") | replace("user:default/", "") | replace("group:", "") | replace("user:", "") }}
+          domain: ${{ parameters.domain }}
+          system: ${{ parameters.system }}
+          theme: ${{ parameters.theme }}
+          message: ${{ parameters.message }}
+          platformRepoUrl: https://github.com/yu-min3/kensan-lab
+          argocdUrl: https://argocd.platform.yu-min3.com/applications/app-canary
+          ghcrPullSecretEnabled: true
+          gatewayName: gateway-prod
+          gatewayNamespace: istio-system
+          name: canary
+          repoName: kensan-lab
+          repoOwner: yu-min3
+          privateCanary: true
+          deploymentPath: kubernetes/apps/app-canary
+          imageRepository: ghcr.io/yu-min3/kensan-lab/canary
+          imageTag: v1
+          applicationRepoUrl: https://github.com/yu-min3/kensan-lab
+          applicationUrl: ""
+          hostname: ""
+          otelEnabled: false
+          loadButtonEnabled: false
+
+    - id: arrange-canary
+      if: ${{ parameters.deploymentMode == "private-canary" }}
+      name: Place canary source and platform files in the existing repository
+      action: fs:rename
+      input:
+        files:
+          - from: canary-output/apps/canary/deploy
+            to: canary-output/kubernetes/apps/app-canary
+          - from: canary-output/apps/canary/.backstage/kubernetes/argocd/applications/apps/APPDIR
+            to: canary-output/kubernetes/argocd/applications/apps/app-canary
+
+    - id: remove-canary-publication
+      if: ${{ parameters.deploymentMode == "private-canary" }}
+      name: Remove repository publication and gateway integration files
+      action: fs:delete
+      input:
+        files:
+          - canary-output/apps/canary/.backstage
+          - canary-output/apps/canary/.github
+          - canary-output/apps/canary/.gitea
+          - canary-output/apps/canary/.devcontainer
+
+    - id: canary-storage
+      if: ${{ parameters.deploymentMode == "private-canary" }}
+      name: Add the canary PVC from the template
+      action: fetch:template
+      input:
+        url: ./canary-overlay
+        targetPath: canary-output
+        values: {}
+
   output:
     text:
       - title: 🎉 アプリケーション作成完了！
         content: |
+          {% if parameters.deploymentMode == "private-canary" %}
+          Private canary preview only. Export `canary-output/` files from Template Editor dry-run.
+          This task does not publish a repository, branch, PR, image or catalog entry.
+          Independent sense Release Gate approval is required before publisher or deployment.
+          {% else %}
           ## 次のステップ
 
           ### 1. Platform Configへのプルリクエスト
@@ -281,6 +377,8 @@ spec:
           `deploy/values.yaml` から生成するので、手書きの manifest はありません。
 
           デプロイ状況は Argo CD UI で確認できます。
+
+          {% endif %}
 
     links:
       - title: 📦 アプリケーションリポジトリ

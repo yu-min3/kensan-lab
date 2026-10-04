@@ -1,52 +1,48 @@
 apiVersion: backstage.io/v1alpha1
 kind: Component
 metadata:
-  name: ${{ values.name }}
-  description: ${{ values.description }}
+  name: canary
+  description: Private sense acceptance canary
   annotations:
-    github.com/project-slug: ${{ values.repoOwner }}/${{ values.repoName }}
+    github.com/project-slug: yu-min3/kensan-lab
     backstage.io/techdocs-ref: dir:.
-    argocd/app-name: app-${{ values.name }}
+    argocd/app-name: app-canary
   tags:
     - fastapi
     - python
   links:
-{% if not values.privateCanary %}
-    - url: ${{ values.applicationUrl }}
-      title: API Docs
-      icon: web
-{% endif %}
-    - url: ${{ values.argocdUrl }}
+
+    - url: https://argocd.platform.yu-min3.com/applications/app-canary
       title: Argo CD
       icon: kubernetes
 spec:
   type: service
   lifecycle: experimental
-  owner: ${{ values.owner }}
-  system: ${{ values.system }}
+  owner: group:default/platform-engineering
+  system: developer-portal
   providesApis:
-    - ${{ values.name }}-api
+    - canary-api
 
 ---
 apiVersion: backstage.io/v1alpha1
 kind: API
 metadata:
-  name: ${{ values.name }}-api
-  description: API for ${{ values.name }}
+  name: canary-api
+  description: API for canary
   tags:
     - fastapi
     - rest
 spec:
   type: openapi
   lifecycle: experimental
-  owner: ${{ values.owner }}
-  system: ${{ values.system }}
+  owner: group:default/platform-engineering
+  system: developer-portal
   definition: |
     openapi: 3.0.0
     info:
-      title: ${{ values.name }}
+      title: canary
       version: 1.0.0
-      description: ${{ values.description }}
+      description: Private sense acceptance canary
     paths:
       /:
         get:

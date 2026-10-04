@@ -1,0 +1,175 @@
+name: Canary CI
+
+on:
+  pull_request:
+    paths: ["apps/canary/**", "kubernetes/apps/app-canary/**", "charts/app-base/**", ".github/workflows/canary-ci.yml"]
+  push:
+    branches: [main]
+    paths: ["apps/canary/**", "kubernetes/apps/app-canary/**", "charts/app-base/**", ".github/workflows/canary-ci.yml"]
+  workflow_dispatch:
+    inputs:
+      expected_sha:
+        description: "Full commit SHA approved by the independent Release Gate"
+        required: true
+        type: string
+      tag:
+        description: "Approved immutable release tag (v1, v2, or v1.2.3)"
+        required: true
+        type: string
+      allow_new_private_package:
+        description: "Yu approved first publication to this new private GHCR package for this exact SHA/tag"
+        default: false
+        type: boolean
+
+permissions:
+  contents: read
+
+concurrency:
+  group: canary-${{ github.workflow }}-${{ github.event_name }}-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  IMAGE: ghcr.io/yu-min3/kensan-lab/canary
+
+jobs:
+  verify:
+    name: canary (locked tests and runtime image)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - name: Test locked dependencies
+        run: docker build --platform linux/amd64 --target test apps/canary
+      - name: Build runtime without pushing
+        run: docker build --platform linux/amd64 -t canary:ci apps/canary
+
+      - name: Verify runtime startup without host networking
+        env:
+          SMOKE_CONTAINER: canary-smoke-${{ github.run_id }}-${{ github.run_attempt }}
+        run: |
+          docker run -d --platform linux/amd64 --name "$SMOKE_CONTAINER" --network none --cap-drop ALL --security-opt no-new-privileges:true --tmpfs /data:rw,uid=1000,gid=1000 -e OTEL_SDK_DISABLED=true canary:ci
+          docker exec -i "$SMOKE_CONTAINER" python - <<'PYTHON'
+          import json, time, urllib.error, urllib.request
+          for attempt in range(60):
+              try:
+                  health = json.load(urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=2))
+                  break
+              except (OSError, urllib.error.URLError):
+                  time.sleep(1)
+          else:
+              raise SystemExit('Runtime failed to become healthy')
+          assert health['status'] == 'healthy'
+          release = json.load(urllib.request.urlopen('http://127.0.0.1:8000/api/release', timeout=3))
+          assert isinstance(release.get('release'), str) and release['release']
+          assert b'id="root"' in urllib.request.urlopen('http://127.0.0.1:8000/', timeout=3).read()
+          print('health, release and packaged frontend: PASS')
+          PYTHON
+      - name: Remove this job's disposable container
+        if: always()
+        env:
+          SMOKE_CONTAINER: canary-smoke-${{ github.run_id }}-${{ github.run_attempt }}
+        run: docker rm -f "$SMOKE_CONTAINER" >/dev/null 2>&1 || true
+
+  release:
+    name: canary (Gate-pinned first private image)
+    if: github.event_name == 'workflow_dispatch' && github.repository == 'yu-min3/kensan-lab' && inputs.allow_new_private_package == true
+    needs: verify
+    concurrency:
+      group: canary-private-release
+      cancel-in-progress: false
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    permissions:
+      contents: read
+      packages: write
+    env:
+      EXPECTED_SHA: ${{ inputs.expected_sha }}
+      RELEASE_TAG: ${{ inputs.tag }}
+      ALLOW_NEW_PRIVATE_PACKAGE: ${{ inputs.allow_new_private_package }}
+    steps:
+      - name: Check approved identity before using credentials
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ "$EXPECTED_SHA" =~ ^[0-9a-f]{40}$ ]]
+          [[ "$EXPECTED_SHA" == "$GITHUB_SHA" ]]
+          [[ "$RELEASE_TAG" =~ ^v[0-9]+(\.[0-9]+){0,2}$ ]]
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      # GHCR visibility does not follow repository visibility. First publication
+      # is private by default; permit that bootstrap only with a separate Gate.
+      # https://docs.github.com/en/packages/working-with-a-github-packages-registry/working-with-the-container-registry
+      - name: Verify package-read scope and separately approved first publication
+        env:
+          GH_TOKEN: ${{ secrets.CANARY_BOOTSTRAP_READ_PACKAGES_TOKEN }}
+        run: |
+          python3 - <<'PY'
+          import json, os, urllib.error, urllib.request
+          token = os.environ['GH_TOKEN']
+          if not token:
+              raise SystemExit('Dedicated package-read credential is not configured')
+          headers = {'Authorization': 'Bearer ' + token, 'Accept': 'application/vnd.github+json'}
+          with urllib.request.urlopen(urllib.request.Request('https://api.github.com/user', headers=headers), timeout=20) as response:
+              identity = json.load(response)
+              scopes = {scope.strip() for scope in response.headers.get('X-OAuth-Scopes', '').split(',')}
+          if identity.get('login') != 'yu-min3' or not scopes.intersection({'read:packages', 'write:packages'}):
+              raise SystemExit('Package absence cannot be established without the owner package-read scope')
+          url = 'https://api.github.com/users/yu-min3/packages/container/kensan-lab%2Fcanary'
+          req = urllib.request.Request(url, headers=headers)
+          try:
+              package = json.load(urllib.request.urlopen(req, timeout=20))
+          except urllib.error.HTTPError as error:
+              if error.code != 404 or os.environ['ALLOW_NEW_PRIVATE_PACKAGE'] != 'true':
+                  raise SystemExit('Cannot verify the private package; stop before push')
+          else:
+              raise SystemExit('Package already exists; bootstrap cannot replace an image. Use the independently gated image workflow')
+          PY
+      - uses: docker/setup-qemu-action@v3
+      - uses: docker/setup-buildx-action@v3
+      - name: Test both release architectures without pushing
+        run: docker buildx build --platform linux/amd64,linux/arm64 --target test apps/canary
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - uses: docker/build-push-action@v6
+        id: publish
+        with:
+          context: apps/canary
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ${{ env.IMAGE }}:${{ env.RELEASE_TAG }}
+          labels: |
+            org.opencontainers.image.source=https://github.com/${{ github.repository }}
+            org.opencontainers.image.revision=${{ github.sha }}
+      - name: Verify private visibility and record the deployed image identity
+        env:
+          GH_TOKEN: ${{ secrets.CANARY_BOOTSTRAP_READ_PACKAGES_TOKEN }}
+          IMAGE_DIGEST: ${{ steps.publish.outputs.digest }}
+        run: |
+          python3 - <<'PY'
+          import json, os, re, urllib.request
+          url = 'https://api.github.com/users/yu-min3/packages/container/kensan-lab%2Fcanary'
+          req = urllib.request.Request(url, headers={'Authorization': 'Bearer ' + os.environ['GH_TOKEN'], 'Accept': 'application/vnd.github+json'})
+          package = json.load(urllib.request.urlopen(req, timeout=20))
+          if package.get('visibility') != 'private' or package.get('repository', {}).get('full_name') != os.environ['GITHUB_REPOSITORY']:
+              raise SystemExit('Post-push package verification failed; do not deploy')
+          digest = os.environ['IMAGE_DIGEST']
+          if not re.fullmatch(r'sha256:[0-9a-f]{64}', digest):
+              raise SystemExit('Missing immutable image digest; do not deploy')
+          record = {'repository': os.environ['GITHUB_REPOSITORY'], 'head_sha': os.environ['GITHUB_SHA'], 'image': os.environ['IMAGE'], 'tag': os.environ['RELEASE_TAG'], 'digest': digest, 'visibility': 'private'}
+          with open('canary-release.json', 'x') as output:
+              json.dump(record, output, indent=2)
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: canary-release-${{ github.sha }}
+          path: canary-release.json
+          if-no-files-found: error
+          retention-days: 14

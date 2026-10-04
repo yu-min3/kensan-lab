@@ -1,0 +1,22 @@
+# Prometheus scrape target. Not part of charts/app-base: what an application
+# exposes and how often it is scraped is the application's decision, so it stays
+# here rather than becoming a chart value.
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: canary
+  namespace: app-canary
+  labels:
+    app.kubernetes.io/name: canary
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: canary
+  endpoints:
+    - port: http
+      path: /metrics
+      # The runtime dashboard rates this over a minute. At 30s that window
+      # holds the two samples a rate needs and nothing to spare, so a single
+      # missed scrape empties the panel.
+      interval: 15s
+      scrapeTimeout: 10s

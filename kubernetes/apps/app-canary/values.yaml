@@ -11,8 +11,8 @@ image:
   # repository-specific image in the disposable in-cluster registry. Its
   # Gitea workflow replaces the initial `pending` tag with an immutable source
   # commit SHA after tests and build succeed.
-  repository: ${{ values.imageRepository }}
-  tag: ${{ values.imageTag }}
+  repository: ghcr.io/yu-min3/kensan-lab/canary
+  tag: v1
 
 # How many pods Argo CD keeps running. This number is the whole scaling path:
 # edit it, commit, and the next sync applies it — no image is built, because
@@ -36,16 +36,16 @@ probes:
 # demonstration of what the platform is for.
 env:
   - name: APP_NAME
-    value: "${{ values.name }}"
+    value: "canary"
   - name: APP_THEME
-    value: "${{ values.theme }}"
+    value: "day"
   - name: APP_MESSAGE
-    value: "${{ values.message }}"
+    value: "Private canary"
   # Off everywhere except the disposable kind environment. /api/load burns a
   # core on request, which is a walkthrough prop in Explore and a
   # denial-of-service tool anywhere a real user can reach it.
   - name: DEMO_LOAD_ENABLED
-    value: "${{ values.loadButtonEnabled }}"
+    value: "false"
 
 # The image declares `USER appuser`, a name rather than a number. The chart
 # asks for runAsNonRoot, and the kubelet cannot resolve a name to a UID without
@@ -59,23 +59,21 @@ securityContext:
 # Production images are private and use a pull secret from Vault. Explore's
 # disposable in-cluster registry intentionally requires no credential.
 ghcrPullSecret:
-  enabled: ${{ values.ghcrPullSecretEnabled }}
+  enabled: true
 
 otel:
-  enabled: ${{ values.otelEnabled }}
-  serviceName: ${{ values.name }}
+  enabled: false
+  serviceName: canary
 
 httproute:
-  enabled: ${{ not values.privateCanary }}
-  hostnames: ${{ "[]" if values.privateCanary else "" }}
+  enabled: false
+  hostnames: []
     # Derived by the template from where the repository went: the real domain
     # on bare metal, the wildcard the explore certificate covers otherwise.
-{% if not values.privateCanary %}
-    - ${{ values.hostname }}
-{% endif %}
+
   gateway:
-    name: ${{ values.gatewayName }}
-    namespace: ${{ values.gatewayNamespace }}
+    name: gateway-prod
+    namespace: istio-system
 
 # gateway-prod protects every hostname it serves (ADR-021 inverted this from
 # opt-in to default), so the service is behind Keycloak whether or not this is
@@ -94,15 +92,15 @@ httproute:
 # where both belong.
 auth:
   gatewayOAuth2:
-    enabled: ${{ not values.privateCanary }}
+    enabled: false
 
-{% if values.privateCanary %}
+
 pvc:
   enabled: true
   create: false
   name: canary-data
   mountPath: /data
-{% endif %}
+
 
 resources:
   requests:

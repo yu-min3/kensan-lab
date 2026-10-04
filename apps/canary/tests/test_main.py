@@ -104,7 +104,7 @@ def test_example_endpoint():
     assert "data" in data
     assert "timestamp" in data
 
-{% if values.privateCanary %}
+
 
 def test_canary_release_is_part_of_image():
     assert client.get("/api/release").json() == {"release": "v1"}
@@ -128,4 +128,3 @@ def test_canary_marker_survives_new_process(monkeypatch, tmp_path):
     )
     assert json.loads(restarted.stdout) == expected
     assert client.put("/api/marker", json={"marker": "x" * 129}).status_code == 422
-{%- endif %}

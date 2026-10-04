@@ -1,4 +1,4 @@
-# Argo CD Application for ${{ values.name }}, opened as a pull request against
+# Argo CD Application for canary, opened as a pull request against
 # the platform repository by the scaffolder.
 #
 # Three sources, the same shape every application on this platform uses:
@@ -12,7 +12,7 @@
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
-  name: app-${{ values.name }}
+  name: app-canary
   namespace: argocd
   annotations:
     # The namespace and anything stateful in it must survive this Application
@@ -23,19 +23,19 @@ spec:
   project: app-project
 
   sources:
-    - repoURL: ${{ values.platformRepoUrl }}
+    - repoURL: https://github.com/yu-min3/kensan-lab
       targetRevision: main
       path: charts/app-base
       helm:
-        releaseName: ${{ values.name }}
+        releaseName: canary
         valueFiles:
-          - $values/${{ values.deploymentPath | default("deploy") }}/values.yaml
-    - repoURL: ${{ values.applicationRepoUrl }}
+          - $values/kubernetes/apps/app-canary/values.yaml
+    - repoURL: https://github.com/yu-min3/kensan-lab
       targetRevision: main
       ref: values
-    - repoURL: ${{ values.applicationRepoUrl }}
+    - repoURL: https://github.com/yu-min3/kensan-lab
       targetRevision: main
-      path: ${{ values.deploymentPath | default("deploy") }}/resources
+      path: kubernetes/apps/app-canary/resources
       directory:
         recurse: false
         include: '*.yaml'
@@ -43,7 +43,7 @@ spec:
   destination:
     server: https://kubernetes.default.svc
     # ADR-006: one namespace per application, created by deploy/resources.
-    namespace: app-${{ values.name }}
+    namespace: app-canary
 
   syncPolicy:
     automated:

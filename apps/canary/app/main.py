@@ -19,26 +19,22 @@ Two endpoints carry the interesting part:
                 set; see the block above the handlers.
 """
 
-{% if values.privateCanary -%}
 import hashlib
-{% endif -%}
 import os
-{% if values.privateCanary -%}
 import tempfile
-{% endif -%}
 import threading
 import time
 from pathlib import Path
 
-from fastapi import {% if values.privateCanary %}Body, {% endif %}FastAPI, HTTPException, Request
+from fastapi import Body, FastAPI, HTTPException, Request
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from prometheus_client import CONTENT_TYPE_LATEST, Counter, Histogram, generate_latest
 from starlette.responses import Response
 
 app = FastAPI(
-    title=os.getenv("APP_NAME", "${{ values.name }}"),
-    description=os.getenv("APP_DESCRIPTION", "${{ values.description }}"),
+    title=os.getenv("APP_NAME", "canary"),
+    description=os.getenv("APP_DESCRIPTION", "Private sense acceptance canary"),
     version="1.0.0",
 )
 
@@ -101,9 +97,9 @@ async def config():
     if theme not in ("day", "night"):
         theme = "day"
     return {
-        "appName": os.getenv("APP_NAME", "${{ values.name }}"),
+        "appName": os.getenv("APP_NAME", "canary"),
         "theme": theme,
-        "message": os.getenv("APP_MESSAGE", "Hello from ${{ values.name }}"),
+        "message": os.getenv("APP_MESSAGE", "Hello from canary"),
     }
 
 
@@ -131,7 +127,6 @@ async def example_endpoint():
     return {"data": "This is an example response", "timestamp": time.time()}
 
 
-{% if values.privateCanary -%}
 # The canary release belongs to the image, so rolling the image back restores it.
 CANARY_RELEASE = "v1"
 
@@ -167,7 +162,6 @@ async def get_marker():
     return {"marker": marker, "sha256": hashlib.sha256(marker.encode()).hexdigest()}
 
 
-{% endif -%}
 # --- Deliberate CPU load ---------------------------------------------------
 #
 # The walkthrough asks the reader to make CPU move and then watch it arrive in
