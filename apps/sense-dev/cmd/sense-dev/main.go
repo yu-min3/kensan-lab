@@ -231,7 +231,7 @@ func run() error {
 	}()
 	if runner != nil {
 		go func() {
-			var nextObservation time.Time
+			var nextObservation, nextPublish time.Time
 			ticker := time.NewTicker(2 * time.Second)
 			defer ticker.Stop()
 			for {
@@ -259,7 +259,8 @@ func run() error {
 							log.Print("release flow requires operator inspection")
 						}
 					}
-					if releaseDriver != nil && *publisherSocket != "" {
+					if releaseDriver != nil && *publisherSocket != "" && !time.Now().Before(nextPublish) {
+						nextPublish = time.Now().Add(time.Minute)
 						if err := releaseDriver.PublishReady(ctx, publisherbridge.Client{Socket: *publisherSocket, AuthFile: *publisherAuth}); err != nil {
 							log.Print("publisher reconciliation needs operator inspection")
 						}
