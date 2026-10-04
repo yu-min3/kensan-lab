@@ -9,16 +9,30 @@ import (
 
 func (s *Store) SeedKnowledge() error {
 	initial := map[string]string{
+		"profile-platform":   "Platform team: own the safe deployment path (Release Gate, publisher, GitOps, and rollback), Golden Path contracts, templates, and operability. Judge versioned App feedback with explicit decisions and reasons. Security and exposure changes require Yu approval. Private conversations are not shared inputs.",
+		"knowledge-platform": "Current mission: provide the canary Golden Path and safe deployment path for App development. Improve the platform from App feedback and return versioned decisions. Adopted changes use independent stages and Gate; the originating App rechecks the same operation after deployment. Keep approved scope and contract fixed.",
+		"profile-app":        "App team: lead application development within approved owned paths. Run requirements, design review, implementation, credentialless verification, and implementation review in independent sessions. Request deployment through Platform Release Gate and publisher; verify the deployed user path. Send platform feedback with expected versus observed evidence.",
+		"knowledge-app":      "Current mission: add a small feature to the canary application, deploy through the Platform path, and verify the user operation. App does not hold publisher credentials. Report deployment or operational needs as versioned platform feedback; continue independent work while Platform decides. Recheck adopted improvements after deployment.",
+		"knowledge-common":   "Shared: user-approved mission and scope, accepted contract, repository rules. Private team memories and author chats are never implicit shared inputs.",
+	}
+	// Upgrade only our original defaults. Operator-maintained knowledge remains
+	// authoritative, and existing artifact references remain immutable.
+	legacy := map[string]string{
 		"profile-platform":   "Platform team: own the Golden Path contract, ADRs, templates, operability, and rollback. Submit versioned contracts and evidence. Consumer constraints from App are input, not hidden shared conversation.",
 		"knowledge-platform": "Current mission: complete the production Golden Path, then align existing apps. Scope and accepted contract are versioned; do not expand either from a worker memo.",
 		"profile-app":        "App team: represent each consumer's UX, identity, data, and acceptance scenarios from design time. Send expected versus observed failures with evidence.",
 		"knowledge-app":      "Current mission: test the Golden Path as a consumer. Preserve web-stateless, web-stateful, and batch differences. Feedback returns to Platform as a versioned artifact.",
-		"knowledge-common":   "Shared: user-approved mission and scope, accepted contract, repository rules. Private team memories and author chats are never implicit shared inputs.",
 	}
 	st := s.Snapshot()
 	for kind, body := range initial {
-		if _, ok := latest(st, "system", kind); ok {
-			continue
+		if old, ok := latest(st, "system", kind); ok {
+			content, err := s.ReadArtifact(old.ID)
+			if err != nil {
+				return err
+			}
+			if legacy[kind] == "" || string(content) != legacy[kind] {
+				continue
+			}
 		}
 		if _, err := s.PutArtifact("system", kind, []byte(body)); err != nil {
 			return err
@@ -51,7 +65,23 @@ func (s *Store) BuildManifest(agentID string, allowedScope []string) (ContextMan
 	if !hasProfile || !hasKnowledge || !hasCommon {
 		return ContextManifest{}, errors.New("team knowledge is not seeded")
 	}
-	m := ContextManifest{SchemaVersion: SchemaVersion, MissionID: t.MissionID, TaskID: t.ID, SourceTaskID: t.SourceTaskID, Team: a.Team, Role: a.Role, AgentID: a.ID, Provider: a.Provider, Model: a.Model, Generation: a.SessionGeneration, TeamProfile: artifactRef(profile), TeamKnowledge: artifactRef(knowledge), CommonKnowledge: artifactRef(common), Inbox: []ArtifactRef{}, StageInputs: []StageInput{}, ReviewInputs: append([]ArtifactRef{}, a.ReviewInputs...), ReviewAuthorID: a.ReviewAuthorID, MessageIDs: []string{}, ContractVersion: t.ContractVersion, BaseSHA: t.BaseSHA, HeadSHA: t.HeadSHA, AllowedScope: append([]string(nil), allowedScope...)}
+	m := ContextManifest{SchemaVersion: SchemaVersion, MissionID: t.MissionID, TaskID: t.ID, SourceTaskID: t.SourceTaskID, CheckoutSourceTaskID: t.CheckoutSourceTaskID, Team: a.Team, Role: a.Role, AgentID: a.ID, Provider: a.Provider, Model: a.Model, Generation: a.SessionGeneration, TeamProfile: artifactRef(profile), TeamKnowledge: artifactRef(knowledge), CommonKnowledge: artifactRef(common), Inbox: []ArtifactRef{}, StageInputs: []StageInput{}, ReviewInputs: append([]ArtifactRef{}, a.ReviewInputs...), ReviewAuthorID: a.ReviewAuthorID, MessageIDs: []string{}, ContractVersion: t.ContractVersion, BaseSHA: t.BaseSHA, HeadSHA: t.HeadSHA, AllowedScope: append([]string(nil), allowedScope...)}
+	if t.CheckoutSourceTaskID != "" {
+		source, ok := st.Tasks[t.CheckoutSourceTaskID]
+		if !ok || t.Team != Platform || t.Kind != "change" || t.SourceTaskID != "" || source.Team != App || source.Kind != "change" || !appDeploymentReady(st, source) || t.BaseSHA != st.Deployments[source.ID].Revision || t.MissionID != source.MissionID || t.ContractVersion != source.ContractVersion {
+			return ContextManifest{}, errors.New("Platform improvement lacks a deployed App checkout")
+		}
+	}
+	if t.Team == App && t.Kind == "acceptance" && t.SourceTaskID != "" {
+		source := st.Tasks[t.SourceTaskID]
+		if source.Team == App || source.FeedbackMessageID != "" {
+			if !acceptanceSourceDeployed(st, source) || t.HeadSHA != source.HeadSHA {
+				return ContextManifest{}, errors.New("App acceptance lacks current deployment evidence")
+			}
+			ref := st.Deployments[source.ID].EvidenceRef
+			m.DeploymentEvidence = &ref
+		}
+	}
 	if memo, ok := latest(st, a.ID, "memo"); ok {
 		ref := artifactRef(memo)
 		m.AgentMemo = &ref
@@ -115,6 +145,15 @@ func (s *Store) BuildManifest(agentID string, allowedScope []string) (ContextMan
 	for _, ref := range m.ReviewInputs {
 		if err := s.verifyRef(ref); err != nil {
 			return ContextManifest{}, fmt.Errorf("review input %s: %w", ref.ID, err)
+		}
+	}
+	if m.DeploymentEvidence != nil {
+		if err := s.verifyRef(*m.DeploymentEvidence); err != nil {
+			return ContextManifest{}, fmt.Errorf("deployment evidence: %w", err)
+		}
+		artifact := st.Artifacts[m.DeploymentEvidence.ID]
+		if artifact.AgentID != "system" || artifact.Kind != "deployment_observation" {
+			return ContextManifest{}, errors.New("deployment evidence is not a host observation")
 		}
 	}
 	if m.PreviousAcceptance != nil {

@@ -6,5 +6,5 @@ export default defineConfig({
   fullyParallel: false,
   workers: 1,
   reporter: "list",
-  use: { trace: "on-first-retry" },
+  use: { channel: "chrome", trace: "on-first-retry" },
 });

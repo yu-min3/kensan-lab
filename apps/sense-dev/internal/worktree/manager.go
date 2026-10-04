@@ -131,6 +131,64 @@ func (m Manager) EnsureFromTask(ctx context.Context, taskID, sourceTaskID, headS
 	return path, headSHA, nil
 }
 
+// EnsureDerivedFromTask seeds a Platform improvement from a deployed App
+// checkout, then permits its own reviewed commits to advance from that base.
+// Unlike EnsureFromTask, later stages are not pinned to the producer's HEAD.
+func (m Manager) EnsureDerivedFromTask(ctx context.Context, taskID, sourceTaskID, baseSHA string) (string, string, error) {
+	return m.checkDerivedFromTask(ctx, taskID, sourceTaskID, baseSHA, true)
+}
+
+// InspectDerivedFromTask checks identity after a model turn, while allowing the
+// expected uncommitted source edits before supervisor capture.
+func (m Manager) InspectDerivedFromTask(ctx context.Context, taskID, sourceTaskID, baseSHA string) (string, string, error) {
+	return m.checkDerivedFromTask(ctx, taskID, sourceTaskID, baseSHA, false)
+}
+
+func (m Manager) checkDerivedFromTask(ctx context.Context, taskID, sourceTaskID, baseSHA string, requireClean bool) (string, string, error) {
+	if !taskIDPattern.MatchString(taskID) || !taskIDPattern.MatchString(sourceTaskID) || taskID == sourceTaskID || !shaPattern.MatchString(baseSHA) {
+		return "", "", errors.New("invalid derived task, source or base")
+	}
+	source, root, err := m.paths()
+	if err != nil {
+		return "", "", err
+	}
+	producer := filepath.Join(root, sourceTaskID)
+	if _, err := validateProducer(ctx, source, producer, sourceTaskID, baseSHA); err != nil {
+		return "", "", err
+	}
+	path := filepath.Join(root, taskID)
+	if _, err := os.Lstat(path); errors.Is(err, os.ErrNotExist) {
+		return m.EnsureFromTask(ctx, taskID, sourceTaskID, baseSHA)
+	} else if err != nil {
+		return "", "", err
+	}
+	if err := validate(ctx, producer, path, "sense-dev/"+taskID, baseSHA); err != nil {
+		return "", "", err
+	}
+	if dirty, err := git(ctx, path, "status", "--porcelain"); err != nil || requireClean && dirty != "" {
+		return "", "", errors.New("derived checkout is dirty")
+	}
+	return path, baseSHA, nil
+}
+
+func validateProducer(ctx context.Context, source, producer, sourceTaskID, baseSHA string) (string, error) {
+	info, err := os.Lstat(producer)
+	if err != nil || !info.IsDir() || info.Mode()&os.ModeSymlink != 0 {
+		return "", errors.New("producer checkout is unavailable")
+	}
+	if err := validate(ctx, source, producer, "sense-dev/"+sourceTaskID, ""); err != nil {
+		return "", err
+	}
+	head, err := git(ctx, producer, "rev-parse", "HEAD")
+	if err != nil || head != baseSHA {
+		return "", errors.New("producer checkout is not at deployed base")
+	}
+	if dirty, err := git(ctx, producer, "status", "--porcelain"); err != nil || dirty != "" {
+		return "", errors.New("producer checkout is dirty")
+	}
+	return head, nil
+}
+
 // AdvanceFromTask fast-forwards a clean consumer checkout to a reviewed
 // producer correction. A crash after the fast-forward is safe to retry.
 func (m Manager) AdvanceFromTask(ctx context.Context, taskID, sourceTaskID, fromHead, toHead string) (string, error) {

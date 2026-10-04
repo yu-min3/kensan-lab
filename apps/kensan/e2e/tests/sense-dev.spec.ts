@@ -39,7 +39,7 @@ test.beforeAll(async () => {
     "-data", join(tempDir, "state"),
     "-admin-token-file", tokenFile,
     "-tokens-css", resolve(appRoot, "../../packages/design-tokens/tokens.css"),
-    "-mock-worker",
+    // Presentation fixtures stay fixed; UI actions are tested without a worker.
   ], { cwd: appRoot, stdio: "ignore" });
   for (let i = 0; i < 100; i++) {
     if (processHandle.exitCode !== null) throw new Error("sense-dev exited before browser test");
@@ -114,7 +114,12 @@ for (const width of [360, 390, 430]) {
     await expect(page.getByRole("heading", { name: "開発の現在地" })).toBeVisible();
     const title = `画面幅 ${width} の模擬案件`;
     await page.getByLabel("依頼内容").fill(title);
+    await expect(page.getByLabel("担当 team")).toHaveValue("app");
+    await expect(page.getByLabel("案件の種類")).toHaveValue("change");
     await page.getByRole("button", { name: "依頼を登録" }).click();
+    const created = page.locator("article").filter({ has: page.getByRole("heading", { name: title }) });
+    await expect(created.getByText("App", { exact: true })).toBeVisible();
+    await expect(created.getByText("要件整理 · ready", { exact: true })).toBeVisible();
     await expect(page.getByText(title)).toBeVisible();
     await page.getByRole("button", { name: "Mac 優先を2時間" }).click();
     await expect(page.getByText(/Mac 優先：/)).toBeVisible();
@@ -170,13 +175,72 @@ for (const width of [360, 390, 430]) {
     await restored.getByRole("button", { name: "回答を送る" }).click();
     await expect(page.locator("article").filter({ hasText: prompt }).getByText(`回答済み：回答 ${width}`)).toBeVisible();
     const approval = page.locator("article").filter({ hasText: `画面幅 ${width} の判断（模擬）` });
+    for (const category of ["認証・認可", "secret・権限", "公開", "統制そのもの", "データ破壊"]) {
+      await expect(approval.getByLabel("Yu 判断の分類").getByText(category, { exact: true })).toBeVisible();
+    }
+    await expect(approval.getByLabel("判断の根拠")).toContainText("公開 host・認証設定");
     await approval.getByRole("button", { name: "承認を記録" }).click();
     await expect(page.locator("article").filter({ hasText: `画面幅 ${width} の判断（模擬）` }).getByText("approved")).toBeVisible();
+    await expect(page.locator("article").filter({ hasText: `画面幅 ${width} の判断（模擬）` })).toContainText("新しい Release Gate 判定が必要");
     const state = JSON.parse(readFileSync(join(tempDir, "state", "state.json"), "utf8"));
     expect(Object.keys(state.intents)).toHaveLength(0);
     const sizes = await page.evaluate(() => ({ page: document.documentElement.scrollWidth, viewport: window.innerWidth }));
     expect(sizes.page).toBeLessThanOrEqual(sizes.viewport);
   });
+  test(`${width}px で App 開発と Platform 判定・改善・再確認を追える`, async ({ page }, testInfo) => {
+    await page.setViewportSize({ width, height: 844 });
+    await page.goto(`${baseURL}/login`);
+    await page.getByLabel("管理トークン").fill(token);
+    await page.getByRole("button", { name: "開く" }).click();
+    const development = page.locator("article").filter({ has: page.getByRole("heading", { name: "canary の機能開発（模擬）" }) });
+    await expect(development).toContainText("要件整理 · auth_required");
+    const appTaskURL = await development.getByRole("link").getAttribute("href");
+    const feedback = page.getByLabel("Platform へのフィードバック");
+    await expect(feedback.getByText("Platform 判定待ち", { exact: true })).toBeVisible();
+    await expect(feedback.getByText("採用・Platform 改善中", { exact: true })).toBeVisible();
+    await expect(feedback.getByText("改善配備済み・App 再確認待ち", { exact: true })).toBeVisible();
+    await expect(feedback.getByText(/採用理由: 利用者操作/).first()).toBeVisible();
+    const humanFeedback = feedback.locator("article").filter({ hasText: "公開設定の改善（模擬）" });
+    await expect(humanFeedback.getByText("Yu の判断待ち", { exact: true })).toBeVisible();
+    await expect(humanFeedback.getByLabel("Yu 判断の分類").getByText("公開", { exact: true })).toBeVisible();
+    await expect(humanFeedback.getByLabel("Yu 判断の分類").getByText("認証・認可", { exact: true })).toBeVisible();
+    await expect(humanFeedback.getByLabel("判断の根拠")).toContainText("公開 host と認証");
+    let sizes = await page.evaluate(() => ({ page: document.documentElement.scrollWidth, viewport: window.innerWidth }));
+    expect(sizes.page).toBeLessThanOrEqual(sizes.viewport);
+    await development.getByRole("link").click();
+    await expect(page.getByRole("heading", { name: "canary の機能開発（模擬）" })).toBeVisible();
+    await expect(page.getByLabel("Platform へのフィードバック").getByText("Platform 判定待ち", { exact: true })).toBeVisible();
+    await expect(page.getByLabel("Platform へのフィードバック").getByText("改善配備済み・App 再確認待ち", { exact: true })).toBeVisible();
+    const detailHumanFeedback = page.getByLabel("Platform へのフィードバック").locator("article").filter({ hasText: "公開設定の改善（模擬）" });
+    await expect(detailHumanFeedback.getByLabel("Yu 判断の分類").getByText("公開", { exact: true })).toBeVisible();
+    await expect(detailHumanFeedback.getByLabel("判断の根拠")).toContainText("公開 host と認証");
+    sizes = await page.evaluate(() => ({ page: document.documentElement.scrollWidth, viewport: window.innerWidth }));
+    expect(sizes.page).toBeLessThanOrEqual(sizes.viewport);
+    await page.screenshot({ path: testInfo.outputPath("app-development.png"), fullPage: true });
+    await page.getByRole("link", { name: "開発の現在地へ戻る" }).click();
+    await page.getByRole("heading", { name: "Golden Path 契約の修正" }).getByRole("link").click();
+    const approval = page.locator("article").filter({ hasText: `画面幅 ${width} の判断（模擬）` });
+    await expect(approval.getByLabel("Yu 判断の分類").getByText("公開", { exact: true })).toBeVisible();
+    await expect(approval.getByLabel("判断の根拠")).toContainText("Yu の判断が必要");
+    sizes = await page.evaluate(() => ({ page: document.documentElement.scrollWidth, viewport: window.innerWidth }));
+    expect(sizes.page).toBeLessThanOrEqual(sizes.viewport);
+    await page.getByRole("link", { name: "開発の現在地へ戻る" }).click();
+    await page.getByLabel("Mission ID").fill("mobile-fixture");
+    await page.getByLabel("契約版", { exact: true }).fill("fixture-v1");
+    await page.getByLabel("案件の種類").selectOption("acceptance");
+    await page.getByLabel("連携する変更 task ID（App 受入のみ）").fill(appTaskURL!.split("/").at(-1)!);
+    const ownAcceptanceTitle = `App 自身の配備後確認 ${width}`;
+    await page.getByLabel("依頼内容").fill(ownAcceptanceTitle);
+    await page.getByRole("button", { name: "依頼を登録" }).click();
+    const ownAcceptance = page.locator("article").filter({ has: page.getByRole("heading", { name: ownAcceptanceTitle }) });
+    await expect(ownAcceptance).toContainText("App 変更:");
+    await expect(ownAcceptance).not.toContainText("Platform 変更:");
+    await ownAcceptance.getByRole("link", { name: ownAcceptanceTitle }).click();
+    await expect(page.getByLabel("案件の情報")).toContainText("App 変更:");
+    sizes = await page.evaluate(() => ({ page: document.documentElement.scrollWidth, viewport: window.innerWidth }));
+    expect(sizes.page).toBeLessThanOrEqual(sizes.viewport);
+  });
+
 }
 
 test("390px の模擬依頼から判断・停止・日報復帰まで一巡する", async ({ page }) => {

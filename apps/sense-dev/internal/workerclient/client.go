@@ -90,14 +90,27 @@ func (r Runner) Run(ctx context.Context, dispatch core.Dispatch) (core.RunResult
 	var taskWorktree, pinnedBase string
 	var err error
 	if dispatch.Manifest.SourceTaskID != "" {
-		if request.Role != "app_acceptance" || dispatch.Manifest.Team != core.App || dispatch.Attempt.BaseSHA != dispatch.Attempt.HeadSHA || dispatch.Attempt.HeadSHA != dispatch.Manifest.HeadSHA {
-			return core.RunResult{}, errors.New("linked consumer revision is not a pinned App acceptance")
+		acceptance := request.Role == "app_acceptance" && dispatch.Manifest.Team == core.App && dispatch.Attempt.BaseSHA == dispatch.Attempt.HeadSHA
+		gate := request.Role == "release_gate" && dispatch.Manifest.Team == core.Platform
+		if (!acceptance && !gate) || dispatch.Attempt.HeadSHA != dispatch.Manifest.HeadSHA {
+			return core.RunResult{}, errors.New("linked consumer revision is not a pinned App acceptance or independent Platform Gate")
 		}
 		taskWorktree, pinnedBase, err = r.Worktrees.EnsureFromTask(ctx, dispatch.Attempt.TaskID, dispatch.Manifest.SourceTaskID, dispatch.Attempt.HeadSHA)
+	} else if dispatch.Manifest.CheckoutSourceTaskID != "" {
+		if dispatch.Manifest.Team != core.Platform || dispatch.Attempt.BaseSHA == "" {
+			return core.RunResult{}, errors.New("derived checkout requires a pinned Platform task")
+		}
+		// The logical App source is a reviewed PR head. The deployed merge
+		// revision is supplied by the operator-owned immutable source repo.
+		taskWorktree, pinnedBase, err = r.Worktrees.Ensure(ctx, dispatch.Attempt.TaskID, dispatch.Attempt.BaseSHA)
 	} else {
 		taskWorktree, pinnedBase, err = r.Worktrees.Ensure(ctx, dispatch.Attempt.TaskID, dispatch.Attempt.BaseSHA)
 	}
-	if err != nil || pinnedBase != dispatch.Attempt.BaseSHA {
+	expectedBase := dispatch.Attempt.BaseSHA
+	if dispatch.Manifest.SourceTaskID != "" && request.Role == "release_gate" {
+		expectedBase = dispatch.Attempt.HeadSHA
+	}
+	if err != nil || pinnedBase != expectedBase {
 		return core.RunResult{}, errors.New("task-scoped worktree failed validation")
 	}
 	config := r.Codex
@@ -136,7 +149,9 @@ func (r Runner) Run(ctx context.Context, dispatch core.Dispatch) (core.RunResult
 		return core.RunResult{}, err
 	}
 	if request.Role == "implementation" {
-		if _, _, err := r.Worktrees.Ensure(ctx, dispatch.Attempt.TaskID, dispatch.Attempt.BaseSHA); err != nil {
+		var verifyErr error
+		_, _, verifyErr = r.Worktrees.Ensure(ctx, dispatch.Attempt.TaskID, dispatch.Attempt.BaseSHA)
+		if verifyErr != nil {
 			return core.RunResult{}, errors.New("task checkout changed identity after implementation")
 		}
 		change, err := worktree.CommitImplementation(ctx, taskWorktree, dispatch.Attempt.BaseSHA)

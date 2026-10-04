@@ -2,6 +2,7 @@ package core
 
 import (
 	"errors"
+	"reflect"
 	"strings"
 	"time"
 )
@@ -69,6 +70,19 @@ func (s *Store) AnswerQuestion(questionID, actionID, answer string) (Question, e
 }
 
 func (s *Store) RequestApproval(decisionID string) (ApprovalRequest, error) {
+	initial := s.Snapshot().Decisions[decisionID]
+	var candidateHash string
+	if initial.ScanRef.ID != "" {
+		scan, err := s.loadReleaseScan(initial.ScanRef, initial)
+		if err != nil || scan.Status == "deny" {
+			return ApprovalRequest{}, errors.New("denied or invalid scan cannot be approved")
+		}
+		_, ref, err := s.releaseCandidate(s.Snapshot().Agents[initial.GateAgentID], scan)
+		if err != nil {
+			return ApprovalRequest{}, err
+		}
+		candidateHash = ref.SHA256
+	}
 	id, err := newID()
 	if err != nil {
 		return ApprovalRequest{}, err
@@ -76,6 +90,9 @@ func (s *Store) RequestApproval(decisionID string) (ApprovalRequest, error) {
 	var out ApprovalRequest
 	err = s.update(func(st *State) error {
 		d, ok := st.Decisions[decisionID]
+		if !reflect.DeepEqual(d, initial) {
+			return errors.New("release decision changed before approval request")
+		}
 		if !ok || d.Verdict != "needs_human" || !time.Now().Before(d.ExpiresAt) {
 			return errors.New("live needs_human release decision required")
 		}
@@ -89,6 +106,8 @@ func (s *Store) RequestApproval(decisionID string) (ApprovalRequest, error) {
 			}
 		}
 		out = ApprovalRequest{ID: id, DecisionID: decisionID, Operation: d.Operation, Repository: d.Repository, Ref: d.Ref, HeadSHA: d.HeadSHA, Environment: d.TargetEnvironment, Reason: d.Reason, Status: "pending", CreatedAt: time.Now().UTC(), ExpiresAt: d.ExpiresAt}
+		out.HumanCategories, out.HumanReasons = append([]string(nil), d.HumanCategories...), append([]string(nil), d.HumanReasons...)
+		out.PolicyVersion, out.ScanSHA256, out.CandidateSHA256, out.AuthorAgentID = d.PolicyVersion, d.ScanRef.SHA256, candidateHash, d.AuthorAgentID
 		st.Approvals[id] = out
 		st.Events = append(st.Events, event("approval_requested", id, decisionID))
 		return nil
@@ -120,8 +139,14 @@ func (s *Store) DecideApproval(requestID, actionID, operation, sha, verdict stri
 			return errors.New("approval operation, SHA or expiry mismatch")
 		}
 		d, ok := st.Decisions[request.DecisionID]
-		if !ok || d.Verdict != "needs_human" || d.Operation != operation || d.HeadSHA != sha || d.PolicyVersion != ReleasePolicyVersion {
+		if !ok || d.Verdict != "needs_human" || d.Operation != operation || d.HeadSHA != sha || d.PolicyVersion != ReleasePolicyVersion || request.PolicyVersion != d.PolicyVersion || request.AuthorAgentID != d.AuthorAgentID || request.Repository != d.Repository || request.Ref != d.Ref || request.Environment != d.TargetEnvironment || request.ScanSHA256 != d.ScanRef.SHA256 || !reflect.DeepEqual(request.HumanCategories, d.HumanCategories) || !reflect.DeepEqual(request.HumanReasons, d.HumanReasons) || request.ExpiresAt.After(d.ExpiresAt) {
 			return errors.New("release gate decision changed")
+		}
+		if d.ScanRef.ID != "" {
+			inputs := st.Agents[d.GateAgentID].ReviewInputs
+			if len(inputs) == 0 || inputs[len(inputs)-1].SHA256 != request.CandidateSHA256 {
+				return errors.New("approval candidate changed")
+			}
 		}
 		if st.Tasks[st.Agents[d.AuthorAgentID].TaskID].HeadSHA != sha {
 			return errors.New("task head changed after approval request")

@@ -75,6 +75,47 @@ func TestTaskWorktreesAreDistinctAndPinned(t *testing.T) {
 	}
 }
 
+func TestDerivedCheckoutRequiresCleanPinnedProducerAndKeepsOwnHistory(t *testing.T) {
+	m, sourceSHA := testManager(t)
+	producerID, derivedID := strings.Repeat("a", 32), strings.Repeat("b", 32)
+	producer, _, err := m.Ensure(context.Background(), producerID, sourceSHA)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := git(context.Background(), producer, "commit", "--allow-empty", "-m", "deployed App revision"); err != nil {
+		t.Fatal(err)
+	}
+	deployedSHA, err := git(context.Background(), producer, "rev-parse", "HEAD")
+	if err != nil {
+		t.Fatal(err)
+	}
+	path, base, err := m.EnsureDerivedFromTask(context.Background(), derivedID, producerID, deployedSHA)
+	if err != nil || base != deployedSHA {
+		t.Fatalf("derived checkout=%s %s %v", path, base, err)
+	}
+	if _, err := git(context.Background(), path, "commit", "--allow-empty", "-m", "platform improvement"); err != nil {
+		t.Fatal(err)
+	}
+	if _, _, err := m.EnsureDerivedFromTask(context.Background(), derivedID, producerID, deployedSHA); err != nil {
+		t.Fatal("own descendant rejected:", err)
+	}
+	if err := os.WriteFile(filepath.Join(path, "draft.txt"), []byte("uncommitted implementation"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	if _, _, err := m.InspectDerivedFromTask(context.Background(), derivedID, producerID, deployedSHA); err != nil {
+		t.Fatal("worker edit rejected before capture:", err)
+	}
+	if _, _, err := m.EnsureDerivedFromTask(context.Background(), derivedID, producerID, deployedSHA); err == nil {
+		t.Fatal("dirty derived checkout admitted as next stage")
+	}
+	if err := os.WriteFile(filepath.Join(producer, "unexpected.txt"), []byte("dirty producer"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	if _, _, err := m.InspectDerivedFromTask(context.Background(), derivedID, producerID, deployedSHA); err == nil {
+		t.Fatal("dirty producer admitted")
+	}
+}
+
 func TestRejectsPathEscapeAndWrongRepository(t *testing.T) {
 	m, sha := testManager(t)
 	if _, _, err := m.Ensure(context.Background(), "../outside", sha); err == nil {

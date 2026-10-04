@@ -56,6 +56,15 @@ func Open(root string) (*Store, error) {
 			s.Close()
 			return nil, fmt.Errorf("invalid state or schema version: %v", err)
 		}
+		if s.data.ReleaseFlows == nil {
+			s.data.ReleaseFlows = map[string]ReleaseFlow{}
+		}
+		if s.data.Deployments == nil {
+			s.data.Deployments = map[string]DeploymentReceipt{}
+		}
+		if s.data.FeedbackLoops == nil {
+			s.data.FeedbackLoops = map[string]FeedbackLoop{}
+		}
 		if s.data.Questions == nil {
 			s.data.Questions = map[string]Question{}
 		}

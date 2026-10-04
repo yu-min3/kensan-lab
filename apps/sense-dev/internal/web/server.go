@@ -93,12 +93,14 @@ func agentOrder(role string) int {
 		return 1
 	case "implementation":
 		return 2
-	case "implementation_review":
+	case "verification":
 		return 3
-	case "release_gate":
+	case "implementation_review":
 		return 4
-	default:
+	case "release_gate":
 		return 5
+	default:
+		return 6
 	}
 }
 
@@ -118,7 +120,7 @@ func agentWaitReason(st core.State, a core.Agent, workerMode string, allowed boo
 			return "Yu の判断待ち"
 		}
 		if task.Status == "revision_wait" {
-			return "Platform 修正待ち"
+			return teamLabel(st.Tasks[task.SourceTaskID].Team) + " 修正待ち"
 		}
 		if task.HeadSHA != "" && task.BaseSHA != "" && task.BaseSHA != task.HeadSHA {
 			return "App 作業ツリー更新待ち"
@@ -143,10 +145,13 @@ func agentWaitReason(st core.State, a core.Agent, workerMode string, allowed boo
 	if task.Team == core.App && task.Kind == "acceptance" && task.SourceTaskID != "" {
 		source := st.Tasks[task.SourceTaskID]
 		if task.HeadSHA == "" {
-			return "Platform の合格成果物待ち"
+			if source.Team == core.App && source.Status == "publish_wait" {
+				return "App 変更の配備証拠待ち"
+			}
+			return teamLabel(source.Team) + " の合格成果物待ち"
 		}
 		if source.HeadSHA != task.HeadSHA {
-			return "Platform 版不一致・要確認"
+			return teamLabel(source.Team) + " 版不一致・要確認"
 		}
 	}
 	if workerMode == "off" {
@@ -327,15 +332,15 @@ func (s *Server) csrf(r *http.Request) string {
 
 func (s *Server) home(w http.ResponseWriter, r *http.Request) {
 	b, _ := static.ReadFile("static/index.html")
-	page, err := template.New("home").Funcs(template.FuncMap{"teamLabel": teamLabel}).Parse(string(b))
+	page, err := template.New("home").Funcs(template.FuncMap{"teamLabel": teamLabel, "humanCategoryLabel": humanCategoryLabel}).Parse(string(b))
 	if err != nil {
 		http.Error(w, "template unavailable", http.StatusInternalServerError)
 		return
 	}
 	st := s.store.Snapshot()
-	tasks := make([]core.Task, 0, len(st.Tasks))
+	tasks := make([]taskView, 0, len(st.Tasks))
 	for _, t := range st.Tasks {
-		tasks = append(tasks, t)
+		tasks = append(tasks, developmentTask(st, t))
 	}
 	sort.Slice(tasks, func(i, j int) bool { return tasks[i].CreatedAt.After(tasks[j].CreatedAt) })
 	messages := make([]messageView, 0, len(st.Messages))
@@ -397,7 +402,7 @@ func (s *Server) home(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	_ = page.Execute(w, struct {
 		CSRF           string
-		Tasks          []core.Task
+		Tasks          []taskView
 		Messages       []messageView
 		Agents         []agentView
 		Questions      []core.Question
@@ -409,7 +414,8 @@ func (s *Server) home(w http.ResponseWriter, r *http.Request) {
 		WorkerMode     string
 		WindowOpen     bool
 		BillingBlocked bool
-	}{s.csrf(r), tasks, messages, agents, questions, approvals, reports, outbox, st.Stopped, st.PausedUntil, s.workerMode, s.allowedNow == nil || s.allowedNow(time.Now()), s.billingBlocked()})
+		Feedbacks      []feedbackView
+	}{s.csrf(r), tasks, messages, agents, questions, approvals, reports, outbox, st.Stopped, st.PausedUntil, s.workerMode, s.allowedNow == nil || s.allowedNow(time.Now()), s.billingBlocked(), s.feedbackViews(st, "")})
 }
 
 func (s *Server) taskDetail(w http.ResponseWriter, r *http.Request) {
@@ -470,7 +476,7 @@ func (s *Server) taskDetail(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "template unavailable", http.StatusInternalServerError)
 		return
 	}
-	page, err := template.New("task").Funcs(template.FuncMap{"teamLabel": teamLabel}).Parse(string(b))
+	page, err := template.New("task").Funcs(template.FuncMap{"teamLabel": teamLabel, "humanCategoryLabel": humanCategoryLabel}).Parse(string(b))
 	if err != nil {
 		http.Error(w, "template unavailable", http.StatusInternalServerError)
 		return
@@ -478,12 +484,13 @@ func (s *Server) taskDetail(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	_ = page.Execute(w, struct {
 		CSRF      string
-		Task      core.Task
+		Task      taskView
 		Agents    []agentView
 		Messages  []messageView
 		Questions []core.Question
 		Approvals []core.ApprovalRequest
-	}{s.csrf(r), task, agents, messages, questions, approvals})
+		Feedbacks []feedbackView
+	}{s.csrf(r), developmentTask(st, task), agents, messages, questions, approvals, s.feedbackViews(st, task.ID)})
 }
 
 func (s *Server) staticCSS(w http.ResponseWriter, r *http.Request) {
@@ -536,8 +543,8 @@ func (s *Server) createTask(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, "source task is only valid for App acceptance", http.StatusBadRequest)
 			return
 		}
-		platform := s.store.Snapshot().Tasks[source]
-		if platform.ID == "" || platform.MissionID != r.Form.Get("mission") || platform.ContractVersion != r.Form.Get("contract") {
+		sourceTask := s.store.Snapshot().Tasks[source]
+		if sourceTask.ID == "" || sourceTask.MissionID != r.Form.Get("mission") || sourceTask.ContractVersion != r.Form.Get("contract") {
 			http.Error(w, "source task mission or contract mismatch", http.StatusBadRequest)
 			return
 		}

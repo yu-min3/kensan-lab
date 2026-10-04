@@ -19,6 +19,7 @@ import (
 	"github.com/yu-min3/kensan-lab/apps/sense-dev/internal/core"
 	"github.com/yu-min3/kensan-lab/apps/sense-dev/internal/isolation"
 	"github.com/yu-min3/kensan-lab/apps/sense-dev/internal/mock"
+	"github.com/yu-min3/kensan-lab/apps/sense-dev/internal/publisherbridge"
 	"github.com/yu-min3/kensan-lab/apps/sense-dev/internal/reportdelivery"
 	"github.com/yu-min3/kensan-lab/apps/sense-dev/internal/verifier"
 	"github.com/yu-min3/kensan-lab/apps/sense-dev/internal/web"
@@ -50,6 +51,9 @@ func run() error {
 	codexAuth := flag.String("codex-auth-home", "", "private Codex subscription configuration directory")
 	turnTimeout := flag.Duration("turn-timeout", 45*time.Minute, "maximum duration of one isolated model turn")
 	inferenceWindow := flag.String("inference-window", "", "required JST HH:MM-HH:MM interval for isolated model dispatch")
+	publisherSocket := flag.String("publisher-socket", "", "private Unix socket for separately confined publisher")
+	publisherAuth := flag.String("publisher-auth-file", "", "private controller-to-publisher authentication file")
+	releasePlanPath := flag.String("release-plan", "", "operator-owned private canary release plan; no publisher credentials")
 	verificationPlan := flag.String("verification-plan", "", "operator-owned JSON plan for credentialless tests")
 	modelLimit := flag.Int("model-attempt-limit", 0, "optional finite-run model budget; stops on failures and decisions")
 	reportChannel := flag.String("report-slack-channel", "", "fixed Slack channel ID for daily report")
@@ -93,6 +97,23 @@ func run() error {
 	}
 	if err := store.RecoverSendingReports(); err != nil {
 		return err
+	}
+	if (*publisherSocket == "") != (*publisherAuth == "") {
+		return errors.New("publisher socket and authentication file are required together")
+	}
+	if *publisherSocket != "" && (!*isolatedWorker || *mockWorker || *releasePlanPath == "" || !filepath.IsAbs(*publisherSocket) || !filepath.IsAbs(*publisherAuth)) {
+		return errors.New("publisher bridge requires isolated worker, release plan and absolute paths")
+	}
+	var releaseDriver *core.ReleaseDriver
+	if *releasePlanPath != "" {
+		if !*isolatedWorker || *modelLimit != 0 {
+			return errors.New("release-plan requires an unbounded isolated worker")
+		}
+		plan, err := core.LoadReleasePlan(*releasePlanPath)
+		if err != nil {
+			return err
+		}
+		releaseDriver = &core.ReleaseDriver{Store: store, Plan: plan, WorktreeRoot: *worktreeRoot}
 	}
 	mode := "off"
 	var runner core.Runner
@@ -210,6 +231,7 @@ func run() error {
 	}()
 	if runner != nil {
 		go func() {
+			var nextObservation time.Time
 			ticker := time.NewTicker(2 * time.Second)
 			defer ticker.Stop()
 			for {
@@ -230,6 +252,23 @@ func run() error {
 					if mode == "isolated" {
 						if err := prepareReadyWorktrees(ctx, store, worktrees); err != nil {
 							log.Print("task worktree preparation needs operator inspection")
+						}
+					}
+					if releaseDriver != nil {
+						if _, err := releaseDriver.Reconcile(ctx); err != nil {
+							log.Print("release flow requires operator inspection")
+						}
+					}
+					if releaseDriver != nil && *publisherSocket != "" {
+						if err := releaseDriver.PublishReady(ctx, publisherbridge.Client{Socket: *publisherSocket, AuthFile: *publisherAuth}); err != nil {
+							log.Print("publisher reconciliation needs operator inspection")
+						}
+					}
+
+					if releaseDriver != nil && *publisherSocket != "" && !time.Now().Before(nextObservation) {
+						nextObservation = time.Now().Add(time.Minute)
+						if err := observeDeployments(ctx, store, publisherbridge.Client{Socket: *publisherSocket, AuthFile: *publisherAuth}, releaseDriver.Plan.MissionID); err != nil {
+							log.Print("deployment observation incomplete; App acceptance remains waiting")
 						}
 					}
 					if _, err := store.TickBounded(ctx, runner, scope, *modelLimit); err != nil && !errors.Is(err, context.Canceled) {

@@ -45,7 +45,7 @@ func (s *Store) ReconcileReviewedHandoffs() (int, error) {
 			continue
 		}
 		source := st.Tasks[app.SourceTaskID]
-		if source.Status != "publish_wait" || !fullSHA(source.HeadSHA) || retest && source.HeadSHA == app.HeadSHA {
+		if !validTeam(source.Team) || source.Kind != "change" || !acceptanceSourceDeployed(st, source) || source.Status != "publish_wait" || !fullSHA(source.HeadSHA) || retest && source.HeadSHA == app.HeadSHA {
 			continue
 		}
 		proof, err := s.reviewedChangeProof(source.ID)
@@ -65,7 +65,7 @@ func (s *Store) ReconcileReviewedHandoffs() (int, error) {
 			change := current.Tasks[source.ID]
 			stillInitial := target.Status == "ready" && target.HeadSHA == "" && target.BaseSHA == ""
 			stillRetest := target.Status == "revision_wait" && fullSHA(target.HeadSHA) && target.BaseSHA == target.HeadSHA && target.HeadSHA != change.HeadSHA
-			if target.SourceTaskID != change.ID || !stillInitial && !stillRetest || change.HeadSHA != source.HeadSHA || change.ContractVersion != target.ContractVersion || change.MissionID != target.MissionID || !releaseProofStillCurrent(current, change.ID, proof) {
+			if !acceptanceSourceDeployed(*current, change) || target.SourceTaskID != change.ID || !stillInitial && !stillRetest || change.HeadSHA != source.HeadSHA || change.ContractVersion != target.ContractVersion || change.MissionID != target.MissionID || !releaseProofStillCurrent(current, change.ID, proof) {
 				return nil
 			}
 			var reviewer, recipient Agent
@@ -118,8 +118,8 @@ func (s *Store) AdvanceAcceptanceBase(taskID, fromHead, toHead string) error {
 			return errors.New("App revision is not awaiting checkout advance")
 		}
 		source := st.Tasks[app.SourceTaskID]
-		if source.Status != "publish_wait" || source.HeadSHA != toHead || source.MissionID != app.MissionID || source.ContractVersion != app.ContractVersion {
-			return errors.New("Platform revision changed before checkout advance")
+		if !validTeam(source.Team) || source.Kind != "change" || !acceptanceSourceDeployed(*st, source) || source.Status != "publish_wait" || source.HeadSHA != toHead || source.MissionID != app.MissionID || source.ContractVersion != app.ContractVersion {
+			return errors.New("source revision or deployment changed before checkout advance")
 		}
 		found := false
 		for _, message := range st.Messages {

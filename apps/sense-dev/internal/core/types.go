@@ -12,20 +12,22 @@ const (
 )
 
 type Task struct {
-	ID              string    `json:"id"`
-	MissionID       string    `json:"mission_id"`
-	Team            Team      `json:"team"`
-	Kind            string    `json:"kind"`
-	Title           string    `json:"title"`
-	Status          string    `json:"status"`
-	ContractVersion string    `json:"contract_version"`
-	BaseSHA         string    `json:"base_sha,omitempty"`
-	HeadSHA         string    `json:"head_sha,omitempty"`
-	SourceTaskID    string    `json:"source_task_id,omitempty"`
-	CorrectionCount int       `json:"correction_count,omitempty"`
-	DependsOn       []string  `json:"depends_on,omitempty"`
-	CreatedAt       time.Time `json:"created_at"`
-	UpdatedAt       time.Time `json:"updated_at"`
+	ID                   string    `json:"id"`
+	MissionID            string    `json:"mission_id"`
+	Team                 Team      `json:"team"`
+	Kind                 string    `json:"kind"`
+	Title                string    `json:"title"`
+	Status               string    `json:"status"`
+	ContractVersion      string    `json:"contract_version"`
+	BaseSHA              string    `json:"base_sha,omitempty"`
+	HeadSHA              string    `json:"head_sha,omitempty"`
+	SourceTaskID         string    `json:"source_task_id,omitempty"`
+	CheckoutSourceTaskID string    `json:"checkout_source_task_id,omitempty"`
+	CorrectionCount      int       `json:"correction_count,omitempty"`
+	FeedbackMessageID    string    `json:"feedback_message_id,omitempty"`
+	DependsOn            []string  `json:"depends_on,omitempty"`
+	CreatedAt            time.Time `json:"created_at"`
+	UpdatedAt            time.Time `json:"updated_at"`
 }
 
 type Agent struct {
@@ -111,31 +113,33 @@ type Message struct {
 }
 
 type ContextManifest struct {
-	SchemaVersion      int           `json:"schema_version"`
-	MissionID          string        `json:"mission_id"`
-	TaskID             string        `json:"task_id"`
-	SourceTaskID       string        `json:"source_task_id,omitempty"`
-	Team               Team          `json:"team"`
-	Role               string        `json:"role"`
-	AgentID            string        `json:"agent_id"`
-	Provider           string        `json:"provider"`
-	Model              string        `json:"model"`
-	Generation         int           `json:"generation"`
-	TeamProfile        ArtifactRef   `json:"team_profile"`
-	TeamKnowledge      ArtifactRef   `json:"team_knowledge"`
-	CommonKnowledge    ArtifactRef   `json:"common_knowledge"`
-	AgentMemo          *ArtifactRef  `json:"agent_memo,omitempty"`
-	Inbox              []ArtifactRef `json:"inbox"`
-	PreviousAcceptance *ArtifactRef  `json:"previous_acceptance,omitempty"`
-	StageInputs        []StageInput  `json:"stage_inputs"`
-	ReviewInputs       []ArtifactRef `json:"review_inputs"`
-	ReviewAuthorID     string        `json:"review_author_id,omitempty"`
-	MessageIDs         []string      `json:"message_ids"`
-	ContractVersion    string        `json:"contract_version"`
-	BaseSHA            string        `json:"base_sha,omitempty"`
-	HeadSHA            string        `json:"head_sha,omitempty"`
-	AllowedScope       []string      `json:"allowed_scope"`
-	InputSHA256        string        `json:"input_sha256"`
+	SchemaVersion        int           `json:"schema_version"`
+	MissionID            string        `json:"mission_id"`
+	TaskID               string        `json:"task_id"`
+	SourceTaskID         string        `json:"source_task_id,omitempty"`
+	CheckoutSourceTaskID string        `json:"checkout_source_task_id,omitempty"`
+	Team                 Team          `json:"team"`
+	Role                 string        `json:"role"`
+	AgentID              string        `json:"agent_id"`
+	Provider             string        `json:"provider"`
+	Model                string        `json:"model"`
+	Generation           int           `json:"generation"`
+	TeamProfile          ArtifactRef   `json:"team_profile"`
+	TeamKnowledge        ArtifactRef   `json:"team_knowledge"`
+	CommonKnowledge      ArtifactRef   `json:"common_knowledge"`
+	AgentMemo            *ArtifactRef  `json:"agent_memo,omitempty"`
+	Inbox                []ArtifactRef `json:"inbox"`
+	PreviousAcceptance   *ArtifactRef  `json:"previous_acceptance,omitempty"`
+	DeploymentEvidence   *ArtifactRef  `json:"deployment_evidence,omitempty"`
+	StageInputs          []StageInput  `json:"stage_inputs"`
+	ReviewInputs         []ArtifactRef `json:"review_inputs"`
+	ReviewAuthorID       string        `json:"review_author_id,omitempty"`
+	MessageIDs           []string      `json:"message_ids"`
+	ContractVersion      string        `json:"contract_version"`
+	BaseSHA              string        `json:"base_sha,omitempty"`
+	HeadSHA              string        `json:"head_sha,omitempty"`
+	AllowedScope         []string      `json:"allowed_scope"`
+	InputSHA256          string        `json:"input_sha256"`
 }
 
 type StageInput struct {
@@ -153,6 +157,9 @@ type Event struct {
 }
 
 type ReleaseDecision struct {
+	HumanCategories   []string      `json:"human_categories,omitempty"`
+	HumanReasons      []string      `json:"human_reasons,omitempty"`
+	ApprovalID        string        `json:"approval_id,omitempty"`
 	ID                string        `json:"id"`
 	AuthorAgentID     string        `json:"author_agent_id"`
 	GateAgentID       string        `json:"gate_agent_id"`
@@ -190,21 +197,28 @@ type ReleaseCandidate struct {
 }
 
 type ReleaseScan struct {
-	BaseSHA       string    `json:"base_sha"`
-	HeadSHA       string    `json:"head_sha"`
-	Repository    string    `json:"repository"`
-	Ref           string    `json:"ref"`
-	Operation     string    `json:"operation"`
-	PolicyVersion string    `json:"policy_version"`
-	Status        string    `json:"status"`
-	CommitCount   int       `json:"commit_count"`
-	ChangedPaths  []string  `json:"changed_paths"`
-	Findings      []string  `json:"findings"`
-	DiffSHA256    string    `json:"diff_sha256"`
-	ScannedAt     time.Time `json:"scanned_at"`
+	HumanCategories []string  `json:"human_categories,omitempty"`
+	HumanReasons    []string  `json:"human_reasons,omitempty"`
+	Team            Team      `json:"team,omitempty"`
+	BaseSHA         string    `json:"base_sha"`
+	HeadSHA         string    `json:"head_sha"`
+	Repository      string    `json:"repository"`
+	Ref             string    `json:"ref"`
+	Operation       string    `json:"operation"`
+	PolicyVersion   string    `json:"policy_version"`
+	Status          string    `json:"status"`
+	CommitCount     int       `json:"commit_count"`
+	ChangedPaths    []string  `json:"changed_paths"`
+	Findings        []string  `json:"findings"`
+	DiffSHA256      string    `json:"diff_sha256"`
+	ScannedAt       time.Time `json:"scanned_at"`
 }
 
 type PublishIntent struct {
+	ExpiresAt          time.Time `json:"expires_at,omitempty"`
+	BaseSHA            string    `json:"base_sha,omitempty"`
+	TargetEnvironment  string    `json:"target_environment,omitempty"`
+	PolicyVersion      string    `json:"policy_version,omitempty"`
 	ID                 string    `json:"id"`
 	DecisionID         string    `json:"decision_id"`
 	Operation          string    `json:"operation"`
@@ -233,19 +247,25 @@ type Question struct {
 }
 
 type ApprovalRequest struct {
-	ID          string     `json:"id"`
-	DecisionID  string     `json:"decision_id"`
-	Operation   string     `json:"operation"`
-	Repository  string     `json:"repository"`
-	Ref         string     `json:"ref"`
-	HeadSHA     string     `json:"head_sha"`
-	Environment string     `json:"environment"`
-	Reason      string     `json:"reason"`
-	Status      string     `json:"status"`
-	ActionID    string     `json:"action_id,omitempty"`
-	CreatedAt   time.Time  `json:"created_at"`
-	ExpiresAt   time.Time  `json:"expires_at"`
-	DecidedAt   *time.Time `json:"decided_at,omitempty"`
+	HumanCategories []string   `json:"human_categories,omitempty"`
+	HumanReasons    []string   `json:"human_reasons,omitempty"`
+	PolicyVersion   string     `json:"policy_version,omitempty"`
+	ScanSHA256      string     `json:"scan_sha256,omitempty"`
+	CandidateSHA256 string     `json:"candidate_sha256,omitempty"`
+	AuthorAgentID   string     `json:"author_agent_id,omitempty"`
+	ID              string     `json:"id"`
+	DecisionID      string     `json:"decision_id"`
+	Operation       string     `json:"operation"`
+	Repository      string     `json:"repository"`
+	Ref             string     `json:"ref"`
+	HeadSHA         string     `json:"head_sha"`
+	Environment     string     `json:"environment"`
+	Reason          string     `json:"reason"`
+	Status          string     `json:"status"`
+	ActionID        string     `json:"action_id,omitempty"`
+	CreatedAt       time.Time  `json:"created_at"`
+	ExpiresAt       time.Time  `json:"expires_at"`
+	DecidedAt       *time.Time `json:"decided_at,omitempty"`
 }
 
 type DailyReport struct {
@@ -276,7 +296,37 @@ type ReportOutboxEntry struct {
 	SentAt                 *time.Time `json:"sent_at,omitempty"`
 }
 
+type DeploymentReceipt struct {
+	ObservedRelease string      `json:"observed_release"`
+	ImageSourceSHA  string      `json:"image_source_sha"`
+	TaskID          string      `json:"task_id"`
+	DecisionID      string      `json:"decision_id"`
+	IntentID        string      `json:"intent_id"`
+	HeadSHA         string      `json:"head_sha"`
+	Revision        string      `json:"revision"`
+	ImageDigest     string      `json:"image_digest"`
+	Environment     string      `json:"environment"`
+	Status          string      `json:"status"`
+	UserPath        string      `json:"user_path"`
+	EvidenceRef     ArtifactRef `json:"evidence_ref"`
+	RecordedAt      time.Time   `json:"recorded_at"`
+}
+
+type FeedbackLoop struct {
+	FeedbackID        string   `json:"feedback_id"`
+	AnalysisTaskID    string   `json:"analysis_task_id"`
+	DecisionID        string   `json:"decision_id,omitempty"`
+	ImprovementTaskID string   `json:"improvement_task_id,omitempty"`
+	RetestTaskID      string   `json:"retest_task_id,omitempty"`
+	Status            string   `json:"status"`
+	HumanCategories   []string `json:"human_categories,omitempty"`
+	HumanReasons      []string `json:"human_reasons,omitempty"`
+}
+
 type State struct {
+	ReleaseFlows  map[string]ReleaseFlow       `json:"release_flows"`
+	Deployments   map[string]DeploymentReceipt `json:"deployments"`
+	FeedbackLoops map[string]FeedbackLoop      `json:"feedback_loops"`
 	SchemaVersion int                          `json:"schema_version"`
 	Tasks         map[string]Task              `json:"tasks"`
 	Agents        map[string]Agent             `json:"agents"`
@@ -295,5 +345,5 @@ type State struct {
 }
 
 func NewState() State {
-	return State{SchemaVersion: SchemaVersion, Tasks: map[string]Task{}, Agents: map[string]Agent{}, Attempts: map[string]Attempt{}, Artifacts: map[string]Artifact{}, Messages: map[string]Message{}, Decisions: map[string]ReleaseDecision{}, Intents: map[string]PublishIntent{}, Questions: map[string]Question{}, Approvals: map[string]ApprovalRequest{}, Reports: map[string]DailyReport{}, ReportOutbox: map[string]ReportOutboxEntry{}, Events: []Event{}}
+	return State{SchemaVersion: SchemaVersion, ReleaseFlows: map[string]ReleaseFlow{}, Deployments: map[string]DeploymentReceipt{}, FeedbackLoops: map[string]FeedbackLoop{}, Tasks: map[string]Task{}, Agents: map[string]Agent{}, Attempts: map[string]Attempt{}, Artifacts: map[string]Artifact{}, Messages: map[string]Message{}, Decisions: map[string]ReleaseDecision{}, Intents: map[string]PublishIntent{}, Questions: map[string]Question{}, Approvals: map[string]ApprovalRequest{}, Reports: map[string]DailyReport{}, ReportOutbox: map[string]ReportOutboxEntry{}, Events: []Event{}}
 }

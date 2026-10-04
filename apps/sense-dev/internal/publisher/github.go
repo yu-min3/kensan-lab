@@ -12,6 +12,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"time"
 
@@ -19,6 +20,8 @@ import (
 )
 
 const repository = "yu-min3/kensan-lab"
+
+var commitSHA = regexp.MustCompile(`^[0-9a-f]{40}$`)
 
 // GitHub has no controller or worker credential. It runs only in the separate
 // publisher process with a repo-scoped token file and a dedicated askpass.
@@ -31,8 +34,14 @@ type GitHub struct {
 }
 
 func (g GitHub) validate(i core.PublishIntent) (string, error) {
-	if i.Repository != repository || !strings.HasPrefix(i.Ref, "refs/heads/") || i.Ref == "refs/heads/main" || i.Ref == "refs/heads/master" || i.HeadSHA == "" || i.Operation != "branch_push" && i.Operation != "pr_create" {
+	if i.Repository != repository || !strings.HasPrefix(i.Ref, "refs/heads/") || i.Ref == "refs/heads/main" || i.Ref == "refs/heads/master" || !commitSHA.MatchString(i.HeadSHA) || i.Operation != "branch_push" && i.Operation != "pr_create" && i.Operation != "merge" && i.Operation != "deploy" {
 		return "", errors.New("publish target outside limited GitHub scope")
+	}
+	if (i.Operation == "merge" || i.Operation == "deploy") && (i.TargetEnvironment != "private-canary" || i.PolicyVersion != core.ReleasePolicyVersion || !commitSHA.MatchString(i.BaseSHA) || i.BaseSHA == i.HeadSHA || i.ExpiresAt.IsZero()) {
+		return "", errors.New("GitOps merge needs fixed private environment, policy and base SHA")
+	}
+	if i.TargetEnvironment == "private-canary" && (i.PolicyVersion != core.ReleasePolicyVersion || i.ExpiresAt.IsZero()) {
+		return "", errors.New("private canary publication needs fixed live policy identity")
 	}
 	branch := strings.TrimPrefix(i.Ref, "refs/heads/")
 	if branch == "" || strings.Contains(branch, "..") || strings.HasPrefix(branch, "/") || strings.HasSuffix(branch, "/") {
@@ -52,7 +61,7 @@ func (g GitHub) endpoint() string {
 }
 
 func (g GitHub) request(ctx context.Context, method, path string, body any, out any) (int, error) {
-	info, err := os.Stat(g.TokenFile)
+	info, err := os.Lstat(g.TokenFile)
 	if err != nil || info.Mode().Perm()&0077 != 0 || !info.Mode().IsRegular() {
 		return 0, errors.New("publisher token file must be private and regular")
 	}
@@ -84,7 +93,7 @@ func (g GitHub) request(ctx context.Context, method, path string, body any, out 
 	}
 	client := g.Client
 	if client == nil {
-		client = &http.Client{Timeout: 15 * time.Second, CheckRedirect: func(*http.Request, []*http.Request) error { return errors.New("GitHub API redirect rejected") }}
+		client = &http.Client{Transport: &http.Transport{Proxy: nil}, Timeout: 15 * time.Second, CheckRedirect: func(*http.Request, []*http.Request) error { return errors.New("GitHub API redirect rejected") }}
 	}
 	response, err := client.Do(req)
 	if err != nil {
@@ -122,6 +131,9 @@ func (g GitHub) Inspect(ctx context.Context, i core.PublishIntent) (string, bool
 	branch, err := g.validate(i)
 	if err != nil {
 		return "", false, err
+	}
+	if i.Operation == "merge" || i.Operation == "deploy" {
+		return g.inspectMerge(ctx, i, branch)
 	}
 	sha, exists, err := g.remoteHead(ctx, branch)
 	if err != nil {
@@ -163,6 +175,12 @@ func (g GitHub) Execute(ctx context.Context, i core.PublishIntent) (string, erro
 	if err != nil {
 		return "", err
 	}
+	if !i.ExpiresAt.IsZero() && !time.Now().Before(i.ExpiresAt) {
+		return "", errors.New("publisher authorization expired")
+	}
+	if i.Operation == "merge" || i.Operation == "deploy" {
+		return g.executeMerge(ctx, i, branch)
+	}
 	if i.Operation == "pr_create" {
 		if strings.TrimSpace(i.PullRequestSummary) == "" {
 			return "", errors.New("approved PR summary required")
@@ -179,7 +197,13 @@ func (g GitHub) Execute(ctx context.Context, i core.PublishIntent) (string, erro
 		var result struct {
 			Number int `json:"number"`
 		}
-		_, err = g.request(ctx, http.MethodPost, "/repos/"+repository+"/pulls", map[string]any{"title": title, "body": body, "head": branch, "base": "main", "draft": true}, &result)
+		if !i.ExpiresAt.IsZero() && !time.Now().Before(i.ExpiresAt) {
+			return "", errors.New("publisher authorization expired before PR creation")
+		}
+		if !i.ExpiresAt.IsZero() && !time.Now().Before(i.ExpiresAt) {
+			return "", errors.New("publisher authorization expired before PR creation")
+		}
+		_, err = g.request(ctx, http.MethodPost, "/repos/"+repository+"/pulls", map[string]any{"title": title, "body": body, "head": branch, "base": "main", "draft": i.TargetEnvironment != "private-canary"}, &result)
 		if err != nil {
 			return "", err
 		}
@@ -198,6 +222,12 @@ func (g GitHub) Execute(ctx context.Context, i core.PublishIntent) (string, erro
 	}
 	cmd := exec.CommandContext(ctx, "git", "-c", "credential.helper=", "-C", g.RepoPath, "push", "--porcelain", "origin", i.HeadSHA+":"+i.Ref)
 	cmd.Env = append(os.Environ(), "GIT_TERMINAL_PROMPT=0", "GIT_ASKPASS="+g.Askpass, "GIT_CONFIG_GLOBAL=/dev/null", "GIT_CONFIG_NOSYSTEM=1")
+	if !i.ExpiresAt.IsZero() && !time.Now().Before(i.ExpiresAt) {
+		return "", errors.New("publisher authorization expired before branch push")
+	}
+	if !i.ExpiresAt.IsZero() && !time.Now().Before(i.ExpiresAt) {
+		return "", errors.New("publisher authorization expired before branch push")
+	}
 	if err := cmd.Run(); err != nil {
 		return "", errors.New("approved branch push failed; inspect remote before retry")
 	}

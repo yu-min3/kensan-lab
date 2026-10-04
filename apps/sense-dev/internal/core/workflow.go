@@ -174,9 +174,12 @@ func (s *Store) SendMessage(m Message) (Message, error) {
 			return Message{}, fmt.Errorf("invalid outgoing artifact: %w", err)
 		}
 	}
+	if err := s.validatePlatformMessage(s.Snapshot(), m); err != nil {
+		return Message{}, err
+	}
 	var linkedProof releaseProof
 	linkedTarget := s.Snapshot().Tasks[m.TargetTask]
-	if linkedTarget.SourceTaskID != "" {
+	if linkedTarget.Kind == "acceptance" && linkedTarget.SourceTaskID != "" && m.Kind != "platform_decision" {
 		var err error
 		linkedProof, err = s.reviewedChangeProof(linkedTarget.SourceTaskID)
 		if err != nil {
@@ -196,18 +199,25 @@ func (s *Store) SendMessage(m Message) (Message, error) {
 		}
 		from, okFrom := st.Agents[m.FromAgent]
 		to, okTo := st.Agents[m.ToAgent]
-		if !okFrom || !okTo || from.ID == to.ID || from.Team == to.Team {
-			return errors.New("cross-team sender and recipient agents required")
+		if !okFrom || !okTo || from.ID == to.ID {
+			return errors.New("distinct sender and recipient agents required")
+		}
+		if err := validatePlatformRoute(st, m); err != nil {
+			return err
 		}
 		if m.SourceTask != from.TaskID || m.TargetTask != to.TaskID {
 			return errors.New("message task ownership mismatch")
 		}
 		fromTask, toTask := st.Tasks[from.TaskID], st.Tasks[to.TaskID]
+		linkedAcceptance := toTask.Team == App && toTask.Kind == "acceptance" && toTask.SourceTaskID != ""
+		if from.Team == to.Team && !(linkedAcceptance && m.Kind == "change_ready" && toTask.SourceTaskID == fromTask.ID && fromTask.Kind == "change") {
+			return errors.New("same-team messages require a linked change acceptance")
+		}
 		if fromTask.MissionID != toTask.MissionID || fromTask.ContractVersion != m.ContractVersion || toTask.ContractVersion != m.ContractVersion {
 			return errors.New("mission or contract version mismatch")
 		}
-		if toTask.SourceTaskID != "" && (m.Kind != "change_ready" || m.SourceTask != toTask.SourceTaskID || !fullSHA(m.HeadSHA) || toTask.BaseSHA != "" || !reviewedPlatformChange(fromTask, from) || !releaseProofStillCurrent(st, fromTask.ID, linkedProof)) {
-			return errors.New("linked acceptance requires reviewed Platform change_ready at a full head SHA")
+		if linkedAcceptance && m.Kind != "platform_decision" && (m.Kind != "change_ready" || m.SourceTask != toTask.SourceTaskID || !fullSHA(m.HeadSHA) || toTask.BaseSHA != "" || !reviewedChange(fromTask, from) || !acceptanceSourceDeployed(*st, fromTask) || !releaseProofStillCurrent(st, fromTask.ID, linkedProof)) {
+			return errors.New("linked acceptance requires reviewed and deploy-ready change_ready at a full head SHA")
 		}
 		if m.HeadSHA != "" && fromTask.HeadSHA != m.HeadSHA {
 			return errors.New("stale head SHA")
@@ -220,7 +230,7 @@ func (s *Store) SendMessage(m Message) (Message, error) {
 		}
 		for _, ref := range m.ArtifactRefs {
 			a, ok := st.Artifacts[ref.ID]
-			if !ok || toTask.SourceTaskID == "" && a.AgentID != from.ID || a.TaskID != fromTask.ID || a.Version != ref.Version || a.SHA256 != ref.SHA256 {
+			if !ok || !linkedAcceptance && a.AgentID != from.ID || a.TaskID != fromTask.ID || a.Version != ref.Version || a.SHA256 != ref.SHA256 {
 				return errors.New("artifact reference mismatch")
 			}
 		}
@@ -272,8 +282,8 @@ func (s *Store) ReceiveMessage(agentID, messageID string) error {
 			return errors.New("message source head is stale")
 		}
 		target := st.Tasks[m.TargetTask]
-		if target.SourceTaskID != "" {
-			if m.Kind != "change_ready" || m.SourceTask != target.SourceTaskID || !fullSHA(m.HeadSHA) || target.BaseSHA != "" || target.HeadSHA != "" && target.HeadSHA != m.HeadSHA {
+		if target.Kind == "acceptance" && target.SourceTaskID != "" && m.Kind != "platform_decision" {
+			if !acceptanceSourceDeployed(*st, st.Tasks[target.SourceTaskID]) || m.Kind != "change_ready" || m.SourceTask != target.SourceTaskID || !fullSHA(m.HeadSHA) || target.BaseSHA != "" || target.HeadSHA != "" && target.HeadSHA != m.HeadSHA {
 				return errors.New("linked acceptance handoff is stale or from another task")
 			}
 		}
@@ -286,7 +296,7 @@ func (s *Store) ReceiveMessage(agentID, messageID string) error {
 		now := time.Now().UTC()
 		m.Status, m.ReceivedAt = "received", &now
 		st.Messages[messageID] = m
-		if target.SourceTaskID != "" {
+		if target.Kind == "acceptance" && target.SourceTaskID != "" && m.Kind != "platform_decision" {
 			target.HeadSHA, target.UpdatedAt = m.HeadSHA, now
 			st.Tasks[target.ID] = target
 		}

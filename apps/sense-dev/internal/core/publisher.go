@@ -22,8 +22,8 @@ func (s *Store) RunPublish(ctx context.Context, decisionID string, transport Pub
 	}
 	st := s.Snapshot()
 	d, ok := st.Decisions[decisionID]
-	if !ok || d.Operation != "branch_push" && d.Operation != "pr_create" {
-		return PublishIntent{}, errors.New("publisher supports only branch push and PR create")
+	if !ok || d.Operation != "branch_push" && d.Operation != "pr_create" && d.Operation != "merge" && d.Operation != "deploy" {
+		return PublishIntent{}, errors.New("unsupported publisher operation")
 	}
 	var intent PublishIntent
 	for _, old := range st.Intents {
@@ -61,16 +61,30 @@ func (s *Store) RunPublish(ctx context.Context, decisionID string, transport Pub
 	if _, err := s.PreparePublish(decisionID, intent.Operation, intent.Repository, intent.Ref, intent.HeadSHA); err != nil {
 		return PublishIntent{}, err
 	}
+	scan, err := s.loadReleaseScan(d.ScanRef, d)
+	if err != nil {
+		return PublishIntent{}, err
+	}
 	// The decision may expire during remote inspection. Recheck it under the
 	// single writer lock immediately before the external operation.
 	err = s.update(func(st *State) error {
 		current := st.Intents[intent.ID]
 		decision := st.Decisions[decisionID]
-		if current.Status != "pending_reconcile" || decision.Verdict != "allow" || !time.Now().Before(decision.ExpiresAt) || decision.HeadSHA != intent.HeadSHA || st.Tasks[st.Agents[decision.AuthorAgentID].TaskID].HeadSHA != intent.HeadSHA {
+		if current.Status != "pending_reconcile" || decision.Verdict != "allow" || !time.Now().Before(decision.ExpiresAt) || current.ExpiresAt.IsZero() || !time.Now().Before(current.ExpiresAt) || current.ExpiresAt.After(decision.ExpiresAt) || decision.HeadSHA != intent.HeadSHA || st.Tasks[st.Agents[decision.AuthorAgentID].TaskID].HeadSHA != intent.HeadSHA || current.Operation != decision.Operation || current.Repository != decision.Repository || current.Ref != decision.Ref || current.HeadSHA != decision.HeadSHA || current.BaseSHA != scan.BaseSHA || current.TargetEnvironment != decision.TargetEnvironment || current.PolicyVersion != decision.PolicyVersion {
 			return errors.New("publish authorization changed before execution")
+		}
+		author, gate := st.Agents[decision.AuthorAgentID], st.Agents[decision.GateAgentID]
+		if !scanMatchesAuthorTeam(scan, author, st.Tasks[author.TaskID]) || author.Team == App && (gate.Team != Platform || st.Tasks[gate.TaskID].Team != Platform) {
+			return errors.New("release ownership changed before execution")
+		}
+		if len(decision.HumanCategories) > 0 {
+			if len(gate.ReviewInputs) == 0 || !approvalMatches(*st, decision, scan, gate.ReviewInputs[len(gate.ReviewInputs)-1].SHA256) {
+				return errors.New("human approval changed or expired before execution")
+			}
 		}
 		current.Status, current.UpdatedAt = "sending", time.Now().UTC()
 		st.Intents[intent.ID] = current
+		intent = current
 		st.Events = append(st.Events, event("publish_sending", intent.ID, intent.Operation))
 		return nil
 	})

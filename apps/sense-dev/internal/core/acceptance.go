@@ -10,13 +10,14 @@ import (
 )
 
 type AcceptanceResult struct {
-	SchemaVersion   int    `json:"schema_version"`
-	Verdict         string `json:"verdict"`
-	ScenarioID      string `json:"scenario_id"`
-	ContractVersion string `json:"contract_version"`
-	HeadSHA         string `json:"head_sha"`
-	Expected        string `json:"expected"`
-	Observed        string `json:"observed"`
+	SchemaVersion    int                `json:"schema_version"`
+	Verdict          string             `json:"verdict"`
+	ScenarioID       string             `json:"scenario_id"`
+	ContractVersion  string             `json:"contract_version"`
+	HeadSHA          string             `json:"head_sha"`
+	Expected         string             `json:"expected"`
+	Observed         string             `json:"observed"`
+	PlatformFeedback []PlatformFeedback `json:"platform_feedback,omitempty"`
 }
 
 func parseAcceptanceResult(body []byte, task Task) (AcceptanceResult, error) {
@@ -36,11 +37,19 @@ func parseAcceptanceResult(body []byte, task Task) (AcceptanceResult, error) {
 	if result.SchemaVersion != 1 || result.Verdict != "pass" && result.Verdict != "fail" || result.ScenarioID != task.ID || result.ContractVersion != task.ContractVersion || result.HeadSHA != task.HeadSHA || result.Expected != task.Title || strings.TrimSpace(result.Observed) == "" {
 		return AcceptanceResult{}, errors.New("acceptance verdict does not match pinned scenario, contract or head")
 	}
+	if len(result.PlatformFeedback) > 4 {
+		return AcceptanceResult{}, errors.New("too many platform feedback items")
+	}
+	for _, feedback := range result.PlatformFeedback {
+		if err := feedback.validate(); err != nil {
+			return AcceptanceResult{}, err
+		}
+	}
 	return result, nil
 }
 
 // ReconcileAcceptanceOutcomes records one versioned App result as a received
-// Platform message. A failed result does not count as accepted or done.
+// source-team message. A failed result does not count as accepted or done.
 func (s *Store) ReconcileAcceptanceOutcomes() (int, error) {
 	st := s.Snapshot()
 	if st.Stopped || st.PausedUntil != nil && time.Now().UTC().Before(*st.PausedUntil) {
@@ -91,7 +100,15 @@ func (s *Store) ReconcileAcceptanceOutcomes() (int, error) {
 			source := current.Tasks[app.SourceTaskID]
 			activeAgent := current.Agents[agent.ID]
 			activeAttempt := current.Attempts[attempt.ID]
-			if target.Status != "done" && target.Status != "revision_wait" || target.HeadSHA != result.HeadSHA || target.ContractVersion != result.ContractVersion || target.SourceTaskID != source.ID || source.Team != Platform || source.Kind != "change" || source.MissionID != target.MissionID || source.ContractVersion != target.ContractVersion || activeAgent.Team != App || activeAgent.Status != "completed" || activeAgent.SessionGeneration != attempt.Generation || activeAttempt.Status != "completed" || activeAttempt.OutputRef == nil || *activeAttempt.OutputRef != *attempt.OutputRef {
+			if !acceptanceSourceDeployed(*current, source) {
+				if target.Status == "done" {
+					target.Status, target.UpdatedAt = "decision_wait", time.Now().UTC()
+					current.Tasks[target.ID] = target
+					current.Events = append(current.Events, event("acceptance_needs_inspection", target.ID, "deployment_changed"))
+				}
+				return nil
+			}
+			if target.Status != "done" && target.Status != "revision_wait" || target.HeadSHA != result.HeadSHA || target.ContractVersion != result.ContractVersion || target.SourceTaskID != source.ID || !validTeam(source.Team) || source.Kind != "change" || source.MissionID != target.MissionID || source.ContractVersion != target.ContractVersion || activeAgent.Team != App || activeAgent.Status != "completed" || activeAgent.SessionGeneration != attempt.Generation || activeAttempt.Status != "completed" || activeAttempt.OutputRef == nil || *activeAttempt.OutputRef != *attempt.OutputRef {
 				return nil
 			}
 			if prior, exists := current.Messages[messageID]; exists {
@@ -107,8 +124,8 @@ func (s *Store) ReconcileAcceptanceOutcomes() (int, error) {
 					break
 				}
 			}
-			if recipient.ID == "" || recipient.Team != Platform {
-				return errors.New("Platform correction agent missing")
+			if recipient.ID == "" || recipient.Team != source.Team {
+				return errors.New("source-team correction agent missing")
 			}
 			kind := "accepted"
 			if result.Verdict == "fail" {
@@ -118,6 +135,12 @@ func (s *Store) ReconcileAcceptanceOutcomes() (int, error) {
 			}
 			now := time.Now().UTC()
 			current.Messages[messageID] = Message{ID: messageID, CorrelationID: target.MissionID, FromAgent: agent.ID, ToAgent: recipient.ID, SourceTask: target.ID, TargetTask: source.ID, Kind: kind, ArtifactRefs: []ArtifactRef{*attempt.OutputRef}, ContractVersion: target.ContractVersion, HeadSHA: result.HeadSHA, ScenarioID: result.ScenarioID, Expected: result.Expected, Observed: result.Observed, Status: "received", CreatedAt: now, ReceivedAt: &now}
+			// A reviewed App candidate is complete only after its deployed user path passes.
+			if kind == "accepted" && source.Team == App && appDeploymentReady(*current, source) {
+				source.Status, source.UpdatedAt = "done", now
+				current.Tasks[source.ID] = source
+				current.Events = append(current.Events, event("app_change_completed", source.ID, messageID))
+			}
 			if result.Verdict == "fail" || kind == "acceptance_stale" {
 				target.Status, target.UpdatedAt = "revision_wait", now
 				current.Tasks[target.ID] = target

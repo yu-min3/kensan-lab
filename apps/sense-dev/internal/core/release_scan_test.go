@@ -58,7 +58,7 @@ func TestReleaseScanInspectsEveryProposedCommit(t *testing.T) {
 	}
 	final := commitTestFile(t, dir, "config/.env", "removed\n", "remove secret later")
 	report, err = ScanGitRange(dir, base, final, "pr_create", "refs/heads/feat/canary")
-	if err != nil || report.Status != "needs_human" || report.CommitCount != 3 {
+	if err != nil || report.Status != "deny" || report.CommitCount != 3 {
 		t.Fatalf("intermediate secret missed: %+v %v", report, err)
 	}
 	if len(report.Findings) == 0 {

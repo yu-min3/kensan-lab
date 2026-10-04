@@ -53,6 +53,7 @@ func fullSHA(value string) bool {
 }
 
 var credentialPattern = regexp.MustCompile(`(?im)(-----BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY-----|github_pat_[a-z0-9_]{12,}|ghp_[a-z0-9]{12,}|AKIA[0-9A-Z]{16}|(?:ANTHROPIC_API_KEY|OPENAI_API_KEY|AWS_SECRET_ACCESS_KEY)\s*[:=]\s*["']?[^\s"']{8,})`)
+var rawSecretAssignmentPattern = regexp.MustCompile(`(?im)(?:^|\s)(?:password|client_secret|access_token|api_key|database_password)\s*[:=]\s*["']?[a-z0-9][^\s"']{3,}`)
 var publicRoutePattern = regexp.MustCompile(`(?i)(trycloudflare|cloudflared|ngrok|tailscale\s+funnel|kind:\s*(?:Ingress|Gateway|HTTPRoute)|type:\s*(?:NodePort|LoadBalancer)|github\.io|pages\.github\.com)`)
 
 func sensitivePath(path string) bool {
@@ -63,7 +64,7 @@ func sensitivePath(path string) bool {
 func highRiskPath(path string) bool {
 	p := strings.ToLower(path)
 	for _, prefix := range []string{
-		".github/workflows/", "clusters/", "infra/", "gitops/",
+		"clusters/", "infra/", "gitops/",
 		"apps/sense-dev/deploy/", "apps/sense-dev/internal/isolation/",
 		"apps/sense-dev/internal/workerclient/", "apps/sense-dev/internal/workerwire/",
 		"apps/sense-dev/internal/verifier/", "apps/sense-dev/internal/core/release",
@@ -83,6 +84,15 @@ func highRiskPath(path string) bool {
 // tree. A candidate is necessary but never sufficient for a release: CI,
 // visibility, rendered manifests and the independent agent still need review.
 func ScanGitRange(repoPath, baseSHA, headSHA, operation, ref string) (ReleaseScan, error) {
+	return ScanGitRangeForTeam(repoPath, baseSHA, headSHA, operation, ref, Platform)
+}
+
+// ScanGitRangeForTeam adds fixed ownership checks to every transferred commit.
+// The author team is bound again at Gate and publisher authorization time.
+func ScanGitRangeForTeam(repoPath, baseSHA, headSHA, operation, ref string, team Team) (ReleaseScan, error) {
+	if team != App && team != Platform {
+		return ReleaseScan{}, errors.New("unknown release author team")
+	}
 	if !fullSHA(baseSHA) || !fullSHA(headSHA) || !allowedOperations[operation] || !strings.HasPrefix(ref, "refs/heads/") {
 		return ReleaseScan{}, errors.New("invalid release scan target")
 	}
@@ -120,6 +130,8 @@ func ScanGitRange(repoPath, baseSHA, headSHA, operation, ref string) (ReleaseSca
 		return ReleaseScan{}, errors.New("scan requires 1 to 100 proposed commits")
 	}
 	findings := map[string]bool{}
+	denied := false
+	humanCategories, humanReasons := map[string]bool{}, map[string]bool{}
 	paths := map[string]bool{}
 	hash := sha256.New()
 	for _, commit := range commits {
@@ -144,8 +156,19 @@ func ScanGitRange(repoPath, baseSHA, headSHA, operation, ref string) (ReleaseSca
 		if indirectEntryChanged {
 			findings["symlink or submodule change needs manual review"] = true
 		}
+		if team == App {
+			ownership := appCommitOwnership(ctx, root, commit, strings.Fields(string(parents)), changedPaths, indirectEntryChanged)
+			for _, finding := range ownership {
+				findings[finding] = true
+				denied = true
+			}
+		}
 		for _, path := range changedPaths {
 			paths[path] = true
+			if team == Platform && strings.HasPrefix(path, "apps/") && !strings.HasPrefix(path, "apps/sense-dev/") {
+				findings["Platform ownership denies App implementation path: "+path] = true
+				denied = true
+			}
 			if sensitivePath(path) {
 				findings["sensitive path: "+path] = true
 			}
@@ -159,8 +182,28 @@ func ScanGitRange(repoPath, baseSHA, headSHA, operation, ref string) (ReleaseSca
 		}
 		_, _ = hash.Write([]byte(commit))
 		_, _ = hash.Write(patch)
-		if credentialPattern.Match(patch) {
+		categories, reasons, rawSecret := classifyReleaseCommit(changedPaths, patch, indirectEntryChanged)
+		valueCategories, valueReasons, publicActivation := classifyAppBaseValues(ctx, root, commit, strings.Fields(string(parents)), changedPaths)
+		for category := range valueCategories {
+			categories[category] = true
+		}
+		reasons = append(reasons, valueReasons...)
+		if publicActivation {
+			findings["private stage forbids publication activation or ambiguous App values"] = true
+			denied = true
+		}
+		for category := range categories {
+			humanCategories[category] = true
+		}
+		for _, reason := range reasons {
+			humanReasons[reason] = true
+		}
+		if rawSecret {
+			denied = true
+		}
+		if credentialPattern.Match(patch) || rawSecretAssignmentPattern.Match(changedPatchLines(patch)) {
 			findings["credential-like content in proposed commit"] = true
+			denied = true
 		}
 		if publicRoutePattern.Match(patch) {
 			findings["potential public route or publication in proposed commit"] = true
@@ -169,7 +212,7 @@ func ScanGitRange(repoPath, baseSHA, headSHA, operation, ref string) (ReleaseSca
 			findings["binary content needs manual review"] = true
 		}
 	}
-	report := ReleaseScan{BaseSHA: baseSHA, HeadSHA: headSHA, Repository: "yu-min3/kensan-lab", Ref: ref, Operation: operation, PolicyVersion: ReleasePolicyVersion, CommitCount: len(commits), DiffSHA256: hex.EncodeToString(hash.Sum(nil)), ScannedAt: time.Now().UTC()}
+	report := ReleaseScan{Team: team, BaseSHA: baseSHA, HeadSHA: headSHA, Repository: "yu-min3/kensan-lab", Ref: ref, Operation: operation, PolicyVersion: ReleasePolicyVersion, CommitCount: len(commits), DiffSHA256: hex.EncodeToString(hash.Sum(nil)), ScannedAt: time.Now().UTC()}
 	for path := range paths {
 		report.ChangedPaths = append(report.ChangedPaths, path)
 	}
@@ -178,7 +221,10 @@ func ScanGitRange(repoPath, baseSHA, headSHA, operation, ref string) (ReleaseSca
 	}
 	sort.Strings(report.ChangedPaths)
 	sort.Strings(report.Findings)
-	if len(report.Findings) == 0 {
+	report.HumanCategories, report.HumanReasons = sortedSet(humanCategories), sortedSet(humanReasons)
+	if denied {
+		report.Status = "deny"
+	} else if len(report.Findings) == 0 && len(report.HumanCategories) == 0 {
 		report.Status = "candidate"
 	} else {
 		report.Status = "needs_human"
@@ -225,7 +271,11 @@ func gitFileMode(mode string) bool {
 }
 
 func (s *Store) ScanAndRecordRelease(repoPath, baseSHA, headSHA, operation, ref string) (ReleaseScan, ArtifactRef, error) {
-	scan, err := ScanGitRange(repoPath, baseSHA, headSHA, operation, ref)
+	return s.ScanAndRecordReleaseForTeam(repoPath, baseSHA, headSHA, operation, ref, Platform)
+}
+
+func (s *Store) ScanAndRecordReleaseForTeam(repoPath, baseSHA, headSHA, operation, ref string, team Team) (ReleaseScan, ArtifactRef, error) {
+	scan, err := ScanGitRangeForTeam(repoPath, baseSHA, headSHA, operation, ref, team)
 	if err != nil {
 		return ReleaseScan{}, ArtifactRef{}, err
 	}
@@ -249,6 +299,20 @@ func (s *Store) recordReleaseScan(scan ReleaseScan) (ArtifactRef, error) {
 }
 
 func (s *Store) checkReleaseScan(ref ArtifactRef, decision ReleaseDecision) (ReleaseScan, error) {
+	scan, err := s.loadReleaseScan(ref, decision)
+	if err != nil {
+		return ReleaseScan{}, err
+	}
+	if scan.Status == "candidate" && len(scan.Findings) == 0 && len(scan.HumanCategories) == 0 {
+		return scan, nil
+	}
+	if scan.Status != "needs_human" || len(scan.HumanCategories) == 0 || !approvalMatches(s.Snapshot(), decision, scan, "") {
+		return ReleaseScan{}, errors.New("release scan requires exact live human approval")
+	}
+	return scan, nil
+}
+
+func (s *Store) loadReleaseScan(ref ArtifactRef, decision ReleaseDecision) (ReleaseScan, error) {
 	if err := s.verifyRef(ref); err != nil {
 		return ReleaseScan{}, err
 	}
@@ -265,8 +329,14 @@ func (s *Store) checkReleaseScan(ref ArtifactRef, decision ReleaseDecision) (Rel
 	if err := json.Unmarshal(b, &scan); err != nil {
 		return ReleaseScan{}, errors.New("invalid release scan artifact")
 	}
-	if scan.Status != "candidate" || len(scan.Findings) != 0 || scan.Repository != decision.Repository || scan.Ref != decision.Ref || scan.Operation != decision.Operation || scan.HeadSHA != decision.HeadSHA || scan.PolicyVersion != decision.PolicyVersion || scan.DiffSHA256 == "" || scan.CommitCount < 1 || time.Since(scan.ScannedAt) > time.Hour || scan.ScannedAt.After(time.Now().Add(time.Minute)) {
+	if scan.Repository != decision.Repository || scan.Ref != decision.Ref || scan.Operation != decision.Operation || scan.HeadSHA != decision.HeadSHA || scan.PolicyVersion != decision.PolicyVersion || scan.DiffSHA256 == "" || scan.CommitCount < 1 || time.Since(scan.ScannedAt) > time.Hour || scan.ScannedAt.After(time.Now().Add(time.Minute)) {
 		return ReleaseScan{}, errors.New("release scan is stale, risky or targets another operation")
+	}
+	if decision.AuthorAgentID != "" {
+		author := st.Agents[decision.AuthorAgentID]
+		if !scanMatchesAuthorTeam(scan, author, st.Tasks[author.TaskID]) {
+			return ReleaseScan{}, errors.New("release scan ownership does not match author team")
+		}
 	}
 	return scan, nil
 }

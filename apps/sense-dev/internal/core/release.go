@@ -42,6 +42,24 @@ func (s *Store) BindReleaseGateInputs(gateID, authorID string, sourceRefs []Arti
 		return err
 	}
 	candidateRef := artifactRef(candidateArtifact)
+	classified := candidateClassification(scan, candidate)
+	var approvalRef ArtifactRef
+	state := s.Snapshot()
+	for id := range state.Approvals {
+		proposed := ReleaseDecision{ApprovalID: id, AuthorAgentID: authorID, GateAgentID: gateID, Operation: scan.Operation, Repository: scan.Repository, Ref: scan.Ref, HeadSHA: scan.HeadSHA, TargetEnvironment: candidate.TargetEnvironment, ScanRef: scanRef, HumanCategories: classified.HumanCategories, HumanReasons: classified.HumanReasons}
+		if approvalMatches(state, proposed, classified, candidateRef.SHA256) {
+			body, err := json.Marshal(state.Approvals[id])
+			if err != nil {
+				return err
+			}
+			artifact, err := s.PutArtifact("system", "human_approval", body)
+			if err != nil {
+				return err
+			}
+			approvalRef = artifactRef(artifact)
+			break
+		}
+	}
 	return s.update(func(st *State) error {
 		gate, okG := st.Agents[gateID]
 		author, okA := st.Agents[authorID]
@@ -49,6 +67,12 @@ func (s *Store) BindReleaseGateInputs(gateID, authorID string, sourceRefs []Arti
 			return errors.New("fresh independent release gate required")
 		}
 		gt, at := st.Tasks[gate.TaskID], st.Tasks[author.TaskID]
+		if author.Team == App && (gate.Team != Platform || gt.Team != Platform) {
+			return errors.New("App release must use Platform gate")
+		}
+		if !scanMatchesAuthorTeam(scan, author, at) {
+			return errors.New("release scan ownership does not match author team")
+		}
 		if gt.MissionID != at.MissionID || gt.ContractVersion != at.ContractVersion || !fullSHA(at.BaseSHA) || !fullSHA(at.HeadSHA) || scan.BaseSHA != at.BaseSHA || scan.HeadSHA != at.HeadSHA || scan.PolicyVersion != ReleasePolicyVersion {
 			return errors.New("release gate mission, contract or SHA mismatch")
 		}
@@ -69,7 +93,11 @@ func (s *Store) BindReleaseGateInputs(gateID, authorID string, sourceRefs []Arti
 		gt.BaseSHA, gt.HeadSHA, gt.UpdatedAt = at.BaseSHA, at.HeadSHA, time.Now().UTC()
 		st.Tasks[gt.ID] = gt
 		gate.ReviewAuthorID = authorID
-		gate.ReviewInputs = append(append(append([]ArtifactRef{}, sourceRefs...), proof.Verification, proof.QualityReview), scanRef, candidateRef)
+		gate.ReviewInputs = append(append(append([]ArtifactRef{}, sourceRefs...), proof.Verification, proof.QualityReview), scanRef)
+		if approvalRef.ID != "" {
+			gate.ReviewInputs = append(gate.ReviewInputs, approvalRef)
+		}
+		gate.ReviewInputs = append(gate.ReviewInputs, candidateRef)
 		gate.UpdatedAt = time.Now().UTC()
 		st.Agents[gate.ID] = gate
 		st.Events = append(st.Events, event("release_gate_inputs_bound", gateID, authorID))
@@ -104,7 +132,7 @@ func (s *Store) releaseCandidate(gate Agent, scan ReleaseScan) (ReleaseCandidate
 	return candidate, ref, nil
 }
 
-const ReleasePolicyVersion = "private-v1"
+const ReleasePolicyVersion = "private-v3-human-review"
 
 var allowedOperations = map[string]bool{
 	"branch_push": true,
@@ -151,6 +179,29 @@ func (s *Store) RecordReleaseDecision(d ReleaseDecision) (ReleaseDecision, error
 	var proof releaseProof
 	var candidateRef ArtifactRef
 	var gateOutputRef ArtifactRef
+	if d.ScanRef.ID != "" {
+		loaded, err := s.loadReleaseScan(d.ScanRef, d)
+		if err != nil {
+			return ReleaseDecision{}, err
+		}
+		candidate, _, err := s.releaseCandidate(s.Snapshot().Agents[d.GateAgentID], loaded)
+		if err != nil {
+			return ReleaseDecision{}, err
+		}
+		loaded = candidateClassification(loaded, candidate)
+		d.HumanCategories, d.HumanReasons = loaded.HumanCategories, loaded.HumanReasons
+		if loaded.Status == "deny" {
+			d.Verdict = "deny"
+		}
+		if d.Verdict == "allow" && len(d.HumanCategories) > 0 && d.ApprovalID == "" {
+			return ReleaseDecision{}, errors.New("classified release needs human approval and fresh gate")
+		}
+		if d.Verdict != "deny" && len(d.HumanCategories) > 0 && d.ApprovalID == "" {
+			d.Verdict = "needs_human"
+		}
+	} else {
+		d.HumanCategories, d.HumanReasons = nil, nil
+	}
 	if d.Verdict == "allow" {
 		if d.ScanRef.ID == "" {
 			return ReleaseDecision{}, errors.New("allow verdict requires controller release scan")
@@ -169,8 +220,11 @@ func (s *Store) RecordReleaseDecision(d ReleaseDecision) (ReleaseDecision, error
 			return ReleaseDecision{}, errors.New("gate candidate differs from requested decision")
 		}
 		candidateRef = ref
+		if err := s.boundApprovalMatches(d, scan, candidateRef); err != nil {
+			return ReleaseDecision{}, err
+		}
 		gateManifest, err = s.BuildManifest(d.GateAgentID, []string{"isolated-model-worker"})
-		if err != nil || gateManifest.ReviewAuthorID != d.AuthorAgentID || len(gateManifest.ReviewInputs) != len(d.ArtifactRefs)+4 || !refsEqual(gateManifest.ReviewInputs[:len(d.ArtifactRefs)], d.ArtifactRefs) || gateManifest.ReviewInputs[len(d.ArtifactRefs)] != proof.Verification || gateManifest.ReviewInputs[len(d.ArtifactRefs)+1] != proof.QualityReview || gateManifest.ReviewInputs[len(d.ArtifactRefs)+2] != d.ScanRef || gateManifest.ReviewInputs[len(d.ArtifactRefs)+3] != candidateRef {
+		if err != nil || gateManifest.ReviewAuthorID != d.AuthorAgentID || len(gateManifest.ReviewInputs) != releaseInputCount(d) || !refsEqual(gateManifest.ReviewInputs[:len(d.ArtifactRefs)], d.ArtifactRefs) || gateManifest.ReviewInputs[len(d.ArtifactRefs)] != proof.Verification || gateManifest.ReviewInputs[len(d.ArtifactRefs)+1] != proof.QualityReview || gateManifest.ReviewInputs[len(d.ArtifactRefs)+2] != d.ScanRef || gateManifest.ReviewInputs[len(gateManifest.ReviewInputs)-1] != candidateRef {
 			return ReleaseDecision{}, errors.New("release gate manifest lacks exact author and scan inputs")
 		}
 		gateOutputRef, err = s.matchingGateOutput(d, gateManifest, proof, candidateRef)
@@ -195,6 +249,12 @@ func (s *Store) RecordReleaseDecision(d ReleaseDecision) (ReleaseDecision, error
 		if !okA || !okG || author.ID == gate.ID || gate.Role != "release_gate" || gate.Provider != "codex" || gate.Model != "gpt-6-astra" || gate.SessionID == "" || author.SessionID == gate.SessionID {
 			return errors.New("independent release gate session required")
 		}
+		if author.Team == App && (gate.Team != Platform || st.Tasks[gate.TaskID].Team != Platform) {
+			return errors.New("App release must use Platform gate")
+		}
+		if d.Verdict == "allow" && d.ApprovalID != "" && !approvalMatches(*st, d, scan, candidateRef.SHA256) {
+			return errors.New("human approval changed before gate decision")
+		}
 		if d.Verdict == "allow" {
 			for _, stage := range st.Agents {
 				if stage.TaskID == author.TaskID && stage.SessionID != "" && stage.SessionID == gate.SessionID {
@@ -210,6 +270,9 @@ func (s *Store) RecordReleaseDecision(d ReleaseDecision) (ReleaseDecision, error
 		}
 		if d.Verdict == "allow" && (author.SessionID == "" || gate.InputHash != gateManifest.InputSHA256 || gate.ReviewAuthorID != author.ID || st.Tasks[gate.TaskID].BaseSHA != scan.BaseSHA || st.Tasks[gate.TaskID].HeadSHA != scan.HeadSHA) {
 			return errors.New("release gate did not review pinned inputs in an independent session")
+		}
+		if d.Verdict == "allow" && !scanMatchesAuthorTeam(scan, author, st.Tasks[author.TaskID]) {
+			return errors.New("release scan ownership changed before gate decision")
 		}
 		if d.Verdict == "allow" && !releaseProofStillCurrent(st, author.TaskID, proof) {
 			return errors.New("verification or quality review changed before gate decision")
@@ -261,8 +324,10 @@ func (s *Store) PreparePublish(decisionID, operation, repository, ref, sha strin
 	var gateManifest ContextManifest
 	var gateOutputRef ArtifactRef
 	var pullRequestSummary string
+	var scan ReleaseScan
 	if d.Verdict == "allow" {
-		scan, err := s.checkReleaseScan(d.ScanRef, d)
+		var err error
+		scan, err = s.checkReleaseScan(d.ScanRef, d)
 		if err != nil || st.Tasks[st.Agents[d.AuthorAgentID].TaskID].BaseSHA != scan.BaseSHA {
 			return PublishIntent{}, errors.New("release scan no longer matches decision")
 		}
@@ -271,12 +336,15 @@ func (s *Store) PreparePublish(decisionID, operation, repository, ref, sha strin
 			return PublishIntent{}, errors.New("release candidate no longer matches decision")
 		}
 		pullRequestSummary = candidate.PullRequestSummary
+		if err := s.boundApprovalMatches(d, scan, candidateRef); err != nil {
+			return PublishIntent{}, err
+		}
 		proof, err = s.releaseReady(d.AuthorAgentID, d.ArtifactRefs)
 		if err != nil {
 			return PublishIntent{}, err
 		}
 		gateManifest, err = s.BuildManifest(d.GateAgentID, []string{"isolated-model-worker"})
-		if err != nil || gateManifest.ReviewAuthorID != d.AuthorAgentID || len(gateManifest.ReviewInputs) != len(d.ArtifactRefs)+4 || gateManifest.ReviewInputs[len(gateManifest.ReviewInputs)-1] != candidateRef {
+		if err != nil || gateManifest.ReviewAuthorID != d.AuthorAgentID || len(gateManifest.ReviewInputs) != releaseInputCount(d) || gateManifest.ReviewInputs[len(gateManifest.ReviewInputs)-1] != candidateRef {
 			return PublishIntent{}, errors.New("gate input manifest changed after decision")
 		}
 		gateOutputRef, err = s.matchingGateOutput(d, gateManifest, proof, candidateRef)
@@ -300,6 +368,17 @@ func (s *Store) PreparePublish(decisionID, operation, repository, ref, sha strin
 		if st.Tasks[st.Agents[d.AuthorAgentID].TaskID].HeadSHA != sha {
 			return errors.New("task head changed after decision")
 		}
+		author := st.Agents[d.AuthorAgentID]
+		gate := st.Agents[d.GateAgentID]
+		if author.Team == App && (gate.Team != Platform || st.Tasks[gate.TaskID].Team != Platform) {
+			return errors.New("App release must use Platform gate")
+		}
+		if d.ApprovalID != "" && !approvalMatches(*st, d, scan, "") {
+			return errors.New("human approval expired or changed before publish intent")
+		}
+		if !scanMatchesAuthorTeam(scan, author, st.Tasks[author.TaskID]) {
+			return errors.New("release scan ownership changed before publish intent")
+		}
 		if !releaseProofStillCurrent(st, st.Agents[d.AuthorAgentID].TaskID, proof) {
 			return errors.New("release readiness changed before publish intent")
 		}
@@ -312,7 +391,11 @@ func (s *Store) PreparePublish(decisionID, operation, repository, ref, sha strin
 				return nil
 			}
 		}
-		intent = PublishIntent{ID: id, DecisionID: decisionID, Operation: operation, Repository: repository, Ref: ref, HeadSHA: sha, PullRequestSummary: pullRequestSummary, Status: "pending_reconcile", CreatedAt: time.Now().UTC()}
+		deadline := d.ExpiresAt
+		if d.ApprovalID != "" && st.Approvals[d.ApprovalID].ExpiresAt.Before(deadline) {
+			deadline = st.Approvals[d.ApprovalID].ExpiresAt
+		}
+		intent = PublishIntent{ID: id, DecisionID: decisionID, Operation: operation, Repository: repository, Ref: ref, HeadSHA: sha, BaseSHA: scan.BaseSHA, TargetEnvironment: d.TargetEnvironment, PolicyVersion: d.PolicyVersion, ExpiresAt: deadline, PullRequestSummary: pullRequestSummary, Status: "pending_reconcile", CreatedAt: time.Now().UTC()}
 		st.Intents[id] = intent
 		st.Events = append(st.Events, event("publish_intent", id, operation))
 		return nil
