@@ -96,3 +96,19 @@ func TestRunProcessWaitsForSessionAck(t *testing.T) {
 		t.Fatalf("worker protocol failed: %q %v", result.Output, err)
 	}
 }
+
+func TestBillingExpiryWithholdsWorkerModelAcknowledgement(t *testing.T) {
+	runner := Runner{BeforeModel: func(context.Context) error { return errors.New("billing confirmation expired") }}
+	events := `{"version":1,"type":"session","session_id":"authenticated-session"}` + "\n"
+	var ack bytes.Buffer
+	bound := false
+	_, err := readEvents(strings.NewReader(events), &ack, "", runner.admittedSession(context.Background(), func(string) error { bound = true; return nil }))
+	var classified core.RunError
+	if !errors.As(err, &classified) || classified.Kind != "retry_wait" || bound || ack.Len() != 0 {
+		t.Fatalf("billing pause did not withhold model permission: bound=%t ack=%q err=%v", bound, ack.String(), err)
+	}
+	runner.BeforeModel = func(context.Context) error { return nil }
+	if err := runner.admittedSession(context.Background(), func(string) error { bound = true; return nil })("authenticated-session"); err != nil || !bound {
+		t.Fatal("valid billing confirmation rejected session")
+	}
+}

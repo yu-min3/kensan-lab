@@ -15,6 +15,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/yu-min3/kensan-lab/apps/sense-dev/internal/billing"
 	"github.com/yu-min3/kensan-lab/apps/sense-dev/internal/core"
 	"github.com/yu-min3/kensan-lab/apps/sense-dev/internal/isolation"
 	"github.com/yu-min3/kensan-lab/apps/sense-dev/internal/mock"
@@ -55,6 +56,8 @@ func run() error {
 	reportToken := flag.String("report-slack-token-file", "", "mode 0600 Slack bot token file")
 	reportBaseURL := flag.String("report-base-url", "", "HTTPS mobile link base for daily report")
 	flag.Parse()
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
 	if *modelLimit < 0 {
 		return errors.New("model-attempt-limit must not be negative")
 	}
@@ -95,6 +98,7 @@ func run() error {
 	var runner core.Runner
 	var scope []string
 	var allowedNow func(time.Time) bool
+	var usage *billing.Monitor
 	var worktrees worktree.Manager
 	if *mockWorker {
 		mode, runner, scope = "mock", mock.Runner{}, []string{"simulation-only"}
@@ -129,7 +133,11 @@ func run() error {
 		if *codexBubblewrap != "" {
 			codexConfig.Bubblewrap = *codexBubblewrap
 		}
-		isolated := workerclient.Runner{Claude: claudeConfig, Codex: codexConfig, WorkerProgram: *workerProgram, Timeout: *turnTimeout, Worktrees: worktrees}
+		usage = billing.New(*claudeAuth)
+		usage.Poll(ctx)
+		go usage.Run(ctx)
+		log.Printf("Claude billing confirmation: %s", usage.Status().Reason)
+		isolated := workerclient.Runner{BeforeModel: usage.Check, Claude: claudeConfig, Codex: codexConfig, WorkerProgram: *workerProgram, Timeout: *turnTimeout, Worktrees: worktrees}
 		if err := isolated.Preflight(context.Background()); err != nil {
 			return fmt.Errorf("isolated worker disabled: %w", err)
 		}
@@ -150,14 +158,15 @@ func run() error {
 	if err != nil {
 		return err
 	}
+	if usage != nil {
+		handler.SetBillingCheck(func() bool { return usage.Check(ctx) == nil })
+	}
 	listener, err := net.Listen("tcp", *addr)
 	if err != nil {
 		return err
 	}
 	defer listener.Close()
 	server := &http.Server{Handler: handler.Handler(), ReadHeaderTimeout: 5 * time.Second, MaxHeaderBytes: 1 << 20}
-	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
-	defer stop()
 	go func() {
 		queue := func() {
 			entry, _, err := store.QueueDailyReport(time.Now())
@@ -208,7 +217,7 @@ func run() error {
 				case <-ctx.Done():
 					return
 				case <-ticker.C:
-					if allowedNow != nil && !allowedNow(time.Now()) {
+					if (allowedNow != nil && !allowedNow(time.Now())) || (usage != nil && usage.Check(ctx) != nil) {
 						continue
 					}
 					// 固まった worker が provider を握ったままにならないよう、

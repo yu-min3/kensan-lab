@@ -67,7 +67,7 @@ func (c Claude) Run(ctx context.Context, req Request) (Result, error) {
 }
 
 func (c Claude) cleanEnv() []string {
-	return []string{"PATH=" + os.Getenv("PATH"), "HOME=" + os.Getenv("HOME"), "CLAUDE_CONFIG_DIR=" + c.AuthHome}
+	return []string{"PATH=" + os.Getenv("PATH"), "HOME=" + os.Getenv("HOME"), "CLAUDE_CONFIG_DIR=" + c.AuthHome, "DISABLE_EXTRA_USAGE_COMMAND=1"}
 }
 
 func (c Claude) checkSettings() error {

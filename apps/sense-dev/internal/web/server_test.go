@@ -11,6 +11,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -411,5 +412,61 @@ func TestNonLoopbackBindRejected(t *testing.T) {
 		if err := LoopbackOnly(addr); err != nil {
 			t.Fatalf("rejected loopback bind %s: %v", addr, err)
 		}
+	}
+}
+
+func TestBillingWaitIsNotMisreportedAsOutsideWindow(t *testing.T) {
+	stateDir := t.TempDir()
+	if err := os.Chmod(stateDir, 0700); err != nil {
+		t.Fatal(err)
+	}
+	store, err := core.Open(stateDir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer store.Close()
+	dir := t.TempDir()
+	token := filepath.Join(dir, "token")
+	css := filepath.Join(dir, "tokens.css")
+	if err := os.WriteFile(token, []byte(strings.Repeat("a", 32)), 0600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(css, []byte(":root {}"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	s, err := New(store, token, css, "isolated", func(time.Time) bool { return true })
+	if err != nil {
+		t.Fatal(err)
+	}
+	var ready atomic.Bool
+	s.SetBillingCheck(ready.Load)
+	server := httptest.NewServer(s.Handler())
+	defer server.Close()
+	jar, _ := cookiejar.New(nil)
+	client := &http.Client{Jar: jar}
+	resp, err := client.PostForm(server.URL+"/login", url.Values{"token": {strings.Repeat("a", 32)}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	body, err := io.ReadAll(resp.Body)
+	resp.Body.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if resp.StatusCode != 200 || !strings.Contains(string(body), "追加使用OFFの確認待ち") || strings.Contains(string(body), "運転時間外です") {
+		t.Fatal("billing pause missing or misreported")
+	}
+	ready.Store(true)
+	resp, err = client.Get(server.URL + "/")
+	if err != nil {
+		t.Fatal(err)
+	}
+	body, err = io.ReadAll(resp.Body)
+	resp.Body.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(string(body), "追加使用OFFの確認待ち") || !strings.Contains(string(body), "隔離 worker の運転時間帯") {
+		t.Fatal("fresh OFF confirmation did not remove billing pause")
 	}
 }

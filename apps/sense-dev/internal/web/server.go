@@ -25,13 +25,26 @@ import (
 var static embed.FS
 
 type Server struct {
-	store      *core.Store
-	token      []byte
-	tokensCSS  string
-	workerMode string
-	allowedNow func(time.Time) bool
-	mu         sync.Mutex
-	sessions   map[string]session
+	store          *core.Store
+	token          []byte
+	tokensCSS      string
+	workerMode     string
+	allowedNow     func(time.Time) bool
+	billingAllowed func() bool
+	mu             sync.Mutex
+	sessions       map[string]session
+}
+
+// SetBillingCheck is configured before serving; it exposes no credential data.
+func (s *Server) SetBillingCheck(check func() bool) { s.billingAllowed = check }
+func (s *Server) billingBlocked() bool {
+	return s.workerMode == "isolated" && s.billingAllowed != nil && !s.billingAllowed()
+}
+func (s *Server) waitReason(st core.State, a core.Agent, allowed bool, now time.Time) string {
+	if s.billingBlocked() && (a.Status == "ready" || a.Status == "retry_wait") {
+		return "追加使用OFFの確認待ち"
+	}
+	return agentWaitReason(st, a, s.workerMode, allowed, now)
 }
 
 type session struct {
@@ -349,7 +362,7 @@ func (s *Server) home(w http.ResponseWriter, r *http.Request) {
 	agents := make([]agentView, 0, len(st.Agents))
 	for _, a := range st.Agents {
 		allowed := s.allowedNow == nil || s.allowedNow(time.Now())
-		agents = append(agents, agentView{Agent: a, WaitReason: agentWaitReason(st, a, s.workerMode, allowed, time.Now())})
+		agents = append(agents, agentView{Agent: a, WaitReason: s.waitReason(st, a, allowed, time.Now())})
 	}
 	sort.Slice(agents, func(i, j int) bool {
 		ai, aj := agents[i].Agent, agents[j].Agent
@@ -383,19 +396,20 @@ func (s *Server) home(w http.ResponseWriter, r *http.Request) {
 	sort.Slice(outbox, func(i, j int) bool { return outbox[i].Date > outbox[j].Date })
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	_ = page.Execute(w, struct {
-		CSRF        string
-		Tasks       []core.Task
-		Messages    []messageView
-		Agents      []agentView
-		Questions   []core.Question
-		Approvals   []core.ApprovalRequest
-		Reports     []core.DailyReport
-		Outbox      []core.ReportOutboxEntry
-		Stopped     bool
-		PausedUntil *time.Time
-		WorkerMode  string
-		WindowOpen  bool
-	}{s.csrf(r), tasks, messages, agents, questions, approvals, reports, outbox, st.Stopped, st.PausedUntil, s.workerMode, s.allowedNow == nil || s.allowedNow(time.Now())})
+		CSRF           string
+		Tasks          []core.Task
+		Messages       []messageView
+		Agents         []agentView
+		Questions      []core.Question
+		Approvals      []core.ApprovalRequest
+		Reports        []core.DailyReport
+		Outbox         []core.ReportOutboxEntry
+		Stopped        bool
+		PausedUntil    *time.Time
+		WorkerMode     string
+		WindowOpen     bool
+		BillingBlocked bool
+	}{s.csrf(r), tasks, messages, agents, questions, approvals, reports, outbox, st.Stopped, st.PausedUntil, s.workerMode, s.allowedNow == nil || s.allowedNow(time.Now()), s.billingBlocked()})
 }
 
 func (s *Server) taskDetail(w http.ResponseWriter, r *http.Request) {
@@ -409,7 +423,7 @@ func (s *Server) taskDetail(w http.ResponseWriter, r *http.Request) {
 	for _, a := range st.Agents {
 		if a.TaskID == task.ID {
 			allowed := s.allowedNow == nil || s.allowedNow(time.Now())
-			agents = append(agents, agentView{Agent: a, WaitReason: agentWaitReason(st, a, s.workerMode, allowed, time.Now())})
+			agents = append(agents, agentView{Agent: a, WaitReason: s.waitReason(st, a, allowed, time.Now())})
 		}
 	}
 	sort.Slice(agents, func(i, j int) bool {

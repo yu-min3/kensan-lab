@@ -42,6 +42,7 @@ if [ "$1" = "auth" ]; then
   exit 0
 fi
 if [ -n "${ANTHROPIC_API_KEY:-}" ]; then exit 8; fi
+if [ "${DISABLE_EXTRA_USAGE_COMMAND:-}" != "1" ]; then exit 11; fi
 case "$*" in *secret-from-prompt*) exit 9;; esac
 read -r line
 case "$line" in *secret-from-prompt*) ;; *) exit 10;; esac

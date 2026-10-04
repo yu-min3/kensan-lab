@@ -4,6 +4,7 @@ sense 上で動く自動開発 controller の実装。現段階はファイル�
 
 ## 配置
 
+- `internal/billing/`: host共有のClaude追加使用OFF確認。通常isolated運転で必須。5分期限・429待機・session ACK前の拒否は [billing-monitor.md](docs/billing-monitor.md)。
 - `internal/core/`: 単一 writer の台帳、immutable 成果物、team/agent context、message、Release Gate。
 - `internal/web/`: loopback 管理画面。Whetstone の `packages/design-tokens/tokens.css` を原本として読む。
 - `internal/isolation/`: Linux bubblewrap の worker 起動引数。モデル worker は専用 rootfs を読取専用、Sol の worktree と購読認証 home のみ書込可で渡す。検証器は認証 home を渡さず、ネットワークなし・worktree 読取専用で起動する。controller state/admin token の経路重複を拒否する。

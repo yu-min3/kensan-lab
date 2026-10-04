@@ -26,6 +26,8 @@ type Runner struct {
 	WorkerProgram string
 	Timeout       time.Duration
 	Worktrees     worktree.Manager
+	// Host-only admission check; no billing state or credentials enter worker IPC.
+	BeforeModel func(context.Context) error
 }
 
 // Preflight executes the trusted worker inside both sandboxes before the
@@ -118,7 +120,12 @@ func (r Runner) Run(ctx context.Context, dispatch core.Dispatch) (core.RunResult
 	if err != nil {
 		return core.RunResult{}, err
 	}
-	result, err := runProcess(cmd, request, dispatch.BindSession)
+	if r.BeforeModel != nil {
+		if err := r.BeforeModel(turnCtx); err != nil {
+			return core.RunResult{}, core.RunError{Kind: "retry_wait", Err: err}
+		}
+	}
+	result, err := runProcess(cmd, request, r.admittedSession(turnCtx, dispatch.BindSession))
 	if errors.Is(turnCtx.Err(), context.DeadlineExceeded) {
 		return core.RunResult{}, core.RunError{Kind: "retry_wait", Err: context.DeadlineExceeded}
 	}
@@ -151,6 +158,20 @@ func (r Runner) Run(ctx context.Context, dispatch core.Dispatch) (core.RunResult
 		result.HeadSHA = change.HeadSHA
 	}
 	return result, err
+}
+
+// A worker asks for an acknowledgement AFTER authenticating and BEFORE sending
+// a model turn. Recheck admission here so auth/preflight delays cannot reuse an
+// expired billing confirmation.
+func (r Runner) admittedSession(ctx context.Context, bind func(string) error) func(string) error {
+	return func(id string) error {
+		if r.BeforeModel != nil {
+			if err := r.BeforeModel(ctx); err != nil {
+				return core.RunError{Kind: "retry_wait", Err: err}
+			}
+		}
+		return bind(id)
+	}
 }
 
 func (r Runner) preflightTask(ctx context.Context, config isolation.Config, provider string) error {
