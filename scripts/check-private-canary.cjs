@@ -92,6 +92,18 @@ for (const mode of ['private-canary', 'public', 'public-default']) {
     assert(!fs.existsSync(path.join(base, 'apps/canary/.devcontainer')));
     assert(!fs.existsSync(path.join(base, 'apps/canary/.backstage')));
     assert(fs.readFileSync(path.join(base, 'apps/canary/app/main.py'), 'utf8').includes('CANARY_RELEASE = "v1"'));
+    const dockerfile = fs.readFileSync(path.join(base, 'apps/canary/Dockerfile'), 'utf8');
+    assert(dockerfile.includes('npm ci --no-audit --no-fund'));
+    for (const line of dockerfile.split('\n')) {
+      if (/^FROM .* AS (builder|frontend)$/.test(line) || /^FROM .*python/.test(line) || line.includes('COPY --from=ghcr.io/astral-sh/uv')) {
+        assert(/@sha256:[0-9a-f]{64}/.test(line), 'private canary registry inputs must be pinned');
+      }
+    }
+    const lock = JSON.parse(fs.readFileSync(path.join(base, 'apps/canary/frontend/package-lock.json'), 'utf8'));
+    assert.equal(lock.lockfileVersion, 3);
+    for (const [name, pkg] of Object.entries(lock.packages)) {
+      if (name) assert(pkg.integrity && pkg.resolved.startsWith('https://registry.npmjs.org/'));
+    }
   } else {
     assert.deepEqual(remote, ['publish:github', 'publish:github:pull-request', 'catalog:register']);
     const values = YAML.parse(fs.readFileSync(path.join(directory, 'deploy/values.yaml'), 'utf8'));
