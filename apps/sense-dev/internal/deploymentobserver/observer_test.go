@@ -3,6 +3,7 @@ package deploymentobserver
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"net/netip"
 	"os"
 	"path/filepath"
@@ -118,6 +119,39 @@ func TestObserveBindsMergeRevisionPrivateImageAndUserPath(t *testing.T) {
 	}
 	if _, err := HTTPProbe(context.Background(), cidrPlan); err == nil {
 		t.Fatal("unresolved CIDR performed an HTTP probe")
+	}
+	// API transport selects a Pod from the same validated CIDR; no name is
+	// accepted from serialized plan input and a new rollout is selected afresh.
+	proxyPlan := cidrPlan
+	proxyPlan.ProbeTransport = "kubernetes-api"
+	proxyPlan.ProbePort = 8000
+	proxy := &recordingProbeSources{fakeSources: f}
+	proxy.pods = append([]PodState(nil), f.pods...)
+	for n, ip := range []string{"10.0.0.12", "10.0.0.17"} {
+		proxy.pods[0].PodIP = netip.MustParseAddr(ip)
+		proxy.pods[0].Name = fmt.Sprintf("canary-rollout-%d", n)
+		proxy.pods[0].Namespace = namespace
+		proxy.pods[0].UID = fmt.Sprintf("uid-%d", n)
+		proxy.pods[0].AppLabel = "canary"
+		if _, err := (Observer{Sources: proxy}).Observe(context.Background(), proxyPlan, head, merge, spec); err != nil {
+			t.Fatal(err)
+		}
+		chosen := proxy.plans[len(proxy.plans)-1]
+		if chosen.probePod == nil || *chosen.probePod != proxy.pods[0] || chosen.ProbeIP != proxy.pods[0].PodIP || chosen.ProbeCIDR.IsValid() {
+			t.Fatal("API probe was not linked to selected verified Pod")
+		}
+	}
+	for _, name := range []string{"../pod", "pod:8000", "pod%2Fother", "pod/name", "Pod", "-pod", "pod-", strings.Repeat("a", 64)} {
+		proxy.pods[0].Name = name
+		before := len(proxy.plans)
+		if _, err := (Observer{Sources: proxy}).Observe(context.Background(), proxyPlan, head, merge, spec); err == nil || len(proxy.plans) != before {
+			t.Fatal("unsafe Pod name selected")
+		}
+	}
+	proxy.pods[0].Name = "canary-rollout"
+	proxy.pods[0].Namespace = "other"
+	if _, err := (Observer{Sources: proxy}).Observe(context.Background(), proxyPlan, head, merge, spec); err == nil {
+		t.Fatal("external namespace selected")
 	}
 	cases := map[string]func(*Plan, *fakeSources){
 		"public endpoint":     func(p *Plan, _ *fakeSources) { p.ProbeIP = netip.MustParseAddr("8.8.8.8") },

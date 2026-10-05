@@ -41,12 +41,18 @@ func (h HostSources) Release(ctx context.Context, p Plan, spec ImageSpec, review
 	return h.ReleaseSource.Release(ctx, p, spec, reviewed, revision)
 }
 func (h HostSources) Probe(ctx context.Context, p Plan) (UserPathState, error) {
+	if p.ProbeTransport == "kubernetes-api" {
+		return h.Kube.APIProbe(ctx, p)
+	}
 	return HTTPProbe(ctx, p)
 }
 
 // KubeCLI shells out to kubectl with fixed read-only arguments, never a shell.
 // The host process owns KUBECONFIG; operator policy must grant GET/LIST only.
-type KubeCLI struct{ Binary, Kubeconfig string }
+type KubeCLI struct {
+	Binary, Kubeconfig string
+	apiDial            func(context.Context, string, string) (net.Conn, error)
+}
 
 func (k KubeCLI) get(ctx context.Context, args ...string) ([]byte, error) {
 	if !filepath.IsAbs(k.Kubeconfig) {
@@ -80,7 +86,17 @@ func (k KubeCLI) Application(ctx context.Context, p Plan) (ApplicationState, err
 	if err := p.validate(); err != nil {
 		return ApplicationState{}, err
 	}
-	body, err := k.get(ctx, "-n", "argocd", "get", "applications.argoproj.io", application, "-o", "json")
+	var body []byte
+	var err error
+	if p.ProbeTransport == "kubernetes-api" {
+		api, e := k.privateAPI()
+		if e != nil {
+			return ApplicationState{}, e
+		}
+		body, err = api.get(ctx, "/apis/argoproj.io/v1alpha1/namespaces/argocd/applications/"+application, 1<<20)
+	} else {
+		body, err = k.get(ctx, "-n", "argocd", "get", "applications.argoproj.io", application, "-o", "json")
+	}
 	if err != nil {
 		return ApplicationState{}, err
 	}
@@ -115,15 +131,30 @@ func (k KubeCLI) Pods(ctx context.Context, p Plan) ([]PodState, error) {
 	if err := p.validate(); err != nil {
 		return nil, err
 	}
-	body, err := k.get(ctx, "-n", namespace, "get", "pods", "-l", "app.kubernetes.io/name=canary", "-o", "json")
+	var body []byte
+	var err error
+	if p.ProbeTransport == "kubernetes-api" {
+		api, e := k.privateAPI()
+		if e != nil {
+			return nil, e
+		}
+		body, err = api.get(ctx, "/api/v1/namespaces/"+namespace+"/pods?labelSelector=app.kubernetes.io%2Fname%3Dcanary", 1<<20)
+	} else {
+		body, err = k.get(ctx, "-n", namespace, "get", "pods", "-l", "app.kubernetes.io/name=canary", "-o", "json")
+	}
 	if err != nil {
 		return nil, err
 	}
+	return parsePods(body)
+}
+
+func parsePods(body []byte) ([]PodState, error) {
 	var document struct {
 		Items []struct {
 			Metadata struct {
-				Namespace         string
-				DeletionTimestamp *time.Time `json:"deletionTimestamp"`
+				Name, Namespace, UID string
+				Labels               map[string]string
+				DeletionTimestamp    *time.Time `json:"deletionTimestamp"`
 			} `json:"metadata"`
 			Spec struct {
 				Containers []struct{ Image string } `json:"containers"`
@@ -153,7 +184,7 @@ func (k KubeCLI) Pods(ctx context.Context, p Plan) ([]PodState, error) {
 		if err != nil {
 			return nil, errors.New("canary PodIP missing or invalid")
 		}
-		result = append(result, PodState{Ready: pod.Status.Phase == "Running" && pod.Status.ContainerStatuses[0].Ready, Image: pod.Spec.Containers[0].Image, ImageID: pod.Status.ContainerStatuses[0].ImageID, PodIP: podIP})
+		result = append(result, PodState{Name: pod.Metadata.Name, Namespace: pod.Metadata.Namespace, UID: pod.Metadata.UID, AppLabel: pod.Metadata.Labels["app.kubernetes.io/name"], Ready: pod.Status.Phase == "Running" && pod.Status.ContainerStatuses[0].Ready, Image: pod.Spec.Containers[0].Image, ImageID: pod.Status.ContainerStatuses[0].ImageID, PodIP: podIP})
 	}
 	return result, nil
 }
@@ -164,7 +195,7 @@ func HTTPProbe(ctx context.Context, p Plan) (UserPathState, error) {
 	if err := p.validate(); err != nil {
 		return UserPathState{}, err
 	}
-	if !p.ProbeIP.IsValid() || p.ProbeCIDR.IsValid() {
+	if p.ProbeTransport == "kubernetes-api" || !p.ProbeIP.IsValid() || p.ProbeCIDR.IsValid() {
 		return UserPathState{}, errors.New("probe CIDR must first resolve to a host-verified Pod IP")
 	}
 	address := net.JoinHostPort(p.ProbeIP.String(), strconv.Itoa(int(p.ProbePort)))

@@ -44,6 +44,9 @@ type Plan struct {
 	ProbePort       uint16       `json:"probe_port"`
 	ProbePath       string       `json:"probe_path"`
 	ExpectedRelease string       `json:"expected_release"`
+	ProbeTransport  string       `json:"probe_transport,omitempty"`
+	// Selected only by host observation, never decoded from operator/model JSON.
+	probePod *PodState
 }
 
 // LoadPlan accepts only an operator-owned, bounded JSON file. Neither model
@@ -74,6 +77,9 @@ func LoadPlan(path string) (Plan, error) {
 }
 
 func (p Plan) validate() error {
+	if p.ProbeTransport != "" && p.ProbeTransport != "direct" && p.ProbeTransport != "kubernetes-api" || p.ProbeTransport == "kubernetes-api" && p.ProbePort != 8000 {
+		return errors.New("probe transport outside fixed direct/API route")
+	}
 	if p.SchemaVersion != 1 || p.Namespace != namespace || p.Application != application || p.Repository != repository || p.Image != image || !p.validProbeBoundary() || p.ProbePort == 0 || p.ProbePath != "/api/release" || !releasePattern.MatchString(p.ExpectedRelease) {
 		return errors.New("observer plan is outside the fixed private canary")
 	}
@@ -105,9 +111,10 @@ type ApplicationState struct {
 }
 type ArgoSource struct{ RepoURL, Path, Ref, TargetRevision, ResolvedRevision string }
 type PodState struct {
-	Ready          bool
-	Image, ImageID string
-	PodIP          netip.Addr
+	Name, Namespace, UID, AppLabel string
+	Ready                          bool
+	Image, ImageID                 string
+	PodIP                          netip.Addr
 }
 
 // ChildDigests are verified platform manifests under the registry's immutable
@@ -175,7 +182,15 @@ func (o Observer) Observe(ctx context.Context, p Plan, reviewedHead, revision st
 		return core.DeploymentReceipt{}, errors.New("registry manifest children are unavailable")
 	}
 	selectedIP := netip.Addr{}
+	var selectedPod PodState
+	names := map[string]bool{}
 	for _, pod := range pods {
+		if p.ProbeTransport == "kubernetes-api" {
+			if !safePodName(pod.Name) || pod.Namespace != namespace || pod.UID == "" || pod.AppLabel != "canary" || names[pod.Name] {
+				return core.DeploymentReceipt{}, errors.New("API probe Pod identity ambiguous or outside fixed namespace")
+			}
+			names[pod.Name] = true
+		}
 		runtimeDigest, ok := runtimeImageDigest(pod.ImageID)
 		if !pod.Ready || !pod.PodIP.Is4() || !pod.PodIP.IsPrivate() || pod.Image != image+"@"+proof.Digest || !ok || !children[runtimeDigest] {
 			return core.DeploymentReceipt{}, errors.New("canary pod is not ready at proven image digest")
@@ -183,6 +198,7 @@ func (o Observer) Observe(ctx context.Context, p Plan, reviewedHead, revision st
 		if pod.PodIP == p.ProbeIP || p.ProbeCIDR.IsValid() && p.ProbeCIDR.Contains(pod.PodIP) {
 			if !selectedIP.IsValid() || pod.PodIP.Compare(selectedIP) < 0 {
 				selectedIP = pod.PodIP
+				selectedPod = pod
 			}
 		}
 	}
@@ -194,6 +210,9 @@ func (o Observer) Observe(ctx context.Context, p Plan, reviewedHead, revision st
 	probePlan := p
 	probePlan.ProbeIP = selectedIP
 	probePlan.ProbeCIDR = netip.Prefix{}
+	if p.ProbeTransport == "kubernetes-api" {
+		probePlan.probePod = &selectedPod
+	}
 	user, err := o.Sources.Probe(ctx, probePlan)
 	if err != nil {
 		return core.DeploymentReceipt{}, fmt.Errorf("private user path: %w", err)
@@ -275,3 +294,7 @@ func (o Observer) Record(ctx context.Context, s *core.Store, p Plan, taskID, dec
 	r.EvidenceRef = core.ArtifactRef{ID: a.ID, Version: a.Version, SHA256: a.SHA256}
 	return s.RecordDeploymentReceipt(r)
 }
+
+var podNamePattern = regexp.MustCompile(`^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$`)
+
+func safePodName(name string) bool { return podNamePattern.MatchString(name) }

@@ -59,6 +59,22 @@ daemonは `-serve-socket <socket> -controller-auth-file <publisher-copy> -repo <
 
 `-observer-plan` の固定 `probe_ip` は従来互換。自律rolloutではoperatorがprivate Pod subnetの `probe_cidr` を固定し、`probe_ip` と排他で使う。hostはnamespace・image@digest・runtime digestをすべて照合済みのready PodだけからCIDR内IPを選ぶ。固定port/path/release marker、proxy禁止、redirect禁止は維持する。CIDRはIPv4 RFC1918内に完全包含し、public・0/0・曖昧prefix・IPv6を拒否する。CIDR境界の実設定は導入審査対象。
 
+### API proxy観測の候補（導入認可ではない）
+
+`probe_transport` は未指定/`direct` が従来のPod IP直接GET、`kubernetes-api` が明示選択したAPI経由のGET。自動fallbackは行わない。API modeはport `8000`、path `/api/release` に固定し、hostがCIDR/IP・namespace・ready・image/runtime digestを検証したPodのname/UIDを内部だけで引き渡す。直前のPod GETでname/UID/IP/image/runtimeを再照合してから、`/api/v1/namespaces/app-canary/pods/<podname>:8000/proxy/api/release` を読む。PodName/URLはplanやworker入力で指定できない。
+
+stock `kubectl get --raw` のredirect追跡を避け、API modeのArgo/Pod/proxy観測は専用HTTPS clientを使う。専用mode0600 kubeconfigは単一context/cluster/user、numeric RFC1918 HTTPS server、CA dataとtokenだけを受け付ける。exec/auth-provider、proxy URL、TLS server override/insecure、token/client cert/keyのfile参照を拒否する。TLS検証、proxy禁止、redirect禁止、10秒timeout、response上限を適用する。管理者kubeconfigのコピーは使用しない。credentialはhost observerだけが保持し、workerにmountしない。
+
+追加RBACの草案は以下。**実権限の導入とcredentialの発行はYuの権限判断が必要**で、このコード候補はどちらも変更しない。
+
+| Namespace | Resource | Verbs | 制限 |
+|---|---|---|---|
+| `app-canary` | `pods` | `get`, `list` | 固定canary selectorで観測 |
+| `app-canary` | `pods/proxy` | `get` | host readerが上記port/pathに固定 |
+| `argocd` | `applications.argoproj.io` | `get` | `resourceNames: [app-canary]` |
+
+RBAC自体はproxyのport/pathを限定できないため、専用tokenと固定host readerが追加の境界になる。API proxy成功はこの経路のrelease marker確認であり、senseからPodへの直接到達、user path全体、インターネット非到達を証明しない。direct TCP timeoutの実環境事象はこの候補だけでは解消・再検証していない。
+
 | 必要な前提 | 欠けたとき |
 |---|---|
 | 実canary source/values・locked test plan | checkout / verifierが進まない |
