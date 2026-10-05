@@ -1,0 +1,15 @@
+# Operator-only opt-in overlay; not loaded by the existing startup command.
+# Supply a dedicated machine credential to Backstage and the host adapter only.
+backend:
+  auth:
+    externalAccess:
+      - type: static
+        options:
+          token: ${SENSE_CANARY_SERVICE_TOKEN}
+          subject: sense-canary-agent
+        accessRestrictions:
+          - plugin: sense-canary
+senseCanary:
+  enabled: true
+  subject: sense-canary-agent
+  templateSHA256: d90fbe17df37c7d1aecf28386c440b73bf0f83d5077cd92e9394e74d33db136e
