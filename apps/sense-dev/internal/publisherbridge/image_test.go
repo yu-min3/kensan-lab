@@ -89,3 +89,28 @@ func TestImageEvidenceIsReadOnlyAndBoundToSentDispatchEvenAfterExpiry(t *testing
 		t.Fatal("unbound public image evidence accepted")
 	}
 }
+
+func TestBridgeDoesNotAcceptPackageCredentialConfiguration(t *testing.T) {
+	calls := 0
+	handler, err := HandlerWithImageEvidence(bridgeAuth(t), &fakeTransport{}, nil, func(_ context.Context, i core.PublishIntent) (publisher.ImageEvidence, error) {
+		calls++
+		return bridgeEvidence(i), nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, field := range []string{"token_file", "package_token_file", "observer_package_token_file"} {
+		input := map[string]any{"action": "image_evidence", "intent": imageBridgeIntent(), field: "/worker/provided-token"}
+		body, _ := json.Marshal(input)
+		r := httptest.NewRequest(http.MethodPost, "/v1/publish", bytes.NewReader(body))
+		r.Header.Set("Authorization", "Bearer "+strings.Repeat("x", 40))
+		w := httptest.NewRecorder()
+		handler.ServeHTTP(w, r)
+		if w.Code != http.StatusBadRequest {
+			t.Fatalf("worker credential field accepted: %s", field)
+		}
+	}
+	if calls != 0 {
+		t.Fatal("credential injection reached host observation")
+	}
+}

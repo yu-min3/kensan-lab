@@ -93,3 +93,15 @@ RBAC自体はproxyのport/pathを限定できないため、専用tokenと固定
 | モデル追加使用OFFのfresh確認、JST inference window | 推論開始を待つ |
 
 この接続はlocalの実Git・fake外部transport・hash付きfixtureで検証する。実GitHub image公開、実Argo配備、実モデルGateの証拠はT037/T027/T052で記録し、local成功を代用しない。
+
+## Package 読み取り credential の分離
+
+`-token-file` は `yu-min3/kensan-lab` だけを許可する fine-grained repository token。Git/API の repository 操作に使い、package API・GHCR の認証へ転用しない。publisher daemon は別の `-package-token-file`、observer は repository GET 用の `-observer-token-file` と別の `-observer-package-token-file` を指定する。package token は実行ユーザー所有の通常ファイル、mode `0600`、別ファイル・別 credential が必須。省略時の repository token fallback はない。
+
+Package credential は `yu-min3` の classic PAT で **`read:packages` のみ**。host は `GET /user` の owner と scope を確認し、package metadata は認証済み owner 用の `GET /user/packages/container/kensan-lab%2Fcanary`（および versions）、GHCR は固定 canary repository の pull scope だけを使用する。account 応答・token 値はログや model context へ渡さない。
+
+classic `read:packages` は repository 1 件に限定できず、owner account の他の読み取り可能な package へも到達しうる。この credential の権限限界は host の固定 GET/registry route で補うが、token 自体が repository 限定になるとは扱わない。repository mutator の fine-grained token は引き続き repository 1 件に限定する。
+
+通常画像 CI の metadata 確認だけは owner readonly secret `CANARY_READ_PACKAGES_TOKEN`、初回 bootstrap は `CANARY_BOOTSTRAP_READ_PACKAGES_TOKEN` を使う。両方とも package read scope と owner を確認する。Docker login/push は repository workflow の `GITHUB_TOKEN` を使い、owner secret を build arguments・source checkout・Docker context・worker へ渡さない。secret の作成・権限付与・画像発行はこの候補では実施していない。
+
+根拠: [Container registry の認証](https://docs.github.com/en/packages/working-with-a-github-packages-registry/working-with-the-container-registry)、[Packages REST API](https://docs.github.com/en/rest/packages/packages)。

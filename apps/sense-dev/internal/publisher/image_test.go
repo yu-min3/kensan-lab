@@ -68,8 +68,15 @@ func newImageFixture(t *testing.T, registryMutation ...string) *imageFixture {
 	f.objects["manifests/"+spec.ImageTag] = f.objects["manifests/"+f.digest]
 	f.intent = core.PublishIntent{Operation: "image_publish", Repository: repository, Ref: "refs/heads/sense-dev/app", HeadSHA: spec.SourceSHA, TargetEnvironment: "private-canary", PolicyVersion: core.ReleasePolicyVersion, ExpiresAt: time.Now().Add(time.Hour), ImageRelease: spec}
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path != "/token" && !strings.HasPrefix(r.URL.Path, "/v2/") && r.Header.Get("Authorization") != "Bearer token" {
-			t.Error("publisher request has no credential")
+		if r.URL.Path == "/user" || strings.HasPrefix(r.URL.Path, "/user/packages/") {
+			if r.Method != http.MethodGet || r.Header.Get("Authorization") != "Bearer package-token" {
+				t.Error("package API credential or method differs")
+			}
+		} else if r.URL.Path != "/token" && !strings.HasPrefix(r.URL.Path, "/v2/") && r.Header.Get("Authorization") != "Bearer token" {
+			t.Error("repository API credential differs")
+		}
+		if strings.HasPrefix(r.URL.Path, "/users/") {
+			t.Error("public-only package API used")
 		}
 		respond := func(v any) {
 			if err := json.NewEncoder(w).Encode(v); err != nil {
@@ -78,9 +85,19 @@ func newImageFixture(t *testing.T, registryMutation ...string) *imageFixture {
 		}
 		path := r.URL.Path
 		switch {
+		case path == "/user":
+			w.Header().Set("X-OAuth-Scopes", "read:packages")
+			login := "yu-min3"
+			if f.mutation == "package-owner" {
+				login = "other"
+			}
+			if f.mutation == "package-scope" {
+				w.Header().Set("X-OAuth-Scopes", "repo, read:packages")
+			}
+			respond(map[string]string{"login": login})
 		case path == "/token":
 			user, pass, ok := r.BasicAuth()
-			if !ok || user != "yu-min3" || pass != "token" {
+			if !ok || user != "yu-min3" || pass != "package-token" {
 				t.Error("registry credential mismatch")
 			}
 			if f.mutation == "registry-auth" {
@@ -240,7 +257,11 @@ func newImageFixture(t *testing.T, registryMutation ...string) *imageFixture {
 	if err := os.WriteFile(token, []byte("token"), 0600); err != nil {
 		t.Fatal(err)
 	}
-	f.g = GitHub{TokenFile: token, API: server.URL, Client: server.Client(), RegistryAPI: server.URL}
+	packageToken := filepath.Join(t.TempDir(), "package-token")
+	if err := os.WriteFile(packageToken, []byte("package-token"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	f.g = GitHub{TokenFile: token, PackageTokenFile: packageToken, API: server.URL, Client: server.Client(), RegistryAPI: server.URL}
 	return f
 }
 func TestImageDispatchAndEvidence(t *testing.T) {

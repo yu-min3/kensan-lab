@@ -26,12 +26,13 @@ var commitSHA = regexp.MustCompile(`^[0-9a-f]{40}$`)
 // GitHub has no controller or worker credential. It runs only in the separate
 // publisher process with a repo-scoped token file and a dedicated askpass.
 type GitHub struct {
-	RepoPath    string
-	TokenFile   string
-	Askpass     string
-	Client      *http.Client
-	API         string // test override; production must use api.github.com
-	RegistryAPI string // loopback-only test override; production uses ghcr.io
+	RepoPath         string
+	TokenFile        string
+	PackageTokenFile string
+	Askpass          string
+	Client           *http.Client
+	API              string // test override; production must use api.github.com
+	RegistryAPI      string // loopback-only test override; production uses ghcr.io
 }
 
 func (g GitHub) validate(i core.PublishIntent) (string, error) {
@@ -68,6 +69,9 @@ func (g GitHub) endpoint() string {
 }
 
 func (g GitHub) request(ctx context.Context, method, path string, body any, out any) (int, error) {
+	if !strings.HasPrefix(path, "/repos/"+repository+"/") {
+		return 0, errors.New("repository credential outside fixed repository API")
+	}
 	info, err := os.Lstat(g.TokenFile)
 	if err != nil || info.Mode().Perm()&0077 != 0 || !info.Mode().IsRegular() {
 		return 0, errors.New("publisher token file must be private and regular")
@@ -80,6 +84,10 @@ func (g GitHub) request(ctx context.Context, method, path string, body any, out 
 	if token == "" {
 		return 0, errors.New("empty publisher token")
 	}
+	return g.requestToken(ctx, token, method, path, body, out)
+}
+
+func (g GitHub) requestToken(ctx context.Context, token, method, path string, body any, out any) (int, error) {
 	var reader io.Reader
 	if body != nil {
 		encoded, err := json.Marshal(body)

@@ -119,7 +119,7 @@ func (g GitHub) existingPrivatePackage(ctx context.Context) error {
 			FullName string `json:"full_name"`
 		}
 	}
-	_, err := g.request(ctx, http.MethodGet, "/users/yu-min3/packages/container/kensan-lab%2Fcanary", nil, &p)
+	_, err := g.packageRequest(ctx, "/user/packages/container/kensan-lab%2Fcanary", &p)
 	if err != nil || p.Visibility != "private" || p.Repository.FullName != repository {
 		return errors.New("existing repository-bound private package required; bootstrap is forbidden")
 	}
@@ -131,7 +131,7 @@ func (g GitHub) unusedImageTag(ctx context.Context, tag string) error {
 		var versions []struct {
 			Metadata struct{ Container struct{ Tags []string } }
 		}
-		_, err := g.request(ctx, http.MethodGet, fmt.Sprintf("/users/yu-min3/packages/container/kensan-lab%%2Fcanary/versions?per_page=100&page=%d", page), nil, &versions)
+		_, err := g.packageRequest(ctx, fmt.Sprintf("/user/packages/container/kensan-lab%%2Fcanary/versions?per_page=100&page=%d", page), &versions)
 		if err != nil {
 			return errors.New("immutable image tag history unavailable")
 		}

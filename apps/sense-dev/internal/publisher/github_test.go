@@ -48,7 +48,7 @@ func TestGitHubPRRequiresExactRemoteSHAAndCreatesDraft(t *testing.T) {
 	if err := os.WriteFile(file, []byte("test-token\n"), 0600); err != nil {
 		t.Fatal(err)
 	}
-	g := GitHub{TokenFile: file, Client: server.Client(), API: server.URL}
+	g := GitHub{TokenFile: file, PackageTokenFile: fixturePackageToken(t), Client: server.Client(), API: server.URL}
 	i := core.PublishIntent{DecisionID: "gate-1", Operation: "pr_create", Repository: repository, Ref: "refs/heads/feat/canary", HeadSHA: sha, PullRequestSummary: "Add private canary"}
 	if _, exists, err := g.Inspect(context.Background(), i); err != nil || exists {
 		t.Fatalf("unexpected PR state: %t %v", exists, err)
@@ -93,7 +93,7 @@ func TestPrivateCanaryPRIsReadyUnderFixedPolicy(t *testing.T) {
 	if err := os.WriteFile(file, []byte("test-token"), 0600); err != nil {
 		t.Fatal(err)
 	}
-	g := GitHub{TokenFile: file, Client: server.Client(), API: server.URL}
+	g := GitHub{TokenFile: file, PackageTokenFile: fixturePackageToken(t), Client: server.Client(), API: server.URL}
 	i := core.PublishIntent{Operation: "pr_create", Repository: repository, Ref: "refs/heads/sense-dev/task", HeadSHA: sha, TargetEnvironment: "private-canary", PolicyVersion: core.ReleasePolicyVersion, ExpiresAt: time.Now().Add(time.Hour), PullRequestSummary: "Add private canary"}
 	if _, err := g.Execute(context.Background(), i); err != nil || !created {
 		t.Fatalf("ready private PR: %v", err)

@@ -7,10 +7,10 @@ import (
 	"encoding/json"
 	"errors"
 	"github.com/yu-min3/kensan-lab/apps/sense-dev/internal/core"
+	"github.com/yu-min3/kensan-lab/apps/sense-dev/internal/packageauth"
 	"io"
 	"net/http"
 	"net/url"
-	"os"
 	"strings"
 	"time"
 )
@@ -26,13 +26,9 @@ func (g GitHub) registryImage(ctx context.Context, spec core.ImageReleaseSpec, d
 		}
 		endpoint = g.RegistryAPI
 	}
-	info, err := os.Lstat(g.TokenFile)
-	if err != nil || !info.Mode().IsRegular() || info.Mode().Perm()&0077 != 0 {
-		return errors.New("private registry credential unavailable")
-	}
-	credential, err := os.ReadFile(g.TokenFile)
-	if err != nil || strings.TrimSpace(string(credential)) == "" {
-		return errors.New("private registry credential unavailable")
+	credential, err := packageauth.OwnerToken(ctx, g.TokenFile, g.PackageTokenFile, g.Client, g.API)
+	if err != nil {
+		return err
 	}
 	client := &http.Client{Timeout: 20 * time.Second, Transport: &http.Transport{Proxy: nil}}
 	if g.Client != nil {
@@ -43,7 +39,7 @@ func (g GitHub) registryImage(ctx context.Context, spec core.ImageReleaseSpec, d
 	if err != nil {
 		return err
 	}
-	req.SetBasicAuth("yu-min3", strings.TrimSpace(string(credential)))
+	req.SetBasicAuth("yu-min3", credential)
 	response, err := client.Do(req)
 	if err != nil {
 		return errors.New("private registry auth unavailable")

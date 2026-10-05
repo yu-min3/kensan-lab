@@ -68,7 +68,7 @@ func newMergeFixture(t *testing.T) (*mergeFixture, GitHub, core.PublishIntent) {
 		t.Fatal(err)
 	}
 	i := core.PublishIntent{Operation: "merge", Repository: repository, Ref: "refs/heads/sense-dev/test", HeadSHA: f.head, BaseSHA: f.base, TargetEnvironment: "private-canary", PolicyVersion: core.ReleasePolicyVersion, ExpiresAt: time.Now().Add(time.Hour)}
-	return f, GitHub{TokenFile: file, Client: server.Client(), API: server.URL}, i
+	return f, GitHub{TokenFile: file, PackageTokenFile: fixturePackageToken(t), Client: server.Client(), API: server.URL}, i
 }
 
 func TestGitOpsMergeReturnsVerifiedRevisionAndReconciles(t *testing.T) {

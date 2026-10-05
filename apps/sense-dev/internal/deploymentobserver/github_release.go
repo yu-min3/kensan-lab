@@ -15,12 +15,19 @@ import (
 	"os"
 	"strings"
 	"time"
+
+	"github.com/yu-min3/kensan-lab/apps/sense-dev/internal/packageauth"
 )
 
 // GitHubRelease reads the successful trusted workflow W and its source-A image
 // artifact, then independently checks Git trees at A/B/C and GHCR index leaves.
-// Its token belongs only to the host observer process.
-type GitHubRelease struct{ TokenFile string }
+// Its separate repository and package tokens belong only to the host observer.
+type GitHubRelease struct {
+	TokenFile        string
+	PackageTokenFile string
+	Client           *http.Client // loopback-only package API test override
+	API              string
+}
 
 func (g GitHubRelease) Release(ctx context.Context, p Plan, spec ImageSpec, reviewed, revision string) (ReleaseProof, error) {
 	if err := p.validate(); err != nil {
@@ -30,6 +37,10 @@ func (g GitHubRelease) Release(ctx context.Context, p Plan, spec ImageSpec, revi
 		return ReleaseProof{}, errors.New("reviewed, merge or image identity missing")
 	}
 	token, err := g.token()
+	if err != nil {
+		return ReleaseProof{}, err
+	}
+	packageToken, err := g.packageToken(ctx)
 	if err != nil {
 		return ReleaseProof{}, err
 	}
@@ -59,15 +70,19 @@ func (g GitHubRelease) Release(ctx context.Context, p Plan, spec ImageSpec, revi
 	if err := imageValuesAt(ctx, token, revision, spec.Digest); err != nil {
 		return ReleaseProof{}, err
 	}
-	private, err := g.packagePrivate(ctx, token)
+	private, err := g.packagePrivate(ctx, packageToken)
 	if err != nil || !private {
 		return ReleaseProof{}, errors.New("current GHCR package privacy could not be verified")
 	}
-	children, err := g.registryChildren(ctx, token, spec.Digest)
+	children, err := g.registryChildren(ctx, packageToken, spec.Digest)
 	if err != nil {
 		return ReleaseProof{}, err
 	}
 	return ReleaseProof{Repository: repository, Image: image, SourceSHA: spec.SourceSHA, SourceAppTreeSHA: spec.SourceAppTreeSHA, ImageTag: spec.ImageTag, Digest: spec.Digest, WorkflowRef: spec.WorkflowRef, WorkflowSHA: spec.WorkflowSHA, WorkflowSHA256: spec.WorkflowSHA256, WorkflowRunID: spec.WorkflowRunID, DispatchID: spec.DispatchID, Visibility: "private", ChildDigests: children, Succeeded: true}, nil
+}
+
+func (g GitHubRelease) packageToken(ctx context.Context) (string, error) {
+	return packageauth.OwnerToken(ctx, g.TokenFile, g.PackageTokenFile, g.Client, g.API)
 }
 
 func (g GitHubRelease) token() (string, error) {
@@ -87,7 +102,11 @@ func (g GitHubRelease) token() (string, error) {
 }
 
 func githubGET(ctx context.Context, token, path string, out any) error {
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, "https://api.github.com"+path, nil)
+	return githubGETWithClient(ctx, token, path, out, nil, "https://api.github.com")
+}
+
+func githubGETWithClient(ctx context.Context, token, path string, out any, override *http.Client, endpoint string) error {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint+path, nil)
 	if err != nil {
 		return err
 	}
@@ -95,6 +114,10 @@ func githubGET(ctx context.Context, token, path string, out any) error {
 	req.Header.Set("Accept", "application/vnd.github+json")
 	req.Header.Set("X-GitHub-Api-Version", "2022-11-28")
 	client := &http.Client{Timeout: 20 * time.Second, Transport: &http.Transport{Proxy: nil}, CheckRedirect: func(*http.Request, []*http.Request) error { return errors.New("GitHub API redirect rejected") }}
+	if override != nil {
+		*client = *override
+		client.CheckRedirect = func(*http.Request, []*http.Request) error { return errors.New("GitHub API redirect rejected") }
+	}
 	response, err := client.Do(req)
 	if err != nil {
 		return errors.New("GitHub read-only API unavailable")
@@ -242,17 +265,21 @@ func (g GitHubRelease) packagePrivate(ctx context.Context, token string) (bool, 
 			FullName string `json:"full_name"`
 		}
 	}
-	err := githubGET(ctx, token, "/users/yu-min3/packages/container/kensan-lab%2Fcanary", &result)
+	endpoint := g.API
+	if endpoint == "" {
+		endpoint = "https://api.github.com"
+	}
+	err := githubGETWithClient(ctx, token, "/user/packages/container/kensan-lab%2Fcanary", &result, g.Client, endpoint)
 	return result.Visibility == "private" && result.Repository.FullName == repository, err
 }
 
-func (g GitHubRelease) registryChildren(ctx context.Context, githubToken, digest string) ([]string, error) {
+func (g GitHubRelease) registryChildren(ctx context.Context, packageToken, digest string) ([]string, error) {
 	tokenURL := "https://ghcr.io/token?service=ghcr.io&scope=" + url.QueryEscape("repository:yu-min3/kensan-lab/canary:pull")
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, tokenURL, nil)
 	if err != nil {
 		return nil, err
 	}
-	req.SetBasicAuth("yu-min3", githubToken)
+	req.SetBasicAuth("yu-min3", packageToken)
 	client := &http.Client{Timeout: 20 * time.Second, Transport: &http.Transport{Proxy: nil}, CheckRedirect: func(*http.Request, []*http.Request) error { return errors.New("registry redirect rejected") }}
 	response, err := client.Do(req)
 	if err != nil {
