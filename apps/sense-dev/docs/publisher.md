@@ -65,6 +65,14 @@ daemonは `-serve-socket <socket> -controller-auth-file <publisher-copy> -repo <
 
 stock `kubectl get --raw` のredirect追跡を避け、API modeのArgo/Pod/proxy観測は専用HTTPS clientを使う。専用mode0600 kubeconfigは単一context/cluster/user、numeric RFC1918 HTTPS server、CA dataとtokenだけを受け付ける。exec/auth-provider、proxy URL、TLS server override/insecure、token/client cert/keyのfile参照を拒否する。TLS検証、proxy禁止、redirect禁止、10秒timeout、response上限を適用する。管理者kubeconfigのコピーは使用しない。credentialはhost observerだけが保持し、workerにmountしない。
 
+#### API serverでの認証ヘッダー削除の前提
+
+Kubernetes [v1.33.5の標準認証filter](https://github.com/kubernetes/kubernetes/blob/v1.33.5/staging/src/k8s.io/apiserver/pkg/endpoints/filters/authentication.go#L44-L113) は、認証成功後、下流handlerを呼ぶ前に `Authorization` と認証用front proxy headersを削除する。Bearer tokenをApp Podへ渡さない根拠はこのfilterであり、Pod proxy自体が任意の機密headerを除去する保証ではない。専用readerはCookieを設定せず、cookie jarも保持せず、Proxy-Authorizationも送らない。workerは専用kubeconfig/tokenを読み取れない隔離を維持する。
+
+導入前のread-only実測として、親審査でAPI version `v1.33.5`、`kube-apiserver-master` のimage `registry.k8s.io/kube-apiserver:v1.33.5`、`--authorization-mode=Node,RBAC`、`--client-ca-file=/etc/kubernetes/pki/ca.crt`、`--requestheader-client-ca-file=/etc/kubernetes/pki/front-proxy-ca.crt`、`--service-account-issuer=https://kubernetes.default.svc.cluster.local` が報告された。独自の `--authentication-config` / `--anonymous-auth` flagは観測されていない。この実測と固定版ソースから、標準の認証filterを通るAPI serverを採用前提とする。API server認証を無効化・改変するactorはApp/workerの任務外であり、その管理境界を維持する必要がある。認証filterが無効なら削除は迂回されるため、この前提を満たせない環境ではBearer方式を導入しない。
+
+実測はimage tag/metadataとの対応までであり、稼働imageのregistry digestや実binaryと公式ソースの同一性は証明していない。実PodへのAPI proxy GETとPod側でのheader非受信も未実測である。コード候補とソース確認を実環境の配備・到達・非漏洩試験成功と扱わない。
+
 追加RBACの草案は以下。**実権限の導入とcredentialの発行はYuの権限判断が必要**で、このコード候補はどちらも変更しない。
 
 | Namespace | Resource | Verbs | 制限 |
