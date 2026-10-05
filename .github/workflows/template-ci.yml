@@ -13,6 +13,8 @@ name: Template CI
 on:
   pull_request:
     paths:
+      - "scripts/render-template-smoke.cjs"
+      - "scripts/template-ci/**"
       - "backstage/templates/**"
       - "charts/app-base/**"
       - "environments/kind/resources/backstage/configmap-app-config.yaml"
@@ -20,6 +22,8 @@ on:
   push:
     branches: [main]
     paths:
+      - "scripts/render-template-smoke.cjs"
+      - "scripts/template-ci/**"
       - "backstage/templates/**"
       - "charts/app-base/**"
       - "environments/kind/resources/backstage/configmap-app-config.yaml"
@@ -39,87 +43,12 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      # The scaffolder substitutes these; here they are filled in with sample
-      # values so the skeleton can be treated as a real project.
-      #
-      # Done in Python rather than sed on purpose: Backstage's placeholders and
-      # GitHub Actions expressions are the same syntax, so writing the literal
-      # sequence anywhere in a `run:` block makes Actions try to evaluate
-      # `values.name` as one of its own contexts and the workflow stops parsing.
-      # The escaped regex below never contains that sequence.
+      # Use the same Nunjucks expressions and raw blocks as fetch:template.
+      # This renders content only; fs:rename remains a separate action below.
+      - name: Install locked template renderer
+        run: npm ci --prefix scripts/template-ci --ignore-scripts --no-audit --no-fund
       - name: Fill in the template variables
-        run: |
-          cp -r "${SKELETON}" /tmp/scaffolded
-          python3 - <<'PY'
-          import pathlib, re
-          # What the scaffolder would fill in, for a service called sample-api.
-          sample = {
-              "name": "widget-service",
-              "description": "Sample FastAPI service",
-              "ownerSlug": "platform-engineering",
-              "repoOwner": "yu-min3",
-              "repoName": "app-widget-service",
-              "owner": "platform-engineering",
-              "system": "developer-portal",
-              "domain": "platform",
-              # Appearance, and where the service is served. These reach the
-              # running pod as environment variables rather than being built in,
-              # so the rendered values file is where they have to appear.
-              "theme": "night",
-              "message": "hello from CI",
-              "hostname": "widget-service.app.yu-min3.com",
-              "imageRepository": "ghcr.io/yu-min3/app-widget-service",
-              "imageTag": "v0.1.0",
-              "applicationUrl": "https://widget-service.app.yu-min3.com/docs",
-              "argocdUrl": "https://argocd.platform.yu-min3.com/applications/app-widget-service",
-              "loadButtonEnabled": "false",
-              "ghcrPullSecretEnabled": "true",
-              "otelEnabled": "true",
-              "gatewayName": "gateway-prod",
-              "gatewayNamespace": "istio-system",
-              "platformRepoUrl": "https://github.com/yu-min3/kensan-lab",
-              "applicationRepoUrl": "https://github.com/yu-min3/app-widget-service",
-          }
-          # Dotted references (values.destination.x) count too — the earlier
-          # pattern matched only single words, so a placeholder the scaffolder
-          # never fills could sit in a shipped file unnoticed.
-          pattern = re.compile(r"\$\{\{\s*values\.([\w.]+)\s*\}\}")
-          root = pathlib.Path("/tmp/scaffolded")
-          missing = set()
-
-          def fill(match):
-              key = match.group(1)
-              if key not in sample:
-                  missing.add(key)
-                  return match.group(0)
-              return sample[key]
-
-          for path in sorted(root.rglob("*")):
-              if not path.is_file():
-                  continue
-              try:
-                  text = path.read_text()
-              except UnicodeDecodeError:
-                  continue
-              filled = pattern.sub(fill, text)
-              if filled != text:
-                  path.write_text(filled)
-
-          # Deliberately not renaming paths. fetch:template substitutes file
-          # contents only — a directory named after a placeholder arrives with
-          # the placeholder still in it — and a job that renamed them would be
-          # more capable than the thing it is testing. The per-app path comes
-          # from targetPath in template.yaml instead.
-          leftover = sorted(str(p.relative_to(root)) for p in root.rglob("*")
-                            if pattern.search(p.name))
-          assert not leftover, (
-              "these paths rely on placeholder substitution, which fetch:template "
-              f"does not do: {leftover}")
-
-          # A placeholder this job does not know about means the template grew a
-          # parameter and nothing here exercises it.
-          assert not missing, f"template uses parameters this job does not supply: {sorted(missing)}"
-          PY
+        run: node scripts/render-template-smoke.cjs /tmp/scaffolded
 
       # What a developer gets must render through the platform's chart with no
       # edits. A values file that has drifted from charts/app-base fails here

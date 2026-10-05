@@ -1,0 +1,8 @@
+{
+  "name": "kensan-template-ci-renderer",
+  "private": true,
+  "version": "1.0.0",
+  "dependencies": {
+    "nunjucks": "3.2.4"
+  }
+}
