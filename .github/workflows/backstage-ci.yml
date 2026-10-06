@@ -22,12 +22,16 @@ on:
   pull_request:
     paths:
       - "backstage/**"
+      - "scripts/sense-canary-generate.py"
+      - "scripts/tests/test-sense-canary-generate.py"
       - ".github/workflows/backstage-ci.yml"
       - "!backstage/**/*.md"
   push:
     branches: [main]
     paths:
       - "backstage/**"
+      - "scripts/sense-canary-generate.py"
+      - "scripts/tests/test-sense-canary-generate.py"
       - ".github/workflows/backstage-ci.yml"
       - "!backstage/**/*.md"
   workflow_dispatch:
@@ -85,6 +89,8 @@ jobs:
 
       - run: yarn tsc
       - run: yarn test
+      - name: Check sense canary API and host boundaries
+        run: yarn test:sense-canary
 
       # Builds for one architecture and stops there. The point is to catch a
       # broken Dockerfile or a backend bundle that will not assemble, not to
@@ -192,6 +198,8 @@ jobs:
       # it is how this job came to need the check below.
       - run: yarn tsc
       - run: yarn test
+      - name: Check sense canary API and host boundaries
+        run: yarn test:sense-canary
 
       - name: Build backend bundle
         run: yarn workspace backend build

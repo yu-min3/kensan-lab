@@ -43,12 +43,12 @@ token fileはabsolute canonical regular file・mode0600、出力は未存在のd
 
 局所型検査とAPI境界試験で、disabled/missing credential、service-only、入力差替え、4固定step、内部token、logs非返却、悪い出力拒否を確認する。policy試験は実source bundleのpinと変更検出、path逸脱・secret/mode差替えを確認する。host client試験はローカルHTTP fixtureで固定route/credential、content証明、redirect、public endpoint、広いfile権限、既存出力拒否を確認する。
 
-API試験はcompiled `senseCanary.js`/`senseCanaryPolicy.js`のdirectoryを `SENSE_CANARY_TEST_BUILD`へ設定し、依存をinstallしたbackend packageから実行する。policy試験はNode22.18+のtype strippingが必要。
+Backstage CIのverify/release双方は`yarn tsc`と既存の`yarn test`の後に`yarn test:sense-canary`を実行する。host clientだけの変更でもCIを起動する。専用runnerがprojectのTypeScriptでAPI/policyとpolicy試験をCommonJSへ変換し、API 2件・policy 3件・host Python試験を実行する。生成先はignore済みの`.cache/`内の一時directoryで、成功・失敗とも削除する。手動のbuild directory指定やNodeのtype strippingは不要。
 
 ```sh
-node --test backstage/tests/sense-canary-api.test.cjs
-node --experimental-strip-types --test backstage/tests/sense-canary-policy.node-test.ts
-python3 scripts/tests/test-sense-canary-generate.py
+cd backstage
+yarn tsc
+yarn test:sense-canary
 ```
 
 実Backstageでの新image/config反映、機械token受理、実scaffolder dry-run、hostの固定private接続経路は未実測。局所API試験のscaffolder応答はfixtureであり、実生成成功の証拠として扱わない。既存mock/既存サービス、外部credential、route、cluster状態はこの実装で変更していない。
