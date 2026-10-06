@@ -6,6 +6,7 @@ nameOverride: "" # 省略時は Release 名
 image:
   repository: ""
   tag: ""
+  digest: "" # sha256 index digest。指定時は tag を空にする
   pullPolicy: IfNotPresent
 
 replicas: 1

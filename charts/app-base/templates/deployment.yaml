@@ -33,7 +33,17 @@ spec:
       {{- end }}
       containers:
         - name: app
-          image: "{{ required "image.repository is required" .Values.image.repository }}:{{ required "image.tag is required" .Values.image.tag }}"
+          {{- $repository := required "image.repository is required" .Values.image.repository }}
+          {{- if not (kindIs "string" .Values.image.digest) }}{{ fail "image.digest must be a string" }}{{ end }}
+          {{- $digest := default "" .Values.image.digest }}
+          {{- $tag := default "" .Values.image.tag }}
+          {{- if $digest }}
+          {{- if $tag }}{{ fail "image.tag must be empty when image.digest is set" }}{{ end }}
+          {{- if not (regexMatch "^sha256:[0-9a-f]{64}$" $digest) }}{{ fail "image.digest must be a full lowercase sha256 digest" }}{{ end }}
+          image: "{{ $repository }}@{{ $digest }}"
+          {{- else }}
+          image: "{{ $repository }}:{{ required "image.tag or image.digest is required" $tag }}"
+          {{- end }}
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           ports:
             - name: http
