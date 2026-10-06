@@ -177,8 +177,21 @@ fi
 # Generated services do not reuse it: Gitea Actions builds each repository and
 # pushes a commit-SHA image to the disposable registry created below.
 info "building the built-in demo image from this checkout"
+mkdir -p "${TMP_DIR}/template-ci"
+cp "${REPO_ROOT}/scripts/render-template-smoke.cjs" "${TMP_DIR}/"
+cp "${REPO_ROOT}/scripts/template-ci/"package*.json "${TMP_DIR}/template-ci/"
+# The skeleton contains fetch:template conditions, so it is not runnable source
+# until rendered. Use Docker for Node too: make try keeps its existing host
+# prerequisites, and renderer dependencies and output share the exit cleanup.
+docker run --rm --user "$(id -u):$(id -g)" \
+  --volume "${REPO_ROOT}:/source:ro" --volume "${TMP_DIR}:/work" \
+  --workdir /work --env npm_config_cache=/tmp/npm-cache \
+  docker.io/library/node:22-slim@sha256:43ac6c60b8f89723f746e8a92ce91abd5017e627ce1ddfe4238355d3a30b772c sh -ec '
+    npm ci --prefix /work/template-ci --ignore-scripts --no-audit --no-fund
+    node /work/render-template-smoke.cjs /work/demo /source/backstage/templates/fastapi-template/skeleton
+  '
 docker build --quiet --tag "${EXPLORE_DEMO_IMAGE}" \
-  "${REPO_ROOT}/backstage/templates/fastapi-template/skeleton" >/dev/null
+  "${TMP_DIR}/demo" >/dev/null
 
 # Explore templates are loaded from Gitea at runtime, but custom scaffolder
 # actions are backend code. Building the portal here makes this checkout the

@@ -28,6 +28,8 @@ on:
       - "backstage/.dockerignore"
       - "scripts/explore-up.sh"
       - "scripts/explore-down.sh"
+      - "scripts/render-template-smoke.cjs"
+      - "scripts/template-ci/**"
       # The smoke checks are part of what this job proves. A change that breaks
       # one of them would otherwise go untested.
       - "scripts/explore-login-check.sh"
@@ -50,6 +52,8 @@ on:
       - "backstage/.dockerignore"
       - "scripts/explore-up.sh"
       - "scripts/explore-down.sh"
+      - "scripts/render-template-smoke.cjs"
+      - "scripts/template-ci/**"
       # The smoke checks are part of what this job proves. A change that breaks
       # one of them would otherwise go untested.
       - "scripts/explore-login-check.sh"
