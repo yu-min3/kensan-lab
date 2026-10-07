@@ -1,0 +1,6 @@
+# External service registrations are operator-owned deployment configuration.
+# The image default permits no external services; production overlays this file
+# from a private Secret. Consumer identities and tokens do not belong in Git.
+backend:
+  auth:
+    externalAccess: []
