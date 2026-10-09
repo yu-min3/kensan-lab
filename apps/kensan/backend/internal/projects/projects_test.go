@@ -172,3 +172,24 @@ func TestCreate(t *testing.T) {
 		t.Error("invalid name should fail")
 	}
 }
+
+func TestSnapshotCarriesCurrentState(t *testing.T) {
+	root := t.TempDir()
+	write(t, root, "with-current", "---\ntype: project\nstatus: active\n---\n## 現在地\n\n2026-10-09: **発信へ戻す**。CI レビューは閉じた。\n\n## 目標\nx\n")
+	write(t, root, "without-current", "---\ntype: project\nstatus: active\n---\n## 目標\ny\n")
+	now := time.Date(2026, 10, 9, 0, 0, 0, 0, time.UTC)
+	got, err := ReadSnapshot(root, "with-current", now)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.Summary.Current.Date != "2026-10-09" || got.Summary.Current.Text != "**発信へ戻す**。CI レビューは閉じた。" {
+		t.Errorf("current: %+v", got.Summary.Current)
+	}
+	empty, err := ReadSnapshot(root, "without-current", now)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if empty.Summary.Current != (CurrentState{}) {
+		t.Errorf("missing 現在地 must stay empty, not inferred: %+v", empty.Summary.Current)
+	}
+}

@@ -32,19 +32,34 @@ test("空のプロジェクト一覧でも次の操作を案内する", async ({
   await expect(page.getByRole("link", { name: "プロジェクトを作る", exact: true })).toHaveAttribute("href", "/projects");
 });
 
-test("モバイルの上部から日記を開き、日別実績もタッチで確認できる", async ({ page }) => {
+test("モバイルの最上段から1行日記を残し、日別実績もタッチで確認できる", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto("/");
-  const diary = page.getByRole("button", { name: "今日の日記を書く", exact: true });
-  await expect(diary).toBeInViewport();
-  expect((await diary.boundingBox())!.y).toBeLessThan(260);
+  const input = page.getByLabel("今日の日記（1 行）");
+  await expect(input).toBeInViewport();
+  expect((await input.boundingBox())!.y).toBeLessThan(320);
   expect((await page.locator("main header").first().boundingBox())!.height).toBeLessThan(250);
   const date = (await (await page.request.get("/api/v1/today")).json()).date;
+  await input.fill("E2Eの1行日記");
+  await input.press("Enter");
+  await expect(page.getByText("日記に追記しました", { exact: true })).toBeVisible();
+  await expect(input).toHaveValue("");
+  await expect(page.getByTestId("diary-days")).toContainText("今日書いた");
+  const daily = await (await page.request.get(`/api/v1/daily?date=${date}`)).json();
+  expect(daily.content).toMatch(/## 日記\n\n- \d{2}:\d{2} E2Eの1行日記\n/);
   await page.getByLabel("日別の記録を確認").fill(date);
   await expect(page.getByRole("status").filter({ hasText: date })).toBeVisible();
-  await diary.click();
+  await page.getByRole("link", { name: "日記ページで書く", exact: true }).click();
   await expect(page).toHaveURL(new RegExp(`/daily\\?date=${date}$`));
   await expect(page.getByRole("button", { name: "日記を作成", exact: true })).toHaveCount(0);
+});
+
+test("目標カードは現在地を日付付きで出し、次の節目と分ける", async ({ page }) => {
+  await page.goto("/");
+  const card = page.locator("section").filter({ has: page.getByRole("heading", { name: "今日の一歩を確かめる" }) }).last();
+  const current = card.getByTestId("project-current");
+  await expect(current).toContainText("2026-09-09");
+  await expect(current).toContainText("記録の経路を先に固める。");
 });
 
 test("目標内の完了・取消と習慣をAPIへ保存し、再読込後も保持する", async ({ page }) => {

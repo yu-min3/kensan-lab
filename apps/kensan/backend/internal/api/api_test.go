@@ -9,6 +9,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -263,5 +264,25 @@ func TestTaskMoveAPI(t *testing.T) {
 	readme, _ := os.ReadFile(filepath.Join(root, "projects", "demo", "README.md"))
 	if bytes.Contains(readme, []byte("タスクB")) {
 		t.Errorf("task not removed from project README:\n%s", readme)
+	}
+}
+
+func TestDailyLineAPI(t *testing.T) {
+	ts, root := newTestServer(t)
+	var out struct {
+		Path string `json:"path"`
+	}
+	if code := doJSON(t, "POST", ts.URL+"/api/v1/daily/line", map[string]string{"date": "2026-10-09", "text": "1行だけ"}, &out); code != 200 || out.Path != "daily/2026/10/09.md" {
+		t.Fatalf("append: %d %+v", code, out)
+	}
+	content, err := os.ReadFile(filepath.Join(root, out.Path))
+	if err != nil || !strings.Contains(string(content), " 1行だけ\n") || !strings.Contains(string(content), "## 日記") {
+		t.Fatalf("daily: %s %v", content, err)
+	}
+	if code := doJSON(t, "POST", ts.URL+"/api/v1/daily/line", map[string]string{"date": "2026-10-09", "text": "  "}, nil); code != 400 {
+		t.Fatalf("empty line must be 400, got %d", code)
+	}
+	if code := doJSON(t, "POST", ts.URL+"/api/v1/daily/line", map[string]string{"date": "10/09", "text": "x"}, nil); code != 400 {
+		t.Fatalf("bad date must be 400, got %d", code)
 	}
 }

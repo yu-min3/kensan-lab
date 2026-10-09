@@ -156,6 +156,9 @@ export function GoalCard({
       ? Math.min(100, Math.max(0, (metric.current / metric.target) * 100))
       : null;
   const remaining = daysUntil(p.deadline ?? "", date);
+  const current = p.current;
+  const sinceCurrent = current?.date ? daysUntil(current.date, date) : null;
+  const currentAge = sinceCurrent === null ? null : -sinceCurrent;
   const [expandedGoal, setExpandedGoal] = useState(false);
   const goal = p.goal.replace(/\*\*/g, "") || "暮らしを整える、一歩ずつ";
   return (
@@ -235,11 +238,27 @@ export function GoalCard({
           )}
           {!metric && <span>進捗はプロジェクトで確認</span>}
         </div>
-        {phase && (
+        <div className="ds-stack !gap-1" data-testid="project-current">
           <p className="text-xs text-muted-foreground">
-            今の節目 · {phase.replace(/\*\*/g, "")}
+            現在地
+            {current?.date && (
+              <>
+                {" "}· <span className="font-mono tnum">{current.date}</span>
+                {currentAge !== null && currentAge > 0 && `（${currentAge}日前）`}
+              </>
+            )}
           </p>
-        )}
+          {current?.text ? (
+            <p className="text-sm break-words line-clamp-3">{current.text.replace(/\*\*/g, "")}</p>
+          ) : (
+            <p className="text-sm text-muted-foreground">未記入（README の ## 現在地）</p>
+          )}
+          {phase && (
+            <p className="text-xs text-muted-foreground">
+              次の節目 · {phase.replace(/\*\*/g, "")}
+            </p>
+          )}
+        </div>
         <div className="border-t border-border pt-3 ds-stack">
           {routines.map((r) => (
             <RoutineCheck

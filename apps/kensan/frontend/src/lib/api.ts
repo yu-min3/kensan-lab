@@ -135,6 +135,7 @@ export interface ProjectSummary {
   openTasks: number;
   state: ProjectState;
   metric?: MetricBrief;
+  current?: { date?: string; text: string };
 }
 
 export interface LogEntry {
@@ -219,6 +220,11 @@ export interface TodayView {
   activity: { date: string; count: number }[]; recordedSince: string;
   triage: Task | null; deferredToday: boolean; skipped: Task[];
   forecasts: Record<string, string>; phases: Record<string, string>;
+  diary: DiarySummary;
+}
+export interface DiarySummary {
+  last?: string;
+  days: { date: string; written: boolean }[];
 }
 
 // W3C traceparent を生成して伝搬する（backend の otelhttp が拾う）
@@ -257,6 +263,9 @@ export const api = {
     method: "POST", body: JSON.stringify({ file: t.file, line: t.line, text: t.text, action }),
   }),
   today: () => request<TodayView>("/today"),
+  // 1 行日記。daily の ## 日記 へ時刻付きで追記する（保存先はサーバーが決める）。
+  dailyLine: (date: string, text: string) =>
+    request<{ path: string }>("/daily/line", { method: "POST", body: JSON.stringify({ date, text }) }),
   routineState: (r: Routine, date: string, done: boolean) => request<{ done: boolean }>("/routines/state", {
     method: "PUT", body: JSON.stringify({ file: r.file, id: r.id, date, done }),
   }),

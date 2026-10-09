@@ -25,7 +25,7 @@ func ReadSnapshot(root, name string, now time.Time) (Snapshot, error) {
 		return Snapshot{}, err
 	}
 	fm := frontmatter(content)
-	s := Summary{Name: name, Status: fm["status"], Deadline: fm["deadline"], Goal: firstLine(section(content, "目標"))}
+	s := Summary{Name: name, Status: fm["status"], Deadline: fm["deadline"], Goal: firstLine(section(content, "目標")), Current: parseCurrent(section(content, "現在地"))}
 	snapshot := Snapshot{Content: content, Tasks: []tasks.Task{}, Milestones: []tasks.Task{}}
 	file := filepath.ToSlash(filepath.Join("projects", name, "README.md"))
 	for _, t := range tasks.ExtractLines(content, file) {

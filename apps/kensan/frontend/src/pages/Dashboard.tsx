@@ -5,11 +5,11 @@ import { Compass } from "lucide-react";
 import { api, type Task } from "../lib/api";
 import { useWorkspaceRefresh } from "../hooks/useWorkspaceRefresh";
 import { PageHeader } from "../components/PageHeader";
-import { DiaryButton } from "../components/DiaryCta";
 import { MemoSummary } from "../components/MemoSummary";
 import { Whiteboard } from "../components/Whiteboard";
 import { GoalCard, TaskCheck } from "../components/today/GoalCard";
 import { ActivityRail } from "../components/today/ActivityRail";
+import { DiaryLine } from "../components/today/DiaryLine";
 import { TriageCard, TaskRecovery } from "../components/today/TriageCard";
 import { projectGroups, taskKey } from "../components/today/model";
 import { Card, CardHead, CardBody } from "../components/ui/card";
@@ -59,14 +59,12 @@ export function Dashboard() {
         title={weekday}
         sub="目標の下に、今日の一歩を。"
         actions={
-          <div className="flex flex-wrap items-center gap-3">
-            <Link to="/tasks" className="text-sm text-brand">
-              全タスクを開く →
-            </Link>
-            <DiaryButton date={view.date} />
-          </div>
+          <Link to="/tasks" className="text-sm text-brand">
+            全タスクを開く →
+          </Link>
         }
       />
+      <DiaryLine date={view.date} diary={view.diary} />
       <div className="flex items-start gap-3 text-sm text-muted-foreground">
         <Compass size={18} className="text-brand shrink-0 mt-0.5" />
         <p>

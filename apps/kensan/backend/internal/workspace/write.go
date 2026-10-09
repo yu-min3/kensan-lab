@@ -117,3 +117,9 @@ func TouchUpdated(content []byte, today time.Time) []byte {
 	out = append(out, content[delim+len(src):]...)
 	return out
 }
+
+// DailySkeleton は conventions.md に従った daily の骨組みを返す。
+func DailySkeleton(date time.Time) string {
+	d := date.Format("2006-01-02")
+	return fmt.Sprintf("---\ntype: daily\ntags: []\ncreated: %s\nupdated: %s\n---\n\n# %s\n\n## 日記\n", d, d, d)
+}

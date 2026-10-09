@@ -36,6 +36,8 @@ type Summary struct {
 	// 一覧でも「今どういう状態か」を出すため、詳細と同じ判定を返す（実装は state.go）
 	State  State        `json:"state"`
 	Metric *MetricBrief `json:"metric,omitempty"`
+	// 今日画面は現在地（判断と日付）を主に出し、次のマイルストーンとは区別する。
+	Current CurrentState `json:"current"`
 }
 
 // LogEntry は ## ログ の 1 エントリ（日付 + 本文）。

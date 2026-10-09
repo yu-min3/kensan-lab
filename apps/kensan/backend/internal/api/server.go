@@ -30,6 +30,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("DELETE /api/v1/files/{path...}", s.handleFileDelete)
 	mux.HandleFunc("GET /api/v1/history/{path...}", s.handleHistory)
 	mux.HandleFunc("GET /api/v1/daily", s.handleDaily)
+	mux.HandleFunc("POST /api/v1/daily/line", s.handleDailyLine)
 	mux.HandleFunc("GET /api/v1/feeds", s.handleFeeds)
 	mux.HandleFunc("GET /api/v1/feeds/latest", s.handleLatestFeed)
 	mux.HandleFunc("GET /api/v1/feeds/acknowledgements", s.handleFeedAcknowledgements)

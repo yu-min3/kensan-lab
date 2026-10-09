@@ -680,18 +680,7 @@ func newDailySkeleton(date time.Time) string {
 	if date.IsZero() {
 		date = time.Now()
 	}
-	d := date.Format("2006-01-02")
-	return fmt.Sprintf(`---
-type: daily
-tags: []
-created: %s
-updated: %s
----
-
-# %s
-
-## 日記
-`, d, d, d)
+	return workspace.DailySkeleton(date)
 }
 
 // workspaceTouch は frontmatter の updated を今日に更新する。

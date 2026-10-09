@@ -6,6 +6,7 @@ import (
 	"sort"
 	"time"
 
+	"github.com/yu-min3/kensan-lab/apps/kensan/backend/internal/diary"
 	"github.com/yu-min3/kensan-lab/apps/kensan/backend/internal/goals"
 	"github.com/yu-min3/kensan-lab/apps/kensan/backend/internal/metrics"
 	"github.com/yu-min3/kensan-lab/apps/kensan/backend/internal/projects"
@@ -30,6 +31,7 @@ type View struct {
 	Skipped       []tasks.Task       `json:"skipped"`
 	Forecasts     map[string]string  `json:"forecasts"`
 	Phases        map[string]string  `json:"phases"`
+	Diary         diary.Summary      `json:"diary"`
 }
 
 func Load(ws *workspace.Workspace, now time.Time) (View, error) {
@@ -46,6 +48,9 @@ func Load(ws *workspace.Workspace, now time.Time) (View, error) {
 		return v, err
 	}
 	if v.Board, err = tasks.CollectAt(ws.Root, now); err != nil {
+		return v, err
+	}
+	if v.Diary, err = diary.Recent(ws.Root, now, 30); err != nil {
 		return v, err
 	}
 	events, err := ws.Activities()
