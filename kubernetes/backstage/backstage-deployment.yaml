@@ -22,13 +22,31 @@ spec:
                     operator: In
                     values:
                       - high-performance
+      volumes:
+      - name: external-service-access
+        secret:
+          secretName: backstage-service-access
+          optional: false
+          defaultMode: 0444
+          items:
+          - key: config.yaml
+            path: config.yaml
       containers:
       - name: backstage
-        image: ghcr.io/yu-min3/kensan-lab/backstage:v0.0.14
+        image: ghcr.io/yu-min3/kensan-lab/backstage@sha256:c409c5d64acc7313c708b53b404543ba9d73d06b65bb7e1717bbf5ee7af58a93
         imagePullPolicy: Always
+        volumeMounts:
+        - name: external-service-access
+          mountPath: /app/app-config.external-access.yaml
+          subPath: config.yaml
+          readOnly: true
         ports:
         - containerPort: 7007
           name: http
+        envFrom:
+        - secretRef:
+            name: backstage-service-credentials
+            optional: false
         env:
         - name: POSTGRES_HOST
           value: postgresql

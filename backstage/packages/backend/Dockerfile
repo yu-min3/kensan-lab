@@ -82,4 +82,4 @@ RUN tar xzf bundle.tar.gz && rm bundle.tar.gz
 # hand — this label makes that connection happen on its own from now on.
 LABEL org.opencontainers.image.source="https://github.com/yu-min3/kensan-lab"
 
-CMD ["node", "packages/backend", "--config", "app-config.yaml", "--config", "app-config.kubernetes.yaml"]
+CMD ["node", "packages/backend", "--config", "app-config.yaml", "--config", "app-config.kubernetes.yaml", "--config", "app-config.external-access.yaml"]
