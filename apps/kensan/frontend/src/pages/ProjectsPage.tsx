@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { useSearchParams, Link } from "react-router-dom";
+import { useSearchParams } from "react-router-dom";
 import {
   FolderKanban,
   CheckSquare,
@@ -23,6 +23,7 @@ import {
 import clsx from "clsx";
 import { api, ApiError, todayISO, type Doc, type ProjectSummary, type ProjectDetail, type MetricBrief, type ProjectMetric, type ProjectState, type RelatedItem, type Task } from "../lib/api";
 import { PageHeader } from "../components/PageHeader";
+import { markportURL } from "../lib/markport";
 import { MilkdownEditor } from "../components/editors/MilkdownEditor";
 import { useAutosaveFile } from "../hooks/useAutosaveFile";
 import { Card, CardBody } from "../components/ui/card";
@@ -954,7 +955,7 @@ function RelatedSection({ related, taggedNotes, name }: { related: RelatedItem[]
           <li key={i} className="flex items-baseline gap-2 text-sm">
             <span className="shrink-0 w-[52px] font-mono text-[10px] text-muted-foreground">{KIND_LABEL[r.kind]}</span>
             {r.target ? (
-              <Link to={`/notes?path=${encodeURIComponent(r.target)}`} className="text-brand hover:underline">{r.label}</Link>
+              <a href={markportURL(r.target)} target="_blank" rel="noreferrer" title="markport で開く（Mac のみ）" className="text-brand hover:underline">{r.label}</a>
             ) : r.url ? (
               <a href={r.url} target="_blank" rel="noreferrer" className="text-brand hover:underline inline-flex items-center gap-1">
                 {r.label} <ExternalLink size={11} />

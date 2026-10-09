@@ -369,11 +369,6 @@ export const api = {
     return request<{ files: Doc[]; total: number }>(`/files${qs ? `?${qs}` : ""}`);
   },
 
-  search: (q: string, type?: string) =>
-    request<{ hits: SearchHit[]; total: number; truncated: boolean }>(
-      `/search?q=${encodeURIComponent(q)}${type ? `&type=${type}` : ""}`,
-    ),
-
   reviews: () => request<{ reviews: ReviewEntry[]; total: number }>("/reviews"),
 
   // git 履歴（読み取り専用）。コミット一覧（新しい順）。
@@ -390,12 +385,6 @@ export interface Commit {
   short: string;
   date: string; // RFC3339（author date）
   subject: string;
-}
-
-export interface SearchHit {
-  path: string;
-  line: number;
-  snippet: string;
 }
 
 export interface ReviewEntry {

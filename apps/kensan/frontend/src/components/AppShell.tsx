@@ -6,7 +6,6 @@ import {
   StickyNote,
   SquareKanban,
   ChartSpline,
-  FileText,
   FolderKanban,
   Sparkles,
   Menu,
@@ -35,7 +34,6 @@ const nav = [
     items: [
       { to: "/daily", label: "日記", icon: BookOpen },
       { to: "/memos", label: "メモ", icon: StickyNote },
-      { to: "/notes", label: "ノート", icon: FileText },
     ],
   },
   {

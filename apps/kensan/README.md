@@ -82,10 +82,10 @@ go run ./cmd/kensan
 
 デプロイ定義は `kubernetes/apps/app-kensan/`（`charts/app-base` chart の最初の消費者）。`app-kensan` 専用 namespace で動く。
 
-- **画面構成** — ダッシュボード / daily / notes / memo に加えて、
+- **画面構成** — ダッシュボード / daily / memo に加えて、
   - **タスクかんばん**（`frontend/src/pages/TasksPage.tsx`）— ストック（`projects/<p>/README.md` の `## タスク`）と今日やる（`todo.md` の `## Now`）を DnD で行移動。`/morning` が Claude 側で行う操作と対称。
   - **レビュービューワ**（`frontend/src/pages/ReviewsPage.tsx`）— `/weekly-review`・`/reflection` が生成した `reviews/` 配下の HTML をそのまま表示（可視化の進化は Claude の HTML 生成側が担う契約）。
-  - **Markdown Viewer**（`/view?path=<workspace-relative.md>`）— workspace 内の任意の Markdown を読み取り専用でレンダリング。frontmatter は隠し、GFM の表・チェックボックス・コードと相対 `.md` リンクに対応する。
+  - **ノート閲覧は持たない** — ノート一覧・全文検索・Markdown Viewer は 2026-10-09 にローカルの [markport](https://github.com/yomon8/markport) へ統合した。project の関連ドキュメントは `VITE_MARKPORT_URL`（既定 `http://127.0.0.1:3000`）の markport で開く。旧 `/notes` `/view` は markport への案内だけを返す。
 - **workspace volume** — Markdown の実体は Longhorn 上の `kensan-workspace` PVC（Retain）。app pod に `/data`（`KENSAN_DATA_DIR`）でマウント。
 - **Syncthing 同期** — Mac のローカル workspace ⇄ クラスタ volume を Syncthing で双方向同期する（`resources/syncthing.yaml`）。
   - **LAN-only** — 同期ポート 22000 を Cilium L2 の **VIP 192.168.0.245** で LAN に出し、Mac が direct 接続。global discovery / relay / NAT traversal は無効。
