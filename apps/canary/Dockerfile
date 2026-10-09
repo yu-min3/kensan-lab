@@ -1,4 +1,4 @@
-# syntax=docker/dockerfile@sha256:4edf897a3ffa55b89f906fc8cc78afdb3f1834cc9c7083565e611a8a7d5fe99e
+# syntax=mirror.gcr.io/docker/dockerfile@sha256:4edf897a3ffa55b89f906fc8cc78afdb3f1834cc9c7083565e611a8a7d5fe99e
 # Multi-stage build: a React frontend built to static files, served by a
 # FastAPI backend.
 #
@@ -6,7 +6,7 @@
 # the scaffolder form is still runtime configuration, but edits to either the
 # Python or React source now produce a new immutable image.
 
-FROM docker.io/library/node@sha256:43ac6c60b8f89723f746e8a92ce91abd5017e627ce1ddfe4238355d3a30b772c AS frontend
+FROM mirror.gcr.io/library/node@sha256:43ac6c60b8f89723f746e8a92ce91abd5017e627ce1ddfe4238355d3a30b772c AS frontend
 
 WORKDIR /frontend
 
@@ -17,7 +17,7 @@ RUN npm ci --no-audit --no-fund
 COPY frontend/ ./
 RUN npm run build
 
-FROM docker.io/library/python@sha256:6f31d6e9ba2b0a787a3f81c37b004155b87b9efa1b771182bd550c1615745be5 AS builder
+FROM mirror.gcr.io/library/python@sha256:6f31d6e9ba2b0a787a3f81c37b004155b87b9efa1b771182bd550c1615745be5 AS builder
 
 # Install uv
 COPY --from=ghcr.io/astral-sh/uv@sha256:61d393e44e249f2e4b526b6c7ddcecce245946826e608e11c93ad4f5bba55b21 /uv /uvx /bin/
@@ -49,7 +49,7 @@ RUN uv run --frozen --no-sync ruff check app/ && uv run --frozen --no-sync ruff 
 RUN uv run --frozen --no-sync pytest tests/ -v
 
 # Final stage
-FROM docker.io/library/python@sha256:6f31d6e9ba2b0a787a3f81c37b004155b87b9efa1b771182bd550c1615745be5
+FROM mirror.gcr.io/library/python@sha256:6f31d6e9ba2b0a787a3f81c37b004155b87b9efa1b771182bd550c1615745be5
 
 WORKDIR /app
 
