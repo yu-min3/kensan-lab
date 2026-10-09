@@ -35,7 +35,7 @@ The existing app-base chart creates the namespace-local ExternalSecret and binds
 
 1. Check package existence and visibility with an owner credential that has `read:packages`. A 404 from a credential without that scope is inconclusive.
 2. Separately review the exact source commit SHA, initial immutable tag v1, private package creation, and rollback. No initial publication is authorized by generation.
-3. The initial-only Canary CI dispatch requires matching `expected_sha` and `tag`, and an explicit `allow_new_private_package=true`. Its `CANARY_BOOTSTRAP_READ_PACKAGES_TOKEN` repository Secret reference is a dedicated package-read credential; missing or unverified owner scope stops before push. Secret preparation itself needs the owner's separate authorization. Image upload uses the workflow's repository-scoped GitHub token. Existing packages are refused by this initial-only job.
+3. The Canary CI in this source change builds and tests only. It has no image-publishing job or package token. A separate, reviewed workflow and credential setup are required before the first private-package publication; the source/CI change grants no publication authority.
 4. Require the post-push private visibility/repository/digest record and a namespace-local pull Secret ready from the existing Vault reference before adopting the image or deploying.
 
-Health and release checks use the internal Pod network on port 8000. If the observer cannot reach that network, deployment acceptance stays blocked. Do not enable HTTPRoute, NodePort, Gateway, auth routes, or a public hostname to bypass that prerequisite.
+Health and release checks use the selected Pod on port 8000 through the read-only Kubernetes pods/proxy API. The direct Pod network is not assumed reachable from the host. If authorized observation fails, deployment acceptance stays blocked. Do not enable HTTPRoute, NodePort, Gateway, auth routes, or a public hostname to bypass that prerequisite.
