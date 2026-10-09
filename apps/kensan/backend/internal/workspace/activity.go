@@ -73,6 +73,9 @@ func (w *Workspace) MutateEvent(rel string, fn func([]byte, []Activity) ([]byte,
 	if err != nil {
 		return err
 	}
+	if w.NoActivity {
+		event = nil
+	}
 	if event == nil && out == nil {
 		return nil
 	}

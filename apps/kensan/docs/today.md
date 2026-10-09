@@ -39,7 +39,7 @@ Direct Markdown edits are visible as current tasks but are not automatically con
 
 An otherwise valid final JSON record without a trailing newline is safely delimited on append. Replaying the same triage request while its resulting state remains intact does not create a duplicate event; changes to the task text or band still conflict.
 
-**Production gate:** the deployed workspace uses bidirectional Syncthing, and the current CLI writes files locally. Two devices appending to the same activity log are not supported: sync-conflict copies are not merged. The current implementation is for single-writer preview validation until the owner chooses server-only event recording or offline-capable immutable events. Do not deploy this journal to concurrent writers merely because local tests pass. CLI transport/authentication has not been changed or configured by this increment.
+**Single writer:** only the server process (`kensan serve`, the deployed pod) appends to `activity.ndjson`. The workspace is synced both ways with Syncthing, and two devices appending to one log produce conflict copies that cannot be merged, so the `kensan task` CLI sets `Workspace.NoActivity` and changes Markdown only. Offline recording from the Mac is intentionally not supported (decided 2026-10-09). Any new tool that writes the log must go through the server API, not the file. Never run a second server against the same synced workspace.
 
 Reflection switches away from routine copies in `todo.md` only after the workspace contains a `routine.state` event. Existing incomplete copies are retained for explicit migration; completed copies without logged evidence should be archived with a confirmed date, not silently discarded or backfilled.
 

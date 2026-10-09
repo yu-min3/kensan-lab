@@ -24,6 +24,8 @@ func taskCmd(args []string) error {
 		return err
 	}
 	ws := workspace.New(root)
+	// 活動ログはサーバーだけが書く（docs/today.md）。CLI の状態変更は Markdown にだけ反映する。
+	ws.NoActivity = true
 
 	switch args[0] {
 	case "list":

@@ -34,3 +34,23 @@ func TestActivityAppendPreservesMissingFinalNewline(t *testing.T) {
 		t.Fatalf("history changed: %+v", events)
 	}
 }
+
+func TestNoActivityChangesSourceWithoutLogging(t *testing.T) {
+	w := New(t.TempDir())
+	w.NoActivity = true
+	if err := w.Create("todo.md", []byte("original")); err != nil {
+		t.Fatal(err)
+	}
+	err := w.MutateEvent("todo.md", func(_ []byte, _ []Activity) ([]byte, *Activity, error) {
+		return []byte("changed"), &Activity{At: time.Now(), ID: "cli", Kind: "task.state", State: "done", Date: "2026-10-09"}, nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got, _ := os.ReadFile(filepath.Join(w.Root, "todo.md")); string(got) != "changed" {
+		t.Fatalf("source not changed: %q", got)
+	}
+	if _, err := os.Stat(filepath.Join(w.Root, ActivityFile)); !os.IsNotExist(err) {
+		t.Fatalf("activity log must not be created by a non-server writer: %v", err)
+	}
+}

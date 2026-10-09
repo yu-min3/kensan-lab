@@ -27,6 +27,10 @@ type cacheEntry struct {
 // Workspace は kensan-workspace ルートへの読み取りアクセス。
 type Workspace struct {
 	Root string
+	// NoActivity は活動ログへ書かない（Markdown の変更だけ行う）。
+	// activity.ndjson の書き手はサーバー 1 つに限る。Syncthing で同期する Mac 側の CLI が
+	// 追記すると競合コピーが統合できないため、CLI はこれを立てる。
+	NoActivity bool
 
 	mu    sync.Mutex
 	cache map[string]cacheEntry
