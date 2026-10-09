@@ -1,0 +1,61 @@
+[project]
+# Deliberately not the service name. uv writes the root package name into
+# uv.lock, and `uv sync --frozen` in the Dockerfile then refuses any project
+# whose name disagrees ("Missing workspace member"). Since the Dockerfile
+# builds with --no-install-project, this package is never installed and the
+# name is internal — so it stays fixed and the lockfile works for every
+# scaffolded service. The service's identity lives in the image name and the
+# Kubernetes resources.
+name = "app"
+version = "1.0.0"
+description = "Private sense acceptance canary"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "fastapi==0.115.0",
+    "uvicorn[standard]==0.32.0",
+    "prometheus-client==0.21.0",
+    "opentelemetry-distro==0.49b0",
+    "opentelemetry-exporter-otlp==1.28.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "ruff==0.8.0",
+    "pytest==8.3.3",
+    "httpx==0.27.2",  # For testing FastAPI
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["app"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+select = [
+    "E",   # pycodestyle errors
+    "W",   # pycodestyle warnings
+    "F",   # pyflakes
+    "I",   # isort
+    "B",   # flake8-bugbear
+    "C4",  # flake8-comprehensions
+    "UP",  # pyupgrade
+]
+ignore = [
+    "E501",  # line too long (handled by formatter)
+]
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+skip-magic-trailing-comma = false
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
