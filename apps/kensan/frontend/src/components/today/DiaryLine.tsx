@@ -57,31 +57,34 @@ export function DiaryLine({ date, diary }: { date: string; diary: DiarySummary }
             {save.error.message}
           </p>
         )}
-        <div className="flex flex-wrap items-center justify-between gap-3 text-xs text-muted-foreground">
-          <div className="flex items-center gap-2 min-w-0" data-testid="diary-days">
-            <span className="flex gap-[3px]" aria-hidden="true">
-              {diary.days.map((d) => (
-                <span
-                  key={d.date}
-                  title={d.date}
-                  className={`size-2 rounded-[2px] ${d.written ? "bg-brand" : "bg-muted"}`}
-                />
-              ))}
-            </span>
+        <div className="ds-stack !gap-2 text-xs text-muted-foreground" data-testid="diary-days">
+          <div
+            className="grid gap-[3px] w-full max-w-[420px]"
+            style={{ gridTemplateColumns: `repeat(${diary.days.length || 1}, minmax(0, 1fr))` }}
+            aria-hidden="true"
+          >
+            {diary.days.map((d) => (
+              <span
+                key={d.date}
+                title={d.date}
+                className={`aspect-square max-w-3 rounded-[2px] ${d.written ? "bg-brand" : "bg-muted"}`}
+              />
+            ))}
+          </div>
+          <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
             <span>
-              直近30日で
-              <span className="font-mono tnum"> {written30} </span>日
+              直近30日で<span className="font-mono tnum"> {written30} </span>日
               {diary.last
                 ? since !== null && since < 0
                   ? ` · 最後は ${diary.last}（${-since}日前）`
                   : " · 今日書いた"
                 : " · まだ記録なし"}
             </span>
+            <Link to={`/daily?date=${date}`} className="inline-flex items-center gap-1 text-brand">
+              <BookOpen size={14} />
+              日記ページで書く
+            </Link>
           </div>
-          <Link to={`/daily?date=${date}`} className="inline-flex items-center gap-1 text-brand">
-            <BookOpen size={14} />
-            日記ページで書く
-          </Link>
         </div>
       </CardBody>
     </Card>
