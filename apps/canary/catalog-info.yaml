@@ -1,0 +1,64 @@
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: canary
+  description: Private sense acceptance canary
+  annotations:
+    github.com/project-slug: yu-min3/kensan-lab
+    backstage.io/techdocs-ref: dir:.
+    argocd/app-name: app-canary
+  tags:
+    - fastapi
+    - python
+  links:
+
+    - url: https://argocd.platform.yu-min3.com/applications/app-canary
+      title: Argo CD
+      icon: kubernetes
+spec:
+  type: service
+  lifecycle: experimental
+  owner: group:default/platform-engineering
+  system: developer-portal
+  providesApis:
+    - canary-api
+
+---
+apiVersion: backstage.io/v1alpha1
+kind: API
+metadata:
+  name: canary-api
+  description: API for canary
+  tags:
+    - fastapi
+    - rest
+spec:
+  type: openapi
+  lifecycle: experimental
+  owner: group:default/platform-engineering
+  system: developer-portal
+  definition: |
+    openapi: 3.0.0
+    info:
+      title: canary
+      version: 1.0.0
+      description: Private sense acceptance canary
+    paths:
+      /:
+        get:
+          summary: Root endpoint
+          responses:
+            '200':
+              description: Success
+      /health:
+        get:
+          summary: Health check
+          responses:
+            '200':
+              description: Healthy
+      /api/v1/example:
+        get:
+          summary: Example endpoint
+          responses:
+            '200':
+              description: Example response
