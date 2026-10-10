@@ -32,6 +32,13 @@ type View struct {
 	Forecasts     map[string]string  `json:"forecasts"`
 	Phases        map[string]string  `json:"phases"`
 	Diary         diary.Summary      `json:"diary"`
+	// 今日の完了を予定（@today 付き）と予定外に分ける。8/11 の「ToDo が実態を捉えていない」を測る。
+	DoneToday Split `json:"doneToday"`
+}
+
+type Split struct {
+	Planned   int `json:"planned"`
+	Unplanned int `json:"unplanned"`
 }
 
 func Load(ws *workspace.Workspace, now time.Time) (View, error) {
@@ -60,6 +67,7 @@ func Load(ws *workspace.Workspace, now time.Time) (View, error) {
 	if v.Routines, err = Routines(ws.Root, h, now); err != nil {
 		return v, err
 	}
+	v.DoneToday = Split{Planned: h.Planned[v.Date], Unplanned: h.Done[v.Date] - h.Planned[v.Date]}
 	counts := map[string]int{}
 	for date, n := range h.Done {
 		counts[date] += n
