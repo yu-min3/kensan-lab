@@ -9,11 +9,9 @@ kind: Namespace
 metadata:
   name: app-canary
   annotations:
-    # The Application syncs with prune: false, and Prune=false on the
-    # Application does not protect its children. Without this, dropping the
-    # app from Git deletes the namespace and cascades through everything in
-    # it — including any PVC.
+    # Retain the namespace even if this resource is removed from Git.
     argocd.argoproj.io/sync-options: Prune=false
+    argocd.argoproj.io/sync-wave: "-2"
   labels:
     kensan-lab.platform/environment: production
     # OwnerPicker hands back an entity reference — "group:default/platform" —

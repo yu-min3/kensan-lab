@@ -5,6 +5,7 @@ metadata:
   namespace: app-canary
   annotations:
     argocd.argoproj.io/sync-options: Prune=false
+    argocd.argoproj.io/sync-wave: "-1"
 spec:
   accessModes: [ReadWriteOnce]
   storageClassName: longhorn
