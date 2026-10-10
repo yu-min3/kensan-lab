@@ -1,0 +1,60 @@
+# Review-only. Platform-owned Application should apply these five resources.
+# This is read-only RBAC. Mutation tests require a separate approved operator.
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: koubou-observer
+  namespace: app-canary
+automountServiceAccountToken: false
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: koubou-observer
+  namespace: app-canary
+rules:
+  - apiGroups: [""]
+    resources: [pods]
+    verbs: [get, list]
+  - apiGroups: [""]
+    resources: [pods/proxy]
+    verbs: [get]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: koubou-observer
+  namespace: app-canary
+subjects:
+  - kind: ServiceAccount
+    name: koubou-observer
+    namespace: app-canary
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: koubou-observer
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: koubou-canary-observer
+  namespace: argocd
+rules:
+  - apiGroups: [argoproj.io]
+    resources: [applications]
+    resourceNames: [app-canary]
+    verbs: [get]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: koubou-canary-observer
+  namespace: argocd
+subjects:
+  - kind: ServiceAccount
+    name: koubou-observer
+    namespace: app-canary
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: koubou-canary-observer
