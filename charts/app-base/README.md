@@ -1,3 +1,12 @@
+---
+type: note
+title: app-base
+status: active
+tags: [platform, helm]
+created: 2026-10-10
+updated: 2026-10-10
+---
+
 # app-base
 
 kensan-lab platform が application に提供する汎用デプロイ chart。
@@ -33,7 +42,21 @@ sources:
     ref: values
 ```
 
-namespace 等の raw マニフェストが必要なら 3 つ目の source（`directory.recurse`）として足す。
+新規App専用namespaceは `namespace.create: true` でchartから生成できる案です。既定はfalseのため、既存Appはそのまま使えます。Platformがenvironment/team/appのラベル値を指定します。
+
+```yaml
+namespace:
+  create: true
+  environment: production
+  team: platform-engineering
+  app: canary
+```
+
+namespace名はHelmのrelease namespace（Argo Applicationのdestination.namespace）を使います。`restricted`のラベル、Argoのsync-wave=-2、Prune=false、Helmのkeepを固定します。保持annotationは誤削除を減らす仕組みであり、管理者による手動削除を禁止するものではありません。
+
+既存raw Namespaceから移す場合は、同じPRでraw定義を除き、同じ名前・ラベル・保持annotationが描画されることとGitOpsの所有を確認します。二重定義のまま有効にしません。今回は共通chartのdraftだけで、canaryや既存Appの移行は含めません。observerの権限と資格はPlatform側の別管理を維持します。
+
+他のrawマニフェストが必要なら3つ目のsourceとして足せます。
 
 ## 主要 values
 
