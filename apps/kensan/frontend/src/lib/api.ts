@@ -224,6 +224,33 @@ export interface TodayView {
   // 今日の完了のうち @today 付き（予定どおり）と、それ以外（予定外）
   doneToday: { planned: number; unplanned: number };
 }
+// ---- ポートフォリオ（ダッシュボード）: GET /api/v1/portfolio
+export type CellStatus = "public" | "internal" | "empty";
+export interface PortfolioEvidence {
+  when: string; date?: string; title: string; story: string; impact: string; public: boolean; project?: string; raw: string;
+}
+export interface PortfolioCell {
+  rung: string; domain: string; status: CellStatus; note?: string;
+  evidence: PortfolioEvidence[]; aims: { project: string; next?: string }[];
+}
+export interface PortfolioAlloc { project: string; target: number; actual: number; count: number; weeks: number[]; aims: string[] }
+export interface PortfolioMilestone { date: string; title: string; project?: string; kind: "milestone" | "evidence" }
+export interface PortfolioProposal {
+  file: string; line: number; text: string; state: string; rung: string; domain: string;
+  evidence: PortfolioEvidence; source?: string;
+}
+export interface PortfolioView {
+  date: string; northStar: string;
+  rungs: { id: string; name: string; question: string }[]; domains: string[];
+  cells: PortfolioCell[]; publicCells: number;
+  compass: { from: string; to: string; total: number; allocs: PortfolioAlloc[] };
+  gapShare: number;
+  annual: { year: number; total: number; month: number; chapters: { quarter: string; name: string; items: PortfolioMilestone[] }[] };
+  proposals: PortfolioProposal[];
+  reflect: { lastRunAt?: string; lastSuccessAt?: string; status?: string; reason?: string; proposals?: number; inputDate?: string } | null;
+  missing: boolean;
+}
+
 export interface DiarySummary {
   last?: string;
   days: { date: string; written: boolean }[];
@@ -265,6 +292,11 @@ export const api = {
     method: "POST", body: JSON.stringify({ file: t.file, line: t.line, text: t.text, action }),
   }),
   today: () => request<TodayView>("/today"),
+  portfolio: () => request<PortfolioView>("/portfolio"),
+  decideProposal: (p: PortfolioProposal, accept: boolean) =>
+    request<{ proposal: PortfolioProposal }>(`/portfolio/proposals/${accept ? "accept" : "reject"}`, {
+      method: "POST", body: JSON.stringify({ file: p.file, line: p.line, text: p.text }),
+    }),
   // 1 行日記。daily の ## 日記 へ時刻付きで追記する（保存先はサーバーが決める）。
   // やったこと。project の ## タスク（空なら todo.md ## Now）へ完了済みで足す。
   recordDone: (project: string, display: string) =>
