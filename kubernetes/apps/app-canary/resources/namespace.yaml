@@ -1,0 +1,28 @@
+# ADR-006: one namespace per application, named app-{name}, carrying the
+# prefixed three-axis labels the platform selects on.
+#
+# The environment label is not decoration: gateway-prod admits routes by
+# namespace selector, so an HTTPRoute in a namespace without it comes back
+# NotAllowedByListeners.
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: app-canary
+  annotations:
+    # The Application syncs with prune: false, and Prune=false on the
+    # Application does not protect its children. Without this, dropping the
+    # app from Git deletes the namespace and cascades through everything in
+    # it — including any PVC.
+    argocd.argoproj.io/sync-options: Prune=false
+  labels:
+    kensan-lab.platform/environment: production
+    # OwnerPicker hands back an entity reference — "group:default/platform" —
+    # and a label value cannot contain ':' or '/', so the API server would
+    # reject this namespace. template.yaml derives ownerSlug from it for use
+    # here; the full reference stays in catalog-info.yaml where it belongs.
+    kensan-lab.platform/team: platform-engineering
+    kensan-lab.platform/app: canary
+    kensan-lab.platform/tier: application
+    # Declares which Kyverno pod-security policy applies (ADR-012).
+    kensan-lab.platform/pss-level: restricted
+    pod-security.kubernetes.io/enforce: restricted
