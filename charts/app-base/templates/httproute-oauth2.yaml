@@ -16,6 +16,9 @@ spec:
       kind: Gateway
       name: {{ .Values.httproute.gateway.name }}
       namespace: {{ .Values.httproute.gateway.namespace }}
+      {{- with .Values.httproute.gateway.sectionName }}
+      sectionName: {{ . | quote }}
+      {{- end }}
   hostnames:
     {{- toYaml .Values.httproute.hostnames | nindent 4 }}
   rules:

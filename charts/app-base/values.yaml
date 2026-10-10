@@ -6,9 +6,18 @@ nameOverride: "" # 省略時は Release 名
 image:
   repository: ""
   tag: ""
+  digest: "" # sha256 index digest。指定時は tag を空にする
   pullPolicy: IfNotPresent
 
 replicas: 1
+
+# Optional container startup and app-owned configuration mounts.
+command: []
+args: []
+extraVolumeMounts: []
+extraVolumes: []
+# null preserves the existing Pod default; apps may explicitly opt out.
+automountServiceAccountToken: null
 
 ports:
   http: 8080
@@ -72,6 +81,7 @@ httproute:
   gateway:
     name: gateway-prod
     namespace: istio-system
+    sectionName: "" # Optional listener (e.g. https); empty keeps existing behavior
 
 # gateway 層 OAuth2（oauth2-proxy ext_authz、Keycloak SSO）の /oauth2/* ルート。
 #

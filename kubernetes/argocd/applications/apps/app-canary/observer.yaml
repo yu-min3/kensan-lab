@@ -1,0 +1,32 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: app-canary-observer
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-options: Prune=false
+    argocd.argoproj.io/sync-wave: "10"
+spec:
+  project: platform-project
+  source:
+    repoURL: https://github.com/yu-min3/kensan-lab
+    targetRevision: main
+    path: kubernetes/apps/app-canary/observer
+    directory:
+      recurse: false
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: app-canary
+  syncPolicy:
+    automated:
+      prune: false
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=false
+      - ServerSideApply=true
+    retry:
+      limit: 5
+      backoff:
+        duration: 5s
+        factor: 2
+        maxDuration: 3m

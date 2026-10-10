@@ -1,0 +1,46 @@
+# Approved public canary baseline; image source and deployment Git revisions differ.
+image:
+  repository: ghcr.io/yu-min3/kensan-lab/canary
+  tag: ""
+  digest: sha256:2042feace7e693ce3937b1e37a519a96c685e55ba23a20d84c071f0fbbd0f8e0
+replicas: 1
+ports:
+  http: 8000
+probes:
+  path: /health
+podSecurityContext:
+  fsGroup: 1000
+securityContext:
+  runAsUser: 1000
+  runAsGroup: 1000
+env:
+  - name: APP_NAME
+    value: canary
+  - name: APP_THEME
+    value: day
+  - name: APP_MESSAGE
+    value: Private canary endpoint
+  - name: DEMO_LOAD_ENABLED
+    value: "false"
+  - name: OTEL_SDK_DISABLED
+    value: "true"
+ghcrPullSecret:
+  enabled: true
+pvc:
+  enabled: true
+  create: false
+  name: canary-data
+  mountPath: /data
+httproute:
+  enabled: false
+auth:
+  gatewayOAuth2:
+    enabled: false
+otel:
+  enabled: false
+resources:
+  requests:
+    cpu: 100m
+    memory: 128Mi
+  limits:
+    memory: 512Mi

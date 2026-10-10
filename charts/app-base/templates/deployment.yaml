@@ -18,6 +18,9 @@ spec:
       labels:
         {{- include "app-base.selectorLabels" . | nindent 8 }}
     spec:
+      {{- if kindIs "bool" .Values.automountServiceAccountToken }}
+      automountServiceAccountToken: {{ .Values.automountServiceAccountToken }}
+      {{- end }}
       serviceAccountName: {{ include "app-base.name" . }}
       {{- with .Values.podSecurityContext }}
       securityContext:
@@ -33,7 +36,25 @@ spec:
       {{- end }}
       containers:
         - name: app
-          image: "{{ required "image.repository is required" .Values.image.repository }}:{{ required "image.tag is required" .Values.image.tag }}"
+          {{- $repository := required "image.repository is required" .Values.image.repository }}
+          {{- if not (kindIs "string" .Values.image.digest) }}{{ fail "image.digest must be a string" }}{{ end }}
+          {{- $digest := default "" .Values.image.digest }}
+          {{- $tag := default "" .Values.image.tag }}
+          {{- if $digest }}
+          {{- if $tag }}{{ fail "image.tag must be empty when image.digest is set" }}{{ end }}
+          {{- if not (regexMatch "^sha256:[0-9a-f]{64}$" $digest) }}{{ fail "image.digest must be a full lowercase sha256 digest" }}{{ end }}
+          image: "{{ $repository }}@{{ $digest }}"
+          {{- else }}
+          image: "{{ $repository }}:{{ required "image.tag or image.digest is required" $tag }}"
+          {{- end }}
+          {{- with .Values.command }}
+          command:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- with .Values.args }}
+          args:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           ports:
             - name: http
@@ -64,14 +85,24 @@ spec:
           resources:
             {{- toYaml . | nindent 12 }}
           {{- end }}
-          {{- if .Values.pvc.enabled }}
+          {{- if or .Values.pvc.enabled .Values.extraVolumeMounts }}
           volumeMounts:
+            {{- if .Values.pvc.enabled }}
             - name: data
               mountPath: {{ .Values.pvc.mountPath }}
+            {{- end }}
+            {{- with .Values.extraVolumeMounts }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
           {{- end }}
-      {{- if .Values.pvc.enabled }}
+      {{- if or .Values.pvc.enabled .Values.extraVolumes }}
       volumes:
+        {{- if .Values.pvc.enabled }}
         - name: data
           persistentVolumeClaim:
             claimName: {{ include "app-base.pvcName" . }}
+        {{- end }}
+        {{- with .Values.extraVolumes }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
       {{- end }}
