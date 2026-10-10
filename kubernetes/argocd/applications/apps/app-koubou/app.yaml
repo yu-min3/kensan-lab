@@ -16,10 +16,10 @@ spec:
       releaseName: app-koubou
       valueFiles:
       - $app/deploy/lan-entry-values.yaml
-  - repoURL: git@github.com:yu-min3/koubou.git
+  - repoURL: ssh://git@github.com/yu-min3/koubou.git
     targetRevision: d5154ef0cb9b280cbbc35ff932bb115ddc7f51a7
     ref: app
-  - repoURL: git@github.com:yu-min3/koubou.git
+  - repoURL: ssh://git@github.com/yu-min3/koubou.git
     targetRevision: d5154ef0cb9b280cbbc35ff932bb115ddc7f51a7
     path: deploy/app-entry-resources
   destination:
