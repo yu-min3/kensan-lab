@@ -10,16 +10,16 @@ spec:
   sources:
   - repoURL: https://github.com/yu-min3/kensan-lab
     # Review/merge the generic app-base extension before any manual sync.
-    targetRevision: 8b56ce2eacb34131b059b7563db7514fffd3fb77
+    targetRevision: 62cabffe7ab52b250f28034bde98cc29b2212f6e
     path: charts/app-base
     helm:
       releaseName: app-koubou
       valueFiles:
       - $app/deploy/lan-entry-values.yaml
-  - repoURL: https://github.com/yu-min3/koubou
+  - repoURL: git@github.com:yu-min3/koubou.git
     targetRevision: d5154ef0cb9b280cbbc35ff932bb115ddc7f51a7
     ref: app
-  - repoURL: https://github.com/yu-min3/koubou
+  - repoURL: git@github.com:yu-min3/koubou.git
     targetRevision: d5154ef0cb9b280cbbc35ff932bb115ddc7f51a7
     path: deploy/app-entry-resources
   destination:

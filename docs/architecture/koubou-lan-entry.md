@@ -71,3 +71,14 @@ P001は機能がないと断定せず確認事項。P002/P003は既存の手動�
 独立レビューはchart/multi-source/selectors/TLS設定に確定P0/P1なし。P006は [Istio 1.27.3実装](https://raw.githubusercontent.com/istio/istio/1.27.3/pilot/pkg/security/authn/policy_applier.go) と [Envoy JWT契約](https://raw.githubusercontent.com/envoyproxy/envoy/v1.35.2/api/envoy/extensions/filters/http/jwt_authn/v3/config.proto) で確認した。PR544の共有認証変更はこのApp登録PRと分離し、未適用。
 
 senseのTLS adapterはlan-sso-v3でactive/running、公開CA/SAN検証と未認証401を実測。systemdのroot:root0440 credential形式を限定許可する修正・拒否試験を追加し、installer成功条件も実TLS応答へ変更。これはSSO全経路の合格ではない。private repoの直接取得とLAN DNSは未確認/未提供の条件として残る。
+
+## 2026-10-10 導入条件の更新
+
+| 条件 | 現在の状態 | 残る確認 |
+|---|---|---|
+| 共通chart・JWT転送・認証参照 | PR543/544はマージ済み。chartは62cabffeへ固定 | GitOps実反映と本人SSO |
+| 宅内DNS | .247が稼働。YuがDHCPにPrimary .247/Secondary .1を設定、Mac反映と内部/外部UDP/TCP解決を実測 | 工房route作成後の名前解決とスマホ確認。障害時切替は未検証 |
+| sense本人検証 | koubou-lan-sso.service稼働、TLS8790。sense限定hostsでauth.yu-mins.comを.242へ解決し、TLS検証付きJWKS取得成功 | 実際の本人JWTで拒否/許可を確認 |
+| private repo取得 | 専用read-only deploy keyとSealedSecretをPR545へ準備。App参照はSSHへ変更 | Yuの承認後に公開鍵登録、PR545反映、固定commit取得 |
+
+公開DNSの変更は不要。App routeを共通chartから作るとLAN DNSに自動登録される。Appの手動syncはPR545と本PRの承認・GitOps反映確認後に実施する。家族の端末で障害時のDNS切替がどう動くかは別途確認が必要。
