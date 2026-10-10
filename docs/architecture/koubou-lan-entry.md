@@ -1,68 +1,59 @@
 ---
 type: note
-title: "工房の宅内DNS・HTTPS・本人認証"
+title: "工房Appの独立配備とPlatformの不足契約"
 status: active
-tags: [network, dns, authentication]
+tags: [platform, app, koubou]
 created: 2026-10-10
 updated: 2026-10-10
 ---
 
 ## 結論
 
-宅内の工房入口は `https://koubou.platform.yu-min3.com`。Cilium LBの既存Gateway `192.168.0.242` でHTTPS・Keycloak本人認証を行い、senseの独立adapterへTLSで中継する。Cloudflare Access/Tunnelや外部公開設定は変更しない。工房の管理tokenはhost内だけで扱う。
+工房はprivate `yu-min3/koubou` repoのApp chartで配備する。kensan-labにはapp-projectのApplication登録だけを置き、工房専用のDeployment/route/CA/TLS設定は複製しない。共有DNS・Gateway・SSOの変更をこのPRに混ぜない。配備は手動syncとし、以下の前提が満たされるまで運転開始しない。
 
-この差分は配備準備で、まだ実運用の合格を示さない。sense到達、GatewayからのID token転送、本人以外の拒否、スマホDNSと操作を配備後に実測する。
+旧PR案のnetwork/koubou-entry、platform-project、共有Gateway認可へのhost追加、工房専用DestinationRule/SealedSecret、新LAN DNSは今回のdiffから削除した。旧案は未マージ・未配備であり、既存リソースのpruneは発生しない。
 
-## 管理の境界
+## App／Platformの契約
 
-| 所有者 | 対象 | 契約 |
+| 項目 | Appが所有 | Platformが提供 |
 |---|---|---|
-| Platform / kensan-lab | LAN DNS、Gateway routeとSSO許可、backend CA | HTTPSと署名付き本人IDをsenseへ渡す。工房の実装・台帳・モデル資格は置かない |
-| 工房 / private koubou | controller、UI/API、本人認証adapter、TLS秘密鍵、管理token | 固定本人sub、platform-admin、署名・issuer・aud・exp/nbfを独立検証し内部sessionを作る。UIへ認証基盤を埋め込まない |
-| operator | Keycloak clientへの工房callback登録、本人subの確認 | 全realm bootstrapを実行せず、既存callbackを保ったまま工房のURLだけ追加 |
-| Yu | PR merge判断、宅内ルーターのDHCP DNS設定 | DNSと認証経路の実測後に切替。スマホへ管理tokenを渡さない |
+| 配備 | private repoのchart/valuesと固定commit | Argo CD、app-project、repo参照権限 |
+| 通信 | app-koubou内relay/Service/route/NetworkPolicy、senseへのCA/SAN検証 | gateway-prodのHTTPS・既定SSO、許可されたroute接続 |
+| 認証 | senseの本人sub/group/署名検証、内部session | Keycloak本人認証、署名済みID token、callback登録 |
+| 名前解決 | 必要なhostとGateway IPを要求 | LAN端末のDNS解決。DHCPや共通DNSはApp管理外 |
 
-## 構成
+namespaceはprivate chartが所有しPrune=false。PVCなし。App内relayからsenseへTLSを張るためEndpointSliceやGateway用DestinationRuleを追加しない。既存SSO契約を使うため共有AuthorizationPolicyに工房hostを追記しない。
 
-1. スマホは宅内DNS `192.168.0.247:53` で工房と `auth.yu-mins.com` をLAN Gatewayへ解決。
-2. Gatewayは既存のTLS証明書とoauth2-proxyによるKeycloak本人認証を使う。工房はplatform-adminのみに許可。
-3. Gatewayからselectorless Service／EndpointSliceを通してsense `192.168.0.113:8790` へ中継。DestinationRuleでTLSを始め、専用CAと `koubou-sense.internal` のSANを検証。
-4. sense adapterはAuthorizationのID tokenを独立検証し、固定本人subを照合。coreには工房のsession cookieだけを渡し、ID tokenを渡さない。
-5. controllerは `127.0.0.1:8787` のまま。JSON API/core/台帳はUIを使わず操作できる。
+候補URL: `https://koubou.app.yu-min3.com`（LAN Gateway 192.168.0.243）。まだ利用不可。App側の仕様・導入手順はprivate repoの `deploy/app-entry.md`。
 
-現Istio 1.27.3にBackendTLSPolicy CRDがないため、既存Istio DestinationRuleを使う。公開CA証明書だけをSealedSecretへ封入し、秘密鍵はGitへ入れない。TLSが成立しない場合のHTTP fallbackは用意しない。
+## Platformに足りない要素・確認事項
 
-## 宅内DNS
+| ID | 現状／不足 | 当面の導入条件 | 継続改善の契約 | 担当 |
+|---|---|---|---|---|
+| P001 | private repoの参照権限は既存org credential templateの仕組みがあるが、工房repoへの実アクセス未検証 | Argo CDが工房の固定commitを読めることを確認。資格値は取得/表示しない | repo登録時に接続確認まで返す | Platform |
+| P002 | Keycloakのcallback登録はhostごとのPlatform操作 | 工房App hostのcallback/weborigin登録を別Platform変更として行う | Appがhostを申請し、Platformが承認/登録/検証結果を返す。共有realmをAppが変更しない | Platform、公開/認証変更の判断はYu |
+| P003 | OAuth2 routeのReferenceGrantがapp-kensan/app-konroを個別列挙 | app-koubouのHTTPRoute→auth-system/oauth2-proxy参照を別変更で許可 | App登録とcross-namespace認証参照許可を一緒に処理する。全namespaceへの無条件許可にはしない | Platform |
+| P004 | LANスマホ用の名前解決がなく、Mac hostsに依存 | 工房host→.243と認証hostのLAN解決を提供 | LAN DNSを共有基盤として設計・独立PRで提供。Appはレコード要求だけを渡す | Platform、DHCP切替はYu |
 
-`lan-dns` は独立したCoreDNS 2 Pod。UDP/TCP 53をLBから非特権の5353へ転送する。工房・Keycloak・oauth2-proxyの固定名だけをLANへ向け、他の名前は外部resolverへ転送する。clusterのkube-dnsやMac hostsは変更しない。
+P001は機能がないと断定せず確認事項。P002/P003は既存の手動登録契約が残っている。P004がスマホ導入の不足。これらを工房Appが直接作る構成にはしない。Appが自身のchartを持てるため、共通app-base chartへの外部host TLS機能追加は今回必須ではない。
 
-DNSの通信制限は、Namespace -2 → NetworkPolicy -1 → Deployment/Service 0の順で、同じPlatform管理Applicationに置く。新namespaceを別Applicationのpolicyが先に参照する競合と、Pod起動時のpolicy未適用を避けるため、通常のnetwork-policy集約からこのresolverだけを分けた。
+## 採用・却下
 
-ルーターへの変更はArcher A10のDHCP ServerのDNS配布。WAN側DNS、DHCPアドレス範囲・gateway・lease・予約は変えない。DNS稼働と入口の合格後にPrimary DNSを192.168.0.247へ変更する。Public DNSをSecondaryへ混ぜるとprivate名が解決しない場合があるため混ぜない。切替前の設定を控える。
-
-## 導入順と確認
-
-1. senseへTLS adapterと固定本人subを設定する。模型workerやPublisherを有効にする操作ではない。
-2. operatorは `bootstrap/keycloak/register-koubou-host.py` のread-only確認を実行する。管理資格はmemoryで扱い、ログ・argv・Gitへ出さない。
-3. PR merge後、同operatorの `--apply` で工房のcallback/web originだけ追加する。既存URL・user・password・realm設定は維持する。
-4. CA Secret Ready → DestinationRule → 工房routeを確認。DNSの2 Pod、LB 192.168.0.247、UDP/TCP名前解決も確認する。
-5. DNSを一時指定した検証端末でTLS・本人ログイン・登録・停止を確認。未認証/別人/期限切れ/CSRFの拒否も確認する。
-6. YuがDHCP DNSを切替し、スマホWi-Fi再接続で反映。Safariで操作して合格記録を残す。
-
-## 壊れうるもの・戻し方
-
-| 箇所 | 失敗時の体験 | 戻し方 |
+| 判定 | 案 | 理由 |
 |---|---|---|
-| callback・SSO許可の登録漏れ | 工房だけログイン時にエラー/403。既存サービスへの追加許可は変更しない | 工房hostの追加をrevert。追加callbackだけ削除し、既存callbackは残す |
-| sense/TLS/固定subが未準備 | 工房は503または401で使えない。認証を迂回して開かない | routeをrevertしてhost導入を修復。TLS検証を外さない |
-| DNS Pod/上流resolver停止 | DHCP切替後の端末で名前解決できない | ArcherのDHCP DNSを控えた旧設定へ戻し、Wi-Fi再接続 |
-| 新Appを削除 | finalizer/pruneで新Namespace内のPod/Serviceが消え、宅内DNSと工房入口が停止 | 先にDHCP DNSを復旧してから削除。新AppはPVCなし。既存canary/Keycloak/PVCを削除対象に含めない |
-| backend証明書期限 | Gateway→sense TLSが失敗し工房503 | server証明書更新とhostservice再起動。CA変更時はSealedSecret更新を先行。初期server証明書は180日、更新の自動化は別作業 |
+| 採用 | private App chart＋既存gateway-prod | Appの追加で共有認可のhost列挙を編集しない。App資源はapp-project内に収まる |
+| 採用 | App relayがsense TLSを検証 | App固有CAをAppへ閉じ、EndpointSlice権限の拡大や共有DestinationRuleを不要にする |
+| 却下 | 工房専用入口をnetwork/platform-projectへ置く | AppがPlatform権限に依存し、repo独立の要件を満たさない |
+| 却下 | このApp PRでLAN DNS/DHCPまで導入する | 宅内全体への影響をAppの変更と分離して判断できない |
 
-## 実施済み／未実施
+## 検証と残作業
 
-実施済み: Goの署名・固定本人sub・groups・期限・peer拒否試験、Linux build、YAML lint/schema、実clusterへのserver dry-run、SealedSecretのcontroller検証、Argo Application静的検証、管理APIで本人IDのread-only確認。
+private chartはHelm lint/render、schema検証、上流imageのamd64/arm64 manifest確認を実施。Platform登録はAppProjectの許可kind/namespaceと整合する。実SSO・sense・Gateway datapath・スマホは未検証。P001〜P004とsense側導入を満たしてから手動syncし、本人ログイン/登録/停止と拒否経路を実測する。
 
-server dry-runは未作成のlan-dns/koubou-entry namespaceだけdefaultへ置換して実施した。実際の新namespaceのdatapath・SSO連携を合格とみなさない。
+## 壊れうるもの／戻し方
 
-未実施: このPRのmerge/正式sync、Keycloak callback更新、sense service導入、ルーター変更、スマホ実機。senseは準備時点でSSH到達不能だった。
+このPRの旧infra案は未配備のため、その削除による既存namespace/PVC/DNSのpruneはない。新Appはauto-sync/finalizerなし、ApplicationとnamespaceにはPrune=false。手動配備後にAppを止める場合はApp内route/relayだけを対象とし、共有Gateway/SSO/DNSは削除しない。
+
+## Yuの未決事項
+
+このdraft PRでは共有Platform変更の承認を求めない。不足要素を別のPlatform改善として具体化してからレビューする。マージ前の本人確認条件を維持する。

@@ -1,0 +1,25 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: app-koubou
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-options: Prune=false
+spec:
+  project: app-project
+  source:
+    repoURL: https://github.com/yu-min3/koubou
+    targetRevision: d2488fb42a14d7ad918bda04ca38e1c4cf64baf4
+    path: deploy/charts/koubou-entry
+    helm:
+      releaseName: app-koubou
+      valueFiles:
+      - ../../lan-entry-values.yaml
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: app-koubou
+  # Intentional manual sync until repository access, SSO and DNS are verified.
+  syncPolicy:
+    syncOptions:
+    - CreateNamespace=false
+    - ServerSideApply=true

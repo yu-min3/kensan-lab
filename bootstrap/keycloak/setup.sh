@@ -275,7 +275,6 @@ CLIENT_UUID=$(ensure_oidc_client \
 # 新 protected host を追加するときは `GATEWAY_PROTECTED_HOSTS` に追記して
 # script を再実行する (ensure_oidc_client が既存 client を update する)。
 GATEWAY_PROTECTED_HOSTS=(
-  koubou.platform.yu-min3.com
   backstage.platform.yu-min3.com
   prometheus.platform.yu-min3.com
   hubble.platform.yu-min3.com
