@@ -90,3 +90,11 @@ auth:
 
 # Secret/ConfigMap 更新時の自動 rollout（stakater/reloader）
 reloader: true
+
+# 新規App専用namespaceをchartで管理する場合だけ有効化する。
+# 既存namespaceの所有を自動で移さない。Platformがラベル値を選ぶ。
+namespace:
+  create: false
+  environment: production
+  team: ""
+  app: ""
