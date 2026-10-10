@@ -78,6 +78,8 @@ otel:
 httproute:
   enabled: false
   hostnames: []
+  dns:
+    enabled: true # LAN DNS follows HTTPRoute lifecycle; false excludes both routes
   gateway:
     name: gateway-prod
     namespace: istio-system

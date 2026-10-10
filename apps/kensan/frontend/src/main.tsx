@@ -5,6 +5,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { AppShell } from "./components/AppShell";
 import { ToastProvider } from "./components/ui/toast";
 import { Dashboard } from "./pages/Dashboard";
+import { PortfolioPage } from "./pages/PortfolioPage";
 import { DailyPage } from "./pages/DailyPage";
 import { MemoPage } from "./pages/MemoPage";
 import { TasksPage } from "./pages/TasksPage";
@@ -29,7 +30,9 @@ createRoot(document.getElementById("root")!).render(
         <ToastProvider>
           <AppShell>
             <Routes>
-              <Route path="/" element={<Dashboard />} />
+              {/* ダッシュボード = ポートフォリオ（地図・羅針盤・年報）。今日画面は /today */}
+              <Route path="/" element={<PortfolioPage />} />
+              <Route path="/today" element={<Dashboard />} />
               <Route path="/tasks" element={<TasksPage />} />
               <Route path="/projects" element={<ProjectsPage />} />
               <Route path="/feed" element={<FeedPage />} />

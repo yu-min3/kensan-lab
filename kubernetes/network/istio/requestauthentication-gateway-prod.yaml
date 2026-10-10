@@ -15,5 +15,8 @@ spec:
     kind: Gateway
     name: gateway-prod
   jwtRules:
-    - issuer: "https://auth.yu-mins.com/realms/kensan"
+    # Apps may independently validate the signed identity received at the edge.
+    # This preserves only a successfully verified JWT; invalid JWTs still fail.
+    - forwardOriginalToken: true
+      issuer: "https://auth.yu-mins.com/realms/kensan"
       jwksUri: "https://auth.yu-mins.com/realms/kensan/protocol/openid-connect/certs"

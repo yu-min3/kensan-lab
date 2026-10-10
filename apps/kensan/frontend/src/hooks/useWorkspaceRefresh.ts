@@ -10,6 +10,7 @@ export function useWorkspaceRefresh() {
       Promise.all(
         [
           "today",
+          "portfolio",
           "board",
           "projects",
           "project",
