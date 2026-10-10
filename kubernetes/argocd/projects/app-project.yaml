@@ -11,6 +11,8 @@ spec:
   sourceRepos:
   - "https://github.com/yu-min3/kensan-lab"
   - "https://github.com/yu-min3/*"
+  # Same owner as HTTPS; permits private App repos via scoped SSH deploy keys.
+  - "ssh://git@github.com/yu-min3/*"
 
   destinations:
   # ADR-006 の app-{name} flat namespace。個別列挙ではなく glob（app-konro 追加時に
