@@ -8,7 +8,7 @@ for enabled in true false; do
     --set auth.gatewayOAuth2.enabled=true --set httproute.dns.enabled="$enabled")"
   ignore=true
   if [[ "$enabled" == true ]]; then ignore=false; fi
-  [[ $(printf '%s\n' "$output" | rg -c '^kind: HTTPRoute$') == 2 ]]
-  [[ $(printf '%s\n' "$output" | rg -c "k8s-gateway.dns/ignore: \"$ignore\"") == 2 ]]
+  [[ $(printf '%s\n' "$output" | grep -cx 'kind: HTTPRoute') == 2 ]]
+  [[ $(printf '%s\n' "$output" | grep -cF "k8s-gateway.dns/ignore: \"$ignore\"") == 2 ]]
 done
 printf '%s\n' 'PASS: DNS opt-out applies to normal and OAuth2 routes together'
