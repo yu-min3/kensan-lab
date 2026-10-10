@@ -42,6 +42,18 @@ ValidatingAdmissionPolicyをAPIサーバーで強制する。App namespace `app-
 
 DNS PodはHTTPRoute/Gatewayのlist/watchと対象CRDのgetだけを許可する。Secret読み取り、APIの更新、DNSレコードの別ストアへの書き込みは不要。PodはUID65532、capabilities全drop、読み取り専用rootfs、port5353で動作する。API egressはCiliumのkube-apiserver entityに限定する。
 
+## LAN入口とノード間転送
+
+Cilium L2のノード間転送では送信元IPが変わり、Pod側でLAN CIDRだけを許可すると断続的にDNSが失敗する。Pod CIDRを追加するだけでも、引き継がれたworld identityに合わず拒否された。
+
+入口Serviceの `loadBalancerSourceRanges: [192.168.0.0/24]` で転送前にLANからの接続だけを許可し、DNS Podでは転送後のworld identityをUDP/TCP5353だけ受け入れる。`service.cilium.io/type: LoadBalancer` と `allocateLoadBalancerNodePorts: false` で外部frontendをVIPだけに限定する。旧NodePortを確実に解放するため各portに `nodePort: 0` を明示する。全Cilium設定や他のServiceは変更しない。
+
+Service側の制限をsync-wave -1で先に反映し、転送許可のCiliumNetworkPolicyはwave 0で反映する。戻す場合はPod側のworld許可を先に除いてからServiceの制限を戻す。
+
+実機の一時Service `.248` で、UDP/TCP40連続成功、接続元Macを許可範囲から外すと両方拒否、範囲を戻すと両方成功を確認する。BPF frontendはVIPだけで、ClusterIP/NodePortは公開しない。正式反映後は `.247` でも再確認する。
+
+[Cilium v1.18.3のsource ranges仕様](https://github.com/cilium/cilium/blob/v1.18.3/Documentation/network/kubernetes/kubeproxy-free.rst#loadbalancer-source-ranges-checks)
+
 ## App chartの使い方
 
 ```yaml
