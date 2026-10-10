@@ -1,0 +1,22 @@
+# L2 LoadBalancer cross-node SNAT carries world identity rather than client CIDR.
+# Enforce LAN source ranges at the VIP before SNAT (service.yaml), then accept
+# the forwarded traffic only at these DNS Pod ports. No NodePort frontend.
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: lan-dns-lb-ingress
+  namespace: lan-dns
+  annotations:
+    argocd.argoproj.io/sync-wave: '0'
+spec:
+  endpointSelector:
+    matchLabels:
+      app.kubernetes.io/name: lan-dns
+  ingress:
+  - fromEntities: [world]
+    toPorts:
+    - ports:
+      - port: '5353'
+        protocol: UDP
+      - port: '5353'
+        protocol: TCP
