@@ -34,7 +34,8 @@ namespaceはApp resourcesが所有しPrune=false。PVCなし。App内relayから
 | P002 | Keycloakのcallback登録はhostごとのPlatform操作 | 工房App hostのcallback/weborigin登録を別Platform変更として行う | Appがhostを申請し、Platformが承認/登録/検証結果を返す。共有realmをAppが変更しない | Platform、公開/認証変更の判断はYu |
 | P003 | OAuth2 routeのReferenceGrantがapp-kensan/app-konroを個別列挙 | app-koubouのHTTPRoute→auth-system/oauth2-proxy参照を別変更で許可 | App登録とcross-namespace認証参照許可を一緒に処理する。全namespaceへの無条件許可にはしない | Platform |
 | P004 | LANスマホ用の名前解決がなく、Mac hostsに依存 | 工房host→.243と認証hostのLAN解決を提供 | LAN DNSを共有基盤として設計・独立PRで提供。Appはレコード要求だけを渡す | Platform、DHCP切替はYu |
-| P005 | app-baseにcommand/argsと追加volume/mountの指定がない | 共通chartの汎用拡張draft PR #543をレビュー・マージ後に利用 | Appが共通templateを複製せずvaluesで設定できる | Platform |
+| P005 | app-baseにcommand/argsと追加volume/mountの指定がない | 共通chart PR #543はレビュー/CI後にマージ済み | Appが共通templateを複製せずvaluesで設定できる | Platform |
+| P006 | 既存App Gatewayが検証済みJWTを除去し、senseへ本人の署名が届かない | draft PR #544でJWT転送契約とP002/P003の登録を分離。Yu判断後に導入 | Appへ署名済み本人IDを渡し、App側でも検証できる | Platform、共有SSOの判断はYu |
 
 P001は機能がないと断定せず確認事項。P002/P003は既存の手動登録契約が残っている。P004がスマホ導入の不足。これらを工房Appが直接作る構成にはしない。外部host TLSはAppのConfigMapで設定する。app-baseに必要な汎用機能はP005として別PRに分離する。
 
@@ -49,7 +50,7 @@ P001は機能がないと断定せず確認事項。P002/P003は既存の手動�
 
 ## 検証と残作業
 
-既存app-baseと工房valuesはHelm lint/render、schema検証、上流imageのamd64/arm64 manifest確認を実施。Platform登録はAppProjectの許可kind/namespaceと整合する。実SSO・sense・Gateway datapath・スマホは未検証。P001〜P005とsense側導入を満たしてから手動syncし、本人ログイン/登録/停止と拒否経路を実測する。
+既存app-baseと工房valuesはHelm lint/render、schema検証、上流imageのamd64/arm64 manifest確認を実施。Platform登録はAppProjectの許可kind/namespaceと整合する。実SSO・sense・Gateway datapath・スマホは未検証。P001〜P006とsense側導入を満たしてから手動syncし、本人ログイン/登録/停止と拒否経路を実測する。
 
 ## 壊れうるもの／戻し方
 
@@ -63,3 +64,10 @@ P001は機能がないと断定せず確認事項。P002/P003は既存の手動�
 ## 共通Helm chartの利用
 
 工房側の独自Deployment/Service/HTTPRoute templatesは削除した。Argo CDは既存app-baseとprivate工房values/resourcesをmulti-sourceで組み合わせる。汎用chartの不足（起動指定、追加mount、API token制御、listener指定）は別draft PR #543で扱う。既存kensan/konro/canaryのrenderが旧chartと同じ構造であることを確認した。工房固有のConfigMap・Namespace・NetworkPolicyだけがprivate repoに残る。
+
+
+## 導入前レビューとsense実測
+
+独立レビューはchart/multi-source/selectors/TLS設定に確定P0/P1なし。P006は [Istio 1.27.3実装](https://raw.githubusercontent.com/istio/istio/1.27.3/pilot/pkg/security/authn/policy_applier.go) と [Envoy JWT契約](https://raw.githubusercontent.com/envoyproxy/envoy/v1.35.2/api/envoy/extensions/filters/http/jwt_authn/v3/config.proto) で確認した。PR544の共有認証変更はこのApp登録PRと分離し、未適用。
+
+senseのTLS adapterはlan-sso-v3でactive/running、公開CA/SAN検証と未認証401を実測。systemdのroot:root0440 credential形式を限定許可する修正・拒否試験を追加し、installer成功条件も実TLS応答へ変更。これはSSO全経路の合格ではない。private repoの直接取得とLAN DNSは未確認/未提供の条件として残る。
