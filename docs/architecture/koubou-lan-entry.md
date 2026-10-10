@@ -34,7 +34,6 @@ namespaceはApp resourcesが所有しPrune=false。PVCなし。App内relayから
 | P002 | Keycloakのcallback登録はhostごとのPlatform操作 | 工房App hostのcallback/weborigin登録を別Platform変更として行う | Appがhostを申請し、Platformが承認/登録/検証結果を返す。共有realmをAppが変更しない | Platform、公開/認証変更の判断はYu |
 | P003 | OAuth2 routeのReferenceGrantがapp-kensan/app-konroを個別列挙 | app-koubouのHTTPRoute→auth-system/oauth2-proxy参照を別変更で許可 | App登録とcross-namespace認証参照許可を一緒に処理する。全namespaceへの無条件許可にはしない | Platform |
 | P004 | LANスマホ用の名前解決がなく、Mac hostsに依存 | 工房host→.243と認証hostのLAN解決を提供 | LAN DNSを共有基盤として設計・独立PRで提供。Appはレコード要求だけを渡す | Platform、DHCP切替はYu |
-
 | P005 | app-baseにcommand/argsと追加volume/mountの指定がない | 共通chartの汎用拡張draft PR #543をレビュー・マージ後に利用 | Appが共通templateを複製せずvaluesで設定できる | Platform |
 
 P001は機能がないと断定せず確認事項。P002/P003は既存の手動登録契約が残っている。P004がスマホ導入の不足。これらを工房Appが直接作る構成にはしない。外部host TLSはAppのConfigMapで設定する。app-baseに必要な汎用機能はP005として別PRに分離する。
