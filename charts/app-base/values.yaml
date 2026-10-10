@@ -11,6 +11,14 @@ image:
 
 replicas: 1
 
+# Optional container startup and app-owned configuration mounts.
+command: []
+args: []
+extraVolumeMounts: []
+extraVolumes: []
+# null preserves the existing Pod default; apps may explicitly opt out.
+automountServiceAccountToken: null
+
 ports:
   http: 8080
 
@@ -73,6 +81,7 @@ httproute:
   gateway:
     name: gateway-prod
     namespace: istio-system
+    sectionName: "" # Optional listener (e.g. https); empty keeps existing behavior
 
 # gateway 層 OAuth2（oauth2-proxy ext_authz、Keycloak SSO）の /oauth2/* ルート。
 #
