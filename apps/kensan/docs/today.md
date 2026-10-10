@@ -21,6 +21,8 @@ The diary counts as written only when `## 日記` has prose of its own. Headings
 
 `GET /api/v1/today` joins these sources. Task edits retain the existing task API; `PUT /api/v1/routines/state` records a routine check or cancellation, `POST /api/v1/tasks/triage` accepts `today`, `later`, or `skip`, and `POST /api/v1/daily/line` appends one diary line.
 
+The top card has two tabs. **日記** appends to `## 日記`. **やったこと** (`POST /api/v1/tasks/done`) adds `- [x] text @done(today)` to the chosen project's `## タスク`, or to `todo.md ## Now` for "プロジェクト外". These lines have no `@today`, so they count as unplanned: `doneToday` splits today's completions into planned (`@today`) and unplanned. When more than three tasks are planned for today, the screen suggests moving the rest to tomorrow; it never blocks adding more.
+
 ## History in Markdown
 
 | What | Where it is written | Example |

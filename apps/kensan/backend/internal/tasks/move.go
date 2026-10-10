@@ -279,6 +279,26 @@ func CreateTask(ws *workspace.Workspace, project, display, band string, due, ms 
 	return out, err
 }
 
+// RecordDone は「やったこと」を完了済みで 1 行足す（今日画面の 1 行入力）。
+// 予定していなかった作業もここから入るので、@today を付けない＝予定外として数える。
+func RecordDone(ws *workspace.Workspace, project, display string, now time.Time) (Task, error) {
+	if strings.TrimSpace(display) == "" {
+		return Task{}, fmt.Errorf("display must not be empty")
+	}
+	destFile, destSection := projectTarget(project)
+	body := strings.Join(strings.Fields(display), " ") + " @done(" + now.Format("2006-01-02") + ")"
+	var out Task
+	err := ws.Mutate(destFile, func(content []byte, exists bool) ([]byte, error) {
+		if !exists {
+			return nil, fmt.Errorf("destination not found: %s", destFile)
+		}
+		text, ln := insertIntoSection(string(content), destSection, "- [x] "+body)
+		out = taskFromBody("x", body, destFile, ln, project)
+		return []byte(workspaceTouch(text)), nil
+	})
+	return out, err
+}
+
 // EditTask はタスクを編集する。project が変わる場合はファイル間移動になる。
 // 既存の @p（優先度）は引き継ぐ。本文・バンド・@due・@ms はフォームの値で置換。
 func EditTask(ws *workspace.Workspace, file string, line int, expectText, project, display, band string, due, ms string) (Task, error) {

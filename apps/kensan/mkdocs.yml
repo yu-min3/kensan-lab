@@ -5,6 +5,7 @@ nav:
   - Home: index.md
   - Architecture: architecture.md
   - Today Dashboard: today.md
+  - Portfolio Dashboard: portfolio.md
   - Personal Daily Briefing: feed.md
 
 plugins:

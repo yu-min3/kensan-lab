@@ -125,3 +125,42 @@ body {
 .markdown-body th { white-space: nowrap; background: hsl(var(--muted)); font-weight: 700; }
 .markdown-body img { max-width: 100%; height: auto; }
 .markdown-body hr { margin-block: 2rem; border-color: hsl(var(--border)); }
+
+/* ---- ポートフォリオ（ダッシュボード）
+   マスの 3 状態（外から見える / 社内だけ / 空き）と、ずれ（橙）だけに色を使う。
+   North Star の帯は明暗どちらのテーマでも夜空の 1 面にする（唯一の暗い面） */
+.pf {
+  --pf-full: 172 66% 26%;
+  --pf-full-soft: 165 45% 90%;
+  --pf-half: 36 80% 36%;
+  --pf-half-soft: 40 70% 90%;
+  --pf-empty: 36 6% 58%;
+  --pf-empty-soft: 36 15% 91%;
+  --pf-gap: 20 88% 40%;
+  --pf-gap-soft: 24 85% 93%;
+}
+.dark .pf {
+  --pf-full: 170 65% 62%;
+  --pf-full-soft: 170 40% 16%;
+  --pf-half: 40 82% 66%;
+  --pf-half-soft: 38 40% 17%;
+  --pf-empty: 32 6% 52%;
+  --pf-empty-soft: 30 10% 19%;
+  --pf-gap: 24 95% 64%;
+  --pf-gap-soft: 22 45% 18%;
+}
+.pf-sky {
+  background: radial-gradient(120% 140% at 90% -30%, #1b2b4d 0%, #111b31 60%);
+  color: #f0ebdf;
+}
+.pf-sky .pf-muted { color: #9aa6bd; }
+.pf-sky .pf-glow { color: #5cc0ff; }
+.pf-cell-public { background: hsl(var(--pf-full-soft)); border: 1.5px solid hsl(var(--pf-full)); }
+.pf-cell-internal { background: hsl(var(--pf-half-soft)); border: 1.5px dashed hsl(var(--pf-half)); }
+.pf-cell-empty { background: hsl(var(--pf-empty-soft)); border: 1.5px dotted hsl(var(--pf-empty)); }
+.pf-t-public { color: hsl(var(--pf-full)); }
+.pf-t-internal { color: hsl(var(--pf-half)); }
+.pf-t-empty { color: hsl(var(--muted-foreground)); }
+.pf-gap { color: hsl(var(--pf-gap)); }
+.pf-gap-bg { background: hsl(var(--pf-gap-soft)); }
+.pf-gap-line { background: hsl(var(--pf-gap)); }
