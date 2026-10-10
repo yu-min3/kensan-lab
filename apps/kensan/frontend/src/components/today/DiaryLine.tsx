@@ -107,7 +107,7 @@ export function DiaryLine({ view }: { view: TodayView }) {
                   : "今日を 1 行で"
                 : "予定になかったことも、そのまま"
             }
-            className="min-w-0 flex-1 rounded-md border border-border bg-card px-3 h-10 text-base focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            className="min-w-0 flex-1 rounded-md border border-border bg-card px-3 h-10 min-h-[2.5rem] text-base focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
           />
           <Button type="submit" variant="primary" loading={save.isPending} disabled={!text.trim()}>
             残す
