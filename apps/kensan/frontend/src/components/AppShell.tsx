@@ -2,6 +2,7 @@ import { useState, type ReactNode } from "react";
 import { NavLink } from "react-router-dom";
 import {
   LayoutDashboard,
+  Sun,
   BookOpen,
   StickyNote,
   SquareKanban,
@@ -24,6 +25,7 @@ const nav = [
     group: "今日",
     items: [
       { to: "/", label: "ダッシュボード", icon: LayoutDashboard },
+      { to: "/today", label: "今日", icon: Sun },
       { to: "/tasks", label: "タスク", icon: SquareKanban },
       { to: "/projects", label: "プロジェクト", icon: FolderKanban },
       { to: "/feed", label: "フィード", icon: Newspaper },

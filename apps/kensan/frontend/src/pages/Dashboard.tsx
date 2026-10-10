@@ -35,6 +35,8 @@ export function Dashboard() {
   const groups = projectGroups(view);
   const today = view.board.today ?? [];
   const standalone = today.filter((t) => !t.project && t.state !== "skipped");
+  // 予定は 3 件まで（ソフトな注意。置けなくはしない）
+  const plannedToday = today.filter((t) => t.state === "todo").length;
   const candidates = [
     ...(view.board.week ?? []),
     ...(view.board.month ?? []),
@@ -64,7 +66,15 @@ export function Dashboard() {
           </Link>
         }
       />
-      <DiaryLine date={view.date} diary={view.diary} />
+      <DiaryLine view={view} />
+      {plannedToday > 3 && (
+        <p role="status" className="text-sm text-muted-foreground">
+          今日の予定が<span className="font-mono tnum"> {plannedToday} </span>件あります。3 件までにすると、終わらなかった分が溜まりにくくなります。{" "}
+          <Link to="/tasks" className="text-brand">
+            タスク画面で明日へ回す →
+          </Link>
+        </p>
+      )}
       <div className="flex items-start gap-3 text-sm text-muted-foreground">
         <Compass size={18} className="text-brand shrink-0 mt-0.5" />
         <p>

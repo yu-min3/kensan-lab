@@ -5,6 +5,7 @@ import (
 	"errors"
 	"net/http"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/yu-min3/kensan-lab/apps/kensan/backend/internal/diary"
@@ -401,4 +402,26 @@ func (s *Server) handleDailyLine(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"path": path})
+}
+
+// POST /api/v1/tasks/done {project, display} — 今日画面の「やったこと」。完了済み（@done 今日）で足す。
+func (s *Server) handleTaskDone(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		Project string `json:"project"`
+		Display string `json:"display"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || strings.TrimSpace(req.Display) == "" {
+		writeError(w, http.StatusBadRequest, "display is required")
+		return
+	}
+	if len([]rune(req.Display)) > 200 {
+		writeError(w, http.StatusBadRequest, "やったことは 200 文字までです")
+		return
+	}
+	out, err := tasks.RecordDone(s.ws, req.Project, req.Display, time.Now().In(today.JST))
+	if err != nil {
+		writeOpError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"task": out})
 }

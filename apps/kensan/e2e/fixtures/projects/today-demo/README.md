@@ -1,6 +1,7 @@
 ---
 type: project
 status: active
+aims: [事業に効かせる×AI]
 created: 2026-09-09
 updated: 2026-09-09
 ---

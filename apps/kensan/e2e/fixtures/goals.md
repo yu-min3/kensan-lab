@@ -12,3 +12,8 @@ E2E テスト用の North Star
 ## 今期のフォーカス
 
 - [[sample-project]]
+
+## 配分
+
+- today-demo 60
+- sample-project 40

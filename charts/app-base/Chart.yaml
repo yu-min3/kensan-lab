@@ -6,5 +6,5 @@ description: >-
   OTel 配線を values だけで構成する。「PE が chart を提供、app が values で利用」
   パターン（vault-database と同型）の app 向け一般化。
 type: application
-version: 0.1.0
+version: 0.1.2
 appVersion: "0.1.0"
