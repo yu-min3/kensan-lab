@@ -189,6 +189,7 @@ nav:
       - architecture/index.md
       - Namespace & label contract: architecture/namespace-label-design.md
       - Argo CD: architecture/argocd.md
+      - Koubou App contract: architecture/koubou-lan-entry.md
       - Network (Cilium + Istio):
           - architecture/network/index.md
           - Cloudflare Tunnel & Access: architecture/cloudflare-tunnel.md
