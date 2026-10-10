@@ -1,0 +1,11 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: lan-dns
+  namespace: lan-dns
+data:
+  Corefile: ".:5353 {\n    errors\n    health :8080\n    ready :8181\n    hosts {\n\
+    \        192.168.0.243 koubou.app.yu-min3.com\n        192.168.0.242 auth.yu-mins.com\n\
+    \        192.168.0.242 oauth2-proxy.platform.yu-min3.com\n        fallthrough\n\
+    \    }\n    forward . 9.9.9.9 149.112.112.112\n    cache 30\n    reload\n    loop\n\
+    }\n"
