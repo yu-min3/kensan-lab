@@ -287,6 +287,7 @@ GATEWAY_PROTECTED_HOSTS=(
   # gateway-prod 側の protected host (新 kensan、ADR-010 の app 系への拡張)
   kensan.app.yu-min3.com # 本番 host（Phase 7 で legacy から継承, #394）
   kensan.yu-mins.com # kensan アプリの外部公開 (Cloudflare Tunnel → gateway-prod)
+  koubou.app.yu-min3.com # 工房のApp入口（LANのみ）
   konro.app.yu-min3.com # konro（作り置き並行調理アプリ、LAN のみ・外部公開なし）
 )
 # Grafana は auth.generic_oauth で Keycloak 直結 (Path B)。Authorization Bearer
