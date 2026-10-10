@@ -43,6 +43,10 @@ var (
 	msRe       = regexp.MustCompile(`@ms\(([^)]+)\)`)
 	pRe        = regexp.MustCompile(`@p\((\d+)\)`)
 	idRe       = regexp.MustCompile(`@id\(([a-zA-Z0-9-]+)\)`)
+	// @done(YYYY-MM-DD) は完了日、@seen(YYYY-MM-DD) は今日画面で最後に仕分けた日。
+	// 履歴は別ファイルに持たず、この 2 つのタグとして Markdown の行に残す。
+	doneRe     = regexp.MustCompile(`@done\((\d{4}-\d{2}-\d{2})\)`)
+	seenRe     = regexp.MustCompile(`@seen\((\d{4}-\d{2}-\d{2})\)`)
 	multiSpace = regexp.MustCompile(`\s{2,}`)
 )
 
@@ -63,6 +67,8 @@ type Task struct {
 	Due       string `json:"due,omitempty"`       // @due(YYYY-MM-DD)
 	Milestone string `json:"milestone,omitempty"` // @ms(slug)
 	Priority  int    `json:"priority,omitempty"`  // @p(N)（0 = 未設定）
+	Done      string `json:"done,omitempty"`      // @done(YYYY-MM-DD)
+	Seen      string `json:"seen,omitempty"`      // @seen(YYYY-MM-DD)
 }
 
 // Board はかんばんの 1 画面分。project の未完了タスクを時間軸バンドに振り分ける。
@@ -86,6 +92,8 @@ type inlineTags struct {
 	Due       string
 	Milestone string
 	Priority  int
+	Done      string
+	Seen      string
 }
 
 // parseInline は行テキストから @today / @week / @month / @due / @ms / @p を抽出し、タグを除いた表示用テキストを返す。
@@ -104,6 +112,12 @@ func parseInline(text string) inlineTags {
 	if m := pRe.FindStringSubmatch(text); m != nil {
 		t.Priority, _ = strconv.Atoi(m[1])
 	}
+	if m := doneRe.FindStringSubmatch(text); m != nil {
+		t.Done = m[1]
+	}
+	if m := seenRe.FindStringSubmatch(text); m != nil {
+		t.Seen = m[1]
+	}
 	d := todayRe.ReplaceAllString(text, "")
 	d = weekRe.ReplaceAllString(d, "")
 	d = monthRe.ReplaceAllString(d, "")
@@ -111,6 +125,8 @@ func parseInline(text string) inlineTags {
 	d = msRe.ReplaceAllString(d, "")
 	d = pRe.ReplaceAllString(d, "")
 	d = idRe.ReplaceAllString(d, "")
+	d = doneRe.ReplaceAllString(d, "")
+	d = seenRe.ReplaceAllString(d, "")
 	t.Display = strings.TrimSpace(multiSpace.ReplaceAllString(d, " "))
 	return t
 }
@@ -145,6 +161,8 @@ func ExtractLines(content string, file string) []Task {
 			Due:       tg.Due,
 			Milestone: tg.Milestone,
 			Priority:  tg.Priority,
+			Done:      tg.Done,
+			Seen:      tg.Seen,
 		})
 	}
 	return out

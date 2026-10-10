@@ -5,6 +5,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -237,6 +238,7 @@ func taskFromBody(mark, body, file string, line int, project string) Task {
 		ID:   taskID(body),
 		Text: body, Display: tg.Display, State: stateOf(mark), File: file, Line: line, Project: project,
 		Today: tg.Today, Week: tg.Week, Month: tg.Month, Due: tg.Due, Milestone: tg.Milestone, Priority: tg.Priority,
+		Done: tg.Done, Seen: tg.Seen,
 	}
 }
 
@@ -406,6 +408,12 @@ func tagSuffix(raw string) string {
 	if s := pRe.FindString(raw); s != "" {
 		parts = append(parts, s)
 	}
+	if s := doneRe.FindString(raw); s != "" {
+		parts = append(parts, s)
+	}
+	if s := seenRe.FindString(raw); s != "" {
+		parts = append(parts, s)
+	}
 	return strings.Join(parts, " ")
 }
 
@@ -516,13 +524,15 @@ func DeleteLine(ws *workspace.Workspace, file string, line int, expectText strin
 
 // SetState はチェックボックスの状態を書き換える（todo / done / skipped）。
 func SetState(ws *workspace.Workspace, file string, line int, expectText, state string) (Task, error) {
-	return observeTask(ws, file, line, expectText, state, "task.state", "")
+	return observeTask(ws, file, line, expectText, state, "")
 }
 
 func ReviewLater(ws *workspace.Workspace, file string, line int, text string) (Task, error) {
 	return Triage(ws, file, line, text, "later")
 }
 
+// Triage は今日画面の仕分け（today / later / skip）。どれを選んでも @seen(今日) を付け、
+// その日の仕分けを終える。次に出す候補は @seen の古い順（タグ無しが先）。
 func Triage(ws *workspace.Workspace, file string, line int, text, action string) (Task, error) {
 	state := "todo"
 	switch action {
@@ -532,7 +542,7 @@ func Triage(ws *workspace.Workspace, file string, line int, text, action string)
 	default:
 		return Task{}, fmt.Errorf("unknown triage action: %q", action)
 	}
-	return observeTask(ws, file, line, text, state, "task.triaged", action)
+	return observeTask(ws, file, line, text, state, action)
 }
 
 func preserveID(body, old string) string {
@@ -543,31 +553,49 @@ func preserveID(body, old string) string {
 }
 
 // Old clients may reuse the locator from before the first state operation.
-// Ignore only a newly assigned ID, never a changed title, band or deadline.
+// Ignore only tags the app adds itself (@id / @done / @seen), never a changed
+// title, band or deadline.
 func matchesExpected(actual, expected string) bool {
 	if taskID(expected) == "" {
 		actual = idRe.ReplaceAllString(actual, "")
 	}
-	return strings.TrimSpace(actual) == strings.TrimSpace(expected)
+	// 完了日・仕分け日は状態の記録であって本文ではない。両側から外して比べる。
+	for _, re := range []*regexp.Regexp{doneRe, seenRe} {
+		actual, expected = re.ReplaceAllString(actual, ""), re.ReplaceAllString(expected, "")
+	}
+	return strings.TrimSpace(multiSpace.ReplaceAllString(actual, " ")) == strings.TrimSpace(multiSpace.ReplaceAllString(expected, " "))
 }
 
-func observeTask(ws *workspace.Workspace, file string, line int, expectText, state, kind, action string) (Task, error) {
+// setTag は行の re に一致するタグを tag へ置き換える（空なら除去）。
+func setTag(body string, re *regexp.Regexp, tag string) string {
+	body = strings.TrimSpace(multiSpace.ReplaceAllString(re.ReplaceAllString(body, ""), " "))
+	if tag == "" {
+		return body
+	}
+	return body + " " + tag
+}
+
+// observeTask は状態変更と仕分けを Markdown の行だけで記録する。
+// 完了は @done(日付)、仕分けは @seen(日付)。同じ操作の再送は何も変えずに受け付ける。
+func observeTask(ws *workspace.Workspace, file string, line int, expectText, state, action string) (Task, error) {
 	marks := map[string]string{"todo": " ", "done": "x", "skipped": "-"}
 	mark, ok := marks[state]
 	if !ok {
 		return Task{}, fmt.Errorf("unknown state: %q", state)
 	}
+	date := time.Now().In(time.FixedZone("JST", 9*60*60)).Format("2006-01-02")
 	var out Task
-	err := ws.MutateEvent(file, func(content []byte, events []workspace.Activity) ([]byte, *workspace.Activity, error) {
+	err := ws.Mutate(file, func(content []byte, exists bool) ([]byte, error) {
+		if !exists {
+			return nil, fmt.Errorf("file not found: %s", file)
+		}
 		lines := strings.Split(string(content), "\n")
 		if line < 1 || line > len(lines) {
-			return nil, nil, fmt.Errorf("%w: line %d out of range", ErrLineMismatch, line)
+			return nil, fmt.Errorf("%w: line %d out of range", ErrLineMismatch, line)
 		}
 		m := checkboxRe.FindStringSubmatch(lines[line-1])
-		// 「今日やる」の初回だけ本文に@todayが付く。同じ日の実行履歴と
-		// 現在の全文・状態まで一致する再送だけ受け付け、別編集は競合のままにする。
 		if m == nil {
-			return nil, nil, fmt.Errorf("%w: %s:%d", ErrLineMismatch, file, line)
+			return nil, fmt.Errorf("%w: %s:%d", ErrLineMismatch, file, line)
 		}
 		out = taskFromBody(m[1], strings.TrimSpace(m[2]), file, line, "")
 		for _, t := range ExtractLines(string(content), file) {
@@ -576,45 +604,35 @@ func observeTask(ws *workspace.Workspace, file string, line int, expectText, sta
 				break
 			}
 		}
-		replayText := strings.TrimSpace(expectText)
-		now := time.Now().In(time.FixedZone("JST", 9*60*60))
-		date := now.Format("2006-01-02")
-		if taskID(expectText) == "" && taskID(m[2]) != "" {
-			replayText += " @id(" + taskID(m[2]) + ")"
-		}
-		if kind == "task.triaged" && action == "today" && m[1] == mark &&
-			matchesExpected(m[2], setBandTag(replayText, "today")) {
-			for _, e := range events {
-				if e.Kind == kind && e.ID == taskID(m[2]) && e.Date == date && e.Action == action {
-					return nil, nil, nil
+		if action != "" && out.Seen == date && m[1] == mark {
+			// 今日すでに仕分け済みの行。付けたタグを除いて元の本文と一致する同じ操作の再送だけ受け付ける。
+			replay, want := setTag(m[2], seenRe, ""), setTag(expectText, seenRe, "")
+			if action == "today" {
+				if !todayRe.MatchString(replay) {
+					return nil, fmt.Errorf("%w: %s:%d", ErrLineMismatch, file, line)
 				}
+				replay, want = setBandTag(replay, "today"), setBandTag(want, "today")
 			}
+			if matchesExpected(replay, want) {
+				return nil, nil
+			}
+			return nil, fmt.Errorf("%w: %s:%d", ErrLineMismatch, file, line)
 		}
 		if !matchesExpected(m[2], expectText) {
-			return nil, nil, fmt.Errorf("%w: %s:%d", ErrLineMismatch, file, line)
+			return nil, fmt.Errorf("%w: %s:%d", ErrLineMismatch, file, line)
 		}
-		if kind == "task.state" && m[1] == mark {
-			return nil, nil, nil
+		if action == "" && m[1] == mark {
+			return nil, nil
 		}
-		if kind == "task.triaged" {
-			for _, e := range events {
-				if e.Kind == kind && e.ID == out.ID && e.Date == date && e.Action == action {
-					if action != "today" && m[1] == mark {
-						return nil, nil, nil
-					}
-					return nil, nil, ErrLineMismatch
-				}
-			}
-			if out.State != "todo" {
-				return nil, nil, ErrLineMismatch
-			}
+		if action != "" && out.State != "todo" {
+			return nil, ErrLineMismatch
 		}
 		body := strings.TrimSpace(m[2])
 		id := taskID(body)
 		if id == "" {
 			buf := make([]byte, 16)
 			if _, err := rand.Read(buf); err != nil {
-				return nil, nil, err
+				return nil, err
 			}
 			id = hex.EncodeToString(buf)
 			body += " @id(" + id + ")"
@@ -623,14 +641,21 @@ func observeTask(ws *workspace.Workspace, file string, line int, expectText, sta
 		if action == "today" {
 			body = setBandTag(body, "today")
 		}
+		if action != "" {
+			body = setTag(body, seenRe, "@seen("+date+")")
+		}
+		if state == "done" {
+			body = setTag(body, doneRe, "@done("+date+")")
+		} else {
+			body = setTag(body, doneRe, "")
+		}
 		out = rewriteLine(lines, line, mark, body, file)
 		out.ID, out.Section = id, section
 		parts := strings.Split(file, "/")
 		if len(parts) == 3 && parts[0] == "projects" {
 			out.Project = parts[1]
 		}
-		e := &workspace.Activity{At: now, Kind: kind, ID: id, Project: out.Project, Text: out.Display, Date: now.Format("2006-01-02"), State: state, Action: action}
-		return []byte(workspaceTouch(strings.Join(lines, "\n"))), e, nil
+		return []byte(workspaceTouch(strings.Join(lines, "\n"))), nil
 	})
 	return out, err
 }

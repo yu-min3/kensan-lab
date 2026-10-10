@@ -1,4 +1,4 @@
-// Package today joins file-backed goals, tasks and observed activity for the daily view.
+// Package today joins file-backed goals, tasks and their Markdown history for the daily view.
 package today
 
 import (
@@ -12,7 +12,6 @@ import (
 	"time"
 
 	"github.com/yu-min3/kensan-lab/apps/kensan/backend/internal/tasks"
-	"github.com/yu-min3/kensan-lab/apps/kensan/backend/internal/workspace"
 )
 
 var JST = time.FixedZone("JST", 9*60*60)
@@ -138,18 +137,10 @@ func (r Routine) next(d time.Time, step int) time.Time {
 	return d.AddDate(0, 0, step)
 }
 
-func Routines(root string, events []workspace.Activity, now time.Time) ([]Routine, error) {
+// Routines は README の定義と、daily の ## 習慣 に残った実施日から期間ごとの達成を出す。
+// 記録の最初の日より前は未知（unknown）として扱い、未達と断定しない。
+func Routines(root string, h History, now time.Time) ([]Routine, error) {
 	out := []Routine{}
-	first := map[string]string{}
-	states := map[string]workspace.Activity{}
-	for _, e := range events {
-		if e.Kind == "routine.state" {
-			if first[e.ID] == "" || e.Date < first[e.ID] {
-				first[e.ID] = e.Date
-			}
-			states[e.ID+"/"+e.Date] = e
-		}
-	}
 	for _, project := range tasks.Projects(root) {
 		file := "projects/" + project + "/README.md"
 		b, err := os.ReadFile(filepath.Join(root, file))
@@ -160,10 +151,17 @@ func Routines(root string, events []workspace.Activity, now time.Time) ([]Routin
 			return nil, err
 		}
 		for _, r := range ParseRoutines(string(b), file, project) {
-			r.DoneToday = states[r.ID+"/"+now.Format("2006-01-02")].State == "done"
+			dates := h.Routines[routineKey(project, r.Text)]
+			first := ""
+			for d := range dates {
+				if first == "" || d < first {
+					first = d
+				}
+			}
+			r.DoneToday = dates[now.Format("2006-01-02")]
 			r.ExpectedToday = r.expected(now)
 			start := r.start(now)
-			for len(r.Periods) < 8 || (first[r.ID] != "" && start.Format("2006-01-02") >= first[r.ID]) {
+			for len(r.Periods) < 8 || (first != "" && start.Format("2006-01-02") >= first) {
 				if r.MonthDay > 0 && start.AddDate(0, 1, -1).Day() < r.MonthDay {
 					start = r.next(start, -1)
 					continue
@@ -174,8 +172,8 @@ func Routines(root string, events []workspace.Activity, now time.Time) ([]Routin
 				}
 				end := r.next(start, 1)
 				p := Period{Start: start.Format("2006-01-02"), Target: r.Target, Status: "missed"}
-				for _, e := range states {
-					if e.ID == r.ID && e.State == "done" && e.Date >= p.Start && e.Date < end.Format("2006-01-02") {
+				for d := range dates {
+					if d >= p.Start && d < end.Format("2006-01-02") {
 						p.Count++
 					}
 				}
@@ -186,7 +184,7 @@ func Routines(root string, events []workspace.Activity, now time.Time) ([]Routin
 					p.Status = "met"
 				case end.After(now):
 					p.Status = "pending"
-				case first[r.ID] == "" || p.Start < first[r.ID]:
+				case first == "" || p.Start < first:
 					p.Status = "unknown"
 				}
 				r.Periods = append(r.Periods, p)
@@ -206,36 +204,4 @@ func Routines(root string, events []workspace.Activity, now time.Time) ([]Routin
 		}
 	}
 	return out, nil
-}
-
-func SetRoutine(ws *workspace.Workspace, file, id, date string, done bool, now time.Time) error {
-	parts := strings.Split(file, "/")
-	if len(parts) != 3 || parts[0] != "projects" || parts[2] != "README.md" {
-		return fmt.Errorf("invalid routine file")
-	}
-	if date != now.Format("2006-01-02") {
-		return fmt.Errorf("only today's routine can be changed")
-	}
-	return ws.MutateEvent(file, func(b []byte, events []workspace.Activity) ([]byte, *workspace.Activity, error) {
-		for _, r := range ParseRoutines(string(b), file, parts[1]) {
-			if r.ID != id {
-				continue
-			}
-			state := "todo"
-			if done {
-				state = "done"
-			}
-			previous := "todo"
-			for _, e := range events {
-				if e.Kind == "routine.state" && e.ID == id && e.Date == date {
-					previous = e.State
-				}
-			}
-			if previous == state {
-				return nil, nil, nil
-			}
-			return nil, &workspace.Activity{At: now, Kind: "routine.state", ID: id, Project: r.Project, Text: r.Text, Date: date, State: state}, nil
-		}
-		return nil, nil, tasks.ErrLineMismatch
-	})
 }

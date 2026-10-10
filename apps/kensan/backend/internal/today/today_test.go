@@ -39,19 +39,18 @@ func TestTriageReplayAndConflictingEdits(t *testing.T) {
 				t.Fatal(err)
 			}
 			a := *v.Triage
+			var after []string
 			for i := 0; i < 2; i++ {
 				if _, err := tasks.Triage(ws, a.File, a.Line, a.Text, action); err != nil {
 					t.Fatalf("request %d: %v", i, err)
 				}
+				b, _ := os.ReadFile(filepath.Join(ws.Root, a.File))
+				after = append(after, string(b))
 			}
-			events, err := ws.Activities()
-			if err != nil || len(events) != 1 {
-				t.Fatalf("retry duplicated events: %v %v", events, err)
+			if after[0] != after[1] || strings.Count(after[0], "@seen(") != 1 {
+				t.Fatalf("retry changed the file again:\n%s\n%s", after[0], after[1])
 			}
-			content, err := os.ReadFile(filepath.Join(ws.Root, a.File))
-			if err != nil {
-				t.Fatal(err)
-			}
+			content := []byte(after[1])
 			if err := os.WriteFile(filepath.Join(ws.Root, a.File), []byte(strings.Replace(string(content), "Item", "Edited", 1)), 0644); err != nil {
 				t.Fatal(err)
 			}
@@ -100,6 +99,13 @@ func taskAt(t *testing.T, ws *workspace.Workspace) tasks.Task {
 	}
 	return b.Today[0]
 }
+func history(key string, dates ...string) History {
+	h := History{Done: map[string]int{}, Routines: map[string]map[string]bool{key: {}}}
+	for _, d := range dates {
+		h.Routines[key][d] = true
+	}
+	return h
+}
 func total(v View) int {
 	n := 0
 	for _, d := range v.Activity {
@@ -122,9 +128,9 @@ func TestCompletionRetryUndoAndRename(t *testing.T) {
 		}()
 	}
 	wg.Wait()
-	events, err := ws.Activities()
-	if err != nil || len(events) != 1 {
-		t.Fatalf("retry generated events: %v %+v", err, events)
+	b, _ := os.ReadFile(filepath.Join(ws.Root, original.File))
+	if strings.Count(string(b), "@done(") != 1 {
+		t.Fatalf("retry duplicated the completion tag: %s", b)
 	}
 	current := taskAt(t, ws)
 	if current.ID == "" {
@@ -180,17 +186,23 @@ func TestSaveAndMoveKeepIdentity(t *testing.T) {
 	}
 }
 
-func TestUnreadableActivityDoesNotCompleteTask(t *testing.T) {
-	ws := fixture(t, "## タスク\n- [ ] Safe @today\n")
+func TestDoneTagSurvivesMoveToDaily(t *testing.T) {
+	ws := fixture(t, "## タスク\n- [ ] Ship @today\n")
 	a := taskAt(t, ws)
-	if err := os.Mkdir(filepath.Join(ws.Root, workspace.ActivityFile), 0755); err != nil {
+	if _, err := tasks.SetState(ws, a.File, a.Line, a.Text, "done"); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := tasks.SetState(ws, a.File, a.Line, a.Text, "done"); err == nil {
-		t.Fatal("wanted failure")
+	done := taskAt(t, ws)
+	today := time.Now().In(JST).Format("2006-01-02")
+	if done.Done != today || strings.Contains(done.Display, "@done") {
+		t.Fatalf("completion date: %+v", done)
 	}
-	if taskAt(t, ws).State != "todo" {
-		t.Fatal("task changed despite log failure")
+	if _, err := tasks.Move(ws, done.File, done.Line, done.Text, tasks.Dest{Kind: "daily"}); err != nil {
+		t.Fatal(err)
+	}
+	v, err := Load(ws, time.Now())
+	if err != nil || total(v) != 1 || v.RecordedSince != today {
+		t.Fatalf("history lost on move: %v %d %q", err, total(v), v.RecordedSince)
 	}
 }
 
@@ -231,15 +243,12 @@ func TestTriageSurvivesReloadAndRestoresSkipped(t *testing.T) {
 func TestRoutinePeriodsAndUnknownHistory(t *testing.T) {
 	ws := fixture(t, "## ルーティン\n- [週3回] English\n- [月1] Article\n- [月,水,金] Gym\n- [月,水,木,金,土,日] Gym（土日はどちらか1日）\n- [31日] Close\n")
 	now := time.Date(2026, 9, 8, 12, 0, 0, 0, JST) // Tuesday
-	routines, _ := Routines(ws.Root, nil, now)
+	routines, _ := Routines(ws.Root, History{}, now)
 	if len(routines) != 5 {
 		t.Fatal(routines)
 	}
-	events := []workspace.Activity{}
-	for _, date := range []string{"2026-08-31", "2026-09-02", "2026-09-04", "2026-09-07"} {
-		events = append(events, workspace.Activity{ID: routines[0].ID, Kind: "routine.state", Date: date, State: "done"})
-	}
-	routines, _ = Routines(ws.Root, events, now)
+	h := history(routineKey("demo", "English"), "2026-08-31", "2026-09-02", "2026-09-04", "2026-09-07")
+	routines, _ = Routines(ws.Root, h, now)
 	week := routines[0]
 	if week.Streak != 1 || week.Periods[0].Count != 1 || week.Periods[0].Status != "pending" {
 		t.Fatalf("week: %+v", week)
@@ -263,21 +272,29 @@ func TestRoutinePeriodsAndUnknownHistory(t *testing.T) {
 func TestRoutineRetryAndCancel(t *testing.T) {
 	ws := fixture(t, "## ルーティン\n- [週3回] English\n")
 	now := time.Date(2026, 9, 8, 23, 0, 0, 0, JST)
-	rs, _ := Routines(ws.Root, nil, now)
+	rs, _ := Routines(ws.Root, History{}, now)
 	r := rs[0]
+	daily := filepath.Join(ws.Root, "daily/2026/09/08.md")
 	for i := 0; i < 2; i++ {
 		if err := SetRoutine(ws, r.File, r.ID, "2026-09-08", true, now); err != nil {
 			t.Fatal(err)
 		}
 	}
-	es, _ := ws.Activities()
-	if len(es) != 1 {
-		t.Fatal("retry duplicated")
+	b, _ := os.ReadFile(daily)
+	if strings.Count(string(b), "- [x] English @routine(demo)") != 1 || !strings.Contains(string(b), "type: daily") {
+		t.Fatalf("retry duplicated or skeleton missing: %s", b)
+	}
+	v, err := Load(ws, now)
+	if err != nil || total(v) != 1 || !v.Routines[0].DoneToday {
+		t.Fatalf("routine not read back: %v", err)
 	}
 	if err := SetRoutine(ws, r.File, r.ID, "2026-09-08", false, now); err != nil {
 		t.Fatal(err)
 	}
-	v, err := Load(ws, now)
+	if b, _ := os.ReadFile(daily); strings.Contains(string(b), "習慣") {
+		t.Fatalf("empty habit section left behind: %s", b)
+	}
+	v, err = Load(ws, now)
 	if err != nil || total(v) != 0 || v.Routines[0].DoneToday {
 		t.Fatalf("cancel failed: %v", err)
 	}
@@ -289,13 +306,13 @@ func TestRoutineRetryAndCancel(t *testing.T) {
 func TestLongStreakAndMonthBoundary(t *testing.T) {
 	ws := fixture(t, "## ルーティン\n- [毎日] Read\n- [月1] Publish\n")
 	now := time.Date(2026, 10, 1, 12, 0, 0, 0, JST)
-	rs, _ := Routines(ws.Root, nil, now)
-	es := []workspace.Activity{}
+	dates := []string{}
 	for i := 1; i <= 12; i++ {
-		es = append(es, workspace.Activity{ID: rs[0].ID, Kind: "routine.state", Date: now.AddDate(0, 0, -i).Format("2006-01-02"), State: "done"})
+		dates = append(dates, now.AddDate(0, 0, -i).Format("2006-01-02"))
 	}
-	es = append(es, workspace.Activity{ID: rs[1].ID, Kind: "routine.state", Date: "2026-09-15", State: "done"})
-	rs, _ = Routines(ws.Root, es, now)
+	h := history(routineKey("demo", "Read"), dates...)
+	h.Routines[routineKey("demo", "Publish")] = map[string]bool{"2026-09-15": true}
+	rs, _ := Routines(ws.Root, h, now)
 	if rs[0].Streak != 12 || len(rs[0].Periods) != 8 {
 		t.Fatalf("long streak truncated: %+v", rs[0])
 	}

@@ -53,48 +53,46 @@ func Load(ws *workspace.Workspace, now time.Time) (View, error) {
 	if v.Diary, err = diary.Recent(ws.Root, now, 30); err != nil {
 		return v, err
 	}
-	events, err := ws.Activities()
+	h, err := ReadHistory(ws.Root)
 	if err != nil {
 		return v, err
 	}
-	if v.Routines, err = Routines(ws.Root, events, now); err != nil {
+	if v.Routines, err = Routines(ws.Root, h, now); err != nil {
 		return v, err
 	}
-	states := map[string]workspace.Activity{}
-	reviews := map[string]time.Time{}
-	for _, e := range events {
-		if v.RecordedSince == "" || e.Date < v.RecordedSince {
-			v.RecordedSince = e.Date
-		}
-		switch e.Kind {
-		case "task.state":
-			states[e.ID] = e
-		case "routine.state":
-			states[e.ID+"/"+e.Date] = e
-		case "task.deferred", "task.triaged":
-			reviews[e.ID] = e.At
-			if e.Date == v.Date {
-				v.DeferredToday = true
-			}
+	counts := map[string]int{}
+	for date, n := range h.Done {
+		counts[date] += n
+	}
+	for _, dates := range h.Routines {
+		for date := range dates {
+			counts[date]++
 		}
 	}
-	counts := map[string]int{}
-	for _, e := range states {
-		if e.State == "done" {
-			counts[e.Date]++
+	for date := range counts {
+		if v.RecordedSince == "" || date < v.RecordedSince {
+			v.RecordedSince = date
 		}
 	}
 	for d := now.AddDate(0, 0, -125); !d.After(now); d = d.AddDate(0, 0, 1) {
 		date := d.Format("2006-01-02")
 		v.Activity = append(v.Activity, Day{date, counts[date]})
 	}
+	// 仕分けは @seen(日付) で記録する。今日の @seen があればその日の仕分けは済み。
 	candidates := []tasks.Task{}
+	for _, d := range snapshots {
+		for _, t := range d.Tasks {
+			if t.Seen == v.Date {
+				v.DeferredToday = true
+			}
+		}
+	}
 	for _, t := range v.Board.Later {
 		if t.State == "todo" {
 			candidates = append(candidates, t)
 		}
 	}
-	sort.SliceStable(candidates, func(i, j int) bool { return reviews[candidates[i].ID].Before(reviews[candidates[j].ID]) })
+	sort.SliceStable(candidates, func(i, j int) bool { return candidates[i].Seen < candidates[j].Seen })
 	if !v.DeferredToday && len(candidates) > 0 {
 		v.Triage = &candidates[0]
 	}
