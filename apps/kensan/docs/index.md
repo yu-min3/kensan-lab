@@ -30,3 +30,5 @@ other component. It proves the platform end-to-end, not just in manifests.
 
 See [Architecture](architecture.md) for how the pieces fit together, and
 [Personal Daily Briefing](feed.md) for the scheduled Feed ingestion flow.
+
+See [Today Dashboard](today.md) for goal-linked tasks, routines, and activity persistence.

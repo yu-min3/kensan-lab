@@ -14,7 +14,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/yu-min3/kensan-lab/apps/kensan/backend/internal/metrics"
 	"github.com/yu-min3/kensan-lab/apps/kensan/backend/internal/tasks"
 	"github.com/yu-min3/kensan-lab/apps/kensan/backend/internal/workspace"
 )
@@ -37,6 +36,8 @@ type Summary struct {
 	// 一覧でも「今どういう状態か」を出すため、詳細と同じ判定を返す（実装は state.go）
 	State  State        `json:"state"`
 	Metric *MetricBrief `json:"metric,omitempty"`
+	// 今日画面は現在地（判断と日付）を主に出し、次のマイルストーンとは区別する。
+	Current CurrentState `json:"current"`
 }
 
 // LogEntry は ## ログ の 1 エントリ（日付 + 本文）。
@@ -90,92 +91,33 @@ func readme(root, name string) (string, error) {
 // Summaries は全アクティブ含む全プロジェクトのサマリを返す。
 // 並び: active 優先 → 締切が近い順（無しは後ろ）→ 名前。
 func Summaries(root string) []Summary {
-	today := time.Now().Truncate(24 * time.Hour)
-	var out []Summary
-	for _, name := range tasks.Projects(root) {
-		content, err := readme(root, name)
-		if err != nil {
-			continue
-		}
-		fm := frontmatter(content)
-		s := Summary{Name: name, Status: fm["status"], Deadline: fm["deadline"], Goal: firstLine(section(content, "目標"))}
-		var ms, ts []tasks.Task
-		for _, t := range tasks.ExtractLines(content, "") {
-			switch t.Section {
-			case "マイルストーン":
-				ms = append(ms, t)
-				s.MilestonesTotal++
-				if t.State == "done" {
-					s.MilestonesDone++
-				}
-			case "タスク", "いつかやる":
-				ts = append(ts, t)
-				if t.State == "todo" {
-					s.OpenTasks++
-				}
-			}
-		}
-		// メトリクスは opt-in。無い project では nil のまま（エラーにしない）。
-		var views []metrics.View
-		if r, err := metrics.Load(root, name, time.Now()); err == nil {
-			views = r.Metrics
-		}
-		s.State = ComputeState(s.Deadline, ms, ts, parseLog(section(content, "ログ")), views, today)
-		s.Metric = briefOf(views)
-		out = append(out, s)
+	snapshots := Snapshots(root, time.Now().In(time.FixedZone("JST", 9*60*60)))
+	out := make([]Summary, 0, len(snapshots))
+	for _, snapshot := range snapshots {
+		out = append(out, snapshot.Summary)
 	}
-	sort.SliceStable(out, func(i, j int) bool {
-		ai, aj := out[i].Status == "active", out[j].Status == "active"
-		if ai != aj {
-			return ai
-		}
-		di, dj := out[i].Deadline, out[j].Deadline
-		if (di == "") != (dj == "") {
-			return di != "" // 締切ありを前に
-		}
-		if di != dj {
-			return di < dj
-		}
-		return out[i].Name < out[j].Name
-	})
 	return out
 }
 
-// Load は 1 プロジェクトの詳細を返す。
+// Load は詳細画面専用の関連文書だけを、軽いスナップショットに追加する。
 func Load(root, name string) (Detail, error) {
-	content, err := readme(root, name)
+	snapshot, err := ReadSnapshot(root, name, time.Now().In(time.FixedZone("JST", 9*60*60)))
 	if err != nil {
 		return Detail{}, err
 	}
+	content, s := snapshot.Content, snapshot.Summary
 	fm := frontmatter(content)
 	d := Detail{
-		Name: name, Status: fm["status"], Deadline: fm["deadline"], Repo: fm["repo"],
+		Name: name, Status: s.Status, Deadline: s.Deadline, Repo: fm["repo"],
 		Overview: strings.TrimSpace(section(content, "概要")),
 		Current:  parseCurrent(section(content, "現在地")),
 		Goal:     strings.TrimSpace(section(content, "目標")),
 		Log:      parseLog(section(content, "ログ")),
 		Notes:    parseNotes(sectionPrefix(content, "関連ノート")),
-	}
-	rel := filepath.ToSlash(filepath.Join("projects", name, "README.md"))
-	for _, t := range tasks.ExtractLines(content, rel) {
-		t.Project = name
-		switch t.Section {
-		case "マイルストーン":
-			d.Milestones = append(d.Milestones, t)
-		case "タスク", "いつかやる":
-			// バンド設計（tasks.Board）と揃える: バンドタグの無いタスクは
-			// 「いつか」バンドであり、## いつかやる もその置き場のひとつ。
-			// ここで落とすと Board に出ているタスクが project 詳細から消える。
-			d.Tasks = append(d.Tasks, t)
-		}
-	}
-	var views []metrics.View
-	if r, err := metrics.Load(root, name, time.Now()); err == nil {
-		views = r.Metrics
+		Tasks:    snapshot.Tasks, Milestones: snapshot.Milestones, State: s.State,
 	}
 	auto := collectProjectDocs(root, name)
 	d.Related = append(auto, manualRelated(d.Notes, auto)...)
-	d.State = ComputeState(d.Deadline, d.Milestones, d.Tasks, d.Log, views, time.Now().Truncate(24*time.Hour))
 	return d, nil
 }
 

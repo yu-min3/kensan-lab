@@ -1,5 +1,6 @@
 import { useState, type ReactNode } from "react";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useMutation } from "@tanstack/react-query";
+import { useWorkspaceRefresh } from "../hooks/useWorkspaceRefresh";
 import {
   DndContext,
   closestCenter,
@@ -40,7 +41,7 @@ const LANES: LaneDef[] = [
 
 // lanes は後方互換のため受け取るが、4 バンドは縦積みで描画する（今日を最上部に）。
 export function TaskBoard(_props: { lanes?: "split" | "stack" } = {}) {
-  const qc = useQueryClient();
+  const refresh = useWorkspaceRefresh();
   const board = useQuery({ queryKey: ["board"], queryFn: api.board });
   const projects = useQuery({ queryKey: ["projects"], queryFn: api.projects });
   const [lastError, setLastError] = useState<string | null>(null);
@@ -52,7 +53,7 @@ export function TaskBoard(_props: { lanes?: "split" | "stack" } = {}) {
         ? "ファイルが他のクライアントに編集されています。再読込しました。"
         : String(e instanceof Error ? e.message : e),
     );
-  const settled = () => qc.invalidateQueries({ queryKey: ["board"] });
+  const settled = refresh;
 
   const setBand = useMutation({
     mutationFn: ({ task, band }: { task: Task; band: Band }) => api.setBand(task, band),

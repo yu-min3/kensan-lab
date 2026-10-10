@@ -58,6 +58,7 @@ export interface FeedAcknowledgement {
 }
 
 export interface Task {
+  id?: string;
   text: string; // 行内タグ込みの生テキスト（state/today/archive の照合に使う）
   display: string; // タグを除いた表示用テキスト
   state: "todo" | "done" | "skipped";
@@ -85,6 +86,7 @@ export interface Board {
 }
 
 export interface Focus {
+  project?: string;
   title: string;
   detail: string;
 }
@@ -115,6 +117,7 @@ export interface ProjectState {
 }
 
 export interface MetricBrief {
+  direction?: string;
   label: string;
   unit: string;
   current?: number;
@@ -132,6 +135,7 @@ export interface ProjectSummary {
   openTasks: number;
   state: ProjectState;
   metric?: MetricBrief;
+  current?: { date?: string; text: string };
 }
 
 export interface LogEntry {
@@ -205,6 +209,24 @@ export class ApiError extends Error {
   }
 }
 
+export interface Routine {
+  id: string; project: string; text: string; schedule: string; unit: string;
+  target: number; file: string; line: number; supported: boolean;
+  doneToday: boolean; expectedToday: boolean; streak: number;
+  periods: { start: string; count: number; target: number; status: "met" | "pending" | "missed" | "unknown" }[];
+}
+export interface TodayView {
+  date: string; goals: Goals; projects: ProjectSummary[]; board: Board; routines: Routine[];
+  activity: { date: string; count: number }[]; recordedSince: string;
+  triage: Task | null; deferredToday: boolean; skipped: Task[];
+  forecasts: Record<string, string>; phases: Record<string, string>;
+  diary: DiarySummary;
+}
+export interface DiarySummary {
+  last?: string;
+  days: { date: string; written: boolean }[];
+}
+
 // W3C traceparent を生成して伝搬する（backend の otelhttp が拾う）
 function traceparent(): string {
   const hex = (n: number) =>
@@ -237,6 +259,19 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 }
 
 export const api = {
+  triageTask: (t: Task, action: "today" | "later" | "skip") => request<{ task: Task }>("/tasks/triage", {
+    method: "POST", body: JSON.stringify({ file: t.file, line: t.line, text: t.text, action }),
+  }),
+  today: () => request<TodayView>("/today"),
+  // 1 行日記。daily の ## 日記 へ時刻付きで追記する（保存先はサーバーが決める）。
+  dailyLine: (date: string, text: string) =>
+    request<{ path: string }>("/daily/line", { method: "POST", body: JSON.stringify({ date, text }) }),
+  routineState: (r: Routine, date: string, done: boolean) => request<{ done: boolean }>("/routines/state", {
+    method: "PUT", body: JSON.stringify({ file: r.file, id: r.id, date, done }),
+  }),
+  deferTask: (t: Task) => request<{ task: Task }>("/tasks/defer", {
+    method: "POST", body: JSON.stringify({ file: t.file, line: t.line, text: t.text }),
+  }),
   feeds: () => request<{ feeds: FeedEntry[]; total: number }>("/feeds"),
 
   latestFeed: () => request<LatestFeed>("/feeds/latest"),
@@ -369,11 +404,6 @@ export const api = {
     return request<{ files: Doc[]; total: number }>(`/files${qs ? `?${qs}` : ""}`);
   },
 
-  search: (q: string, type?: string) =>
-    request<{ hits: SearchHit[]; total: number; truncated: boolean }>(
-      `/search?q=${encodeURIComponent(q)}${type ? `&type=${type}` : ""}`,
-    ),
-
   reviews: () => request<{ reviews: ReviewEntry[]; total: number }>("/reviews"),
 
   // git 履歴（読み取り専用）。コミット一覧（新しい順）。
@@ -390,12 +420,6 @@ export interface Commit {
   short: string;
   date: string; // RFC3339（author date）
   subject: string;
-}
-
-export interface SearchHit {
-  path: string;
-  line: number;
-  snippet: string;
 }
 
 export interface ReviewEntry {

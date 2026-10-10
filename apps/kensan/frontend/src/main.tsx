@@ -10,9 +10,8 @@ import { MemoPage } from "./pages/MemoPage";
 import { TasksPage } from "./pages/TasksPage";
 import { ProjectsPage } from "./pages/ProjectsPage";
 import { ReviewsPage } from "./pages/ReviewsPage";
-import { NotesPage } from "./pages/NotesPage";
 import { LifeGoalsPage } from "./pages/LifeGoalsPage";
-import { MarkdownViewerPage } from "./pages/MarkdownViewerPage";
+import { MarkportRedirect } from "./pages/MarkportRedirect";
 import { NotFoundPage } from "./pages/NotFoundPage";
 import { FeedPage } from "./pages/FeedPage";
 import "./index.css";
@@ -36,10 +35,11 @@ createRoot(document.getElementById("root")!).render(
               <Route path="/feed" element={<FeedPage />} />
               <Route path="/daily" element={<DailyPage />} />
               <Route path="/memos" element={<MemoPage />} />
-              <Route path="/notes" element={<NotesPage />} />
               <Route path="/life" element={<LifeGoalsPage />} />
               <Route path="/reviews" element={<ReviewsPage />} />
-              <Route path="/view" element={<MarkdownViewerPage />} />
+              {/* 旧ノート・ビューアの URL は markport へ案内する */}
+              <Route path="/notes" element={<MarkportRedirect />} />
+              <Route path="/view" element={<MarkportRedirect />} />
               {/* 未定義ルートの受け皿（白画面防止） */}
               <Route path="*" element={<NotFoundPage />} />
             </Routes>

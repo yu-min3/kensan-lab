@@ -1,8 +1,11 @@
 package tasks
 
 import (
+	"crypto/rand"
+	"encoding/hex"
 	"errors"
 	"fmt"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -82,7 +85,7 @@ func Move(ws *workspace.Workspace, file string, line int, expectText string, des
 			return nil, fmt.Errorf("%w: line %d out of range", ErrLineMismatch, line)
 		}
 		m := checkboxRe.FindStringSubmatch(lines[line-1])
-		if m == nil || strings.TrimSpace(m[2]) != strings.TrimSpace(expectText) {
+		if m == nil || !matchesExpected(m[2], expectText) {
 			return nil, fmt.Errorf("%w: %s:%d", ErrLineMismatch, file, line)
 		}
 		taskLine = "- [" + m[1] + "] " + strings.TrimSpace(m[2])
@@ -119,10 +122,9 @@ func Move(ws *workspace.Workspace, file string, line int, expectText string, des
 	}
 
 	m := checkboxRe.FindStringSubmatch(taskLine)
-	return Task{
-		Text: strings.TrimSpace(m[2]), State: stateOf(m[1]),
-		File: destFile, Line: newLine, Section: destSection,
-	}, nil
+	out := taskFromBody(m[1], strings.TrimSpace(m[2]), destFile, newLine, "")
+	out.Section = destSection
+	return out, nil
 }
 
 // SetToday は行の @today タグを付け外しする（今日やる ⇄ ストックの切替）。
@@ -138,7 +140,7 @@ func SetToday(ws *workspace.Workspace, file string, line int, expectText string,
 			return nil, fmt.Errorf("%w: line %d out of range", ErrLineMismatch, line)
 		}
 		m := checkboxRe.FindStringSubmatch(lines[line-1])
-		if m == nil || strings.TrimSpace(m[2]) != strings.TrimSpace(expectText) {
+		if m == nil || !matchesExpected(m[2], expectText) {
 			return nil, fmt.Errorf("%w: %s:%d", ErrLineMismatch, file, line)
 		}
 		newText := toggleToday(strings.TrimSpace(m[2]), on)
@@ -165,7 +167,7 @@ func SetBand(ws *workspace.Workspace, file string, line int, expectText, band st
 			return nil, fmt.Errorf("%w: line %d out of range", ErrLineMismatch, line)
 		}
 		m := checkboxRe.FindStringSubmatch(lines[line-1])
-		if m == nil || strings.TrimSpace(m[2]) != strings.TrimSpace(expectText) {
+		if m == nil || !matchesExpected(m[2], expectText) {
 			return nil, fmt.Errorf("%w: %s:%d", ErrLineMismatch, file, line)
 		}
 		out = rewriteLine(lines, line, m[1], setBandTag(strings.TrimSpace(m[2]), band), file)
@@ -228,9 +230,15 @@ func buildBody(display, band string, due, ms, pTag string) string {
 
 func taskFromBody(mark, body, file string, line int, project string) Task {
 	tg := parseInline(body)
+	parts := strings.Split(file, "/")
+	if project == "" && len(parts) == 3 && parts[0] == "projects" {
+		project = parts[1]
+	}
 	return Task{
+		ID:   taskID(body),
 		Text: body, Display: tg.Display, State: stateOf(mark), File: file, Line: line, Project: project,
-		Today: tg.Today, Due: tg.Due, Milestone: tg.Milestone, Priority: tg.Priority,
+		Today: tg.Today, Week: tg.Week, Month: tg.Month, Due: tg.Due, Milestone: tg.Milestone, Priority: tg.Priority,
+		Done: tg.Done, Seen: tg.Seen,
 	}
 }
 
@@ -291,10 +299,10 @@ func EditTask(ws *workspace.Workspace, file string, line int, expectText, projec
 				return nil, fmt.Errorf("%w: line %d out of range", ErrLineMismatch, line)
 			}
 			m := checkboxRe.FindStringSubmatch(lines[line-1])
-			if m == nil || strings.TrimSpace(m[2]) != strings.TrimSpace(expectText) {
+			if m == nil || !matchesExpected(m[2], expectText) {
 				return nil, fmt.Errorf("%w: %s:%d", ErrLineMismatch, file, line)
 			}
-			body := buildBody(display, band, due, ms, pRe.FindString(strings.TrimSpace(m[2])))
+			body := preserveMeta(buildBody(display, band, due, ms, pRe.FindString(strings.TrimSpace(m[2]))), m[2])
 			out = rewriteLine(lines, line, m[1], body, file)
 			out.Project = project
 			return []byte(workspaceTouch(strings.Join(lines, "\n"))), nil
@@ -313,11 +321,11 @@ func EditTask(ws *workspace.Workspace, file string, line int, expectText, projec
 			return nil, fmt.Errorf("%w: line %d out of range", ErrLineMismatch, line)
 		}
 		m := checkboxRe.FindStringSubmatch(lines[line-1])
-		if m == nil || strings.TrimSpace(m[2]) != strings.TrimSpace(expectText) {
+		if m == nil || !matchesExpected(m[2], expectText) {
 			return nil, fmt.Errorf("%w: %s:%d", ErrLineMismatch, file, line)
 		}
 		mark = m[1]
-		body = buildBody(display, band, due, ms, pRe.FindString(strings.TrimSpace(m[2])))
+		body = preserveMeta(buildBody(display, band, due, ms, pRe.FindString(strings.TrimSpace(m[2]))), m[2])
 		out := append(lines[:line-1:line-1], lines[line:]...)
 		return []byte(workspaceTouch(strings.Join(out, "\n"))), nil
 	})
@@ -360,7 +368,7 @@ func SetText(ws *workspace.Workspace, file string, line int, expectText, newDisp
 			return nil, fmt.Errorf("%w: line %d out of range", ErrLineMismatch, line)
 		}
 		m := checkboxRe.FindStringSubmatch(lines[line-1])
-		if m == nil || strings.TrimSpace(m[2]) != strings.TrimSpace(expectText) {
+		if m == nil || !matchesExpected(m[2], expectText) {
 			return nil, fmt.Errorf("%w: %s:%d", ErrLineMismatch, file, line)
 		}
 		nd := strings.TrimSpace(newDisplay)
@@ -379,6 +387,9 @@ func SetText(ws *workspace.Workspace, file string, line int, expectText, newDisp
 // tagSuffix は行テキストに含まれる行内タグを固定順（band→due→ms→p）で 1 文字列にまとめる。
 func tagSuffix(raw string) string {
 	var parts []string
+	if id := idRe.FindString(raw); id != "" {
+		parts = append(parts, id)
+	}
 	if todayRe.MatchString(raw) {
 		parts = append(parts, "@today")
 	}
@@ -397,6 +408,12 @@ func tagSuffix(raw string) string {
 	if s := pRe.FindString(raw); s != "" {
 		parts = append(parts, s)
 	}
+	if s := doneRe.FindString(raw); s != "" {
+		parts = append(parts, s)
+	}
+	if s := seenRe.FindString(raw); s != "" {
+		parts = append(parts, s)
+	}
 	return strings.Join(parts, " ")
 }
 
@@ -412,7 +429,7 @@ func SetDue(ws *workspace.Workspace, file string, line int, expectText, due stri
 			return nil, fmt.Errorf("%w: line %d out of range", ErrLineMismatch, line)
 		}
 		m := checkboxRe.FindStringSubmatch(lines[line-1])
-		if m == nil || strings.TrimSpace(m[2]) != strings.TrimSpace(expectText) {
+		if m == nil || !matchesExpected(m[2], expectText) {
 			return nil, fmt.Errorf("%w: %s:%d", ErrLineMismatch, file, line)
 		}
 		out = rewriteLine(lines, line, m[1], setDueTag(strings.TrimSpace(m[2]), due), file)
@@ -443,7 +460,7 @@ func SetPriority(ws *workspace.Workspace, file string, line int, expectText stri
 			return nil, fmt.Errorf("%w: line %d out of range", ErrLineMismatch, line)
 		}
 		m := checkboxRe.FindStringSubmatch(lines[line-1])
-		if m == nil || strings.TrimSpace(m[2]) != strings.TrimSpace(expectText) {
+		if m == nil || !matchesExpected(m[2], expectText) {
 			return nil, fmt.Errorf("%w: %s:%d", ErrLineMismatch, file, line)
 		}
 		out = rewriteLine(lines, line, m[1], setPriorityTag(strings.TrimSpace(m[2]), n), file)
@@ -456,11 +473,7 @@ func SetPriority(ws *workspace.Workspace, file string, line int, expectText stri
 func rewriteLine(lines []string, line int, mark, newText, file string) Task {
 	indent := lines[line-1][:strings.Index(lines[line-1], "- [")]
 	lines[line-1] = indent + "- [" + mark + "] " + newText
-	tg := parseInline(newText)
-	return Task{
-		Text: newText, Display: tg.Display, State: stateOf(mark), File: file, Line: line,
-		Today: tg.Today, Due: tg.Due, Milestone: tg.Milestone, Priority: tg.Priority,
-	}
+	return taskFromBody(mark, newText, file, line, "")
 }
 
 // toggleToday は行テキストの末尾の @today を付け外しする。
@@ -500,7 +513,7 @@ func DeleteLine(ws *workspace.Workspace, file string, line int, expectText strin
 			return nil, fmt.Errorf("%w: line %d out of range", ErrLineMismatch, line)
 		}
 		m := checkboxRe.FindStringSubmatch(lines[line-1])
-		if m == nil || strings.TrimSpace(m[2]) != strings.TrimSpace(expectText) {
+		if m == nil || !matchesExpected(m[2], expectText) {
 			return nil, fmt.Errorf("%w: %s:%d", ErrLineMismatch, file, line)
 		}
 		// full slice expression で元 slice の clobber を防ぐ
@@ -511,17 +524,70 @@ func DeleteLine(ws *workspace.Workspace, file string, line int, expectText strin
 
 // SetState はチェックボックスの状態を書き換える（todo / done / skipped）。
 func SetState(ws *workspace.Workspace, file string, line int, expectText, state string) (Task, error) {
-	var mark string
-	switch state {
-	case "todo":
-		mark = " "
-	case "done":
-		mark = "x"
-	case "skipped":
-		mark = "-"
+	return observeTask(ws, file, line, expectText, state, "")
+}
+
+func ReviewLater(ws *workspace.Workspace, file string, line int, text string) (Task, error) {
+	return Triage(ws, file, line, text, "later")
+}
+
+// Triage は今日画面の仕分け（today / later / skip）。どれを選んでも @seen(今日) を付け、
+// その日の仕分けを終える。次に出す候補は @seen の古い順（タグ無しが先）。
+func Triage(ws *workspace.Workspace, file string, line int, text, action string) (Task, error) {
+	state := "todo"
+	switch action {
+	case "today", "later":
+	case "skip":
+		state = "skipped"
 	default:
+		return Task{}, fmt.Errorf("unknown triage action: %q", action)
+	}
+	return observeTask(ws, file, line, text, state, action)
+}
+
+// preserveMeta は編集で本文やバンドを置き換えても、アプリが付けたタグ
+// （@id・完了日 @done・仕分け日 @seen）を引き継ぐ。履歴を消すのは取消などの状態変更だけ。
+func preserveMeta(body, old string) string {
+	for _, re := range []*regexp.Regexp{idRe, doneRe, seenRe} {
+		if tag := re.FindString(old); tag != "" {
+			body += " " + tag
+		}
+	}
+	return body
+}
+
+// Old clients may reuse the locator from before the first state operation.
+// Ignore only tags the app adds itself (@id / @done / @seen), never a changed
+// title, band or deadline.
+func matchesExpected(actual, expected string) bool {
+	if taskID(expected) == "" {
+		actual = idRe.ReplaceAllString(actual, "")
+	}
+	// 完了日・仕分け日は状態の記録であって本文ではない。両側から外して比べる。
+	for _, re := range []*regexp.Regexp{doneRe, seenRe} {
+		actual, expected = re.ReplaceAllString(actual, ""), re.ReplaceAllString(expected, "")
+	}
+	return strings.TrimSpace(multiSpace.ReplaceAllString(actual, " ")) == strings.TrimSpace(multiSpace.ReplaceAllString(expected, " "))
+}
+
+// setTag は行の re に一致するタグを tag へ置き換える（空なら除去）。
+func setTag(body string, re *regexp.Regexp, tag string) string {
+	body = strings.TrimSpace(multiSpace.ReplaceAllString(re.ReplaceAllString(body, ""), " "))
+	if tag == "" {
+		return body
+	}
+	return body + " " + tag
+}
+
+// observeTask は状態変更と仕分けを Markdown の行だけで記録する。
+// 完了は @done(日付)、仕分けは @seen(日付)。同じ操作の再送は何も変えずに受け付ける。
+func observeTask(ws *workspace.Workspace, file string, line int, expectText, state, action string) (Task, error) {
+	marks := map[string]string{"todo": " ", "done": "x", "skipped": "-"}
+	mark, ok := marks[state]
+	if !ok {
 		return Task{}, fmt.Errorf("unknown state: %q", state)
 	}
+	date := time.Now().In(time.FixedZone("JST", 9*60*60)).Format("2006-01-02")
 	var out Task
 	err := ws.Mutate(file, func(content []byte, exists bool) ([]byte, error) {
 		if !exists {
@@ -532,12 +598,67 @@ func SetState(ws *workspace.Workspace, file string, line int, expectText, state 
 			return nil, fmt.Errorf("%w: line %d out of range", ErrLineMismatch, line)
 		}
 		m := checkboxRe.FindStringSubmatch(lines[line-1])
-		if m == nil || strings.TrimSpace(m[2]) != strings.TrimSpace(expectText) {
+		if m == nil {
 			return nil, fmt.Errorf("%w: %s:%d", ErrLineMismatch, file, line)
 		}
-		indent := lines[line-1][:strings.Index(lines[line-1], "- [")]
-		lines[line-1] = indent + "- [" + mark + "] " + strings.TrimSpace(m[2])
-		out = Task{Text: strings.TrimSpace(m[2]), State: state, File: file, Line: line}
+		out = taskFromBody(m[1], strings.TrimSpace(m[2]), file, line, "")
+		for _, t := range ExtractLines(string(content), file) {
+			if t.Line == line {
+				out.Section = t.Section
+				break
+			}
+		}
+		if action != "" && out.Seen == date && m[1] == mark {
+			// 今日すでに仕分け済みの行。付けたタグを除いて元の本文と一致する同じ操作の再送だけ受け付ける。
+			replay, want := setTag(m[2], seenRe, ""), setTag(expectText, seenRe, "")
+			if action == "today" {
+				if !todayRe.MatchString(replay) {
+					return nil, fmt.Errorf("%w: %s:%d", ErrLineMismatch, file, line)
+				}
+				replay, want = setBandTag(replay, "today"), setBandTag(want, "today")
+			}
+			if matchesExpected(replay, want) {
+				return nil, nil
+			}
+			return nil, fmt.Errorf("%w: %s:%d", ErrLineMismatch, file, line)
+		}
+		if !matchesExpected(m[2], expectText) {
+			return nil, fmt.Errorf("%w: %s:%d", ErrLineMismatch, file, line)
+		}
+		if action == "" && m[1] == mark {
+			return nil, nil
+		}
+		if action != "" && out.State != "todo" {
+			return nil, ErrLineMismatch
+		}
+		body := strings.TrimSpace(m[2])
+		id := taskID(body)
+		if id == "" {
+			buf := make([]byte, 16)
+			if _, err := rand.Read(buf); err != nil {
+				return nil, err
+			}
+			id = hex.EncodeToString(buf)
+			body += " @id(" + id + ")"
+		}
+		section := out.Section
+		if action == "today" {
+			body = setBandTag(body, "today")
+		}
+		if action != "" {
+			body = setTag(body, seenRe, "@seen("+date+")")
+		}
+		if state == "done" {
+			body = setTag(body, doneRe, "@done("+date+")")
+		} else {
+			body = setTag(body, doneRe, "")
+		}
+		out = rewriteLine(lines, line, mark, body, file)
+		out.ID, out.Section = id, section
+		parts := strings.Split(file, "/")
+		if len(parts) == 3 && parts[0] == "projects" {
+			out.Project = parts[1]
+		}
 		return []byte(workspaceTouch(strings.Join(lines, "\n"))), nil
 	})
 	return out, err
@@ -588,18 +709,7 @@ func newDailySkeleton(date time.Time) string {
 	if date.IsZero() {
 		date = time.Now()
 	}
-	d := date.Format("2006-01-02")
-	return fmt.Sprintf(`---
-type: daily
-tags: []
-created: %s
-updated: %s
----
-
-# %s
-
-## 日記
-`, d, d, d)
+	return workspace.DailySkeleton(date)
 }
 
 // workspaceTouch は frontmatter の updated を今日に更新する。

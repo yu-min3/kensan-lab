@@ -7,8 +7,10 @@ import (
 	"os"
 	"time"
 
+	"github.com/yu-min3/kensan-lab/apps/kensan/backend/internal/diary"
 	"github.com/yu-min3/kensan-lab/apps/kensan/backend/internal/projects"
 	"github.com/yu-min3/kensan-lab/apps/kensan/backend/internal/tasks"
+	"github.com/yu-min3/kensan-lab/apps/kensan/backend/internal/today"
 	"github.com/yu-min3/kensan-lab/apps/kensan/backend/internal/workspace"
 )
 
@@ -367,4 +369,36 @@ func writeOpError(w http.ResponseWriter, err error) {
 	default:
 		writeError(w, http.StatusBadRequest, err.Error())
 	}
+}
+
+// POST /api/v1/daily/line {date, text} — 今日画面の 1 行日記。daily の ## 日記 へ時刻付きで追記する。
+func (s *Server) handleDailyLine(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		Date string `json:"date"`
+		Text string `json:"text"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	now := time.Now().In(today.JST)
+	date := now
+	if req.Date != "" {
+		d, err := time.ParseInLocation("2006-01-02", req.Date, today.JST)
+		if err != nil {
+			writeError(w, http.StatusBadRequest, "invalid date: "+req.Date)
+			return
+		}
+		date = d
+	}
+	path, err := diary.Add(s.ws, date, now, req.Text)
+	if err != nil {
+		if errors.Is(err, diary.ErrEmpty) || errors.Is(err, diary.ErrTooLong) {
+			writeError(w, http.StatusBadRequest, err.Error())
+			return
+		}
+		writeOpError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"path": path})
 }

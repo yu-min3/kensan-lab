@@ -1,6 +1,7 @@
 import { useState } from "react";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { useSearchParams, Link } from "react-router-dom";
+import { useQuery, useMutation } from "@tanstack/react-query";
+import { useWorkspaceRefresh } from "../hooks/useWorkspaceRefresh";
+import { useSearchParams } from "react-router-dom";
 import {
   FolderKanban,
   CheckSquare,
@@ -23,6 +24,7 @@ import {
 import clsx from "clsx";
 import { api, ApiError, todayISO, type Doc, type ProjectSummary, type ProjectDetail, type MetricBrief, type ProjectMetric, type ProjectState, type RelatedItem, type Task } from "../lib/api";
 import { PageHeader } from "../components/PageHeader";
+import { markportURL } from "../lib/markport";
 import { MilkdownEditor } from "../components/editors/MilkdownEditor";
 import { useAutosaveFile } from "../hooks/useAutosaveFile";
 import { Card, CardBody } from "../components/ui/card";
@@ -37,7 +39,7 @@ const STATUSES = ["active", "paused", "completed", "cancelled"];
 export function ProjectsPage() {
   const [params, setParams] = useSearchParams();
   const selected = params.get("name");
-  const qc = useQueryClient();
+  const refresh = useWorkspaceRefresh();
   const projects = useQuery({ queryKey: ["projects"], queryFn: api.projects });
   const [creating, setCreating] = useState(false);
   const [newName, setNewName] = useState("");
@@ -47,7 +49,7 @@ export function ProjectsPage() {
     onSuccess: (res) => {
       setCreating(false);
       setNewName("");
-      qc.invalidateQueries({ queryKey: ["projects"] });
+      refresh();
       setParams({ name: res.name });
     },
   });
@@ -159,16 +161,11 @@ function ProjectRow({ project, active, onClick }: { project: ProjectSummary; act
 }
 
 function ProjectDetailView({ name }: { name: string }) {
-  const qc = useQueryClient();
+  const invalidate = useWorkspaceRefresh();
   const detail = useQuery({ queryKey: ["project", name], queryFn: () => api.projectDetail(name) });
   const taggedNotes = useQuery({ queryKey: ["files", "note", name], queryFn: () => api.files({ type: "note", tag: name }) });
   const metrics = useQuery({ queryKey: ["project-metrics", name], queryFn: () => api.projectMetrics(name) });
   const file = `projects/${name}/README.md`;
-  const invalidate = () => {
-    qc.invalidateQueries({ queryKey: ["project", name] });
-    qc.invalidateQueries({ queryKey: ["projects"] });
-    qc.invalidateQueries({ queryKey: ["board"] });
-  };
 
   const toggleMs = useMutation({ mutationFn: (m: Task) => api.setTaskState(m, m.state === "done" ? "todo" : "done"), onSettled: invalidate });
   const editMs = useMutation({ mutationFn: ({ m, text }: { m: Task; text: string }) => api.setText(m, text), onSettled: invalidate });
@@ -954,7 +951,7 @@ function RelatedSection({ related, taggedNotes, name }: { related: RelatedItem[]
           <li key={i} className="flex items-baseline gap-2 text-sm">
             <span className="shrink-0 w-[52px] font-mono text-[10px] text-muted-foreground">{KIND_LABEL[r.kind]}</span>
             {r.target ? (
-              <Link to={`/notes?path=${encodeURIComponent(r.target)}`} className="text-brand hover:underline">{r.label}</Link>
+              <a href={markportURL(r.target)} target="_blank" rel="noreferrer" title="markport で開く（Mac のみ）" className="text-brand hover:underline">{r.label}</a>
             ) : r.url ? (
               <a href={r.url} target="_blank" rel="noreferrer" className="text-brand hover:underline inline-flex items-center gap-1">
                 {r.label} <ExternalLink size={11} />
