@@ -1,0 +1,32 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: app-koubou
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-options: Prune=false
+spec:
+  project: app-project
+  sources:
+  - repoURL: https://github.com/yu-min3/kensan-lab
+    # Review/merge the generic app-base extension before any manual sync.
+    targetRevision: 62cabffe7ab52b250f28034bde98cc29b2212f6e
+    path: charts/app-base
+    helm:
+      releaseName: app-koubou
+      valueFiles:
+      - $app/deploy/lan-entry-values.yaml
+  - repoURL: ssh://git@github.com/yu-min3/koubou.git
+    targetRevision: d5154ef0cb9b280cbbc35ff932bb115ddc7f51a7
+    ref: app
+  - repoURL: ssh://git@github.com/yu-min3/koubou.git
+    targetRevision: d5154ef0cb9b280cbbc35ff932bb115ddc7f51a7
+    path: deploy/app-entry-resources
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: app-koubou
+  # Manual sync only after chart review, repository access, SSO and DNS checks.
+  syncPolicy:
+    syncOptions:
+    - CreateNamespace=false
+    - ServerSideApply=true
