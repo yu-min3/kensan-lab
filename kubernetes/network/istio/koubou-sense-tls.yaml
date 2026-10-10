@@ -1,0 +1,17 @@
+apiVersion: networking.istio.io/v1
+kind: DestinationRule
+metadata:
+  name: koubou-sense-tls
+  namespace: istio-system
+spec:
+  host: koubou-sense.koubou-entry.svc.cluster.local
+  workloadSelector:
+    matchLabels:
+      gateway.networking.k8s.io/gateway-name: gateway-platform
+  trafficPolicy:
+    tls:
+      mode: SIMPLE
+      credentialName: koubou-sense-backend-ca
+      sni: koubou-sense.internal
+      subjectAltNames:
+      - koubou-sense.internal

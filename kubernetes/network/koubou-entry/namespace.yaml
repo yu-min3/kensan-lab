@@ -1,0 +1,7 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: koubou-entry
+  labels:
+    kensan-lab.platform/environment: infrastructure
+    istio-injection: disabled

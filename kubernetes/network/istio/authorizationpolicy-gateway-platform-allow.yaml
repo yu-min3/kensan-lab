@@ -75,6 +75,7 @@ spec:
     - to:
         - operation:
             hosts:
+              - koubou.platform.yu-min3.com
               - hubble.platform.yu-min3.com
               - longhorn.platform.yu-min3.com
               - longhorn.yu-mins.com
