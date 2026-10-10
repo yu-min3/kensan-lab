@@ -405,3 +405,27 @@ func TestArchivedProjectKeepsHistory(t *testing.T) {
 		t.Fatalf("archived history lost: %+v %v", h.Done, err)
 	}
 }
+
+func TestRecordDoneCountsAsUnplanned(t *testing.T) {
+	ws := fixture(t, "## タスク\n- [ ] Planned @today\n")
+	now := time.Now().In(JST)
+	got, err := tasks.RecordDone(ws, "demo", "  予定外の  作業 ", now)
+	if err != nil || got.State != "done" || got.Display != "予定外の 作業" || got.Done != now.Format("2006-01-02") {
+		t.Fatalf("record: %+v %v", got, err)
+	}
+	planned := taskAt(t, ws)
+	if _, err := tasks.SetState(ws, planned.File, planned.Line, planned.Text, "done"); err != nil {
+		t.Fatal(err)
+	}
+	v, err := Load(ws, now)
+	if err != nil || v.DoneToday.Planned != 1 || v.DoneToday.Unplanned != 1 {
+		t.Fatalf("split: %+v %v", v.DoneToday, err)
+	}
+	if _, err := tasks.RecordDone(ws, "missing", "x", now); err == nil {
+		t.Fatal("unknown project must fail, not create a file")
+	}
+	if _, err := tasks.RecordDone(ws, "", "todo に入る", now); err == nil {
+		// todo.md が無い workspace では作らない
+		t.Fatal("missing todo.md must fail")
+	}
+}

@@ -221,6 +221,8 @@ export interface TodayView {
   triage: Task | null; deferredToday: boolean; skipped: Task[];
   forecasts: Record<string, string>; phases: Record<string, string>;
   diary: DiarySummary;
+  // 今日の完了のうち @today 付き（予定どおり）と、それ以外（予定外）
+  doneToday: { planned: number; unplanned: number };
 }
 export interface DiarySummary {
   last?: string;
@@ -264,6 +266,9 @@ export const api = {
   }),
   today: () => request<TodayView>("/today"),
   // 1 行日記。daily の ## 日記 へ時刻付きで追記する（保存先はサーバーが決める）。
+  // やったこと。project の ## タスク（空なら todo.md ## Now）へ完了済みで足す。
+  recordDone: (project: string, display: string) =>
+    request<{ task: Task }>("/tasks/done", { method: "POST", body: JSON.stringify({ project, display }) }),
   dailyLine: (date: string, text: string) =>
     request<{ path: string }>("/daily/line", { method: "POST", body: JSON.stringify({ date, text }) }),
   routineState: (r: Routine, date: string, done: boolean) => request<{ done: boolean }>("/routines/state", {
