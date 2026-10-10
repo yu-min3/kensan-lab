@@ -52,3 +52,9 @@ namespace 等の raw マニフェストが必要なら 3 つ目の source（`dir
 | `ghcrPullSecret.enabled` | `false` | ns に ghcr pull secret を ExternalSecret で生成し SA に配線 |
 | `reloader` | `true` | Secret/ConfigMap 更新時の自動 rollout（stakater/reloader） |
 | `nodeSelector` / `affinity` | `{}` | スケジューリング制約（例: amd64 限定） |
+
+## LAN DNSの自動登録
+
+`httproute.enabled: true` の場合、PlatformのLAN DNSはHTTPRouteのhostnameとGatewayのIPから回答を自動生成する。`httproute.dns.enabled` は既定true。falseにすると通常・OAuth2の両RouteをDNS対象から除外する。AppはDNSサーバーの設定や権限を持たず、自分のvaluesだけを変更する。
+
+本クラスタでは `app-{name}` namespaceが登録できるのは `{name}.app.yu-min3.com`、parentは `istio-system/gateway-prod`。既存kensan外部名だけ例外。別名・別GatewayはPlatformとの契約拡張が必要。DNSは配備完了を保証せず、TTL30秒のキャッシュがある。詳しくは[LAN DNS](../../kubernetes/network/lan-dns/README.md)を参照。

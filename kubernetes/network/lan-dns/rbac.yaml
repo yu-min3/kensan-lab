@@ -1,0 +1,39 @@
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: lan-dns
+  namespace: lan-dns
+  annotations:
+    argocd.argoproj.io/sync-wave: '-1'
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: lan-dns-reader
+  annotations:
+    argocd.argoproj.io/sync-wave: '-1'
+rules:
+- apiGroups: [gateway.networking.k8s.io]
+  resources: [httproutes, gateways]
+  verbs: [list, watch]
+- apiGroups: [apiextensions.k8s.io]
+  resources: [customresourcedefinitions]
+  resourceNames:
+  - gatewayclasses.gateway.networking.k8s.io
+  - httproutes.gateway.networking.k8s.io
+  verbs: [get]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: lan-dns-reader
+  annotations:
+    argocd.argoproj.io/sync-wave: '-1'
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: lan-dns-reader
+subjects:
+- kind: ServiceAccount
+  name: lan-dns
+  namespace: lan-dns
