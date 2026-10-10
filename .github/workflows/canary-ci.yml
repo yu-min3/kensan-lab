@@ -1,0 +1,58 @@
+name: Canary CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+    paths: ["apps/canary/**", ".github/workflows/canary-ci.yml"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: canary-${{ github.workflow }}-${{ github.event_name }}-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  verify:
+    name: canary (locked tests and runtime image)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - name: Test locked dependencies
+        run: docker build --platform linux/amd64 --target test apps/canary
+      - name: Build runtime without pushing
+        run: docker build --platform linux/amd64 -t canary:ci apps/canary
+
+      - name: Verify runtime startup without host networking
+        env:
+          SMOKE_CONTAINER: canary-smoke-${{ github.run_id }}-${{ github.run_attempt }}
+        run: |
+          docker run -d --platform linux/amd64 --name "$SMOKE_CONTAINER" --network none --cap-drop ALL --security-opt no-new-privileges:true --tmpfs /data:rw,uid=1000,gid=1000 -e OTEL_SDK_DISABLED=true canary:ci
+          docker exec -i "$SMOKE_CONTAINER" python - <<'PYTHON'
+          import json, time, urllib.error, urllib.request
+          for attempt in range(60):
+              try:
+                  health = json.load(urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=2))
+                  break
+              except (OSError, urllib.error.URLError):
+                  time.sleep(1)
+          else:
+              raise SystemExit('Runtime failed to become healthy')
+          assert health['status'] == 'healthy'
+          release = json.load(urllib.request.urlopen('http://127.0.0.1:8000/api/release', timeout=3))
+          assert isinstance(release.get('release'), str) and release['release']
+          assert b'id="root"' in urllib.request.urlopen('http://127.0.0.1:8000/', timeout=3).read()
+          print('health, release and packaged frontend: PASS')
+          PYTHON
+      - name: Remove this job's disposable container
+        if: always()
+        env:
+          SMOKE_CONTAINER: canary-smoke-${{ github.run_id }}-${{ github.run_attempt }}
+        run: docker rm -f "$SMOKE_CONTAINER" >/dev/null 2>&1 || true
+
