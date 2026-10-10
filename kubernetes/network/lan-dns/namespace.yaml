@@ -1,0 +1,10 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: lan-dns
+  labels:
+    kensan-lab.platform/environment: infrastructure
+    istio-injection: disabled
+    pod-security.kubernetes.io/enforce: restricted
+  annotations:
+    argocd.argoproj.io/sync-wave: '-2'
