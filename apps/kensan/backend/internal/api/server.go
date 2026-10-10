@@ -44,6 +44,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("POST /api/v1/tasks/today", s.handleTaskToday)
 	mux.HandleFunc("POST /api/v1/tasks/band", s.handleTaskBand)
 	mux.HandleFunc("POST /api/v1/tasks/add", s.handleTaskAdd)
+	mux.HandleFunc("POST /api/v1/tasks/done", s.handleTaskDone)
 	mux.HandleFunc("POST /api/v1/tasks/due", s.handleTaskDue)
 	mux.HandleFunc("POST /api/v1/tasks/priority", s.handleTaskPriority)
 	mux.HandleFunc("POST /api/v1/tasks/reorder", s.handleTaskReorder)

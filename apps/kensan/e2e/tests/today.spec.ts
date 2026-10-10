@@ -108,3 +108,30 @@ for (const mode of ["light", "dark"] as const) {
     expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(390);
   });
 }
+
+test("やったことを1行で残すと、選んだプロジェクトに予定外の完了として入る", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto("/");
+  await page.getByRole("tab", { name: "やったこと", exact: true }).click();
+  await page.getByLabel("プロジェクト").selectOption("today-demo");
+  const before = (await (await page.request.get("/api/v1/today")).json()).doneToday.unplanned;
+  const input = page.getByLabel("やったこと（1 行）");
+  await input.fill("E2Eで予定外の作業");
+  await input.press("Enter");
+  await expect(page.getByText("やったことを残しました", { exact: true })).toBeVisible();
+  await expect(page.getByTestId("done-split")).toContainText(`予定外 ${before + 1}`);
+  const readme = await (await page.request.get("/api/v1/files/projects/today-demo/README.md")).json();
+  expect(readme.content).toMatch(/- \[x\] E2Eで予定外の作業 @done\(\d{4}-\d{2}-\d{2}\)/);
+});
+
+test("今日の予定が3件を超えると明日へ回すよう促す", async ({ page }) => {
+  await page.route("**/api/v1/today", async route => {
+    const view = await (await route.fetch()).json();
+    const base = view.board.today[0];
+    const today = [1, 2, 3, 4].map(i => ({ ...base, id: `t${i}`, line: base.line + i, display: `予定${i}`, state: "todo" }));
+    await route.fulfill({ json: { ...view, board: { ...view.board, today } } });
+  });
+  await page.goto("/");
+  await expect(page.getByText(/今日の予定が\s*4\s*件あります/)).toBeVisible();
+  await expect(page.getByRole("link", { name: "タスク画面で明日へ回す →" })).toHaveAttribute("href", "/tasks");
+});

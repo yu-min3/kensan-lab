@@ -26,6 +26,7 @@ var (
 // History は Markdown から読み直した実績。
 type History struct {
 	Done     map[string]int             // 日付 → 完了タスク数
+	Planned  map[string]int             // 日付 → そのうち @today 付き（予定どおり）
 	Routines map[string]map[string]bool // routineKey → 実施日
 }
 
@@ -37,7 +38,7 @@ func habitLine(project, text string) string {
 
 // ReadHistory は project README・todo.md・daily を読み、完了と習慣の実績を集める。
 func ReadHistory(root string) (History, error) {
-	h := History{Done: map[string]int{}, Routines: map[string]map[string]bool{}}
+	h := History{Done: map[string]int{}, Planned: map[string]int{}, Routines: map[string]map[string]bool{}}
 	files := []string{"todo.md"}
 	for _, p := range tasks.Projects(root) {
 		files = append(files, "projects/"+p+"/README.md")
@@ -77,6 +78,9 @@ func ReadHistory(root string) (History, error) {
 		for _, t := range tasks.ExtractLines(content, rel) {
 			if t.State == "done" && t.Done != "" && t.Section != "習慣" {
 				h.Done[t.Done]++
+				if t.Today {
+					h.Planned[t.Done]++
+				}
 			}
 		}
 		if m := dailyPathRe.FindStringSubmatch(rel); m != nil {
