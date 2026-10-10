@@ -67,6 +67,8 @@ jobs:
       # ApplicationSet が inject するのと同等のパラメータを渡して render が壊れていないか確認
       - name: app-base (app-kensan values)
         run: helm template app-kensan charts/app-base -f kubernetes/apps/app-kensan/values.yaml > /dev/null
+      - name: app-base DNS lifecycle labels
+        run: bash charts/app-base/tests/dns-render.sh
       # explore の Application 群と demo app。explore-ci が kind を起こす前に、
       # render できないだけの壊れ方はここで落とす (数秒 vs 15 分)
       - name: explore applications (kind root app)

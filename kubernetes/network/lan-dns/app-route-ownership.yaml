@@ -1,0 +1,48 @@
+# DNS trusts hostnames in routes. App namespace names define host ownership;
+# labels cannot bypass this contract. Existing kensan public alias is retained.
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingAdmissionPolicy
+metadata:
+  name: app-httproute-ownership
+  annotations:
+    argocd.argoproj.io/sync-wave: '-1'
+spec:
+  failurePolicy: Fail
+  matchConstraints:
+    matchPolicy: Equivalent
+    resourceRules:
+    - apiGroups: [gateway.networking.k8s.io]
+      apiVersions: [v1]
+      operations: [CREATE, UPDATE]
+      resources: [httproutes]
+      scope: Namespaced
+  matchConditions:
+  - name: app-namespace
+    expression: "request.namespace.startsWith('app-')"
+  validations:
+  - expression: >-
+      has(object.spec.hostnames) &&
+      size(object.spec.hostnames) > 0 &&
+      object.spec.hostnames.all(h,
+        'app-' + h == request.namespace + '.app.yu-min3.com' ||
+        (request.namespace == 'app-kensan' && h == 'kensan.yu-mins.com'))
+    message: "App route host must belong to its app namespace"
+  - expression: >-
+      has(object.spec.parentRefs) &&
+      size(object.spec.parentRefs) > 0 &&
+      object.spec.parentRefs.all(p,
+        p.name == 'gateway-prod' &&
+        has(p.namespace) && p.namespace == 'istio-system' &&
+        (!has(p.group) || p.group == 'gateway.networking.k8s.io') &&
+        (!has(p.kind) || p.kind == 'Gateway'))
+    message: "App routes must use istio-system/gateway-prod"
+---
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingAdmissionPolicyBinding
+metadata:
+  name: app-httproute-ownership
+  annotations:
+    argocd.argoproj.io/sync-wave: '-1'
+spec:
+  policyName: app-httproute-ownership
+  validationActions: [Deny]

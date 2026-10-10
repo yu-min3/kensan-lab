@@ -9,6 +9,7 @@ kind: HTTPRoute
 metadata:
   name: {{ include "app-base.name" . }}-oauth2
   labels:
+    k8s-gateway.dns/ignore: {{ not .Values.httproute.dns.enabled | quote }}
     {{- include "app-base.labels" . | nindent 4 }}
 spec:
   parentRefs:
