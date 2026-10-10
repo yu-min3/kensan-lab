@@ -15,6 +15,8 @@ The home page connects project goals to today's tasks and routines. Markdown is 
 | `projects/<name>/README.md` | Goals, milestones, tasks and routine definitions |
 | `todo.md` | Existing standalone tasks; still visible on Today |
 | `daily/YYYY/MM/DD.md` | Diary (`## 日記`), routine records (`## 習慣`) and archived tasks |
+
+The diary counts as written only when `## 日記` has prose of its own. Headings and the `### 完了タスク` block that reflection archives into it do not count, and a one-line entry is inserted above that block.
 | Project metrics files | Current measurements and evidence-based forecasts |
 
 `GET /api/v1/today` joins these sources. Task edits retain the existing task API; `PUT /api/v1/routines/state` records a routine check or cancellation, `POST /api/v1/tasks/triage` accepts `today`, `later`, or `skip`, and `POST /api/v1/daily/line` appends one diary line.
@@ -28,8 +30,8 @@ The home page connects project goals to today's tasks and routines. Markdown is 
 | Triage seen | `@seen(YYYY-MM-DD)` on the task line, for every choice. `today` also adds `@today`; `skip` marks `[-]` | `- [ ] Draft @seen(2026-10-10)` |
 | Task identity | `@id(hex)` added on the first state change or triage | `@id(3f2a…)` |
 
-- Tags the app adds (`@done`, `@seen`, `@id`) are hidden from display and kept when a task is edited, moved between projects, or archived to daily. They are not compared as text for optimistic locking, so a retry after the app added them still matches.
-- The heatmap counts `@done` dates across project READMEs, `todo.md` and daily files, plus routine lines. A completed task without `@done` (for example one checked by hand before this change) is a current task, not a history entry. Agents that complete tasks by hand may add `@done(date)` so they count.
+- Tags the app adds (`@done`, `@seen`, `@id`) are hidden from display and kept when a task is edited (text, band, due, milestone), moved between projects, or archived to daily. Only a state change such as undo removes `@done`. They are not compared as text for optimistic locking, so a retry after the app added them still matches.
+- The heatmap counts `@done` dates across project READMEs (including `projects/_archive/`), `todo.md` and daily files, plus routine lines. Archiving a finished project does not erase its history. A completed task without `@done` (for example one checked by hand before this change) is a current task, not a history entry. Agents that complete tasks by hand may add `@done(date)` so they count.
 - Routine history is keyed by project and routine text. Changing the schedule keeps history; changing the text starts a new habit.
 - Today's triage prompt is finished when any project task carries today's `@seen`. Candidates rotate by oldest `@seen` first (untagged first).
 

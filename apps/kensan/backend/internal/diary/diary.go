@@ -55,9 +55,10 @@ func AppendLine(content string, at time.Time, line string) string {
 	if start == -1 {
 		return strings.Join(lines, "\n") + "\n\n" + heading + "\n\n" + entry + "\n"
 	}
+	// 本文の終わりは次の見出し。### 完了タスク（reflection の退避先）より前に入れる。
 	end := len(lines)
 	for i := start + 1; i < len(lines); i++ {
-		if strings.HasPrefix(lines[i], "# ") || strings.HasPrefix(lines[i], "## ") {
+		if strings.HasPrefix(lines[i], "#") {
 			end = i
 			break
 		}
@@ -156,18 +157,27 @@ func Recent(root string, today time.Time, days int) (Summary, error) {
 	return s, nil
 }
 
-// HasEntry は ## 日記 の節に空白以外の本文があるか。
+// HasEntry は ## 日記 の節に Yu が書いた本文があるか。
+// 見出しだけの行と、reflection がタスクを退避する ### 完了タスク の中身は記入に数えない。
 func HasEntry(content string) bool {
-	in := false
+	in, skip := false, false
 	for _, l := range strings.Split(content, "\n") {
-		if strings.TrimSpace(l) == heading {
-			in = true
+		t := strings.TrimSpace(l)
+		if t == heading {
+			in, skip = true, false
 			continue
 		}
-		if in && (strings.HasPrefix(l, "# ") || strings.HasPrefix(l, "## ")) {
+		if !in {
+			continue
+		}
+		if strings.HasPrefix(l, "# ") || strings.HasPrefix(l, "## ") {
 			return false
 		}
-		if in && strings.TrimSpace(l) != "" {
+		if strings.HasPrefix(t, "#") {
+			skip = strings.TrimSpace(strings.TrimLeft(t, "#")) == "完了タスク"
+			continue
+		}
+		if !skip && t != "" {
 			return true
 		}
 	}

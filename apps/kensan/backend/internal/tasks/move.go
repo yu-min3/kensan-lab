@@ -302,7 +302,7 @@ func EditTask(ws *workspace.Workspace, file string, line int, expectText, projec
 			if m == nil || !matchesExpected(m[2], expectText) {
 				return nil, fmt.Errorf("%w: %s:%d", ErrLineMismatch, file, line)
 			}
-			body := preserveID(buildBody(display, band, due, ms, pRe.FindString(strings.TrimSpace(m[2]))), m[2])
+			body := preserveMeta(buildBody(display, band, due, ms, pRe.FindString(strings.TrimSpace(m[2]))), m[2])
 			out = rewriteLine(lines, line, m[1], body, file)
 			out.Project = project
 			return []byte(workspaceTouch(strings.Join(lines, "\n"))), nil
@@ -325,7 +325,7 @@ func EditTask(ws *workspace.Workspace, file string, line int, expectText, projec
 			return nil, fmt.Errorf("%w: %s:%d", ErrLineMismatch, file, line)
 		}
 		mark = m[1]
-		body = preserveID(buildBody(display, band, due, ms, pRe.FindString(strings.TrimSpace(m[2]))), m[2])
+		body = preserveMeta(buildBody(display, band, due, ms, pRe.FindString(strings.TrimSpace(m[2]))), m[2])
 		out := append(lines[:line-1:line-1], lines[line:]...)
 		return []byte(workspaceTouch(strings.Join(out, "\n"))), nil
 	})
@@ -545,9 +545,13 @@ func Triage(ws *workspace.Workspace, file string, line int, text, action string)
 	return observeTask(ws, file, line, text, state, action)
 }
 
-func preserveID(body, old string) string {
-	if id := idRe.FindString(old); id != "" {
-		return body + " " + id
+// preserveMeta は編集で本文やバンドを置き換えても、アプリが付けたタグ
+// （@id・完了日 @done・仕分け日 @seen）を引き継ぐ。履歴を消すのは取消などの状態変更だけ。
+func preserveMeta(body, old string) string {
+	for _, re := range []*regexp.Regexp{idRe, doneRe, seenRe} {
+		if tag := re.FindString(old); tag != "" {
+			body += " " + tag
+		}
 	}
 	return body
 }

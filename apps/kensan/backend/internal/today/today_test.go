@@ -369,3 +369,39 @@ func TestAllTriageChoicesFinishDay(t *testing.T) {
 		})
 	}
 }
+
+// PR535 レビュー指摘 1: 編集・project 変更で完了日と仕分け日が消えない。
+func TestEditKeepsDoneAndSeen(t *testing.T) {
+	ws := fixture(t, "## タスク\n- [x] Shipped @done(2026-10-01) @seen(2026-09-30) @today\n")
+	if err := ws.Create("projects/other/README.md", []byte("## タスク\n")); err != nil {
+		t.Fatal(err)
+	}
+	a := taskAt(t, ws)
+	same, err := tasks.EditTask(ws, a.File, a.Line, a.Text, "demo", "Shipped v2", "today", "2026-10-20", "")
+	if err != nil || same.Done != "2026-10-01" || same.Seen != "2026-09-30" {
+		t.Fatalf("same-file edit lost tags: %+v %v", same, err)
+	}
+	moved, err := tasks.EditTask(ws, same.File, same.Line, same.Text, "other", "Shipped v3", "today", "", "")
+	if err != nil || moved.Done != "2026-10-01" || moved.Seen != "2026-09-30" {
+		t.Fatalf("project move lost tags: %+v %v", moved, err)
+	}
+	h, err := ReadHistory(ws.Root)
+	if err != nil || h.Done["2026-10-01"] != 1 {
+		t.Fatalf("history after edit: %+v %v", h.Done, err)
+	}
+}
+
+// PR535 レビュー指摘 2: _archive へ移した project の完了記録も履歴に残る。
+func TestArchivedProjectKeepsHistory(t *testing.T) {
+	ws := fixture(t, "## タスク\n- [x] Done once @done(2026-10-02)\n")
+	if err := os.MkdirAll(filepath.Join(ws.Root, "projects/_archive"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Rename(filepath.Join(ws.Root, "projects/demo"), filepath.Join(ws.Root, "projects/_archive/demo")); err != nil {
+		t.Fatal(err)
+	}
+	h, err := ReadHistory(ws.Root)
+	if err != nil || h.Done["2026-10-02"] != 1 {
+		t.Fatalf("archived history lost: %+v %v", h.Done, err)
+	}
+}

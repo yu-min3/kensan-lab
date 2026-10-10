@@ -42,6 +42,14 @@ func ReadHistory(root string) (History, error) {
 	for _, p := range tasks.Projects(root) {
 		files = append(files, "projects/"+p+"/README.md")
 	}
+	// 完了して _archive へ移した project の README も履歴には残す（表示中の project 一覧とは別の条件）。
+	if archived, err := os.ReadDir(filepath.Join(root, "projects", "_archive")); err == nil {
+		for _, e := range archived {
+			if e.IsDir() && !strings.HasPrefix(e.Name(), ".") {
+				files = append(files, "projects/_archive/"+e.Name()+"/README.md")
+			}
+		}
+	}
 	err := filepath.WalkDir(filepath.Join(root, "daily"), func(p string, d os.DirEntry, err error) error {
 		if err != nil {
 			if os.IsNotExist(err) {

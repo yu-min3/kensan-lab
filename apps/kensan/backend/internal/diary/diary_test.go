@@ -77,3 +77,21 @@ func TestRecentWithoutDailyDir(t *testing.T) {
 		t.Fatalf("%+v %v", s, err)
 	}
 }
+
+// PR535 レビュー指摘 3: ### 完了タスク の退避だけでは日記を書いたことにしない。
+func TestHasEntryIgnoresArchivedTasks(t *testing.T) {
+	base := "# 2026-10-10\n\n## 日記\n\n### 完了タスク\n\n- [x] 退避したタスク @done(2026-10-10)\n"
+	if HasEntry(base) {
+		t.Fatal("completed-task archive counted as a diary entry")
+	}
+	if HasEntry("## 日記\n\n### 見出しだけ\n\n## みのりちゃんへ\n\nhi\n") {
+		t.Fatal("heading alone counted as an entry")
+	}
+	withLine := AppendLine(base, time.Date(2026, 10, 10, 21, 0, 0, 0, jst), "1行書いた")
+	if !HasEntry(withLine) {
+		t.Fatalf("real one-line diary not counted:\n%s", withLine)
+	}
+	if want := "## 日記\n\n- 21:00 1行書いた\n\n### 完了タスク"; !strings.Contains(withLine, want) {
+		t.Fatalf("diary line must go above the archived tasks:\n%s", withLine)
+	}
+}
