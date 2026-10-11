@@ -12,6 +12,9 @@ body {
 .h-serif {
   font-family: var(--font-serif);
 }
+/* 暗い表示ではスクロールバーやフォーム部品も暗くする（.dark は src/lib/theme.ts が付ける） */
+.dark { color-scheme: dark; }
+
 .tnum {
   font-variant-numeric: tabular-nums;
 }
