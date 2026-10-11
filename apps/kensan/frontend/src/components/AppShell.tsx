@@ -74,8 +74,9 @@ export function AppShell({ children }: { children: ReactNode }) {
         data-testid="app-sidebar"
         className={clsx(
           "border-r border-border flex-col bg-background",
-          // モバイル: 左からのオーバーレイ drawer / md 以上: grid の 1 列目に常設
-          "fixed inset-y-0 left-0 z-50 w-[200px] md:static md:z-auto",
+          // モバイル: 左からのオーバーレイ drawer / md 以上: grid の 1 列目に常設。
+          // 本文が長くても footer の切替が見えるよう、画面の高さで止める
+          "fixed inset-y-0 left-0 z-50 w-[200px] md:sticky md:top-0 md:h-screen md:self-start md:z-auto",
           navOpen ? "flex" : "hidden md:flex",
         )}
       >
@@ -94,7 +95,7 @@ export function AppShell({ children }: { children: ReactNode }) {
             <X size={18} />
           </button>
         </div>
-        <nav className="flex-1 px-2 ds-stack !gap-4">
+        <nav className="flex-1 min-h-0 overflow-y-auto px-2 ds-stack !gap-4">
           <NavLink
             to="/life"
             onClick={close}
