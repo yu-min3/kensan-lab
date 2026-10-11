@@ -6,10 +6,12 @@ import { api, type PortfolioCell, type PortfolioProposal, type PortfolioView } f
 import { useWorkspaceRefresh } from "../hooks/useWorkspaceRefresh";
 import { Button } from "../components/ui/button";
 import { ErrorState, SkeletonRows } from "../components/ui/states";
+import { ProjectsPanel, RadarPanel } from "./PortfolioProjects";
 import { useToast } from "../components/ui/toast";
 
 // ダッシュボード: North Star に対して、どこに証拠があり（地図）、時間がどこへ向いていて（羅針盤）、
-// 今年なにを積んだか（年報）を、ファイルから毎回組み立てて見せる。AI は使わない。
+// 各プロジェクトが何を目指して何で行くか（プロジェクト・技術レーダー）、今年なにを積んだか（年報）を、
+// ファイルから毎回組み立てて見せる。AI は使わない。
 // 夜に拾われた証拠の候補（reflect/inbox）は、ここで採用か却下を押すだけ。
 
 const STATUS_LABEL = { public: "外から見える", internal: "社内だけ", empty: "空き" } as const;
@@ -18,6 +20,8 @@ const projectURL = (name: string) => `/projects?name=${encodeURIComponent(name)}
 export function PortfolioPage() {
   const data = useQuery({ queryKey: ["portfolio"], queryFn: api.portfolio, refetchInterval: 120_000 });
   const [tab, setTab] = useState<"map" | "annual">("map");
+  const [tech, setTech] = useState<string | null>(null);
+  const pick = (name: string) => setTech((cur) => (cur === name ? null : name));
   if (data.isPending) return <SkeletonRows rows={8} />;
   if (data.isError) return <ErrorState error={data.error} onRetry={() => data.refetch()} />;
   const v = data.data;
@@ -44,10 +48,14 @@ export function PortfolioPage() {
         ))}
       </div>
       {tab === "map" ? (
-        <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1.55fr)_minmax(0,1fr)] gap-5 items-start">
-          <MapPanel v={v} />
-          <CompassPanel v={v} />
-        </div>
+        <>
+          <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1.55fr)_minmax(0,1fr)] gap-5 items-start">
+            <MapPanel v={v} />
+            <CompassPanel v={v} />
+          </div>
+          <ProjectsPanel v={v} tech={tech} onPick={pick} />
+          <RadarPanel v={v} tech={tech} onPick={pick} />
+        </>
       ) : (
         <AnnualView v={v} />
       )}

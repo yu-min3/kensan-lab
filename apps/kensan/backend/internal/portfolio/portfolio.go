@@ -1,6 +1,6 @@
-// Package portfolio はダッシュボード（地図・羅針盤・年報）をファイルから組み立てる。
-// AI は使わない。証拠は portfolio.md、担当は README の aims、狙う配分は goals.md の ## 配分、
-// 時間の向きは @done と ## ログ の日付、年報は完了マイルストーンと証拠から数える。
+// Package portfolio はダッシュボード（地図・プロジェクト・羅針盤・技術レーダー・年報）をファイルから組み立てる。
+// AI は使わない。証拠と技術は portfolio.md、担当・目指すこと・使う技術は README の frontmatter、
+// 狙う配分は goals.md の ## 配分、時間の向きは @done と ## ログ の日付、年報は完了マイルストーンと証拠から数える。
 // 契約: kensan-workspace projects/kensan-workspace/docs/portfolio-dashboard.md
 package portfolio
 
@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/yu-min3/kensan-lab/apps/kensan/backend/internal/goals"
+	"github.com/yu-min3/kensan-lab/apps/kensan/backend/internal/metrics"
 	"github.com/yu-min3/kensan-lab/apps/kensan/backend/internal/tasks"
 )
 
@@ -24,6 +25,8 @@ const File = "portfolio.md"
 var (
 	Rungs   = []Rung{{"impact", "事業に効かせる", "いくら効いたか"}, {"invest", "投資を決める", "何に賭けるか"}, {"choose", "技術を選ぶ", "何で作るか"}}
 	Domains = []string{"インフラ", "AI", "事業"}
+	// Rings は技術レーダーの輪。内側から。
+	Rings = []string{"採用", "試す", "調べる", "やめる"}
 )
 
 type Rung struct {
@@ -114,6 +117,42 @@ type Proposal struct {
 }
 
 // ReflectState は夜の証拠拾い（reflect/state.json）。書き手はジョブだけ。
+// Meter はプロジェクトの進み具合。metrics.yaml に target があればそれ、無ければマイルストーンの達成数。
+type Meter struct {
+	Kind        string               `json:"kind"` // metric | milestones
+	Label       string               `json:"label"`
+	Unit        string               `json:"unit,omitempty"`
+	Current     float64              `json:"current"`
+	Target      float64              `json:"target"`
+	Checkpoints []metrics.Checkpoint `json:"checkpoints"`
+}
+
+// Project はプロジェクトの列の 1 枚。目指すことと使う技術は README の frontmatter（headline / stack）。
+type Project struct {
+	Name     string      `json:"name"`
+	Headline string      `json:"headline"`
+	Aims     []string    `json:"aims"`
+	Stack    []string    `json:"stack"`
+	Meter    *Meter      `json:"meter,omitempty"`
+	Next     string      `json:"next,omitempty"`
+	Steps    []Milestone `json:"steps"` // 積み上げ。完了マイルストーンのファイル順で最後の 4 件
+}
+
+// Tech は技術レーダーの 1 点。`- 採用 名前 — 何のために @project(x)`
+type Tech struct {
+	Ring     string `json:"ring"`
+	Quadrant string `json:"quadrant"`
+	Name     string `json:"name"`
+	Why      string `json:"why"`
+	Project  string `json:"project,omitempty"`
+}
+
+type Radar struct {
+	Rings     []string `json:"rings"`
+	Quadrants []string `json:"quadrants"`
+	Items     []Tech   `json:"items"`
+}
+
 type ReflectState struct {
 	LastRunAt     string `json:"lastRunAt,omitempty"`
 	LastSuccessAt string `json:"lastSuccessAt,omitempty"`
@@ -130,6 +169,8 @@ type View struct {
 	Domains     []string      `json:"domains"`
 	Cells       []Cell        `json:"cells"`
 	PublicCells int           `json:"publicCells"`
+	Projects    []Project     `json:"projects"`
+	Radar       Radar         `json:"radar"`
 	Compass     Compass       `json:"compass"`
 	GapShare    int           `json:"gapShare"` // 空きを埋めに行く取り組みへ向いた時間の割合（%）
 	Annual      Annual        `json:"annual"`
@@ -140,6 +181,8 @@ type View struct {
 
 var (
 	headingRe    = regexp.MustCompile(`^##\s+(.+?)\s*$`)
+	subheadRe    = regexp.MustCompile(`^###\s+(.+?)\s*$`)
+	techRe       = regexp.MustCompile(`^-\s+(採用|試す|調べる|やめる)\s+(.+)$`)
 	cellHeadRe   = regexp.MustCompile(`^(.+?)\s*[×x]\s*(.+)$`)
 	evidenceRe   = regexp.MustCompile(`^-\s+(\S+)\s+(.+)$`)
 	publicRe     = regexp.MustCompile(`\s*@public\b`)
@@ -207,22 +250,24 @@ func parseBody(when, rest, raw string) Evidence {
 type Parsed struct {
 	Cells    map[string]*Cell // key: rungID/domain
 	Chapters map[string]string
+	Radar    Radar
 }
 
 func key(rung, domain string) string { return rung + "/" + domain }
 
 func Parse(content string) Parsed {
-	p := Parsed{Cells: map[string]*Cell{}, Chapters: map[string]string{}}
+	p := Parsed{Cells: map[string]*Cell{}, Chapters: map[string]string{}, Radar: Radar{Rings: Rings, Quadrants: []string{}, Items: []Tech{}}}
 	for _, r := range Rungs {
 		for _, d := range Domains {
 			p.Cells[key(r.ID, d)] = &Cell{Rung: r.ID, Domain: d, Evidence: []Evidence{}, Aims: []Aim{}}
 		}
 	}
 	var cur *Cell
-	inChapters := false
+	inChapters, inTech := false, false
+	quadrant := ""
 	for _, line := range strings.Split(content, "\n") {
 		if h := headingRe.FindStringSubmatch(line); h != nil {
-			cur, inChapters = nil, h[1] == "年報の章"
+			cur, inChapters, inTech, quadrant = nil, h[1] == "年報の章", h[1] == "技術", ""
 			if m := cellHeadRe.FindStringSubmatch(h[1]); m != nil {
 				if id := rungID(m[1]); id != "" && domainOK(m[2]) {
 					cur = p.Cells[key(id, strings.TrimSpace(m[2]))]
@@ -232,6 +277,15 @@ func Parse(content string) Parsed {
 		}
 		t := strings.TrimSpace(line)
 		if t == "" {
+			continue
+		}
+		if inTech {
+			if h := subheadRe.FindStringSubmatch(t); h != nil {
+				quadrant = h[1]
+				p.Radar.Quadrants = append(p.Radar.Quadrants, quadrant)
+			} else if m := techRe.FindStringSubmatch(t); m != nil {
+				p.Radar.Items = append(p.Radar.Items, parseTech(m[1], quadrant, m[2]))
+			}
 			continue
 		}
 		if inChapters {
@@ -262,9 +316,24 @@ func Parse(content string) Parsed {
 	return p
 }
 
+// parseTech は `名前 — 何のために @project(x)` を分ける。名前には空白を含んでよい。
+func parseTech(ring, quadrant, rest string) Tech {
+	t := Tech{Ring: ring, Quadrant: quadrant}
+	if m := projectTagRe.FindStringSubmatch(rest); m != nil {
+		t.Project = strings.TrimSpace(m[1])
+	}
+	rest = strings.TrimSpace(projectTagRe.ReplaceAllString(rest, ""))
+	name, why, _ := strings.Cut(rest, " — ")
+	t.Name, t.Why = strings.TrimSpace(name), strings.TrimSpace(why)
+	return t
+}
+
 type projectInfo struct {
 	name, file, status string
-	aims               []string
+	headline           string
+	aims, stack        []string
+	msDone, msTotal    int
+	doneMs             []Milestone // 完了したマイルストーン（ファイル順。日付は無いこともある）
 	nextMilestone      string
 	done               []string // @done の日付（タスク・マイルストーン）
 	logs               []string // ## ログ の日付
@@ -280,19 +349,30 @@ func readProject(root, rel, name string) (projectInfo, bool) {
 	pi := projectInfo{name: name, file: rel}
 	fm := frontmatter(content)
 	pi.status = fm["status"]
-	if a := strings.Trim(fm["aims"], "[] "); a != "" {
-		for _, x := range strings.Split(a, ",") {
-			if x = strings.TrimSpace(strings.Trim(x, `"'`)); x != "" {
-				pi.aims = append(pi.aims, strings.ReplaceAll(x, " ", ""))
-			}
-		}
+	pi.headline = fm["headline"]
+	for _, x := range listField(fm["aims"]) {
+		pi.aims = append(pi.aims, strings.ReplaceAll(x, " ", ""))
 	}
+	pi.stack = listField(fm["stack"])
 	for _, t := range tasks.ExtractLines(content, rel) {
 		if t.State == "done" && t.Done != "" {
 			pi.done = append(pi.done, t.Done)
 		}
 		if t.Section != "マイルストーン" {
 			continue
+		}
+		if t.State != "skipped" {
+			pi.msTotal++
+		}
+		if t.State == "done" {
+			pi.msDone++
+		}
+		if t.State == "done" {
+			date := t.Done
+			if m := checkMarkRe.FindStringSubmatch(t.Text); m != nil {
+				date = m[1]
+			}
+			pi.doneMs = append(pi.doneMs, Milestone{Date: date, Title: milestoneTitle(t.Display), Project: name, Kind: "milestone"})
 		}
 		if t.State == "todo" && pi.nextMilestone == "" {
 			pi.nextMilestone = strings.ReplaceAll(t.Display, "**", "")
@@ -303,11 +383,7 @@ func readProject(root, rel, name string) (projectInfo, bool) {
 				date = m[1]
 			}
 			if date != "" {
-				title := checkMarkRe.ReplaceAllString(strings.ReplaceAll(t.Display, "**", ""), "")
-				if i := strings.IndexAny(title, "（("); i > 0 {
-					title = title[:i]
-				}
-				pi.milestones = append(pi.milestones, Milestone{Date: date, Title: strings.TrimSpace(title), Project: name, Kind: "milestone"})
+				pi.milestones = append(pi.milestones, Milestone{Date: date, Title: milestoneTitle(t.Display), Project: name, Kind: "milestone"})
 			}
 		}
 	}
@@ -341,6 +417,26 @@ func projects(root string) []projectInfo {
 					out = append(out, pi)
 				}
 			}
+		}
+	}
+	return out
+}
+
+// milestoneTitle は表示用に太字・完了印・括弧書きの補足を落とす。
+func milestoneTitle(display string) string {
+	title := checkMarkRe.ReplaceAllString(strings.ReplaceAll(display, "**", ""), "")
+	if i := strings.IndexAny(title, "（("); i > 0 {
+		title = title[:i]
+	}
+	return strings.TrimSpace(title)
+}
+
+// listField は frontmatter の `[a, b]` を分ける。
+func listField(v string) []string {
+	var out []string
+	for _, x := range strings.Split(strings.Trim(v, "[] "), ",") {
+		if x = strings.TrimSpace(strings.Trim(strings.TrimSpace(x), `"'`)); x != "" {
+			out = append(out, x)
 		}
 	}
 	return out
@@ -400,7 +496,7 @@ func Load(root string, now time.Time) (View, error) {
 	jst := time.FixedZone("JST", 9*60*60)
 	now = now.In(jst)
 	today := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, jst)
-	v := View{Date: today.Format("2006-01-02"), Rungs: Rungs, Domains: Domains, Cells: []Cell{}, Proposals: []Proposal{}}
+	v := View{Date: today.Format("2006-01-02"), Rungs: Rungs, Domains: Domains, Cells: []Cell{}, Projects: []Project{}, Proposals: []Proposal{}}
 	g, err := goals.Load(root)
 	if err != nil {
 		return v, err
@@ -414,6 +510,7 @@ func Load(root string, now time.Time) (View, error) {
 		return v, err
 	}
 	parsed := Parse(string(b))
+	v.Radar = parsed.Radar
 	projs := projects(root)
 
 	// 担当: aims を持つ active なプロジェクト
@@ -501,6 +598,8 @@ func Load(root string, now time.Time) (View, error) {
 	}
 	v.GapShare = pct(gapCount, v.Compass.Total)
 
+	v.Projects = projectCards(root, projs, order, now)
+
 	// 年報: 今年の完了マイルストーンと日付のある証拠。同じ日・同じプロジェクトはマイルストーンを優先
 	year := today.Year()
 	var items []Milestone
@@ -548,6 +647,70 @@ func Load(root string, now time.Time) (View, error) {
 		}
 	}
 	return v, nil
+}
+
+// projectCards は目指すこと（headline）か担当（aims）を持つ active なプロジェクトを、
+// goals.md の配分の順に並べる。積み上げはプロジェクトのロードマップ（完了したマイルストーンの直近 4 件）。
+// 証拠（portfolio.md）は地図の側に出すので、ここには混ぜない。
+func projectCards(root string, projs []projectInfo, order []string, now time.Time) []Project {
+	rank := map[string]int{}
+	for i, n := range order {
+		rank[n] = i + 1
+	}
+	var cards []Project
+	for _, pi := range projs {
+		if pi.status != "active" || (pi.headline == "" && len(pi.aims) == 0) {
+			continue
+		}
+		c := Project{Name: pi.name, Headline: pi.headline, Aims: pi.aims, Stack: pi.stack, Next: pi.nextMilestone, Steps: []Milestone{}}
+		if c.Aims == nil {
+			c.Aims = []string{}
+		}
+		if c.Stack == nil {
+			c.Stack = []string{}
+		}
+		c.Meter = meter(root, pi, now)
+		steps := append([]Milestone{}, pi.doneMs...)
+		if len(steps) > 4 {
+			steps = steps[len(steps)-4:]
+		}
+		c.Steps = steps
+		cards = append(cards, c)
+	}
+	sort.SliceStable(cards, func(i, j int) bool {
+		ri, rj := rank[cards[i].Name], rank[cards[j].Name]
+		if ri == 0 {
+			ri = len(order) + 1
+		}
+		if rj == 0 {
+			rj = len(order) + 1
+		}
+		return ri < rj
+	})
+	if cards == nil {
+		cards = []Project{}
+	}
+	return cards
+}
+
+// meter は target のある最初の指標を使い、無ければマイルストーンの達成数にする。
+func meter(root string, pi projectInfo, now time.Time) *Meter {
+	if r, err := metrics.Load(root, pi.name, now); err == nil {
+		for _, m := range r.Metrics {
+			if m.Target == nil || m.Current == nil {
+				continue
+			}
+			cps := m.Checkpoints
+			if cps == nil {
+				cps = []metrics.Checkpoint{}
+			}
+			return &Meter{Kind: "metric", Label: m.Label, Unit: m.Unit, Current: *m.Current, Target: *m.Target, Checkpoints: cps}
+		}
+	}
+	if pi.msTotal == 0 {
+		return nil
+	}
+	return &Meter{Kind: "milestones", Label: "マイルストーン", Current: float64(pi.msDone), Target: float64(pi.msTotal), Checkpoints: []metrics.Checkpoint{}}
 }
 
 func sum(w []int) int {

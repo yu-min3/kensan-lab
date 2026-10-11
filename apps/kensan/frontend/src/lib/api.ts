@@ -239,10 +239,21 @@ export interface PortfolioProposal {
   file: string; line: number; text: string; state: string; rung: string; domain: string;
   evidence: PortfolioEvidence; source?: string;
 }
+export interface PortfolioMeter {
+  kind: "metric" | "milestones"; label: string; unit?: string; current: number; target: number;
+  checkpoints: { value: number; label: string }[];
+}
+export interface PortfolioProject {
+  name: string; headline: string; aims: string[]; stack: string[]; meter?: PortfolioMeter; next?: string;
+  steps: PortfolioMilestone[];
+}
+export interface PortfolioTech { ring: string; quadrant: string; name: string; why: string; project?: string }
 export interface PortfolioView {
   date: string; northStar: string;
   rungs: { id: string; name: string; question: string }[]; domains: string[];
   cells: PortfolioCell[]; publicCells: number;
+  projects: PortfolioProject[];
+  radar: { rings: string[]; quadrants: string[]; items: PortfolioTech[] };
   compass: { from: string; to: string; total: number; allocs: PortfolioAlloc[] };
   gapShare: number;
   annual: { year: number; total: number; month: number; chapters: { quarter: string; name: string; items: PortfolioMilestone[] }[] };

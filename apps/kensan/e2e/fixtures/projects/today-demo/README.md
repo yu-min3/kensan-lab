@@ -2,6 +2,8 @@
 type: project
 status: active
 aims: [事業に効かせる×AI]
+headline: E2E で目指すことを 1 行で見せる
+stack: [kind, 未登録の技術]
 created: 2026-09-09
 updated: 2026-09-09
 ---
