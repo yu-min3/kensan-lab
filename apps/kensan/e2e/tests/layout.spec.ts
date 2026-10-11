@@ -41,6 +41,16 @@ test("sidebar が消えても main は 2 列目に留まる", async ({ page }) =
   expect(main.width).toBeGreaterThan(DESKTOP.width / 2);
 });
 
+test("本文を最後までスクロールしても sidebar の明るさ切替が見えている", async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 600 });
+  await page.goto("/portfolio");
+
+  const theme = page.getByRole("radiogroup", { name: "表示の明るさ" });
+  await expect(theme).toBeInViewport();
+  await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
+  await expect(theme).toBeInViewport();
+});
+
 test("モバイル幅では main が全幅を使う", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto("/");
