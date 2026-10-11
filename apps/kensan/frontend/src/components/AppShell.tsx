@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { NavLink } from "react-router-dom";
 import {
   LayoutDashboard,
@@ -12,9 +12,12 @@ import {
   Menu,
   X,
   Newspaper,
+  Monitor,
+  Moon,
 } from "lucide-react";
 import clsx from "clsx";
 import { FloatingMemoButton } from "./FloatingMemoButton";
+import { readTheme, saveTheme, watchSystem, type Theme } from "../lib/theme";
 
 // patterns.md 00. App Shell — Variant A: Side Nav + Main（kensan 既定）
 // active は bg-accent + text-accent-foreground（border の左帯は使わない）
@@ -139,6 +142,7 @@ export function AppShell({ children }: { children: ReactNode }) {
             Yu
           </div>
           <span className="text-sm">Yu</span>
+          <ThemeSwitch />
         </footer>
       </aside>
       {/* md 以上では 2 列目に明示配置する。暗黙の auto-placement に任せると、
@@ -148,6 +152,41 @@ export function AppShell({ children }: { children: ReactNode }) {
         {children}
       </main>
       <FloatingMemoButton />
+    </div>
+  );
+}
+
+const THEMES: { id: Theme; label: string; icon: typeof Sun }[] = [
+  { id: "system", label: "自動（OS に合わせる）", icon: Monitor },
+  { id: "light", label: "明るい表示", icon: Sun },
+  { id: "dark", label: "暗い表示", icon: Moon },
+];
+
+function ThemeSwitch() {
+  const [theme, setTheme] = useState<Theme>(readTheme);
+  useEffect(() => watchSystem(theme), [theme]);
+  return (
+    <div role="radiogroup" aria-label="表示の明るさ" className="ml-auto flex rounded-md border border-border p-0.5">
+      {THEMES.map((t) => (
+        <button
+          key={t.id}
+          type="button"
+          role="radio"
+          aria-checked={theme === t.id}
+          aria-label={t.label}
+          title={t.label}
+          onClick={() => {
+            saveTheme(t.id);
+            setTheme(t.id);
+          }}
+          className={clsx(
+            "size-7 rounded flex items-center justify-center",
+            theme === t.id ? "bg-accent text-accent-foreground" : "text-muted-foreground hover:text-foreground",
+          )}
+        >
+          <t.icon size={14} />
+        </button>
+      ))}
     </div>
   );
 }
