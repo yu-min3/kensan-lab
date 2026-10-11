@@ -38,6 +38,7 @@ export default function App() {
   const [config, setConfig] = useState<Config | null>(null)
   const [who, setWho] = useState<WhoAmI | null>(null)
   const [load, setLoad] = useState<LoadState | null>(null)
+  const [release, setRelease] = useState('unknown')
   const [failed, setFailed] = useState(false)
 
   useEffect(() => {
@@ -50,6 +51,19 @@ export default function App() {
         setWho(w)
       })
       .catch(() => setFailed(true))
+  }, [])
+
+  useEffect(() => {
+    fetch('api/release')
+      .then((response) => {
+        if (!response.ok) throw new Error('Release request failed')
+        return response.json() as Promise<unknown>
+      })
+      .then((data) => {
+        const value = (data as { release?: unknown } | null)?.release
+        if (typeof value === 'string' && value.trim()) setRelease(value.trim())
+      })
+      .catch(() => setRelease('unknown'))
   }, [])
 
   useEffect(() => {
@@ -119,6 +133,7 @@ export default function App() {
           {night ? 'This service is wearing its night face.' : 'This service is wearing its day face.'}{' '}
           Nobody rebuilt it to make that happen.
         </p>
+        <p className="sub">Release: {release}</p>
 
         <div className="card">
           <h2>Who you are</h2>
