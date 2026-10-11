@@ -230,3 +230,58 @@ func TestDecideRejectsStaleAndForeignFiles(t *testing.T) {
 		t.Fatal("non-inbox file accepted")
 	}
 }
+
+func TestRadarReadsTechSection(t *testing.T) {
+	p := Parse(portfolioFixture + "\n## 技術\n\n### 基盤\n- 採用 kind — 見に来た人が 2 分で試せる入口 @project(kensan-lab)\n- やめる GPU 基盤の自前運用 — Star に効かない\n- 迷う 何か — 輪に無い言葉は読まない\n\n### AI\n- 試す Codex — 工房の実装担当\n")
+	if got := strings.Join(p.Radar.Quadrants, ","); got != "基盤,AI" {
+		t.Fatalf("quadrants: %s", got)
+	}
+	if len(p.Radar.Items) != 3 {
+		t.Fatalf("items: %+v", p.Radar.Items)
+	}
+	k := p.Radar.Items[0]
+	if k.Ring != "採用" || k.Quadrant != "基盤" || k.Name != "kind" || k.Why != "見に来た人が 2 分で試せる入口" || k.Project != "kensan-lab" {
+		t.Fatalf("kind: %+v", k)
+	}
+	if g := p.Radar.Items[1]; g.Name != "GPU 基盤の自前運用" || g.Ring != "やめる" {
+		t.Fatalf("name with spaces: %+v", g)
+	}
+	// 技術の節の行が地図のマスに混ざらない
+	if c := p.Cells[key("choose", "インフラ")]; len(c.Evidence) != 1 {
+		t.Fatalf("cell polluted: %+v", c.Evidence)
+	}
+}
+
+func TestProjectCards(t *testing.T) {
+	root := fixture(t)
+	write(t, root, "projects/kensan-lab/README.md", "---\ntype: project\nstatus: active\nheadline: kensan-lab を Star を稼げるプロダクトにする\naims: [技術を選ぶ×インフラ]\nstack: [Kubernetes, kind]\n---\n## マイルストーン\n- [x] public 化 ✅ 2026-03-20\n- [x] 認証基盤を整える\n- [x] kind explore を出荷（試食導線） ✅ 2026-08-09\n- [-] 取りやめ\n- [ ] kind explore の発信\n")
+	write(t, root, "projects/kensan-lab/metrics.yaml", "version: 1\nmetrics:\n  - id: github-stars\n    label: GitHub Stars\n    unit: stars\n    target: 100\n    direction: increase\n    display: integer\n    checkpoints:\n      - value: 30\n        label: 継続的な流入\n")
+	write(t, root, "projects/kensan-lab/metrics.ndjson", `{"metric":"github-stars","at":"2026-10-10T07:15:00+09:00","value":18,"source":"github"}`+"\n")
+	write(t, root, "projects/life/README.md", "---\ntype: project\nstatus: active\n---\n")
+	v, err := Load(root, time.Date(2026, 10, 10, 12, 0, 0, 0, jst))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(v.Projects) != 2 || v.Projects[0].Name != "kensan-lab" || v.Projects[1].Name != "outbound" {
+		t.Fatalf("projects (headline か aims を持つものだけ、配分の順): %+v", v.Projects)
+	}
+	k := v.Projects[0]
+	if k.Headline != "kensan-lab を Star を稼げるプロダクトにする" || strings.Join(k.Stack, ",") != "Kubernetes,kind" || k.Next != "kind explore の発信" {
+		t.Fatalf("kensan-lab: %+v", k)
+	}
+	if k.Meter == nil || k.Meter.Kind != "metric" || k.Meter.Current != 18 || k.Meter.Target != 100 || len(k.Meter.Checkpoints) != 1 {
+		t.Fatalf("meter: %+v", k.Meter)
+	}
+	// 積み上げ: 完了したマイルストーンだけ（証拠は混ぜない）。日付の無い完了も入る
+	var steps []string
+	for _, s := range k.Steps {
+		steps = append(steps, strings.TrimSpace(s.Date+" "+s.Title))
+	}
+	if got := strings.Join(steps, " / "); got != "2026-03-20 public 化 / 認証基盤を整える / 2026-08-09 kind explore を出荷" {
+		t.Fatalf("steps: %s", got)
+	}
+	o := v.Projects[1]
+	if o.Meter == nil || o.Meter.Kind != "milestones" || o.Meter.Current != 0 || o.Meter.Target != 1 {
+		t.Fatalf("outbound meter (マイルストーン数): %+v", o.Meter)
+	}
+}

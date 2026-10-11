@@ -164,3 +164,34 @@ body {
 .pf-gap { color: hsl(var(--pf-gap)); }
 .pf-gap-bg { background: hsl(var(--pf-gap-soft)); }
 .pf-gap-line { background: hsl(var(--pf-gap)); }
+/* 技術レーダーの輪: 採用=緑 / 試す=青 / 調べる=黄 / やめる=灰。カードのチップも同じ色 */
+.pf { --pf-adopt: var(--pf-full); --pf-trial: var(--brand); --pf-assess: var(--pf-half); --pf-hold: var(--pf-empty); }
+i.pf-ring-adopt { background: hsl(var(--pf-adopt)); }
+i.pf-ring-trial { background: hsl(var(--pf-trial)); }
+i.pf-ring-assess { background: hsl(var(--pf-assess)); }
+i.pf-ring-hold { background: hsl(var(--pf-hold)); }
+circle.pf-ring-adopt { fill: hsl(var(--pf-adopt)); }
+circle.pf-ring-trial { fill: hsl(var(--pf-trial)); }
+circle.pf-ring-assess { fill: hsl(var(--pf-assess)); }
+circle.pf-ring-hold { fill: hsl(var(--pf-hold)); }
+.pf-ring-adopt-text { color: hsl(var(--pf-adopt)); }
+.pf-ring-trial-text { color: hsl(var(--pf-trial)); }
+.pf-ring-assess-text { color: hsl(var(--pf-assess)); }
+.pf-ring-hold-text { color: hsl(var(--pf-hold)); }
+.pf-chip { font-size: 12px; padding: 1px 10px; border-radius: 999px; border: 1px solid hsl(var(--border)); }
+.pf-chip.pf-ring-adopt { border-color: hsl(var(--pf-adopt)); color: hsl(var(--pf-adopt)); }
+.pf-chip.pf-ring-trial { border-color: hsl(var(--pf-trial)); color: hsl(var(--pf-trial)); }
+.pf-chip.pf-ring-assess { border-color: hsl(var(--pf-assess)); color: hsl(var(--pf-assess)); }
+.pf-chip.pf-ring-hold { border-color: hsl(var(--pf-hold)); color: hsl(var(--pf-hold)); }
+.pf-chip-unknown { color: hsl(var(--muted-foreground)); border-style: dashed; }
+.pf-chip.pf-chip-on { background: hsl(var(--foreground)); color: hsl(var(--background)); border-color: hsl(var(--foreground)); }
+.pf-dot-done, .pf-meter { background: hsl(var(--pf-full)); }
+.pf-radar-ring-0 { fill: hsl(var(--muted)); stroke: hsl(var(--border)); }
+.pf-radar-ring-1 { fill: hsl(var(--muted) / 0.7); stroke: hsl(var(--border)); }
+.pf-radar-ring-2 { fill: hsl(var(--muted) / 0.45); stroke: hsl(var(--border)); }
+.pf-radar-ring-3 { fill: hsl(var(--muted) / 0.25); stroke: hsl(var(--border)); }
+.pf-radar-axis { stroke: hsl(var(--border)); }
+.pf-radar-label { paint-order: stroke; stroke: hsl(var(--card)); stroke-width: 3px; }
+.pf-radar-dot { cursor: pointer; transition: opacity .15s; }
+.pf-radar-dim .pf-radar-dot:not(.is-hit) { opacity: .2; }
+.pf-radar-dot.is-hit circle { stroke: hsl(var(--foreground)); stroke-width: 2.5; }
