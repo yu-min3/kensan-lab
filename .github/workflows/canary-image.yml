@@ -1,0 +1,198 @@
+name: Canary Image
+run-name: sense-image-${{ inputs.dispatch_id }}
+
+on:
+  workflow_dispatch:
+    inputs:
+      source_sha:
+        description: Reviewed source commit SHA
+        required: true
+        type: string
+      source_app_tree_sha:
+        description: Independently reviewed apps/canary tree SHA
+        required: true
+        type: string
+      image_tag:
+        description: Unique source and dispatch bound image tag
+        required: true
+        type: string
+      dispatch_id:
+        description: Fixed Gate dispatch identity
+        required: true
+        type: string
+      expected_workflow_sha:
+        description: Operator approved workflow commit SHA
+        required: true
+        type: string
+      expected_visibility:
+        description: Operator approved existing package visibility
+        required: true
+        type: choice
+        options: [private, public]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: canary-image-release
+  cancel-in-progress: false
+
+env:
+  IMAGE: ghcr.io/yu-min3/kensan-lab/canary
+  SOURCE_SHA: ${{ inputs.source_sha }}
+  APP_TREE_SHA: ${{ inputs.source_app_tree_sha }}
+  RELEASE_TAG: ${{ inputs.image_tag }}
+  DISPATCH_ID: ${{ inputs.dispatch_id }}
+  WORKFLOW_SHA: ${{ inputs.expected_workflow_sha }}
+  EXPECTED_VISIBILITY: ${{ inputs.expected_visibility }}
+
+jobs:
+  release:
+    if: github.repository == 'yu-min3/kensan-lab'
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - name: Check fixed identities before checking out App code
+        env:
+          ACTUAL_WORKFLOW_SHA: ${{ github.workflow_sha }}
+        run: |
+          set -euo pipefail
+          [[ "$SOURCE_SHA" =~ ^[0-9a-f]{40}$ ]] || exit 1
+          [[ "$APP_TREE_SHA" =~ ^[0-9a-f]{40}$ ]] || exit 1
+          [[ "$WORKFLOW_SHA" =~ ^[0-9a-f]{40}$ ]] || exit 1
+          [[ "$DISPATCH_ID" =~ ^[0-9a-f]{32}$ ]] || exit 1
+          [[ "$WORKFLOW_SHA" == "$ACTUAL_WORKFLOW_SHA" ]] || exit 1
+          [[ "$WORKFLOW_SHA" == "$GITHUB_SHA" ]] || exit 1
+          [[ "$GITHUB_REF" == refs/tags/* ]] || exit 1
+          [[ "$GITHUB_RUN_ATTEMPT" == 1 ]] || exit 1
+          [[ "$RELEASE_TAG" == "sense-$SOURCE_SHA-$DISPATCH_ID" ]] || exit 1
+          [[ "$EXPECTED_VISIBILITY" == private || "$EXPECTED_VISIBILITY" == public ]] || exit 1
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ inputs.source_sha }}
+          path: source
+          persist-credentials: false
+      - name: Verify exact App tree without executing App files
+        working-directory: source
+        run: |
+          set -euo pipefail
+          [[ "$(git rev-parse HEAD)" == "$SOURCE_SHA" ]] || exit 1
+          [[ "$(git rev-parse HEAD:apps/canary)" == "$APP_TREE_SHA" ]] || exit 1
+          [[ "$(git cat-file -t "$APP_TREE_SHA")" == tree ]] || exit 1
+      - name: Verify existing package and unused tag before building
+        env:
+          PACKAGE_READ_TOKEN: ${{ secrets.CANARY_BOOTSTRAP_READ_PACKAGES_TOKEN }}
+        run: |
+          python3 - <<'PYTHON'
+          import json, os, urllib.request
+          class NoRedirect(urllib.request.HTTPRedirectHandler):
+              def redirect_request(self, *args, **kwargs):
+                  return None
+          opener = urllib.request.build_opener(NoRedirect())
+          token = os.environ['PACKAGE_READ_TOKEN']
+          if not token:
+              raise SystemExit('Dedicated package-read credential required')
+          headers = {'Authorization': 'Bearer ' + token, 'Accept': 'application/vnd.github+json'}
+          def get(url):
+              with opener.open(urllib.request.Request(url, headers=headers), timeout=20) as response:
+                  return json.load(response), response.headers
+          owner, response_headers = get('https://api.github.com/user')
+          if owner.get('login') != 'yu-min3' or response_headers.get('X-OAuth-Scopes', '').strip() != 'read:packages':
+              raise SystemExit('Owner read:packages-only credential required')
+          base = 'https://api.github.com/user/packages/container/kensan-lab%2Fcanary'
+          package, _ = get(base)
+          if package.get('visibility') != os.environ['EXPECTED_VISIBILITY'] or package.get('repository', {}).get('full_name') != 'yu-min3/kensan-lab':
+              raise SystemExit('Existing repository-bound package with approved visibility required')
+          for page in range(1, 11):
+              versions, _ = get(base + '/versions?per_page=100&page=' + str(page))
+              if not isinstance(versions, list):
+                  raise SystemExit('Package versions unavailable')
+              if any(os.environ['RELEASE_TAG'] in v.get('metadata', {}).get('container', {}).get('tags', []) for v in versions):
+                  raise SystemExit('Image tag already used; no overwrite or retry')
+              if len(versions) < 100:
+                  break
+          else:
+              raise SystemExit('Incomplete package version scan')
+          PYTHON
+      - uses: docker/setup-qemu-action@c7c53464625b32c7a7e944ae62b3e17d2b600130 # v3
+      - uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
+      - name: Test both release architectures before login or push
+        run: docker buildx build --platform linux/amd64,linux/arm64 --target test source/apps/canary
+      - name: Build and smoke-test runtime without host networking
+        env:
+          SMOKE_CONTAINER: canary-image-${{ github.run_id }}
+        run: |
+          set -euo pipefail
+          docker build --platform linux/amd64 -t canary:image-test source/apps/canary
+          docker run -d --platform linux/amd64 --name "$SMOKE_CONTAINER" --network none --cap-drop ALL --security-opt no-new-privileges:true --tmpfs /data:rw,uid=1000,gid=1000 -e OTEL_SDK_DISABLED=true canary:image-test
+          docker exec -i "$SMOKE_CONTAINER" python - <<'PYTHON'
+          import json, time, urllib.request
+          for attempt in range(60):
+              try:
+                  health = json.load(urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=2))
+                  break
+              except OSError:
+                  time.sleep(1)
+          else:
+              raise SystemExit('Runtime did not become healthy')
+          assert health['status'] == 'healthy'
+          release = json.load(urllib.request.urlopen('http://127.0.0.1:8000/api/release', timeout=3))
+          assert isinstance(release.get('release'), str) and release['release']
+          assert b'id="root"' in urllib.request.urlopen('http://127.0.0.1:8000/', timeout=3).read()
+          PYTHON
+      - name: Remove this run's disposable container
+        if: always()
+        env:
+          SMOKE_CONTAINER: canary-image-${{ github.run_id }}
+        run: docker rm -f "$SMOKE_CONTAINER" >/dev/null 2>&1 || true
+      - uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6
+        id: publish
+        with:
+          context: source/apps/canary
+          platforms: linux/amd64,linux/arm64
+          provenance: false
+          sbom: false
+          push: true
+          tags: ${{ env.IMAGE }}:${{ env.RELEASE_TAG }}
+          labels: |
+            org.opencontainers.image.source=https://github.com/yu-min3/kensan-lab
+            org.opencontainers.image.revision=${{ env.SOURCE_SHA }}
+            dev.kensan.workflow-sha=${{ env.WORKFLOW_SHA }}
+      - name: Check package visibility and record exact release evidence
+        env:
+          PACKAGE_READ_TOKEN: ${{ secrets.CANARY_BOOTSTRAP_READ_PACKAGES_TOKEN }}
+          IMAGE_DIGEST: ${{ steps.publish.outputs.digest }}
+        run: |
+          python3 - <<'PYTHON'
+          import json, os, re, urllib.request
+          class NoRedirect(urllib.request.HTTPRedirectHandler):
+              def redirect_request(self, *args, **kwargs):
+                  return None
+          opener = urllib.request.build_opener(NoRedirect())
+          headers = {'Authorization': 'Bearer ' + os.environ['PACKAGE_READ_TOKEN'], 'Accept': 'application/vnd.github+json'}
+          req = urllib.request.Request('https://api.github.com/user/packages/container/kensan-lab%2Fcanary', headers=headers)
+          with opener.open(req, timeout=20) as response:
+              package = json.load(response)
+          if package.get('visibility') != os.environ['EXPECTED_VISIBILITY'] or package.get('repository', {}).get('full_name') != 'yu-min3/kensan-lab':
+              raise SystemExit('Post-push package mismatch; do not deploy')
+          digest = os.environ['IMAGE_DIGEST']
+          if not re.fullmatch(r'sha256:[0-9a-f]{64}', digest):
+              raise SystemExit('Missing immutable digest; do not deploy')
+          record = {'repository': 'yu-min3/kensan-lab', 'image': os.environ['IMAGE'], 'source_sha': os.environ['SOURCE_SHA'], 'source_app_tree_sha': os.environ['APP_TREE_SHA'], 'tag': os.environ['RELEASE_TAG'], 'digest': digest, 'visibility': package['visibility'], 'dispatch_id': os.environ['DISPATCH_ID'], 'workflow_sha': os.environ['WORKFLOW_SHA']}
+          with open('canary-image.json', 'x') as output:
+              json.dump(record, output, indent=2)
+          PYTHON
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: canary-image-${{ env.DISPATCH_ID }}
+          path: canary-image.json
+          if-no-files-found: error
+          retention-days: 14
