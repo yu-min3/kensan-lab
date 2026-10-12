@@ -2,7 +2,7 @@
 image:
   repository: ghcr.io/yu-min3/kensan-lab/canary
   tag: ""
-  digest: sha256:2042feace7e693ce3937b1e37a519a96c685e55ba23a20d84c071f0fbbd0f8e0
+  digest: sha256:763da3923b5cc0f3aa37ef5555040c63ea443625ec33edeccb980711d363781e
 replicas: 1
 ports:
   http: 8000
