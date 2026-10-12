@@ -25,7 +25,18 @@ export default async function globalSetup() {
   cpSync(join(__dirname, "fixtures"), dataDir, { recursive: true });
 
   // 3. Go backend を起動
+  //    前回の backend が port に残っていると、古い fixture のまま healthz が通ってしまう
+  const base = `http://127.0.0.1:${PORT}`;
+  if (await healthy(base)) {
+    throw new Error(
+      `port ${PORT} で既に何かが応答している。前回の backend の残りなら止める: lsof -ti tcp:${PORT} -sTCP:LISTEN | xargs kill`,
+    );
+  }
+  // go run は build した binary を子として起動するので、go だけ kill すると binary が残り
+  // port と stdout を握り続ける（playwright がパイプ越しだと終わらない）。
+  // 別の process group で起動し、group ごと止める。
   const proc: ChildProcess = spawn("go", ["run", "./cmd/kensan"], {
+    detached: true,
     cwd: backendDir,
     env: {
       ...process.env,
@@ -37,17 +48,11 @@ export default async function globalSetup() {
   });
 
   // 4. /healthz が通るまで待つ
-  const base = `http://127.0.0.1:${PORT}`;
   const deadline = Date.now() + 60_000;
   for (;;) {
-    try {
-      const res = await fetch(`${base}/healthz`);
-      if (res.ok) break;
-    } catch {
-      /* まだ起動中 */
-    }
+    if (await healthy(base)) break;
     if (Date.now() > deadline) {
-      proc.kill("SIGKILL");
+      stop(proc);
       throw new Error("kensan backend が 60s 以内に起動しませんでした");
     }
     await new Promise((r) => setTimeout(r, 300));
@@ -60,7 +65,24 @@ export default async function globalSetup() {
       | { proc: ChildProcess; dataDir: string }
       | undefined;
     if (!h) return;
-    h.proc.kill("SIGKILL");
+    stop(h.proc);
     rmSync(h.dataDir, { recursive: true, force: true });
   };
+}
+
+async function healthy(base: string): Promise<boolean> {
+  try {
+    return (await fetch(`${base}/healthz`)).ok;
+  } catch {
+    return false;
+  }
+}
+
+function stop(proc: ChildProcess) {
+  if (proc.pid === undefined) return;
+  try {
+    process.kill(-proc.pid, "SIGKILL");
+  } catch {
+    /* 既に終了している */
+  }
 }
