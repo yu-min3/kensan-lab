@@ -41,7 +41,7 @@ func Normalize(text string) (string, error) {
 }
 
 // AppendLine は ## 日記 の末尾へ「- HH:MM 本文」を足す。
-// 見出しが無ければ末尾に ## 日記 を作る。他の節（学習・みのりちゃんへ 等）には触らない。
+// 見出しが無ければ末尾に ## 日記 を作る。他の節（学習 等）には触らない。
 func AppendLine(content string, at time.Time, line string) string {
 	entry := fmt.Sprintf("- %s %s", at.Format("15:04"), line)
 	lines := strings.Split(strings.TrimRight(content, "\n"), "\n")

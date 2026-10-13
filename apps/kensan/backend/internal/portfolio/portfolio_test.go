@@ -152,7 +152,7 @@ type: memo
 
 ## 提案
 
-- [ ] 投資を決める × AI | 2026-10-10 AI 基盤の投資判断を説明 — 面談で比較 → 伝わった @project(job-search) @source(daily/2026/10/10.md)
+- [ ] 投資を決める × AI | 2026-10-10 チームに設計案を説明 — 図で比較 → 伝わった @project(sample-project) @source(daily/2026/10/10.md)
 - [ ] 事業に効かせる × インフラ | 2026-10-10 却下する候補 — x → y
 - [ ] 存在しない × AI | 2026-10-10 壊れた行 — x → y
 `
@@ -162,7 +162,7 @@ func TestAcceptAppendsOnceAndMarksInbox(t *testing.T) {
 	write(t, root, "reflect/inbox/2026-10-11.md", inbox)
 	ws := workspace.New(root)
 	ps := Proposals(root)
-	if len(ps) != 2 || ps[0].Rung != "invest" || ps[0].Source != "daily/2026/10/10.md" || ps[0].Body.Project != "job-search" {
+	if len(ps) != 2 || ps[0].Rung != "invest" || ps[0].Source != "daily/2026/10/10.md" || ps[0].Body.Project != "sample-project" {
 		t.Fatalf("proposals: %+v", ps)
 	}
 	now := time.Date(2026, 10, 11, 8, 0, 0, 0, jst)
@@ -172,13 +172,13 @@ func TestAcceptAppendsOnceAndMarksInbox(t *testing.T) {
 		}
 	}
 	b, _ := os.ReadFile(filepath.Join(root, File))
-	if n := strings.Count(string(b), "AI 基盤の投資判断を説明"); n != 1 {
+	if n := strings.Count(string(b), "チームに設計案を説明"); n != 1 {
 		t.Fatalf("appended %d times:\n%s", n, b)
 	}
-	if !strings.Contains(string(b), "## 投資を決める × AI\n\n- 2026-10-10 AI 基盤の投資判断を説明 — 面談で比較 → 伝わった @project(job-search)\n") {
+	if !strings.Contains(string(b), "## 投資を決める × AI\n\n- 2026-10-10 チームに設計案を説明 — 図で比較 → 伝わった @project(sample-project)\n") {
 		t.Fatalf("new section:\n%s", b)
 	}
-	if strings.Contains(string(b), "@source") || strings.Contains(string(b), "AI 基盤の投資判断を説明 — 面談で比較 → 伝わった @public") {
+	if strings.Contains(string(b), "@source") || strings.Contains(string(b), "チームに設計案を説明 — 図で比較 → 伝わった @public") {
 		t.Fatal("source or public leaked into portfolio")
 	}
 	ib, _ := os.ReadFile(filepath.Join(root, "reflect/inbox/2026-10-11.md"))

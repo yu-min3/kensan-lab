@@ -7,7 +7,7 @@ import (
 )
 
 func TestSetHabitKeepsDiaryAndOtherSections(t *testing.T) {
-	src := "# 2026-10-10\n\n## 日記\n\n- 22:41 書いた\n\n## みのりちゃんへ\n\nおめでとう\n"
+	src := "# 2026-10-10\n\n## 日記\n\n- 22:41 書いた\n\n## メモ\n\nあとで読む\n"
 	line := habitLine("life", "英語 30分")
 	added := string(setHabit(src, line, true))
 	want := src + "\n## 習慣\n\n- [x] 英語 30分 @routine(life)\n"
