@@ -13,9 +13,9 @@ import (
 var jst = time.FixedZone("JST", 9*60*60)
 
 func TestAppendLineKeepsOtherSections(t *testing.T) {
-	src := "---\ntype: daily\n---\n\n# 2026-10-09\n\n## 日記\n\n朝は雨。\n\n## みのりちゃんへ\n\nおめでとう\n"
+	src := "---\ntype: daily\n---\n\n# 2026-10-09\n\n## 日記\n\n朝は雨。\n\n## メモ\n\nあとで読む\n"
 	got := AppendLine(src, time.Date(2026, 10, 9, 22, 41, 0, 0, jst), "ジムに行けた")
-	want := "---\ntype: daily\n---\n\n# 2026-10-09\n\n## 日記\n\n朝は雨。\n- 22:41 ジムに行けた\n\n## みのりちゃんへ\n\nおめでとう\n"
+	want := "---\ntype: daily\n---\n\n# 2026-10-09\n\n## 日記\n\n朝は雨。\n- 22:41 ジムに行けた\n\n## メモ\n\nあとで読む\n"
 	if got != want {
 		t.Fatalf("got:\n%s\nwant:\n%s", got, want)
 	}
@@ -84,7 +84,7 @@ func TestHasEntryIgnoresArchivedTasks(t *testing.T) {
 	if HasEntry(base) {
 		t.Fatal("completed-task archive counted as a diary entry")
 	}
-	if HasEntry("## 日記\n\n### 見出しだけ\n\n## みのりちゃんへ\n\nhi\n") {
+	if HasEntry("## 日記\n\n### 見出しだけ\n\n## メモ\n\nhi\n") {
 		t.Fatal("heading alone counted as an entry")
 	}
 	withLine := AppendLine(base, time.Date(2026, 10, 10, 21, 0, 0, 0, jst), "1行書いた")

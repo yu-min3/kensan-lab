@@ -120,7 +120,7 @@ export function DailyPage() {
               defaultValue={file.initialBody}
               onChange={file.onChange}
               minHeight="28rem"
-              placeholder="今日のこと・学び・みのりちゃん/なぎちゃんへ…"
+              placeholder="今日のこと・学び…"
             />
           </CardBody>
         )}

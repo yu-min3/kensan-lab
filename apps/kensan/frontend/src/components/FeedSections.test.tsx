@@ -23,10 +23,10 @@ describe("splitFeedSections", () => {
 describe("splitFeedItems", () => {
   it("uses the source URL as a stable acknowledgement key", () => {
     const items = splitFeedItems(
-      "### スカウト（未対応）\n本文\n\n- 更新日時: 2026-07-27T09:00:00+09:00\n- 出典: https://mail.google.com/mail/u/0/#inbox/thread-1\n\n### 別件\n本文",
+      "### お知らせ（未対応）\n本文\n\n- 更新日時: 2026-07-27T09:00:00+09:00\n- 出典: https://mail.google.com/mail/u/0/#inbox/thread-1\n\n### 別件\n本文",
     );
     expect(items[0]).toEqual({
-      title: "スカウト（未対応）",
+      title: "お知らせ（未対応）",
       content:
         "本文\n\n- 更新日時: 2026-07-27T09:00:00+09:00\n- 出典: https://mail.google.com/mail/u/0/#inbox/thread-1",
       key: "https://mail.google.com/mail/u/0/#inbox/thread-1",
