@@ -5,6 +5,8 @@ package agentclient
 import (
 	"bytes"
 	"context"
+	"crypto/tls"
+	"crypto/x509"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -14,6 +16,7 @@ import (
 	"net/url"
 	"os"
 	"strings"
+	"syscall"
 	"time"
 
 	"golang.org/x/oauth2"
@@ -59,10 +62,16 @@ func New(base string, token func(context.Context) (string, error)) (*Client, err
 	return &Client{base: strings.TrimRight(base, "/"), http: &http.Client{Timeout: 15 * time.Second, CheckRedirect: func(*http.Request, []*http.Request) error { return errors.New("runtime redirect refused") }}, token: token}, nil
 }
 func privateFile(path string) (string, error) {
-	info, e := os.Lstat(path)
-	if e != nil || !info.Mode().IsRegular() || info.Mode().Perm()&0077 != 0 {
+	info, e := os.Stat(path) // Kubernetes projected volumes use a rotation symlink.
+	if e != nil || !info.Mode().IsRegular() {
 		return "", errors.New("private credential file required")
 	}
+	stat, ok := info.Sys().(*syscall.Stat_t)
+	groupReadable := ok && stat.Gid == uint32(os.Getegid()) && info.Mode().Perm()&0027 == 0
+	if info.Mode().Perm()&0077 != 0 && !groupReadable {
+		return "", errors.New("private credential file required")
+	}
+
 	b, e := os.ReadFile(path)
 	if e != nil || len(b) > 16384 || strings.TrimSpace(string(b)) == "" {
 		return "", errors.New("invalid credential file")
@@ -97,13 +106,33 @@ func FromEnvironment(ctx context.Context) (Gateway, error) {
 	httpClient := &http.Client{Timeout: 10 * time.Second, CheckRedirect: func(*http.Request, []*http.Request) error { return errors.New("token redirect refused") }}
 	ctx = context.WithValue(ctx, oauth2.HTTPClient, httpClient)
 	source := (&clientcredentials.Config{ClientID: id, ClientSecret: secret, TokenURL: endpoint}).TokenSource(ctx)
-	return New(base, func(context.Context) (string, error) {
+	client, err := New(base, func(context.Context) (string, error) {
 		t, e := source.Token()
 		if e != nil {
 			return "", errors.New("agent authentication unavailable")
 		}
 		return t.AccessToken, nil
 	})
+	if err != nil {
+		return nil, err
+	}
+	if caFile := os.Getenv("KONRO_AGENT_CA_FILE"); caFile != "" {
+		pem, err := os.ReadFile(caFile)
+		if err != nil {
+			return nil, errors.New("runtime CA unavailable")
+		}
+		roots, err := x509.SystemCertPool()
+		if err != nil {
+			roots = x509.NewCertPool()
+		}
+		if !roots.AppendCertsFromPEM(pem) {
+			return nil, errors.New("invalid runtime CA")
+		}
+		transport := http.DefaultTransport.(*http.Transport).Clone()
+		transport.TLSClientConfig = &tls.Config{RootCAs: roots, MinVersion: tls.VersionTLS12}
+		client.http.Transport = transport
+	}
+	return client, nil
 }
 func (c *Client) Create(ctx context.Context, r Request) (Job, error) {
 	return c.call(ctx, "POST", "/v1/jobs", r)

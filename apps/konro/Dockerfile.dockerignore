@@ -1,0 +1,10 @@
+**
+!apps/
+!apps/konro/
+!apps/konro/backend/
+!apps/konro/backend/**
+!apps/konro/frontend/
+!apps/konro/frontend/**
+apps/konro/frontend/node_modules
+apps/konro/frontend/dist
+apps/konro/backend/temp
