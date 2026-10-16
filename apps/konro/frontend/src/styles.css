@@ -557,3 +557,25 @@ button {
     --done: #75816f;
   }
 }
+
+/* Source → draft → confirmed recipe. Shares the cooking UI's palette. */
+.import-page { max-width: 720px; margin: 0 auto; padding: 16px 12px 64px; }
+.import-page h1 { font-size: 22px; }
+.import-panel { padding: 20px; margin: 16px 0; background: var(--panel); border: 1px solid var(--line); border-radius: 16px; }
+.import-panel label { display: flex; flex-direction: column; gap: 8px; margin: 16px 0; font-weight: 500; }
+.import-panel input:not([type="checkbox"]), .import-panel textarea, .import-panel select { width: 100%; min-height: 48px; padding: 12px; border: 1px solid var(--line); border-radius: 8px; background: var(--bg); color: var(--ink); font: inherit; }
+.import-panel textarea { line-height: 1.7; resize: vertical; }
+.import-panel fieldset { border: 0; padding: 0; margin: 0; min-width: 0; }
+.import-panel legend { font-size: 18px; font-weight: 600; }
+.import-panel pre { white-space: pre-wrap; overflow-wrap: anywhere; max-height: 360px; overflow: auto; font: inherit; line-height: 1.7; }
+.import-panel summary { cursor: pointer; min-height: 48px; align-content: center; }
+.import-panel a { color: var(--accent); overflow-wrap: anywhere; }
+.import-actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.import-page .chip, .header-row .chip { min-height: 48px; }
+.import-panel .start-button { margin-top: 12px; min-height: 48px; }
+.import-notice { padding: 12px; border-left: 4px solid var(--accent); background: var(--accent-soft); line-height: 1.6; overflow-wrap: anywhere; }
+.import-panel .import-confirm { flex-direction: row; align-items: center; min-height: 48px; line-height: 1.6; }
+.import-confirm input { width: 24px; height: 24px; flex-shrink: 0; accent-color: var(--accent); }
+.import-page button:disabled, .import-page fieldset:disabled { opacity: .6; cursor: default; }
+.import-page :focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+@media (max-width: 480px) { .import-panel { padding: 16px; } .header-row { flex-wrap: wrap; gap: 8px; } .import-page .import-actions .start-button { width: 100%; } }

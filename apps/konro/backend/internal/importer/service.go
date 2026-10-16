@@ -32,6 +32,7 @@ type Draft struct {
 	Content        Content          `json:"content"`
 	Warnings       []string         `json:"warnings"`
 	Job            *agentclient.Job `json:"job,omitempty"`
+	Detached       bool             `json:"detached"`
 	Pending        bool             `json:"pending"`
 	Mode           string           `json:"mode,omitempty"`
 	JobKey         string           `json:"job_key,omitempty"`
@@ -140,12 +141,12 @@ func (s *Service) Get(ctx context.Context, id string) (*Draft, error) {
 	if e != nil {
 		return nil, e
 	}
-	if d.Pending {
+	if d.Pending && !d.Detached {
 		if e = s.submit(ctx, d); e != nil {
 			return d, e
 		}
 	}
-	if d.Job != nil && (d.Job.State == "queued" || d.Job.State == "running" || d.Job.State == "waiting") {
+	if !d.Detached && d.Job != nil && (d.Job.State == "queued" || d.Job.State == "running" || d.Job.State == "waiting") {
 		if s.agent == nil {
 			return d, errors.New("AI接続が設定されていません")
 		}
@@ -167,8 +168,30 @@ func (s *Service) Get(ctx context.Context, id string) (*Draft, error) {
 	return d, nil
 }
 func active(d *Draft) bool {
-	return d.Pending || d.Job != nil && (d.Job.State == "queued" || d.Job.State == "running" || d.Job.State == "waiting")
+	return !d.Detached && (d.Pending || d.Job != nil && (d.Job.State == "queued" || d.Job.State == "running" || d.Job.State == "waiting"))
 }
+
+// Manual detaches the draft so an unavailable runtime cannot lock out editing.
+// A late result can no longer replace the user's work.
+func (s *Service) Manual(id string, revision int) (*Draft, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	d, e := s.read(id)
+	if e != nil {
+		return nil, e
+	}
+	if d.Revision != revision || d.SavedFile != "" {
+		return d, ErrConflict
+	}
+	d.Detached = true
+	d.Pending = false
+	d.Revision++
+	if e = s.write(d); e != nil {
+		return nil, e
+	}
+	return d, nil
+}
+
 func (s *Service) Start(ctx context.Context, id string, revision int, mode string) (*Draft, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -192,6 +215,7 @@ func (s *Service) Start(ctx context.Context, id string, revision int, mode strin
 	d.Revision++
 	d.JobKey = fmt.Sprintf("konro-%s-%d-%s", d.ID, d.Revision, mode)
 	d.Pending = true
+	d.Detached = false
 	d.Job = nil
 	if e = s.write(d); e != nil {
 		return nil, e

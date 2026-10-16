@@ -1,10 +1,12 @@
 import { useEffect, useMemo, useState } from "react";
 import { fetchRecipes, formatDuration, importRecipeZip, RecipeMeta } from "../api";
+import { ImportPage } from "./ImportPage";
 import { normalizeQuery } from "../session";
 
 // Recipe browser + session builder: tap cards to put recipes "on the stove",
 // then start the cooking session.
 export function RecipesPage({ onStart }: { onStart: (files: string[]) => void }) {
+  const [webImport, setWebImport] = useState(false);
   const [recipes, setRecipes] = useState<RecipeMeta[]>([]);
   const [error, setError] = useState("");
   const [q, setQ] = useState("");
@@ -54,13 +56,20 @@ export function RecipesPage({ onStart }: { onStart: (files: string[]) => void })
   const toggle = (file: string) =>
     setSelected((sel) => (sel.includes(file) ? sel.filter((f) => f !== file) : [...sel, file]));
 
+  if (webImport) return <ImportPage onClose={() => setWebImport(false)} onSaved={(file, title) => {
+    setWebImport(false); setImportMsg(`✓ ${title} を保存しました`);
+    setQ(""); setTag(""); setSelected((s) => s.includes(file) ? s : [...s, file]);
+    fetchRecipes().then(setRecipes).catch((e) => setError(String(e)));
+  }} />;
+
   return (
     <div className="recipes-page">
       <header className="list-header">
         <div className="header-row">
           <h1>konro</h1>
+          <div className="import-actions"><button className="chip chip-on" onClick={() => setWebImport(true)}>レシピを追加</button>
           <label className="chip import-chip">
-            {importing ? "取込中…" : "⤵ 取込"}
+            {importing ? "取込中…" : "ZIP取込"}
             <input
               type="file"
               accept=".zip,application/zip"
@@ -72,7 +81,7 @@ export function RecipesPage({ onStart }: { onStart: (files: string[]) => void })
                 e.target.value = "";
               }}
             />
-          </label>
+          </label></div>
         </div>
         {importMsg && (
           <p
@@ -112,6 +121,7 @@ export function RecipesPage({ onStart }: { onStart: (files: string[]) => void })
         </div>
       )}
 
+      {!error && recipes.length === 0 && <div className="empty-state"><p>最初のレシピを追加しましょう</p><button className="chip" onClick={() => setWebImport(true)}>URL・本文から取り込む</button></div>}
       <ul className="recipe-grid">
         {shown.map((r) => {
           const idx = selected.indexOf(r.file);

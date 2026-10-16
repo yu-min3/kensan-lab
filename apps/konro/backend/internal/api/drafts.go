@@ -94,6 +94,8 @@ func registerDrafts(mux *http.ServeMux, s *importer.Service) {
 			d, e = s.Start(r.Context(), id, in.Revision, in.Mode)
 		case "cancel", "retry":
 			d, e = s.Action(r.Context(), id, in.Revision, r.PathValue("action"))
+		case "manual":
+			d, e = s.Manual(id, in.Revision)
 		case "save":
 			d, e = s.Save(id, in.Revision)
 		default:
