@@ -36,9 +36,10 @@ Konroは既存構成どおり単一writer／単一ユーザーを想定する。
 |---|---|
 | `KONRO_AGENT_URL` | agentdのorigin。HTTPS、または開発用のliteral loopback HTTP |
 | `KONRO_AGENT_TOKEN_FILE` | 開発用Bearer tokenの0600ファイル。runtimeをloopbackモードで起動する |
+| `KONRO_AGENT_CA_FILE` | runtime専用CAのPEMファイル。system CAへ追加してTLS検証する |
 | `KONRO_AGENT_TOKEN_URL` | 本番のKeycloak token endpoint（HTTPS） |
 | `KONRO_AGENT_CLIENT_ID` | service-only confidential client ID |
-| `KONRO_AGENT_CLIENT_SECRET_FILE` | client secretの0600ファイル |
+| `KONRO_AGENT_CLIENT_SECRET_FILE` | client secretの0600ファイル、またはPodの専用fsGroupでのみ読める0440 projected file |
 
 本番は開発token変数を設定せず、Keycloakのclient credentialsを使う。
 audience mapperとruntimeのclient allowlistを対応させる。Konroへ渡すのはサービスの
