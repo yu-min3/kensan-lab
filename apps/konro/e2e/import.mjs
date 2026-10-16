@@ -1,0 +1,139 @@
+// Real browser → Konro → separate runtime HTTP process. Only model inference is
+// substituted by runtime's opt-in generic fixture (no paid calls or real data).
+import assert from "node:assert/strict";
+import { spawn } from "node:child_process";
+import { mkdtemp, mkdir, writeFile, readFile } from "node:fs/promises";
+import { createWriteStream } from "node:fs";
+import net from "node:net";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+import { chromium } from "../frontend/node_modules/playwright/index.mjs";
+
+const app = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+const runtimeBinary = process.env.AGENT_RUNTIME_TEST_BINARY;
+const konroBinary = process.env.KONRO_TEST_BINARY;
+assert(runtimeBinary && konroBinary, "Set AGENT_RUNTIME_TEST_BINARY and KONRO_TEST_BINARY to independently built binaries");
+await mkdir(path.join(app, "temp"), { recursive: true });
+const artifacts = await mkdtemp(path.join(app, "temp", "import-e2e-"));
+const state = path.join(artifacts, "runtime");
+const data = path.join(artifacts, "recipes");
+await mkdir(data);
+const control = path.join(artifacts, "inference.json");
+const token = "local-test-only-no-provider-credentials-12345";
+const tokenFile = path.join(artifacts, "service-token");
+await writeFile(tokenFile, token, { mode: 0o600 });
+const freePort = () => new Promise((resolve) => { const s = net.createServer(); s.listen(0, "127.0.0.1", () => { const p = s.address().port; s.close(() => resolve(p)); }); });
+const runtimePort = await freePort(), appPort = await freePort();
+const runtimeURL = `http://127.0.0.1:${runtimePort}`, appURL = `http://127.0.0.1:${appPort}`;
+const output = { title: "鮭の煮物", servings: "2人分", ingredients: ["鮭 2切れ", "水 100ml"], steps: ["水を沸かす", "鮭を10分煮る"] };
+const fixture = async (mode, value = output) => writeFile(control, JSON.stringify({ mode, output: value }));
+await fixture("success");
+const launch = (binary, args, env, name) => {
+  const log = createWriteStream(path.join(artifacts, `${name}.log`), { flags: "a" });
+  const child = spawn(binary, args, { env: { ...process.env, ...env }, stdio: ["ignore", "pipe", "pipe"] });
+  child.stdout.pipe(log); child.stderr.pipe(log); child.on("error", (e) => log.write(String(e)));
+  return child;
+};
+const waitHTTP = async (url, headers = {}) => {
+  for (let i = 0; i < 100; i++) { try { const r = await fetch(url, { headers }); if (r.status < 500) return; } catch {} await new Promise((r) => setTimeout(r, 100)); }
+  throw new Error(`service did not start: ${url}`);
+};
+const startRuntime = async () => {
+  const p = launch(runtimeBinary, ["-test.run=^TestHTTPProcess$"], {
+    AGENT_RUNTIME_TEST_ADDR: `127.0.0.1:${runtimePort}`, AGENT_RUNTIME_TEST_STATE: state,
+    AGENT_RUNTIME_TEST_CONTROL: control, AGENT_RUNTIME_TEST_TOKEN: token,
+  }, "runtime");
+  await waitHTTP(`${runtimeURL}/v1/jobs/missing`, { Authorization: `Bearer ${token}` }); return p;
+};
+const stop = async (p) => { if (p && p.exitCode === null && !p.signalCode) { const exited = new Promise((r) => p.once("exit", r)); p.kill("SIGTERM"); await exited; } };
+let runtime, backend, browser;
+const results = [];
+try {
+  runtime = await startRuntime();
+  backend = launch(konroBinary, [], {
+    KONRO_DATA_DIR: data, KONRO_STATIC_DIR: path.join(app, "frontend/dist"), KONRO_ADDR: `127.0.0.1:${appPort}`,
+    KONRO_AGENT_URL: runtimeURL, KONRO_AGENT_TOKEN_FILE: tokenFile,
+  }, "konro");
+  await waitHTTP(`${appURL}/healthz`);
+  browser = await chromium.launch({ headless: true, executablePath: process.env.CHROME_BINARY || undefined });
+  const page = await browser.newPage({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 1 });
+  const errors = []; page.on("pageerror", (e) => errors.push(String(e)));
+  const button = (name) => page.getByRole("button", { name, exact: true });
+  const source = "鮭の煮物 2人分\n材料 鮭2切れ 水100ml\n水を沸かす。鮭を10分煮る。";
+  const create = async () => {
+    await page.goto(appURL);
+    await button("レシピを追加").click();
+    await page.getByRole("button", { name: /^(本文を貼り付ける|別のレシピを取り込む)$/ }).first().waitFor();
+    // Every scenario starts a fresh import while older source files stay intact.
+    if (await button("別のレシピを取り込む").count()) await button("別のレシピを取り込む").click();
+    await button("本文を貼り付ける").click();
+    await page.getByLabel("レシピの本文", { exact: true }).fill(source);
+    await button("下書きを作る").click();
+    await page.getByLabel("タイトル", { exact: true }).waitFor();
+  };
+  const waitText = async (text) => page.getByText(text, { exact: false }).first().waitFor({ timeout: 30000 });
+  await create();
+  await page.getByLabel("タイトル", { exact: true }).fill("手入力の鮭");
+  await page.getByLabel("材料（1行に1項目）", { exact: true }).fill("鮭 2切れ\n水 100ml");
+  await page.getByLabel("手順（1行に1つの手順）", { exact: true }).fill("水を沸かす\n10分煮る");
+  await button("下書きを保存して戻る").click();
+  await page.reload(); await button("レシピを追加").click();
+  await page.getByLabel("タイトル", { exact: true }).waitFor();
+  assert.equal(await page.getByLabel("タイトル", { exact: true }).inputValue(), "手入力の鮭");
+  assert.equal(await button("レシピとして保存").isEnabled(), false);
+  await page.getByRole("checkbox").check(); await button("レシピとして保存").click();
+  await button("🔥 1 品でコンロを開始").click();
+  await waitText("10分煮る");
+  await page.screenshot({ path: path.join(artifacts, "cooking-mobile.png"), fullPage: true });
+  console.log("passed step", results.length + 1); results.push("manual draft persists after reload; confirmed recipe enters existing cooking session");
+  await page.evaluate(() => localStorage.clear());
+
+  await create();
+  await page.getByLabel("AIでの整え方").selectOption("steps");
+  await button("AIで抽出・整形").click();
+  await waitText("整形が完了しました");
+  assert.equal(await page.getByLabel("タイトル", { exact: true }).inputValue(), output.title);
+  await page.getByText("取り込み元を確認", { exact: true }).click();
+  assert.equal(await page.locator("pre").first().textContent(), source);
+  assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth), false);
+  await page.screenshot({ path: path.join(artifacts, "ai-draft-mobile.png"), fullPage: true });
+  await page.getByRole("checkbox").check(); await button("レシピとして保存").click();
+  await button("レシピを追加").waitFor();
+  console.log("passed step", results.length + 1); results.push("AI normalization over real HTTP; source comparison; confirmation save; no horizontal mobile overflow");
+
+  await fixture("wait"); await create(); await button("AIで抽出・整形").click();
+  await waitText("利用枠が空いてから再試行してください");
+  await fixture("success"); await button("利用枠を再確認").click(); await waitText("整形が完了しました");
+  console.log("passed step", results.length + 1); results.push("quota waits visibly and retries explicitly");
+
+  await fixture("success", { ...output, steps: ["200度で焼く"] });
+  await create(); await button("AIで抽出・整形").click(); await waitText("原文にない数値を検出");
+  assert.equal(await page.getByLabel("タイトル", { exact: true }).inputValue(), "");
+  console.log("passed step", results.length + 1); results.push("new temperature rejected without replacing original draft");
+
+  await fixture("success", { ...output, steps: "invalid" });
+  await create(); await button("AIで抽出・整形").click(); await waitText("AIで整形できませんでした");
+  assert.equal(await page.getByLabel("タイトル", { exact: true }).inputValue(), "");
+  console.log("passed step", results.length + 1); results.push("runtime output-schema failure leaves editable draft");
+
+  await fixture("delay"); await create(); await button("AIで抽出・整形").click();
+  await waitText("材料と手順を整えています"); await button("AIを取り消す").click(); await waitText("AIの処理を取り消しました");
+  assert.equal(await page.getByLabel("タイトル", { exact: true }).isEnabled(), true);
+  console.log("passed step", results.length + 1); results.push("running job cancellation unlocks editor");
+
+  await create(); await button("AIで抽出・整形").click(); await waitText("材料と手順を整えています");
+  await stop(runtime); runtime = await startRuntime(); await waitText("実行中に接続先が再起動しました");
+  console.log("passed step", results.length + 1); results.push("runtime restart reports interrupted, never success or automatic rerun");
+
+  await create(); await button("AIで抽出・整形").click(); await waitText("材料と手順を整えています");
+  await stop(runtime); await button("AIの結果を使わず編集する").click(); await waitText("手入力に切り替えました");
+  await page.getByLabel("タイトル", { exact: true }).fill("接続なしでも編集");
+  assert.equal(await page.getByLabel("タイトル", { exact: true }).isEnabled(), true);
+  console.log("passed step", results.length + 1); results.push("unavailable runtime can be detached locally for manual editing");
+  assert.deepEqual(errors, []);
+  await writeFile(path.join(artifacts, "results.json"), JSON.stringify({ status: "passed", results, browserErrors: errors }, null, 2));
+  console.log(JSON.stringify({ status: "passed", checks: results.length, artifacts }, null, 2));
+} catch (e) {
+  await writeFile(path.join(artifacts, "failure.txt"), String(e.stack || e));
+  console.error(`Artifacts: ${artifacts}`); throw e;
+} finally { await browser?.close(); await stop(backend); await stop(runtime); }

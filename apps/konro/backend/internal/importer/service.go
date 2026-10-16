@@ -254,7 +254,16 @@ func (s *Service) apply(d *Draft) error {
 	var c Content
 	dec := json.NewDecoder(bytes.NewReader(d.Job.Output))
 	dec.DisallowUnknownFields()
-	if e := dec.Decode(&c); e != nil || dec.Decode(new(any)) != io.EOF || Validate(c) != nil {
+	var fields map[string]json.RawMessage
+	_ = json.Unmarshal(d.Job.Output, &fields)
+	required := true
+	for _, name := range []string{"title", "servings", "ingredients", "steps"} {
+		v, ok := fields[name]
+		if !ok || string(bytes.TrimSpace(v)) == "null" {
+			required = false
+		}
+	}
+	if e := dec.Decode(&c); e != nil || dec.Decode(new(any)) != io.EOF || !required || Validate(c) != nil {
 		d.Job.State = "failed"
 		d.Job.Reason = "invalid_recipe"
 		d.Warnings = append(d.Warnings, "AIの結果がレシピ形式に合わないため採用しませんでした")
@@ -272,6 +281,13 @@ func (s *Service) apply(d *Draft) error {
 	}
 	d.Content = c
 	d.Revision++
+	var retained []string
+	for _, w := range d.Warnings {
+		if strings.Contains(w, "複数のレシピ") {
+			retained = append(retained, w)
+		}
+	}
+	d.Warnings = retained
 	d.Warnings = append(d.Warnings, "AIで整形しました。分量・時間・温度と手順を原文で確認してから保存してください")
 	return nil
 }

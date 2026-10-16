@@ -50,12 +50,13 @@ func PublicIP(ip net.IP) bool {
 }
 func validURL(raw string) (*url.URL, error) {
 	u, e := url.Parse(raw)
-	if e != nil || u.User != nil || u.Host == "" || (u.Scheme != "http" && u.Scheme != "https") || u.Fragment != "" {
+	if e != nil || u.User != nil || u.Host == "" || (u.Scheme != "http" && u.Scheme != "https") {
 		return nil, errors.New("http/httpsのURLを入力してください")
 	}
 	if port := u.Port(); port != "" && port != "80" && port != "443" {
 		return nil, errors.New("標準ポートのURLのみ取り込めます")
 	}
+	u.Fragment = ""
 	return u, nil
 }
 func Fetch(ctx context.Context, raw string) (Source, error) {

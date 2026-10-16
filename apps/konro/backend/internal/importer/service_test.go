@@ -101,7 +101,7 @@ func TestDraftAgentConfirmAndReload(t *testing.T) {
 	}
 }
 func TestAgentNumbersAndInvalidRecipeRejected(t *testing.T) {
-	for _, out := range []string{`{"title":"魚","servings":"","ingredients":["魚 2切れ"],"steps":["200度で焼く"]}`, `{"title":"魚","servings":"","ingredients":["魚"],"steps":["焼く"],"execute":"command"}`, `{"title":"魚","ingredients":[],"steps":[]}`} {
+	for _, out := range []string{`{"title":"魚","servings":"","ingredients":["魚 2切れ"],"steps":["200度で焼く"]}`, `{"title":"魚","servings":"","ingredients":["魚"],"steps":["焼く"],"execute":"command"}`, `{"title":"魚","ingredients":["魚"],"steps":["焼く"]}`, `{"title":"魚","servings":null,"ingredients":["魚"],"steps":["焼く"]}`, `{"title":"魚","ingredients":[],"steps":[]}`} {
 		a := &fakeAgent{result: agentclient.Job{ID: "generic-job", State: "succeeded", Output: json.RawMessage(out)}}
 		s := New(t.TempDir(), a)
 		d, _ := s.Create(context.Background(), "", "魚 2切れ 焼く")
@@ -131,5 +131,28 @@ func TestManualAndNamespace(t *testing.T) {
 		if _, e := recipe.Load(s.dir, id); e == nil {
 			t.Fatal("path accepted", id)
 		}
+	}
+}
+
+func TestManualDetachesLateOutput(t *testing.T) {
+	ctx := context.Background()
+	a := &fakeAgent{result: agentclient.Job{ID: "generic-job", State: "succeeded", Output: json.RawMessage(`{"title":"late","servings":"","ingredients":["fish"],"steps":["cook"]}`)}}
+	s := New(t.TempDir(), a)
+	d, _ := s.Create(ctx, "", "fish cook")
+	d, _ = s.Start(ctx, d.ID, d.Revision, "steps")
+	d, e := s.Manual(d.ID, d.Revision)
+	if e != nil {
+		t.Fatal(e)
+	}
+	d, e = s.Edit(d.ID, d.Revision, Content{Title: "manual", Ingredients: []string{"fish"}, Steps: []string{"cook"}})
+	if e != nil {
+		t.Fatal(e)
+	}
+	d, e = s.Get(ctx, d.ID)
+	if e != nil || d.Content.Title != "manual" {
+		t.Fatal("late result overwrote manual work", e)
+	}
+	if _, e = s.Save(d.ID, d.Revision); e != nil {
+		t.Fatal(e)
 	}
 }
