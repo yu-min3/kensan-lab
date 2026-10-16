@@ -55,3 +55,20 @@ export function formatDuration(iso?: string): string {
   if (s && !h && !min) out += `${s}秒`;
   return out;
 }
+
+export type ImportContent = { title: string; servings: string; ingredients: string[]; steps: string[] };
+export type ImportDraft = {
+  id: string; revision: number;
+  source: { url?: string; raw: string; text: string };
+  content: ImportContent; warnings: string[];
+  pending: boolean; detached: boolean; agent_available: boolean; saved_file?: string;
+  job?: { id: string; state: string; reason?: string };
+};
+export async function draftRequest(path: string, method = "GET", body?: unknown): Promise<ImportDraft> {
+  const res = await fetch(`/api/v1/import/drafts${path}`, {
+    method, headers: { "Content-Type": "application/json" },
+    body: body === undefined ? undefined : JSON.stringify(body),
+  });
+  if (!res.ok) throw new Error((await res.text()).trim());
+  return res.json();
+}

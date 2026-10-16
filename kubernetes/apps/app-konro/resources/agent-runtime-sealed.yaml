@@ -1,0 +1,14 @@
+---
+apiVersion: bitnami.com/v1alpha1
+kind: SealedSecret
+metadata:
+  name: konro-agent-runtime
+  namespace: app-konro
+spec:
+  encryptedData:
+    client-secret: AgCwlEAtYVdA/lneX/6i/Al2csQUl7SDZCSJogfTa45s0CqX5tItv9PTwnIz+Hcashu8r18Qr9c2Cs3nqZNBRjPLUh+O+h4RhyCxmncDHWWyJMfj+H3TMrgqeGe1EvEHmrYH6iuSyLRmh7izhzjxy2mLgNuodSEfQCO8Zd9xN6Uwab0aRFCl+8jfnFFB7VrVATEhBymC0NTneMhzjrHSQ7ZKD2ZDxk8x1FcO5ZxDtTs5yyP/Wz+yHRCD0pGmEuoPkdvz6sxNDnPBcGR1wwwGf/h3J0zkVc/44o1lxlPAQw9Ppae8nTD8pj8xEbvhumckvLkSeFHAC5oHsT4n0w39MOhPepyLUH41cPuAYLZcYEl4FH6o9D13VFMEqOv6C6kQSJ6ySgW0FE7jf+WhBjlyUA0x4V9puN5aisLPGuFq6COKSlzbprRXbpRnpTprwKEHHIDC338YtzqztpdHfNMnLH5Gcm20wDjncF0ed3pBBdN1UZYpOKPfWMeqGQqsPhMSEw7ADk/ge8Lc/xxE6gUCGGJNaVThRUZb/dtKG+YS89W6VDSe23H7Qwj0aYMwCK4E0buO36yHb4v2UAdP+okOgPtKhL375mstJ9U+82b0GxiO3cjwsqnlmLswtCahzr2NQm4QRpMYJ8gpaphv31E+uAU1GUIPq8AnPfcnRLswhKo5/pNvvG7odXr1gPg3bAB5gBQgPtRM/t0hsaRHr5RkID+5tdabNLs7c6NfJHDs162Zqw==
+  template:
+    metadata:
+      name: konro-agent-runtime
+      namespace: app-konro
+    type: Opaque

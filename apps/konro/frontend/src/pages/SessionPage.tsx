@@ -183,7 +183,7 @@ export function SessionPage({
             <section>
               <h3 className="section-label">手順</h3>
               {(recipe.steps ?? []).length === 0 && (
-                <p className="no-steps">Recipe Keeper に手順が未登録のレシピです（材料のみ）。出典リンクから手順を確認してください。</p>
+                <p className="no-steps">取り込み元 に手順が未登録のレシピです（材料のみ）。出典リンクから手順を確認してください。</p>
               )}
               <ol className="steps">
                 {(recipe.steps ?? []).map((step, i) => (

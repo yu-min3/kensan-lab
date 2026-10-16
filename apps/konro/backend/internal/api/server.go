@@ -13,6 +13,7 @@ import (
 	"path/filepath"
 	"time"
 
+	"github.com/yu-min3/kensan-lab/apps/konro/backend/internal/importer"
 	"github.com/yu-min3/kensan-lab/apps/konro/backend/internal/recipe"
 	"github.com/yu-min3/kensan-lab/apps/konro/backend/internal/rkimport"
 )
@@ -25,8 +26,13 @@ const maxImportBytes = 64 << 20
 // New builds the handler. dataDir holds recipe .md files + images/;
 // staticDir (optional) holds the built SPA, served with fallback to
 // index.html for client-side routing.
-func New(dataDir, staticDir string) http.Handler {
+func New(dataDir, staticDir string, opts ...Option) http.Handler {
 	mux := http.NewServeMux()
+	config := options{}
+	for _, opt := range opts {
+		opt(&config)
+	}
+	registerDrafts(mux, importer.New(dataDir, config.agent))
 
 	mux.HandleFunc("GET /api/v1/recipes", func(w http.ResponseWriter, r *http.Request) {
 		metas, err := recipe.List(dataDir)
@@ -37,7 +43,7 @@ func New(dataDir, staticDir string) http.Handler {
 		writeJSON(w, metas)
 	})
 
-	mux.HandleFunc("GET /api/v1/recipes/{name}", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("GET /api/v1/recipes/{name...}", func(w http.ResponseWriter, r *http.Request) {
 		rec, err := recipe.Load(dataDir, r.PathValue("name"))
 		if errors.Is(err, fs.ErrNotExist) {
 			http.Error(w, "not found", http.StatusNotFound)

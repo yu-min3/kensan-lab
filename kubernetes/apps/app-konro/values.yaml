@@ -4,12 +4,38 @@
 nameOverride: konro
 image:
   repository: ghcr.io/yu-min3/konro
-  tag: v0.2.0
+  tag: v0.3.0
 env:
   # レシピ frontmatter の created/updated と将来のインポート endpoint が
   # time.Now() 依存になるため JST を明示（kensan と同じ理由）
   - name: TZ
     value: Asia/Tokyo
+  - name: KONRO_AGENT_URL
+    value: https://192.168.0.113:8791
+  - name: KONRO_AGENT_CA_FILE
+    value: /etc/konro/agent-ca/ca.crt
+  - name: KONRO_AGENT_TOKEN_URL
+    value: https://auth.yu-mins.com/realms/kensan/protocol/openid-connect/token
+  - name: KONRO_AGENT_CLIENT_ID
+    value: konro-agent-runtime
+  - name: KONRO_AGENT_CLIENT_SECRET_FILE
+    value: /etc/konro/agent-credentials/client-secret
+reloader: true
+extraVolumeMounts:
+  - name: agent-ca
+    mountPath: /etc/konro/agent-ca
+    readOnly: true
+  - name: agent-credentials
+    mountPath: /etc/konro/agent-credentials
+    readOnly: true
+extraVolumes:
+  - name: agent-ca
+    configMap:
+      name: konro-agent-runtime-ca
+  - name: agent-credentials
+    secret:
+      secretName: konro-agent-runtime
+      defaultMode: 0440
 ghcrPullSecret:
   enabled: true
 pvc:
