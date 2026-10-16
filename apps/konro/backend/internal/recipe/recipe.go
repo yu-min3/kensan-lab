@@ -41,7 +41,17 @@ func List(dir string) ([]Meta, error) {
 	if err != nil {
 		return nil, err
 	}
-	var metas []Meta
+	metas := []Meta{}
+	if imported, err := os.ReadDir(filepath.Join(dir, "imported")); err == nil {
+		for _, e := range imported {
+			if !e.IsDir() && strings.HasSuffix(e.Name(), ".md") {
+				r, err := Load(dir, "imported/"+strings.TrimSuffix(e.Name(), ".md"))
+				if err == nil {
+					metas = append(metas, r.Meta)
+				}
+			}
+		}
+	}
 	for _, e := range entries {
 		if e.IsDir() || !strings.HasSuffix(e.Name(), ".md") {
 			continue
@@ -58,7 +68,7 @@ func List(dir string) ([]Meta, error) {
 
 // Load reads one recipe by id (filename without .md).
 func Load(dir, name string) (*Recipe, error) {
-	if strings.ContainsAny(name, "/\\") || strings.Contains(name, "..") {
+	if !validName(name) {
 		return nil, fmt.Errorf("invalid recipe name %q", name)
 	}
 	data, err := os.ReadFile(filepath.Join(dir, name+".md"))
@@ -159,9 +169,76 @@ func parseList(val string) []string {
 
 func unquote(s string) string {
 	if len(s) >= 2 && strings.HasPrefix(s, "\"") && strings.HasSuffix(s, "\"") {
-		s = s[1 : len(s)-1]
-		s = strings.ReplaceAll(s, "\\\"", "\"")
-		s = strings.ReplaceAll(s, "\\\\", "\\")
+		if v, err := strconv.Unquote(s); err == nil {
+			return v
+		}
 	}
 	return s
+}
+
+func validName(name string) bool {
+	if strings.HasPrefix(name, "imported/") {
+		return importedID.MatchString(strings.TrimPrefix(name, "imported/"))
+	}
+	return name != "" && !strings.ContainsAny(name, "/\\") && !strings.Contains(name, "..")
+}
+
+var importedID = regexp.MustCompile(`^[0-9a-f]{32}$`)
+
+// SaveImported writes an immutable URL/text recipe in its own namespace. ZIP
+// imports only write root-level files and cannot collide with these IDs.
+func SaveImported(dir, id string, r Recipe) error {
+	if !importedID.MatchString(id) {
+		return fmt.Errorf("invalid imported ID")
+	}
+	target := filepath.Join(dir, "imported")
+	if err := os.MkdirAll(target, 0700); err != nil {
+		return err
+	}
+	var b strings.Builder
+	fmt.Fprintf(&b, "---\ntitle: %s\nservings: %s\nsource: %s\ntags: []\n---\n\n## 材料\n", strconv.Quote(r.Title), strconv.Quote(r.Servings), strconv.Quote(r.Source))
+	for _, v := range r.Ingredients {
+		fmt.Fprintf(&b, "- %s\n", v)
+	}
+	b.WriteString("\n## 手順\n")
+	for i, v := range r.Steps {
+		fmt.Fprintf(&b, "%d. %s\n", i+1, v)
+	}
+	path := filepath.Join(target, id+".md")
+	// A repeated confirm after a crash is safe; never replace a different recipe.
+	if old, err := os.ReadFile(path); err == nil {
+		if string(old) == b.String() {
+			return nil
+		}
+		return fmt.Errorf("imported recipe already exists")
+	}
+	f, err := os.CreateTemp(target, ".recipe-")
+	if err != nil {
+		return err
+	}
+	name := f.Name()
+	defer os.Remove(name)
+	if err = f.Chmod(0600); err == nil {
+		_, err = f.WriteString(b.String())
+	}
+	if err == nil {
+		err = f.Sync()
+	}
+	closeErr := f.Close()
+	if err == nil {
+		err = closeErr
+	}
+	if err != nil {
+		return err
+	}
+	// Hard-link publication is atomic and refuses any existing destination.
+	if err = os.Link(name, path); err != nil {
+		return err
+	}
+	d, err := os.Open(target)
+	if err != nil {
+		return err
+	}
+	defer d.Close()
+	return d.Sync()
 }

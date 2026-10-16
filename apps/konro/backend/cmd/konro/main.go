@@ -2,10 +2,12 @@
 package main
 
 import (
+	"context"
 	"log"
 	"net/http"
 	"os"
 
+	"github.com/yu-min3/kensan-lab/apps/konro/backend/internal/agentclient"
 	"github.com/yu-min3/kensan-lab/apps/konro/backend/internal/api"
 )
 
@@ -14,8 +16,12 @@ func main() {
 	staticDir := os.Getenv("KONRO_STATIC_DIR") // empty = API only (vite dev serves the UI)
 	addr := envOr("KONRO_ADDR", ":8090")
 
+	agent, err := agentclient.FromEnvironment(context.Background())
+	if err != nil {
+		log.Fatal(err)
+	}
 	log.Printf("konro: data=%s static=%s addr=%s", dataDir, staticDir, addr)
-	if err := http.ListenAndServe(addr, api.New(dataDir, staticDir)); err != nil {
+	if err := http.ListenAndServe(addr, api.New(dataDir, staticDir, api.WithAgent(agent))); err != nil {
 		log.Fatal(err)
 	}
 }
