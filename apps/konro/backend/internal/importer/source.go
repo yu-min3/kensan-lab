@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/PuerkitoBio/goquery"
+	"github.com/yu-min3/kensan-lab/apps/konro/backend/internal/recipe"
 )
 
 const MaxSource = 5 << 20
@@ -23,12 +24,7 @@ type Source struct {
 	Raw  string `json:"raw"`
 	Text string `json:"text"`
 }
-type Content struct {
-	Title       string   `json:"title"`
-	Servings    string   `json:"servings"`
-	Ingredients []string `json:"ingredients"`
-	Steps       []string `json:"steps"`
-}
+type Content = recipe.Content
 
 // PublicIP excludes local/private/link-local and transition ranges which can
 // otherwise reach metadata endpoints or tunnel an embedded private IPv4.

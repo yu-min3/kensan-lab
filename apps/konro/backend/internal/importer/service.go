@@ -383,15 +383,8 @@ func validateContent(c Content, complete bool) error {
 	if complete && (strings.TrimSpace(c.Title) == "" || len(c.Ingredients) == 0 || len(c.Steps) == 0) {
 		return errors.New("タイトル・材料・手順を入力してください")
 	}
-	if len(c.Title) > 300 || len(c.Servings) > 200 || strings.ContainsAny(c.Title+c.Servings, "\r\n") || len(c.Ingredients) > 100 || len(c.Steps) > 150 {
-		return errors.New("タイトル・材料・手順を入力してください（材料100件、手順150件まで）")
-	}
-	for _, list := range [][]string{c.Ingredients, c.Steps} {
-		for _, line := range list {
-			if strings.TrimSpace(line) == "" || len(line) > 3000 || strings.ContainsAny(line, "\r\n") {
-				return errors.New("材料・手順は1項目1行、3000バイト以内にしてください")
-			}
-		}
+	if recipe.ValidateContent(c) != nil {
+		return errors.New("タイトル・材料・手順を確認してください（材料100件、手順150件、1項目1行3000バイト以内）")
 	}
 	return nil
 }

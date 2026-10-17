@@ -5,13 +5,11 @@
 package recipe
 
 import (
-	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
 	"regexp"
 	"sort"
-	"strconv"
 	"strings"
 )
 
@@ -80,59 +78,17 @@ func Load(dir, name string) (*Recipe, error) {
 	if err != nil {
 		return nil, err
 	}
-	r := parse(string(data))
+	d, err := DecodeDocument(data)
+	if err != nil {
+		return nil, err
+	}
+	r := &d.Recipe
 	r.File = name
 	r.Version = version(data)
 	if r.Title == "" {
 		r.Title = name
 	}
 	return r, nil
-}
-
-func parse(src string) *Recipe {
-	r := &Recipe{}
-	body := src
-	if strings.HasPrefix(src, "---\n") {
-		if end := strings.Index(src[4:], "\n---\n"); end >= 0 {
-			parseFrontmatter(src[4:4+end], r)
-			body = src[4+end+5:]
-		}
-	}
-	parseBody(body, r)
-	return r
-}
-
-func parseFrontmatter(fm string, r *Recipe) {
-	for _, line := range strings.Split(fm, "\n") {
-		if len(line) == 0 || line[0] == ' ' || line[0] == '\t' {
-			continue
-		}
-		key, val, ok := strings.Cut(line, ":")
-		if !ok {
-			continue
-		}
-		val = strings.TrimSpace(val)
-		switch strings.TrimSpace(key) {
-		case "title":
-			r.Title = unquote(val)
-		case "tags":
-			r.Tags = parseList(val)
-		case "servings":
-			r.Servings = unquote(val)
-		case "prep_time":
-			r.PrepTime = val
-		case "cook_time":
-			r.CookTime = val
-		case "source":
-			r.Source = unquote(val)
-		case "rating":
-			r.Rating, _ = strconv.Atoi(val)
-		case "images":
-			r.Images = parseList(val)
-		case "rk_id":
-			r.RKID = val
-		}
-	}
 }
 
 var stepLine = regexp.MustCompile(`^\d+\.\s+`)
@@ -166,33 +122,6 @@ func parseBody(body string, r *Recipe) {
 	r.Notes = strings.TrimSpace(strings.Join(notes, "\n"))
 }
 
-func parseList(val string) []string {
-	val = strings.TrimSpace(val)
-	if !strings.HasPrefix(val, "[") || !strings.HasSuffix(val, "]") {
-		return nil
-	}
-	var jsonList []string
-	if json.Unmarshal([]byte(val), &jsonList) == nil {
-		return jsonList
-	}
-	var out []string
-	for _, item := range strings.Split(val[1:len(val)-1], ",") {
-		if item = unquote(strings.TrimSpace(item)); item != "" {
-			out = append(out, item)
-		}
-	}
-	return out
-}
-
-func unquote(s string) string {
-	if len(s) >= 2 && strings.HasPrefix(s, "\"") && strings.HasSuffix(s, "\"") {
-		if v, err := strconv.Unquote(s); err == nil {
-			return v
-		}
-	}
-	return s
-}
-
 func validName(name string) bool {
 	if strings.HasPrefix(name, "imported/") {
 		return importedID.MatchString(strings.TrimPrefix(name, "imported/"))
@@ -202,60 +131,8 @@ func validName(name string) bool {
 
 var importedID = regexp.MustCompile(`^[0-9a-f]{32}$`)
 
-// SaveImported writes an immutable URL/text recipe in its own namespace. ZIP
-// imports only write root-level files and cannot collide with these IDs.
+// SaveImported uses the same validation, codec and no-overwrite publication as manual creation.
 func SaveImported(dir, id string, r Recipe) error {
-	if !importedID.MatchString(id) {
-		return fmt.Errorf("invalid imported ID")
-	}
-	target := filepath.Join(dir, "imported")
-	if err := os.MkdirAll(target, 0700); err != nil {
-		return err
-	}
-	var b strings.Builder
-	fmt.Fprintf(&b, "---\ntitle: %s\nservings: %s\nsource: %s\ntags: []\n---\n\n## 材料\n", strconv.Quote(r.Title), strconv.Quote(r.Servings), strconv.Quote(r.Source))
-	for _, v := range r.Ingredients {
-		fmt.Fprintf(&b, "- %s\n", v)
-	}
-	b.WriteString("\n## 手順\n")
-	for i, v := range r.Steps {
-		fmt.Fprintf(&b, "%d. %s\n", i+1, v)
-	}
-	path := filepath.Join(target, id+".md")
-	// A repeated confirm after a crash is safe; never replace a different recipe.
-	if old, err := os.ReadFile(path); err == nil {
-		if string(old) == b.String() {
-			return nil
-		}
-		return fmt.Errorf("imported recipe already exists")
-	}
-	f, err := os.CreateTemp(target, ".recipe-")
-	if err != nil {
-		return err
-	}
-	name := f.Name()
-	defer os.Remove(name)
-	if err = f.Chmod(0600); err == nil {
-		_, err = f.WriteString(b.String())
-	}
-	if err == nil {
-		err = f.Sync()
-	}
-	closeErr := f.Close()
-	if err == nil {
-		err = closeErr
-	}
-	if err != nil {
-		return err
-	}
-	// Hard-link publication is atomic and refuses any existing destination.
-	if err = os.Link(name, path); err != nil {
-		return err
-	}
-	d, err := os.Open(target)
-	if err != nil {
-		return err
-	}
-	defer d.Close()
-	return d.Sync()
+	_, err := create(dir, id, r, false)
+	return err
 }

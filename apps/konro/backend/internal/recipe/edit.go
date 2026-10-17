@@ -4,14 +4,11 @@ import (
 	"crypto/rand"
 	"crypto/sha256"
 	"encoding/hex"
-	"encoding/json"
 	"errors"
-	"fmt"
 	"os"
 	"path/filepath"
 	"reflect"
 	"regexp"
-	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -54,7 +51,10 @@ func normalizeEdit(e Editable) Editable {
 	return e
 }
 func validateEdit(e Editable) error {
-	if strings.ContainsRune(e.Notes, 0) || strings.TrimSpace(e.Title) == "" || len(e.Title) > 300 || len(e.Servings) > 200 || len(e.Source) > 2048 || len(e.Notes) > 65536 || e.Rating < 0 || e.Rating > 5 || len(e.Tags) > 30 || len(e.Ingredients) > 100 || len(e.Steps) > 150 {
+	if err := ValidateContent(Content{e.Title, e.Servings, e.Ingredients, e.Steps}); err != nil {
+		return err
+	}
+	if strings.ContainsRune(e.Notes, 0) || strings.TrimSpace(e.Title) == "" || len(e.Source) > 2048 || len(e.Notes) > 65536 || e.Rating < 0 || e.Rating > 5 || len(e.Tags) > 30 {
 		return ErrInvalid
 	}
 	for _, s := range []string{e.Title, e.Servings, e.Source} {
@@ -67,7 +67,7 @@ func validateEdit(e Editable) error {
 			return ErrInvalid
 		}
 	}
-	for _, a := range [][]string{e.Tags, e.Ingredients, e.Steps} {
+	for _, a := range [][]string{e.Tags} {
 		for _, s := range a {
 			if strings.TrimSpace(s) == "" || len(s) > 3000 || strings.ContainsAny(s, "\r\n\x00") {
 				return ErrInvalid
@@ -102,102 +102,8 @@ func readSource(dir, name string) ([]byte, error) {
 	return os.ReadFile(p)
 }
 
-// Our writable format uses one-line metadata. Refuse unsupported editable
-// blocks instead of dropping values that the reader cannot represent.
-func checkEditableFormat(data []byte) error {
-	src := string(data)
-	if strings.HasPrefix(src, "\ufeff") {
-		return ErrInvalid
-	}
-	if strings.HasPrefix(src, "---") && !strings.HasPrefix(src, "---\n") {
-		return ErrInvalid
-	}
-	if !strings.HasPrefix(src, "---\n") {
-		return nil
-	}
-	end := strings.Index(src[4:], "\n---\n")
-	if end < 0 {
-		return ErrInvalid
-	}
-	keys := map[string]bool{"title": true, "servings": true, "tags": true, "prep_time": true, "cook_time": true, "source": true, "rating": true}
-	editableBlock := false
-	topLevelSeen := false
-	for _, line := range strings.Split(src[4:4+end], "\n") {
-		if strings.TrimSpace(line) == "" || strings.HasPrefix(strings.TrimSpace(line), "#") {
-			continue
-		}
-		if line[0] == ' ' || line[0] == '\t' {
-			if !topLevelSeen || editableBlock {
-				return fmt.Errorf("%w: 複数行のmetadataには未対応です。元のファイルは変更していません", ErrInvalid)
-			}
-			continue
-		}
-		key, value, hasKey := strings.Cut(line, ":")
-		if !hasKey || strings.HasPrefix(line, "- ") {
-			if editableBlock {
-				return fmt.Errorf("%w: 複数行のmetadataには未対応です。元のファイルは変更していません", ErrInvalid)
-			}
-			continue
-		}
-		if keys[strings.Trim(strings.TrimSpace(key), "\"'")] && !keys[key] {
-			return ErrInvalid
-		}
-		topLevelSeen = true
-		editableBlock = keys[key]
-		value = strings.TrimSpace(value)
-		if editableBlock && (strings.HasPrefix(value, "|") || strings.HasPrefix(value, ">")) {
-			return fmt.Errorf("%w: 複数行のmetadataには未対応です。元のファイルは変更していません", ErrInvalid)
-		}
-	}
-	return nil
-}
-
-func renderEdit(old []byte, e Editable) []byte {
-	list := func(a []string) string {
-		if a == nil {
-			a = []string{}
-		}
-		b, _ := json.Marshal(a)
-		return string(b)
-	}
-	values := map[string]string{"title": strconv.Quote(e.Title), "servings": strconv.Quote(e.Servings), "tags": list(e.Tags), "prep_time": e.PrepTime, "cook_time": e.CookTime, "source": strconv.Quote(e.Source), "rating": strconv.Itoa(e.Rating), "updated": time.Now().Format("2006-01-02"), "konro_edited": "true"}
-	var fm []string
-	if strings.HasPrefix(string(old), "---\n") {
-		if end := strings.Index(string(old[4:]), "\n---\n"); end >= 0 {
-			dropping := false
-			for _, line := range strings.Split(string(old[4:4+end]), "\n") {
-				if len(line) > 0 && line[0] != ' ' && line[0] != '\t' && line[0] != '#' {
-					k, _, ok := strings.Cut(line, ":")
-					_, dropping = values[k]
-					dropping = dropping && ok
-				}
-				if !dropping {
-					fm = append(fm, line)
-				}
-			}
-		}
-	}
-	if len(old) == 0 {
-		fm = append(fm, "created: "+time.Now().Format("2006-01-02"))
-	}
-	for _, key := range []string{"title", "servings", "tags", "prep_time", "cook_time", "source", "rating", "updated", "konro_edited"} {
-		if values[key] != "" {
-			fm = append(fm, key+": "+values[key])
-		}
-	}
-	var b strings.Builder
-	b.WriteString("---\n" + strings.Join(fm, "\n") + "\n---\n\n## 材料\n")
-	for _, v := range e.Ingredients {
-		fmt.Fprintf(&b, "- %s\n", v)
-	}
-	b.WriteString("\n## 手順\n")
-	for i, v := range e.Steps {
-		fmt.Fprintf(&b, "%d. %s\n", i+1, v)
-	}
-	b.WriteString("\n## メモ\n" + e.Notes + "\n")
-	return []byte(b.String())
-}
-func atomicReplace(path string, data []byte) error {
+func atomicReplace(path string, data []byte) error { return atomicWrite(path, data, true) }
+func atomicWrite(path string, data []byte, replace bool) error {
 	f, e := os.CreateTemp(filepath.Dir(path), ".recipe-")
 	if e != nil {
 		return e
@@ -217,7 +123,12 @@ func atomicReplace(path string, data []byte) error {
 	if e != nil {
 		return e
 	}
-	if e = os.Rename(tmp, path); e != nil {
+	if replace {
+		e = os.Rename(tmp, path)
+	} else {
+		e = os.Link(tmp, path)
+	}
+	if e != nil {
 		return e
 	}
 	d, e := os.Open(filepath.Dir(path))
@@ -241,26 +152,34 @@ func Update(dir, name, expected string, e Editable) (*Recipe, error) {
 	if expected == "" || expected != version(old) {
 		return nil, ErrConflict
 	}
-	if err := checkEditableFormat(old); err != nil {
+	doc, err := DecodeDocument(old)
+	if err != nil {
 		return nil, err
 	}
-
-	if err = atomicReplace(filepath.Join(dir, name+".md"), renderEdit(old, e)); err != nil {
+	data, err := doc.render(e, time.Now().Format("2006-01-02"), true)
+	if err != nil {
+		return nil, err
+	}
+	if err = atomicReplace(filepath.Join(dir, name+".md"), data); err != nil {
 		return nil, err
 	}
 	return Load(dir, name)
 }
 func Create(dir, id string, e Editable) (*Recipe, error) {
 	e = normalizeEdit(e)
+	return create(dir, id, Recipe{Meta: Meta{Title: e.Title, Servings: e.Servings, Tags: e.Tags, PrepTime: e.PrepTime, CookTime: e.CookTime, Source: e.Source, Rating: e.Rating}, Ingredients: e.Ingredients, Steps: e.Steps, Notes: e.Notes}, true)
+}
+func create(dir, id string, r Recipe, edited bool) (*Recipe, error) {
+	e := normalizeEdit(editable(&r))
 	if err := validateEdit(e); err != nil {
 		return nil, err
 	}
 	if id == "" {
-		var r [16]byte
-		if _, err := rand.Read(r[:]); err != nil {
+		var random [16]byte
+		if _, err := rand.Read(random[:]); err != nil {
 			return nil, err
 		}
-		id = hex.EncodeToString(r[:])
+		id = hex.EncodeToString(random[:])
 	}
 	if !importedID.MatchString(id) {
 		return nil, ErrInvalid
@@ -268,7 +187,6 @@ func Create(dir, id string, e Editable) (*Recipe, error) {
 	writes.Lock()
 	defer writes.Unlock()
 	name := "imported/" + id
-	// Stable client-generated IDs make a lost create response safe to retry.
 	if old, err := Load(dir, name); err == nil {
 		if reflect.DeepEqual(normalizeEdit(editable(old)), e) {
 			return old, nil
@@ -286,7 +204,21 @@ func Create(dir, id string, e Editable) (*Recipe, error) {
 	} else if !i.IsDir() || i.Mode()&os.ModeSymlink != 0 {
 		return nil, ErrInvalid
 	}
-	if err := atomicReplace(filepath.Join(dir, name+".md"), renderEdit(nil, e)); err != nil {
+	data, err := Encode(r, time.Now().Format("2006-01-02"))
+	if err != nil {
+		return nil, err
+	}
+	if edited {
+		doc, err := DecodeDocument(data)
+		if err != nil {
+			return nil, err
+		}
+		data, err = doc.render(e, "", true)
+		if err != nil {
+			return nil, err
+		}
+	}
+	if err := atomicWrite(filepath.Join(dir, name+".md"), data, false); err != nil {
 		return nil, err
 	}
 	return Load(dir, name)
@@ -297,6 +229,13 @@ func WriteLegacyImport(dir, name string, data []byte) (bool, error) {
 	if strings.ContainsAny(name, "/\\") || !strings.HasSuffix(name, ".md") || !validName(strings.TrimSuffix(name, ".md")) {
 		return false, ErrInvalid
 	}
+	doc, err := DecodeDocument(data)
+	if err != nil {
+		return false, err
+	}
+	if err = validateEdit(normalizeEdit(editable(&doc.Recipe))); err != nil {
+		return false, err
+	}
 	writes.Lock()
 	defer writes.Unlock()
 	old, err := readSource(dir, strings.TrimSuffix(name, ".md"))
@@ -304,16 +243,12 @@ func WriteLegacyImport(dir, name string, data []byte) (bool, error) {
 		return false, err
 	}
 	if err == nil {
-		src := string(old)
-		if strings.HasPrefix(src, "---\n") {
-			if end := strings.Index(src[4:], "\n---\n"); end >= 0 {
-				for _, line := range strings.Split(src[4:4+end], "\n") {
-					k, v, _ := strings.Cut(line, ":")
-					if k == "konro_edited" && strings.TrimSpace(v) == "true" {
-						return false, nil
-					}
-				}
-			}
+		doc, decodeErr := DecodeDocument(old)
+		if decodeErr != nil {
+			return false, decodeErr
+		}
+		if doc.Edited() {
+			return false, nil
 		}
 	}
 	if err = atomicReplace(filepath.Join(dir, name), data); err != nil {
