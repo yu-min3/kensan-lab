@@ -12,11 +12,14 @@ func resultLinks(raw, site string, add func(string, string), done func() bool) {
 	z := html.NewTokenizer(strings.NewReader(raw))
 	z.SetMaxBuf(2 << 20)
 	type frame struct {
-		tag   string
-		scope bool
+		tag     string
+		scope   bool
+		heading bool
 	}
 	stack := []frame{}
 	scopeDepth := 0
+	headingDepth := 0
+	precise := ""
 	href, title, alt := "", "", ""
 	anchor := false
 	for !done() {
@@ -40,7 +43,11 @@ func resultLinks(raw, site string, add func(string, string), done func() bool) {
 				if len(stack) >= 256 {
 					return
 				}
-				stack = append(stack, frame{t.Data, scoped})
+				heading := anchor && (t.Data == "h2" || t.Data == "h3" || strings.Contains(attrs["class"], "item-card__title ") || attrs["class"] == "item-card__title")
+				stack = append(stack, frame{t.Data, scoped, heading})
+				if heading {
+					headingDepth++
+				}
 				if scoped {
 					scopeDepth++
 				}
@@ -49,19 +56,25 @@ func resultLinks(raw, site string, add func(string, string), done func() bool) {
 				href = attrs["href"]
 				title = ""
 				alt = ""
+				precise = ""
 				anchor = true
 			}
-			if t.Data == "img" && anchor && attrs["alt"] != "" {
+			if t.Data == "img" && anchor && alt == "" && attrs["alt"] != "" {
 				alt = attrs["alt"]
 			}
 		case html.TextToken:
+			if anchor && headingDepth > 0 && len(precise) < 2000 {
+				precise += string(z.Text()) + " "
+			}
 			if anchor && len(title) < 2000 {
 				title += string(z.Text()) + " "
 			}
 		case html.EndTagToken:
 			t := z.Token()
 			if t.Data == "a" && anchor {
-				if alt != "" {
+				if strings.TrimSpace(precise) != "" {
+					title = precise
+				} else if alt != "" {
 					title = alt
 				}
 				add(href, title)
@@ -72,6 +85,9 @@ func resultLinks(raw, site string, add func(string, string), done func() bool) {
 					for _, f := range stack[i:] {
 						if f.scope {
 							scopeDepth--
+						}
+						if f.heading {
+							headingDepth--
 						}
 					}
 					stack = stack[:i]

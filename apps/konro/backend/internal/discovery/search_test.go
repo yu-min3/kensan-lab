@@ -73,3 +73,11 @@ func TestSearchLargeHTMLIsStreamed(t *testing.T) {
 		t.Fatal(r)
 	}
 }
+
+func TestSearchTitleDoesNotBecomeBadgeLabel(t *testing.T) {
+	page := webpage.Page{URL: searchURL("delish", "魚"), HTML: `<section class="delish-search"><a href="/recipes/123"><img alt="魚の写真"><img alt="きょうの献立"><p class="item-card__title text-bold">検索した魚料理</p><p>材料や評価</p></a></section>`}
+	r := parseResults(page, "delish")
+	if len(r) != 1 || r[0].Title != "検索した魚料理" {
+		t.Fatal(r)
+	}
+}
