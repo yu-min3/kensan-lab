@@ -89,9 +89,9 @@ try {
   await page.evaluate(() => localStorage.clear());
 
   await create();
-  await page.getByLabel("AIでの整え方").selectOption("steps");
+  assert.equal(await page.getByRole("combobox").count(), 0);
   await button("AIで抽出・整形").click();
-  await waitText("整形が完了しました");
+  await waitText("AIの整形が完了");
   assert.equal(await page.getByLabel("タイトル", { exact: true }).inputValue(), output.title);
   await page.getByText("取り込み元を確認", { exact: true }).click();
   assert.equal(await page.locator("pre").first().textContent(), source);
@@ -102,8 +102,8 @@ try {
   console.log("passed step", results.length + 1); results.push("AI normalization over real HTTP; source comparison; confirmation save; no horizontal mobile overflow");
 
   await fixture("wait"); await create(); await button("AIで抽出・整形").click();
-  await waitText("利用枠が空いてから再試行してください");
-  await fixture("success"); await button("利用枠を再確認").click(); await waitText("整形が完了しました");
+  await waitText("利用枠が空くのを待っています");
+  await fixture("success"); await button("利用枠を再確認").click(); await waitText("AIの整形が完了");
   console.log("passed step", results.length + 1); results.push("quota waits visibly and retries explicitly");
 
   await fixture("success", { ...output, steps: ["200度で焼く"] });
@@ -112,21 +112,27 @@ try {
   console.log("passed step", results.length + 1); results.push("new temperature rejected without replacing original draft");
 
   await fixture("success", { ...output, steps: "invalid" });
-  await create(); await button("AIで抽出・整形").click(); await waitText("AIで整形できませんでした");
+  await create(); await button("AIで抽出・整形").click(); await waitText("AIの抽出・整形に失敗しました");
+  await waitText("自動では再試行しません");
+  assert.equal(await button("AIでもう一度試す").isEnabled(), true);
+  await page.screenshot({ path: path.join(artifacts, "ai-failure-mobile.png"), fullPage: true });
   assert.equal(await page.getByLabel("タイトル", { exact: true }).inputValue(), "");
-  console.log("passed step", results.length + 1); results.push("runtime output-schema failure leaves editable draft");
+  await fixture("success"); await button("AIでもう一度試す").click(); await waitText("AIの整形が完了");
+  console.log("passed step", results.length + 1); results.push("runtime output-schema failure is visibly stopped and explicitly retries");
 
   await fixture("delay"); await create(); await button("AIで抽出・整形").click();
-  await waitText("材料と手順を整えています"); await button("AIを取り消す").click(); await waitText("AIの処理を取り消しました");
+  await waitText("材料と手順を整えています"); await button("AIを取り消す").click(); await waitText("AIを取り消しました");
   assert.equal(await page.getByLabel("タイトル", { exact: true }).isEnabled(), true);
   console.log("passed step", results.length + 1); results.push("running job cancellation unlocks editor");
 
   await create(); await button("AIで抽出・整形").click(); await waitText("材料と手順を整えています");
-  await stop(runtime); runtime = await startRuntime(); await waitText("実行中に接続先が再起動しました");
+  await stop(runtime); runtime = await startRuntime(); await waitText("AIの接続先が処理中に再起動しました");
   console.log("passed step", results.length + 1); results.push("runtime restart reports interrupted, never success or automatic rerun");
 
   await create(); await button("AIで抽出・整形").click(); await waitText("材料と手順を整えています");
-  await stop(runtime); await button("AIの結果を使わず編集する").click(); await waitText("手入力に切り替えました");
+  await stop(runtime); await waitText("AIの状態を確認できません");
+  assert.equal(await page.locator(".import-spinner").count(), 0);
+  await button("AIの結果を使わず編集する").click(); await waitText("手入力に切り替えました");
   await page.getByLabel("タイトル", { exact: true }).fill("接続なしでも編集");
   assert.equal(await page.getByLabel("タイトル", { exact: true }).isEnabled(), true);
   console.log("passed step", results.length + 1); results.push("unavailable runtime can be detached locally for manual editing");

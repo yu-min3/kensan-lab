@@ -205,6 +205,9 @@ func (s *Service) Start(ctx context.Context, id string, revision int, mode strin
 	if d.Revision != revision || d.SavedFile != "" {
 		return d, ErrConflict
 	}
+	if mode == "" {
+		mode = "steps"
+	}
 	if mode != "faithful" && mode != "steps" {
 		return d, errors.New("整形方法を選んでください")
 	}

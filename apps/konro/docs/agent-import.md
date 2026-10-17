@@ -53,7 +53,7 @@ runtime側の起動・課金確認の条件は、そのリポジトリの`runtim
 | URLまたは本文から下書き作成 | `POST /api/v1/import/drafts` (`url`または`text`) |
 | 取得・runtime状態確認 | `GET /api/v1/import/drafts/{id}` |
 | 編集を保持 | `PATCH /api/v1/import/drafts/{id}` (`revision`, `content`) |
-| AI抽出・整形 | `POST .../{id}/normalize` (`revision`, `mode: faithful/steps`) |
+| AI抽出・整形 | `POST .../{id}/normalize` (`revision`, `mode`: 既定は`steps`。旧clientの`faithful`も受理) |
 | 取消・枠再確認 | `POST .../{id}/cancel` / `retry` (`revision`) |
 | AI結果の受け取りを終了し手入力へ | `POST .../{id}/manual` (`revision`) |
 | 確認済みレシピを保存 | `POST .../{id}/save` (`revision`) |
@@ -94,3 +94,11 @@ runtimeの汎用テストfixtureへ差し替える。購読資格や従量APIは
 未指定ならPlaywright管理のChromiumを使う。結果・ログ・画像は`apps/konro/temp/`。
 8シナリオで確認保存→調理、再読込、枠待ち、数値改変、schema違反、取消、runtime再起動、
 接続断からの手編集を確認する。実subscription推論と実Keycloakへの接続は別途確認が必要。
+
+
+## 取り込み操作（2026-10-17更新）
+
+URLのscheme省略時はhttpsを補完する。明示したhttp/httpsは維持し、補完後も従来のSSRF検査を通す。
+UIでの整形方法は「原文の材料・数値・順序を守り、操作ごとに手順を分ける」に統一した。
+送信・順番待ち・処理中・待機・失敗・完了を見出しと状態記号で区別する。失敗は自動再試行せず、明示的な再試行か手入力を選ぶ。
+通信断は失敗と断定せず「状態を確認できません」と表示する。再接続時には自動で状態確認を再開する。

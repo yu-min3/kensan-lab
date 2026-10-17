@@ -156,3 +156,31 @@ func TestManualDetachesLateOutput(t *testing.T) {
 		t.Fatal(e)
 	}
 }
+
+func TestURLSchemeCompletion(t *testing.T) {
+	for _, tc := range []struct{ in, want string }{
+		{"www.sirogohan.com/recipe/oyakodon/", "https://www.sirogohan.com/recipe/oyakodon/"},
+		{" example.org/recipe?a=1#step ", "https://example.org/recipe?a=1"},
+		{"//example.org/recipe", "https://example.org/recipe"},
+		{"http://example.org/recipe", "http://example.org/recipe"},
+		{"https://example.org/recipe", "https://example.org/recipe"},
+		{"example.org:443/recipe", "https://example.org:443/recipe"},
+	} {
+		t.Run(tc.in, func(t *testing.T) {
+			u, err := validURL(tc.in)
+			if err != nil || u.String() != tc.want {
+				t.Fatalf("%v %v", u, err)
+			}
+		})
+	}
+	for _, in := range []string{"", "javascript:alert(1)", "file:///etc/passwd", "user:pw@example.org", "example.org:8080/recipe"} {
+		if _, err := validURL(in); err == nil {
+			t.Errorf("accepted %q", in)
+		}
+	}
+	for _, in := range []string{"127.0.0.1/recipe", "localhost/recipe", "//192.168.0.1/recipe"} {
+		if _, err := Fetch(context.Background(), in); err == nil {
+			t.Errorf("fetched private URL %q", in)
+		}
+	}
+}

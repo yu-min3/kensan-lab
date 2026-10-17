@@ -49,6 +49,12 @@ func PublicIP(ip net.IP) bool {
 	return true
 }
 func validURL(raw string) (*url.URL, error) {
+	raw = strings.TrimSpace(raw)
+	if strings.HasPrefix(raw, "//") {
+		raw = "https:" + raw
+	} else if raw != "" && !strings.Contains(raw, "://") {
+		raw = "https://" + raw
+	}
 	u, e := url.Parse(raw)
 	if e != nil || u.User != nil || u.Host == "" || (u.Scheme != "http" && u.Scheme != "https") {
 		return nil, errors.New("http/httpsのURLを入力してください")
