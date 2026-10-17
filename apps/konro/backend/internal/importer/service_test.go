@@ -184,3 +184,41 @@ func TestURLSchemeCompletion(t *testing.T) {
 		}
 	}
 }
+
+func TestNumberValidationUsesTextNotJSONEscapes(t *testing.T) {
+	for _, tc := range []struct{ name, title, step, reason string }{
+		{"ampersand", "魚 & 野菜", "10分煮る", ""},
+		{"angle brackets", "魚 <野菜>", "10分煮る", ""},
+		{"unicode line separator", "魚\u2028野菜", "10分煮る", ""},
+		{"actual new number remains rejected", "魚 & 野菜", "26分煮る", "numbers_changed"},
+		{"escape digits do not authorize new quantity", "魚 & 野菜", "0026分煮る", "numbers_changed"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			c := Content{Title: tc.title, Servings: "2人分", Ingredients: []string{"魚 2切れ"}, Steps: []string{tc.step}}
+			encoded, err := json.Marshal(c)
+			if err != nil {
+				t.Fatal(err)
+			}
+			agent := &fakeAgent{result: agentclient.Job{ID: "generic-job", State: "succeeded", Output: encoded}}
+			s := New(t.TempDir(), agent)
+			d, err := s.Create(context.Background(), "", tc.title+" 2人分 魚2切れ 10分煮る")
+			if err != nil {
+				t.Fatal(err)
+			}
+			d, err = s.Start(context.Background(), d.ID, d.Revision, "")
+			if err != nil {
+				t.Fatal(err)
+			}
+			d, err = s.Get(context.Background(), d.ID)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if d.Job.Reason != tc.reason {
+				t.Fatalf("state=%s reason=%s", d.Job.State, d.Job.Reason)
+			}
+			if tc.reason == "" && (d.Job.State != "succeeded" || d.Content.Title != tc.title) {
+				t.Fatalf("valid text rejected: %+v", d)
+			}
+		})
+	}
+}
