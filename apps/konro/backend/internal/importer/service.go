@@ -272,11 +272,9 @@ func (s *Service) apply(d *Draft) error {
 		d.Warnings = append(d.Warnings, "AIの結果がレシピ形式に合わないため採用しませんでした")
 		return nil
 	}
-	original := d.Source.Text
-	before, _ := json.Marshal(d.Content)
-	original += " " + string(before)
-	after, _ := json.Marshal(c)
-	if newNumbers(original, string(after)) {
+	// Compare recipe text, never its JSON representation: encoding/json turns
+	// '&', '<', '>' and line separators into escapes containing unrelated digits.
+	if newNumbers(d.Source.Text+" "+contentText(d.Content), contentText(c)) {
 		d.Job.State = "failed"
 		d.Job.Reason = "numbers_changed"
 		d.Warnings = append(d.Warnings, "原文にない数値がAIの結果に含まれたため採用しませんでした。材料・時間・温度を確認してください")
@@ -396,6 +394,13 @@ func validateContent(c Content, complete bool) error {
 		}
 	}
 	return nil
+}
+
+func contentText(c Content) string {
+	parts := []string{c.Title, c.Servings}
+	parts = append(parts, c.Ingredients...)
+	parts = append(parts, c.Steps...)
+	return strings.Join(parts, "\n")
 }
 
 var number = regexp.MustCompile(`[0-9]+(?:\.[0-9]+)?`)
