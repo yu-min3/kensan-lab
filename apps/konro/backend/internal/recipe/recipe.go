@@ -40,6 +40,9 @@ type Recipe struct {
 // Unparseable files are skipped rather than failing the listing.
 func List(dir string) ([]Meta, error) {
 	entries, err := os.ReadDir(dir)
+	if os.IsNotExist(err) {
+		return []Meta{}, nil
+	}
 	if err != nil {
 		return nil, err
 	}
@@ -101,6 +104,9 @@ func parse(src string) *Recipe {
 
 func parseFrontmatter(fm string, r *Recipe) {
 	for _, line := range strings.Split(fm, "\n") {
+		if len(line) == 0 || line[0] == ' ' || line[0] == '\t' {
+			continue
+		}
 		key, val, ok := strings.Cut(line, ":")
 		if !ok {
 			continue

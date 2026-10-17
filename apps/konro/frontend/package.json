@@ -4,10 +4,13 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
+    "predev": "node scripts/sync-manifest.mjs",
     "dev": "vite",
+    "prebuild": "node scripts/sync-manifest.mjs",
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview",
-    "test:e2e": "node ../e2e/import.mjs"
+    "test:e2e": "node ../e2e/import.mjs",
+    "test:library": "node ../e2e/library.mjs"
   },
   "dependencies": {
     "react": "^18.3.1",

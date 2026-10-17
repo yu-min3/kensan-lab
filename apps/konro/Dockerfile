@@ -5,7 +5,7 @@
 FROM --platform=$BUILDPLATFORM node:22-slim AS frontend
 WORKDIR /workspace/apps/konro/frontend
 COPY apps/konro/frontend ./
-COPY packages/design-tokens/tokens.css /workspace/packages/design-tokens/tokens.css
+COPY packages/design-tokens/tokens.css packages/design-tokens/tokens.json /workspace/packages/design-tokens/
 RUN npm ci && npm run build
 
 # ---- backend build（クロスコンパイル: BUILDPLATFORM 上で TARGETARCH 向けに）----

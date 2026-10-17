@@ -1,13 +1,18 @@
 {
   "name": "konro",
   "short_name": "konro",
-  "description": "作り置き並行調理サポート",
+  "description": "レシピ管理と作り置き調理",
   "start_url": "/",
   "display": "standalone",
   "orientation": "portrait",
-  "background_color": "#faf7f2",
-  "theme_color": "#e85d2f",
+  "background_color": "hsl(40 27% 94%)",
+  "theme_color": "hsl(40 27% 94%)",
   "icons": [
-    { "src": "/favicon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }
+    {
+      "src": "/favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
   ]
 }

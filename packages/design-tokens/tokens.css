@@ -200,7 +200,7 @@
 
   /* Muted = subtle warm gray surface; muted-foreground = sub text */
   --muted: 40 22% 90%;
-  --muted-foreground: 32 8% 45%;     /* #7A736A */
+  --muted-foreground: 32 8% 42%;     /* #746C63; readable on background/card */
 
   /* Accent = warm-tinted sky for highlights (active nav, selection) */
   --accent: 199 70% 92%;              /* #E0F1F8 */

@@ -101,6 +101,57 @@ func readSource(dir, name string) ([]byte, error) {
 	}
 	return os.ReadFile(p)
 }
+
+// Our writable format uses one-line metadata. Refuse unsupported editable
+// blocks instead of dropping values that the reader cannot represent.
+func checkEditableFormat(data []byte) error {
+	src := string(data)
+	if strings.HasPrefix(src, "\ufeff") {
+		return ErrInvalid
+	}
+	if strings.HasPrefix(src, "---") && !strings.HasPrefix(src, "---\n") {
+		return ErrInvalid
+	}
+	if !strings.HasPrefix(src, "---\n") {
+		return nil
+	}
+	end := strings.Index(src[4:], "\n---\n")
+	if end < 0 {
+		return ErrInvalid
+	}
+	keys := map[string]bool{"title": true, "servings": true, "tags": true, "prep_time": true, "cook_time": true, "source": true, "rating": true}
+	editableBlock := false
+	topLevelSeen := false
+	for _, line := range strings.Split(src[4:4+end], "\n") {
+		if strings.TrimSpace(line) == "" || strings.HasPrefix(strings.TrimSpace(line), "#") {
+			continue
+		}
+		if line[0] == ' ' || line[0] == '\t' {
+			if !topLevelSeen || editableBlock {
+				return fmt.Errorf("%w: 複数行のmetadataには未対応です。元のファイルは変更していません", ErrInvalid)
+			}
+			continue
+		}
+		key, value, hasKey := strings.Cut(line, ":")
+		if !hasKey || strings.HasPrefix(line, "- ") {
+			if editableBlock {
+				return fmt.Errorf("%w: 複数行のmetadataには未対応です。元のファイルは変更していません", ErrInvalid)
+			}
+			continue
+		}
+		if keys[strings.Trim(strings.TrimSpace(key), "\"'")] && !keys[key] {
+			return ErrInvalid
+		}
+		topLevelSeen = true
+		editableBlock = keys[key]
+		value = strings.TrimSpace(value)
+		if editableBlock && (strings.HasPrefix(value, "|") || strings.HasPrefix(value, ">")) {
+			return fmt.Errorf("%w: 複数行のmetadataには未対応です。元のファイルは変更していません", ErrInvalid)
+		}
+	}
+	return nil
+}
+
 func renderEdit(old []byte, e Editable) []byte {
 	list := func(a []string) string {
 		if a == nil {
@@ -113,9 +164,14 @@ func renderEdit(old []byte, e Editable) []byte {
 	var fm []string
 	if strings.HasPrefix(string(old), "---\n") {
 		if end := strings.Index(string(old[4:]), "\n---\n"); end >= 0 {
+			dropping := false
 			for _, line := range strings.Split(string(old[4:4+end]), "\n") {
-				k, _, _ := strings.Cut(line, ":")
-				if _, replace := values[strings.TrimSpace(k)]; !replace {
+				if len(line) > 0 && line[0] != ' ' && line[0] != '\t' && line[0] != '#' {
+					k, _, ok := strings.Cut(line, ":")
+					_, dropping = values[k]
+					dropping = dropping && ok
+				}
+				if !dropping {
 					fm = append(fm, line)
 				}
 			}
@@ -185,6 +241,10 @@ func Update(dir, name, expected string, e Editable) (*Recipe, error) {
 	if expected == "" || expected != version(old) {
 		return nil, ErrConflict
 	}
+	if err := checkEditableFormat(old); err != nil {
+		return nil, err
+	}
+
 	if err = atomicReplace(filepath.Join(dir, name+".md"), renderEdit(old, e)); err != nil {
 		return nil, err
 	}
@@ -249,7 +309,7 @@ func WriteLegacyImport(dir, name string, data []byte) (bool, error) {
 			if end := strings.Index(src[4:], "\n---\n"); end >= 0 {
 				for _, line := range strings.Split(src[4:4+end], "\n") {
 					k, v, _ := strings.Cut(line, ":")
-					if strings.TrimSpace(k) == "konro_edited" && strings.TrimSpace(v) == "true" {
+					if k == "konro_edited" && strings.TrimSpace(v) == "true" {
 						return false, nil
 					}
 				}

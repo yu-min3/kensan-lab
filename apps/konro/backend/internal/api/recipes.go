@@ -6,11 +6,26 @@ import (
 	"github.com/yu-min3/kensan-lab/apps/konro/backend/internal/recipe"
 	"io"
 	"io/fs"
+	"mime"
 	"net/http"
+	"net/url"
 )
 
 func registerRecipeWrites(mux *http.ServeMux, dir string) {
 	decode := func(w http.ResponseWriter, r *http.Request, v any) bool {
+		media, _, err := mime.ParseMediaType(r.Header.Get("Content-Type"))
+		if err != nil || media != "application/json" {
+			http.Error(w, "application/json required", 415)
+			return false
+		}
+		if origin := r.Header.Get("Origin"); origin != "" {
+			u, e := url.Parse(origin)
+			if e != nil || (u.Scheme != "http" && u.Scheme != "https") || u.Host != r.Host {
+				http.Error(w, "origin rejected", 403)
+				return false
+			}
+		}
+
 		d := json.NewDecoder(http.MaxBytesReader(w, r.Body, 1<<20))
 		d.DisallowUnknownFields()
 		if d.Decode(v) != nil || d.Decode(new(any)) != io.EOF {

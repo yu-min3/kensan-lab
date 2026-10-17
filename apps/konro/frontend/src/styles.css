@@ -137,8 +137,8 @@ button {
   width: 28px;
   height: 28px;
   border-radius: 50%;
-  background: hsl(var(--brand));
-  color: hsl(var(--brand-foreground));
+  background: hsl(var(--primary));
+  color: hsl(var(--primary-foreground));
   font-weight: 700;
   display: flex;
   align-items: center;
@@ -282,7 +282,7 @@ button {
 }
 
 .recipe-info a {
-  color: hsl(var(--brand));
+  color: hsl(var(--accent-foreground));
 }
 
 .section-toggle,
@@ -313,7 +313,7 @@ button {
   padding: 6px 6px 2px;
   font-size: 12px;
   font-weight: 700;
-  color: hsl(var(--brand));
+  color: hsl(var(--accent-foreground));
   border-bottom: 1px dashed hsl(var(--border));
   margin-bottom: 2px;
 }
@@ -389,8 +389,8 @@ button {
 }
 
 .step-current .step-num {
-  background: hsl(var(--brand));
-  color: hsl(var(--brand-foreground));
+  background: hsl(var(--primary));
+  color: hsl(var(--primary-foreground));
 }
 
 .step-current .step-text {
@@ -399,7 +399,7 @@ button {
 }
 
 .step-done {
-  opacity: 0.55;
+  border-color: hsl(var(--border));
 }
 
 .step-done .step-text {
@@ -416,8 +416,8 @@ button {
 
 .step-timers .chip {
   background: hsl(var(--accent));
-  border-color: hsl(var(--brand));
-  color: hsl(var(--brand));
+  border-color: hsl(var(--accent-foreground));
+  color: hsl(var(--accent-foreground));
   font-weight: 700;
   font-size: 15px;
   padding: 10px 16px;
@@ -529,12 +529,12 @@ button {
 
 .burner-timer {
   font-style: normal;
-  color: hsl(var(--brand));
+  color: hsl(var(--accent-foreground));
   font-weight: 700;
 }
 
 .burner-timer-fired {
-  color: hsl(var(--destructive));
+  color: hsl(var(--foreground));
   animation: pulse 0.9s infinite;
 }
 
@@ -549,7 +549,7 @@ button {
 .import-panel legend { font-size: 18px; font-weight: 600; }
 .import-panel pre { white-space: pre-wrap; overflow-wrap: anywhere; max-height: 360px; overflow: auto; font: inherit; line-height: 1.7; }
 .import-panel summary { cursor: pointer; min-height: 48px; align-content: center; }
-.import-panel a { color: hsl(var(--brand)); overflow-wrap: anywhere; }
+.import-panel a { color: hsl(var(--accent-foreground)); overflow-wrap: anywhere; }
 .import-actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
 .import-page .chip, .header-row .chip { min-height: 48px; }
 .import-panel .start-button { margin-top: 12px; min-height: 48px; }
@@ -577,3 +577,19 @@ input::placeholder, textarea::placeholder { color: hsl(var(--muted-foreground));
 .import-status:has(.import-state-mark) { color: hsl(var(--foreground)); }
 .error { color: hsl(var(--foreground)); border-left: 3px solid hsl(var(--destructive)); padding-left: var(--gap-inline); }
 .end-confirm, .timer-fired { color: hsl(var(--foreground)); background: color-mix(in srgb, hsl(var(--destructive)) 15%, hsl(var(--card))); }
+
+/* Library cards open the recipe; choosing it for cooking is a separate action. */
+.recipe-open { display: block; width: 100%; text-align: left; }
+.recipe-select { display: block; width: 100%; min-height: var(--row-h); border-top: 1px solid hsl(var(--border)); font-size: var(--text-size); }
+.recipe-cover { width: 100%; max-height: 320px; object-fit: cover; border-radius: var(--radius-xl); margin-top: var(--gap-stack); }
+.recipe-detail h2 { margin-top: 0; }
+.recipe-summary { color: hsl(var(--muted-foreground)); }
+.detail-tags { display: flex; flex-wrap: wrap; gap: var(--gap-inline); margin-bottom: var(--gap-stack); }
+.detail-ingredients, .detail-steps { margin: 0; padding-left: var(--card-pad-x); }
+.detail-ingredients li, .detail-steps li { padding: var(--gap-inline) 0; line-height: var(--text-lh); overflow-wrap: anywhere; }
+.detail-steps li + li { border-top: 1px solid hsl(var(--border)); }
+.detail-steps li::marker { font-family: var(--font-mono); color: hsl(var(--accent-foreground)); }
+.detail-notes { white-space: pre-wrap; overflow-wrap: anywhere; }
+.recipe-error { border-color: hsl(var(--destructive)); background: color-mix(in srgb, hsl(var(--destructive)) 10%, hsl(var(--card))); }
+.recipe-detail input[type="number"] { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+.recipe-detail .import-panel .import-actions { margin-top: var(--gap-stack); }

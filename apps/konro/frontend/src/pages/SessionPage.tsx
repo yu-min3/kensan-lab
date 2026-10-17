@@ -145,7 +145,7 @@ export function SessionPage({
             <div className="recipe-info">
               {recipe.servings && <span>{recipe.servings}</span>}
               {formatDuration(recipe.cookTime) && <span>⏱ {formatDuration(recipe.cookTime)}</span>}
-              {recipe.source && (
+              {recipe.source && /^https?:\/\//i.test(recipe.source) && (
                 <a href={recipe.source} target="_blank" rel="noreferrer">
                   出典
                 </a>

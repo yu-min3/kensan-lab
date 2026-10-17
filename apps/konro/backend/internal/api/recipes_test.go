@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -19,13 +20,13 @@ func TestRecipeEditorPreservesMetadataAndRejectsConflict(t *testing.T) {
 	dir := t.TempDir()
 	name := "魚"
 	path := filepath.Join(dir, name+".md")
-	original := "---\ntitle: 魚\nrk_id: source-123\nimages: [images/fish.jpg]\ncreated: 2026-07-01\ncustom_key: keep-me\ntags: []\n---\n\n## 材料\n- 魚 2切れ\n\n## 手順\n1. 煮る\n\n## メモ\nold note\n"
+	original := "---\ntitle: 魚\nrk_id: source-123\nimages: [images/fish.jpg]\ncreated: 2026-07-01\ncustom_key: keep-me\ncustom_nested:\n  title: keep-nested-title\n  tags: [nested]\ntags: []\n---\n\n## 材料\n- 魚 2切れ\n\n## 手順\n1. 煮る\n\n## メモ\nold note\n"
 	if err := os.WriteFile(path, []byte(original), 0600); err != nil {
 		t.Fatal(err)
 	}
 	handler := New(dir, "")
 	get := httptest.NewRecorder()
-	handler.ServeHTTP(get, httptest.NewRequest("GET", "/api/v1/recipes/魚", nil))
+	handler.ServeHTTP(get, recipeJSONRequest("GET", "/api/v1/recipes/魚", nil))
 	var initial recipe.Recipe
 	_ = json.Unmarshal(get.Body.Bytes(), &initial)
 	if initial.Version == "" {
@@ -35,7 +36,7 @@ func TestRecipeEditorPreservesMetadataAndRejectsConflict(t *testing.T) {
 	encoded, _ := json.Marshal(payload)
 	put := func() *httptest.ResponseRecorder {
 		w := httptest.NewRecorder()
-		handler.ServeHTTP(w, httptest.NewRequest("PUT", "/api/v1/recipes/魚", bytes.NewReader(encoded)))
+		handler.ServeHTTP(w, recipeJSONRequest("PUT", "/api/v1/recipes/魚", bytes.NewReader(encoded)))
 		return w
 	}
 	if w := put(); w.Code != 200 {
@@ -49,7 +50,7 @@ func TestRecipeEditorPreservesMetadataAndRejectsConflict(t *testing.T) {
 		t.Fatalf("lost data %+v", got)
 	}
 	saved, _ := os.ReadFile(path)
-	for _, keep := range []string{"created: 2026-07-01", "custom_key: keep-me", "konro_edited: true"} {
+	for _, keep := range []string{"created: 2026-07-01", "custom_key: keep-me", "  title: keep-nested-title", "  tags: [nested]", "konro_edited: true"} {
 		if !strings.Contains(string(saved), keep) {
 			t.Fatalf("lost %s", keep)
 		}
@@ -66,7 +67,7 @@ func TestRecipeEditorPreservesMetadataAndRejectsConflict(t *testing.T) {
 			p := map[string]any{"version": got.Version, "title": fmt.Sprintf("別の編集%d", i)}
 			body, _ := json.Marshal(p)
 			w := httptest.NewRecorder()
-			handler.ServeHTTP(w, httptest.NewRequest("PUT", "/api/v1/recipes/魚", bytes.NewReader(body)))
+			handler.ServeHTTP(w, recipeJSONRequest("PUT", "/api/v1/recipes/魚", bytes.NewReader(body)))
 			statuses[i] = w.Code
 		}(i)
 	}
@@ -76,14 +77,19 @@ func TestRecipeEditorPreservesMetadataAndRejectsConflict(t *testing.T) {
 	}
 }
 func TestCreateRecipeIsIdempotentAndRejectsUnsafePaths(t *testing.T) {
-	dir := t.TempDir()
+	dir := filepath.Join(t.TempDir(), "fresh-library")
 	handler := New(dir, "")
 	create := func(key string, body string) *httptest.ResponseRecorder {
 		w := httptest.NewRecorder()
-		r := httptest.NewRequest("POST", "/api/v1/recipes", strings.NewReader(body))
+		r := recipeJSONRequest("POST", "/api/v1/recipes", strings.NewReader(body))
 		r.Header.Set("Idempotency-Key", key)
 		handler.ServeHTTP(w, r)
 		return w
+	}
+	list := httptest.NewRecorder()
+	handler.ServeHTTP(list, recipeJSONRequest("GET", "/api/v1/recipes", nil))
+	if list.Code != 200 || strings.TrimSpace(list.Body.String()) != "[]" {
+		t.Fatalf("empty library failed: %d %s", list.Code, list.Body.String())
 	}
 	id := strings.Repeat("a", 32)
 	input := `{"title":"手入力","notes":"  メモ  ","tags":[],"ingredients":[],"steps":[]}`
@@ -125,7 +131,7 @@ func TestZIPReimportKeepsKonroEdits(t *testing.T) {
 	handler := New(dir, "")
 	post := func() *httptest.ResponseRecorder {
 		w := httptest.NewRecorder()
-		handler.ServeHTTP(w, httptest.NewRequest("POST", "/api/v1/import", bytes.NewReader(exportZip(t))))
+		handler.ServeHTTP(w, recipeJSONRequest("POST", "/api/v1/import", bytes.NewReader(exportZip(t))))
 		return w
 	}
 	if w := post(); w.Code != 200 {
@@ -150,5 +156,51 @@ func TestZIPReimportKeepsKonroEdits(t *testing.T) {
 	after, _ := os.ReadFile(filepath.Join(dir, name+".md"))
 	if !bytes.Equal(before, after) || report.Skipped != 1 || report.Recipes != 1 {
 		t.Fatalf("edited recipe overwritten: %+v", report)
+	}
+}
+
+func recipeJSONRequest(method, path string, body io.Reader) *http.Request {
+	r := httptest.NewRequest(method, path, body)
+	r.Header.Set("Content-Type", "application/json")
+	return r
+}
+func TestRecipeWritesRejectCrossOriginAndNonJSON(t *testing.T) {
+	handler := New(t.TempDir(), "")
+	for _, tc := range []struct {
+		content, origin string
+		status          int
+	}{{"text/plain", "", 415}, {"application/x-www-form-urlencoded", "", 415}, {"application/json", "https://attacker.example", 403}, {"application/json", "null", 403}} {
+		r := httptest.NewRequest("POST", "http://konro.example/api/v1/recipes", strings.NewReader(`{"title":"x"}`))
+		r.Header.Set("Content-Type", tc.content)
+		if tc.origin != "" {
+			r.Header.Set("Origin", tc.origin)
+		}
+		w := httptest.NewRecorder()
+		handler.ServeHTTP(w, r)
+		if w.Code != tc.status {
+			t.Fatalf("%+v => %d", tc, w.Code)
+		}
+	}
+}
+
+func TestUnsupportedEditableMetadataNeverLosesOriginal(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "block.md")
+	for _, fm := range []string{"title: レシピ\ntags:\n  - 和食\n", "title: |\n  レシピ\n", "title: レシピ\ntags:\n- 和食\n- 魚\n", "\"title\": レシピ\n", " title: レシピ\n tags: []\n", "title : レシピ\n"} {
+		src := []byte("---\n" + fm + "---\n\n## 材料\n- 魚\n")
+		if err := os.WriteFile(path, src, 0600); err != nil {
+			t.Fatal(err)
+		}
+		r, err := recipe.Load(dir, "block")
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, err = recipe.Update(dir, "block", r.Version, recipe.Editable{Title: "変更"}); err == nil {
+			t.Fatal("unsupported metadata rewritten")
+		}
+		after, _ := os.ReadFile(path)
+		if !bytes.Equal(src, after) {
+			t.Fatal("unsupported data lost")
+		}
 	}
 }
