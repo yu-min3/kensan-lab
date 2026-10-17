@@ -301,7 +301,7 @@ func (s *Service) apply(d *Draft) error {
 			required = false
 		}
 	}
-	if e := dec.Decode(&c); e != nil || dec.Decode(new(any)) != io.EOF || !required || Validate(c) != nil {
+	if e := dec.Decode(&c); e != nil || dec.Decode(new(any)) != io.EOF || !required || validateContent(c, false) != nil {
 		d.Job.State = "failed"
 		d.Job.Reason = "invalid_recipe"
 		d.Warnings = append(d.Warnings, "AIの結果がレシピ形式に合わないため採用しませんでした")
@@ -315,15 +315,21 @@ func (s *Service) apply(d *Draft) error {
 		d.Warnings = append(d.Warnings, "原文にない数値がAIの結果に含まれたため採用しませんでした。材料・時間・温度を確認してください")
 		return nil
 	}
+	if strings.TrimSpace(c.Title) == "" {
+		c.Title = d.Content.Title
+	}
 	d.Content = c
 	d.Revision++
 	var retained []string
 	for _, w := range d.Warnings {
-		if strings.Contains(w, "複数のレシピ") {
+		if strings.Contains(w, "複数のレシピ") || strings.Contains(w, "字幕・") {
 			retained = append(retained, w)
 		}
 	}
 	d.Warnings = retained
+	if Validate(c) != nil {
+		d.Warnings = append(d.Warnings, "材料または手順が不足しています。原文にない内容は補っていません。取り込み元を確認して入力してから保存してください")
+	}
 	d.Warnings = append(d.Warnings, "AIで整形しました。分量・時間・温度と手順を原文で確認してから保存してください")
 	return nil
 }
@@ -446,4 +452,4 @@ func newNumbers(before, after string) bool {
 	return false
 }
 
-const Schema = `{"type":"object","additionalProperties":false,"required":["title","servings","ingredients","steps"],"properties":{"title":{"type":"string","minLength":1,"maxLength":300},"servings":{"type":"string","maxLength":200},"ingredients":{"type":"array","minItems":1,"maxItems":100,"items":{"type":"string","minLength":1,"maxLength":1000}},"steps":{"type":"array","minItems":1,"maxItems":150,"items":{"type":"string","minLength":1,"maxLength":1000}}}}`
+const Schema = `{"type":"object","additionalProperties":false,"required":["title","servings","ingredients","steps"],"properties":{"title":{"type":"string","minLength":0,"maxLength":300},"servings":{"type":"string","maxLength":200},"ingredients":{"type":"array","minItems":0,"maxItems":100,"items":{"type":"string","minLength":1,"maxLength":1000}},"steps":{"type":"array","minItems":0,"maxItems":150,"items":{"type":"string","minLength":1,"maxLength":1000}}}}`

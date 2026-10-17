@@ -2,6 +2,8 @@ package importer
 
 import (
 	"context"
+	"encoding/json"
+	"github.com/yu-min3/kensan-lab/apps/konro/backend/internal/agentclient"
 	"github.com/yu-min3/kensan-lab/apps/konro/backend/internal/webpage"
 	"strings"
 	"testing"
@@ -35,5 +37,38 @@ func TestYouTubeOnlyUsesDescriptionAndMissingSourceCannotStart(t *testing.T) {
 	}
 	if _, e = service.Start(context.Background(), d.ID, d.Revision, "steps"); e == nil {
 		t.Fatal("AI started without description")
+	}
+}
+
+func TestIncompleteAIKeepsIngredientsWithoutInventingSteps(t *testing.T) {
+	a := &fakeAgent{result: agentclient.Job{ID: "generic-job", State: "succeeded", Output: json.RawMessage(`{"title":"試験の料理","servings":"","ingredients":["魚 100g"],"steps":[]}`)}}
+	s := New(t.TempDir(), a)
+	ctx := context.Background()
+	d, e := s.Create(ctx, "", "試験の料理 魚100g")
+	if e != nil {
+		t.Fatal(e)
+	}
+	d.Source.Kind = "youtube_description"
+	d.Warnings = []string{"概要欄のみ取得。字幕・音声・映像は取得していません"}
+	if e = s.write(d); e != nil {
+		t.Fatal(e)
+	}
+	d, e = s.Start(ctx, d.ID, d.Revision, "steps")
+	if e != nil {
+		t.Fatal(e)
+	}
+	d, e = s.Get(ctx, d.ID)
+	if e != nil {
+		t.Fatal(e)
+	}
+	if d.Job.State != "succeeded" || len(d.Content.Ingredients) != 1 || len(d.Content.Steps) != 0 {
+		t.Fatalf("%+v", d)
+	}
+	warnings := strings.Join(d.Warnings, " ")
+	if !strings.Contains(warnings, "不足") || !strings.Contains(warnings, "字幕・") {
+		t.Fatal(warnings)
+	}
+	if _, e = s.Save(d.ID, d.Revision); e == nil {
+		t.Fatal("incomplete draft saved as recipe")
 	}
 }

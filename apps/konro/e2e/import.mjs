@@ -101,6 +101,13 @@ try {
   await button("レシピを追加").waitFor();
   console.log("passed step", results.length + 1); results.push("AI normalization over real HTTP; source comparison; confirmation save; no horizontal mobile overflow");
 
+  await fixture("success",{...output,steps:[]});await create();await button("AIで抽出・整形").click();
+  await waitText("材料または手順が不足しています");
+  assert.equal(await page.getByLabel("手順（1行に1つの手順）",{exact:true}).inputValue(),"");
+  assert((await page.getByLabel("材料（1行に1項目）",{exact:true}).inputValue()).includes("鮭 2切れ"));
+  await page.getByRole("checkbox").check();assert.equal(await button("レシピとして保存").isEnabled(),false);
+  console.log("passed step",results.length+1);results.push("partial AI result keeps known ingredients and blocks saving until missing steps are entered");
+
   await fixture("wait"); await create(); await button("AIで抽出・整形").click();
   await waitText("利用枠が空くのを待っています");
   await fixture("success"); await button("利用枠を再確認").click(); await waitText("AIの整形が完了");
