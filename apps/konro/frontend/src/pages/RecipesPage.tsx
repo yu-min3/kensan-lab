@@ -6,7 +6,7 @@ import { normalizeQuery } from "../session";
 
 // Recipe browser + session builder: tap cards to put recipes "on the stove",
 // then start the cooking session.
-export function RecipesPage({ onStart }: { onStart: (files: string[]) => void }) {
+export function RecipesPage({ onStart, starting = false }: { onStart: (files: string[]) => void; starting?: boolean }) {
   const [webImport, setWebImport] = useState(false);
   const [opened, setOpened] = useState<string | null>(null);
   const [recipes, setRecipes] = useState<RecipeMeta[]>([]);
@@ -161,7 +161,7 @@ export function RecipesPage({ onStart }: { onStart: (files: string[]) => void })
 
       {selected.length > 0 && (
         <div className="start-bar">
-          <button className="start-button" onClick={() => onStart(selected)}>
+          <button className="start-button" disabled={starting} onClick={() => onStart(selected)}>
             🔥 {selected.length} 品でコンロを開始
           </button>
         </div>

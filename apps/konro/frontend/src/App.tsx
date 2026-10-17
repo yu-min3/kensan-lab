@@ -1,11 +1,16 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { RecipesPage } from "./pages/RecipesPage";
 import { SessionPage } from "./pages/SessionPage";
 import { loadSession, newSession, saveSession, Session } from "./session";
+import { fetchRecipe } from "./api";
 import { primeAudio } from "./alerts";
 
 export function App() {
   const [session, setSession] = useState<Session | null>(() => loadSession());
+
+  const [startError, setStartError] = useState("");
+  const [starting, setStarting] = useState(false);
+  const startLock = useRef(false);
 
   // Restored-session path never went through the "start" tap, so audio is
   // still locked; prime on the first interaction or timer alarms stay silent.
@@ -14,11 +19,17 @@ export function App() {
     return () => window.removeEventListener("pointerdown", primeAudio);
   }, []);
 
-  const start = (files: string[]) => {
-    primeAudio(); // user gesture: unlock audio for timer alarms
-    const s = newSession(files);
-    saveSession(s);
-    setSession(s);
+  const start = async (files: string[]) => {
+    if (startLock.current) return;
+    startLock.current = true; setStarting(true); setStartError("");
+    primeAudio();
+    try {
+      const recipes = await Promise.all(files.map(fetchRecipe));
+      const s = newSession(files, Object.fromEntries(recipes.map((r) => [r.file, r])));
+      saveSession(s);
+      setSession(s);
+    } catch (e) { setStartError(`調理を開始できませんでした。${e instanceof Error ? e.message : String(e)}`); }
+    finally { startLock.current = false; setStarting(false); }
   };
 
   const update = (s: Session) => {
@@ -34,6 +45,6 @@ export function App() {
   return session ? (
     <SessionPage session={session} onUpdate={update} onEnd={end} />
   ) : (
-    <RecipesPage onStart={start} />
+    <><div aria-live="polite">{starting && <p className="import-notice" role="status">調理用のレシピを準備しています…</p>}{startError && <p className="import-notice" role="alert">{startError}</p>}</div><RecipesPage onStart={start} starting={starting} /></>
   );
 }
