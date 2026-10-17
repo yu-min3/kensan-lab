@@ -315,8 +315,17 @@ func (s *Service) apply(d *Draft) error {
 		d.Warnings = append(d.Warnings, "原文にない数値がAIの結果に含まれたため採用しませんでした。材料・時間・温度を確認してください")
 		return nil
 	}
+	keptInput := false
 	if strings.TrimSpace(c.Title) == "" {
 		c.Title = d.Content.Title
+	}
+	if len(c.Ingredients) == 0 && len(d.Content.Ingredients) > 0 {
+		c.Ingredients = d.Content.Ingredients
+		keptInput = true
+	}
+	if len(c.Steps) == 0 && len(d.Content.Steps) > 0 {
+		c.Steps = d.Content.Steps
+		keptInput = true
 	}
 	d.Content = c
 	d.Revision++
@@ -327,6 +336,9 @@ func (s *Service) apply(d *Draft) error {
 		}
 	}
 	d.Warnings = retained
+	if keptInput {
+		d.Warnings = append(d.Warnings, "AIが読み取れなかった項目は、入力済みの内容を残しました")
+	}
 	if Validate(c) != nil {
 		d.Warnings = append(d.Warnings, "材料または手順が不足しています。原文にない内容は補っていません。取り込み元を確認して入力してから保存してください")
 	}

@@ -72,3 +72,32 @@ func TestIncompleteAIKeepsIngredientsWithoutInventingSteps(t *testing.T) {
 		t.Fatal("incomplete draft saved as recipe")
 	}
 }
+
+func TestPartialAINeverClearsExistingInput(t *testing.T) {
+	a := &fakeAgent{result: agentclient.Job{ID: "generic-job", State: "succeeded", Output: json.RawMessage(`{"title":"","servings":"","ingredients":[],"steps":[]}`)}}
+	s := New(t.TempDir(), a)
+	ctx := context.Background()
+	d, e := s.Create(ctx, "", "魚 100g 10分煮る")
+	if e != nil {
+		t.Fatal(e)
+	}
+	original := Content{Title: "手入力した料理", Ingredients: []string{"魚 100g"}, Steps: []string{"10分煮る"}}
+	d, e = s.Edit(d.ID, d.Revision, original)
+	if e != nil {
+		t.Fatal(e)
+	}
+	d, e = s.Start(ctx, d.ID, d.Revision, "steps")
+	if e != nil {
+		t.Fatal(e)
+	}
+	d, e = s.Get(ctx, d.ID)
+	if e != nil {
+		t.Fatal(e)
+	}
+	if d.Content.Title != original.Title || len(d.Content.Ingredients) != 1 || d.Content.Ingredients[0] != original.Ingredients[0] || len(d.Content.Steps) != 1 || d.Content.Steps[0] != original.Steps[0] {
+		t.Fatalf("input lost: %+v", d.Content)
+	}
+	if !strings.Contains(strings.Join(d.Warnings, " "), "入力済みの内容を残しました") {
+		t.Fatal(d.Warnings)
+	}
+}
