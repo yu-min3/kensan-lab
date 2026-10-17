@@ -579,3 +579,10 @@ button {
 .import-page button:disabled, .import-page fieldset:disabled { opacity: .6; cursor: default; }
 .import-page :focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
 @media (max-width: 480px) { .import-panel { padding: 16px; } .header-row { flex-wrap: wrap; gap: 8px; } .import-page .import-actions .start-button { width: 100%; } }
+
+.import-status-title { display: flex; align-items: center; gap: 12px; margin: 0; font-size: 18px; line-height: 1.5; }
+.import-status-failed { border: 2px solid var(--accent); background: var(--accent-soft); }
+.import-state-mark { color: var(--accent); font-weight: 700; flex-shrink: 0; }
+.import-spinner { width: 20px; height: 20px; flex-shrink: 0; border: 3px solid var(--line); border-top-color: var(--accent); border-radius: 50%; animation: import-spin 1s linear infinite; }
+@keyframes import-spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .import-spinner { animation: none; } }
