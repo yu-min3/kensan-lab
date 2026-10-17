@@ -539,26 +539,26 @@ button {
 }
 
 /* Source → draft → confirmed recipe. Shares the cooking UI's palette. */
-.import-page { max-width: 720px; margin: 0 auto; padding: 16px 12px 64px; }
-.import-page h1 { font-size: 22px; }
-.import-panel { padding: 20px; margin: 16px 0; background: hsl(var(--card)); border: 1px solid hsl(var(--border)); border-radius: 16px; }
-.import-panel label { display: flex; flex-direction: column; gap: 8px; margin: 16px 0; font-weight: 500; }
-.import-panel input:not([type="checkbox"]), .import-panel textarea, .import-panel select { width: 100%; min-height: 48px; padding: 12px; border: 1px solid hsl(var(--border)); border-radius: 8px; background: hsl(var(--background)); color: hsl(var(--foreground)); font: inherit; }
-.import-panel textarea { line-height: 1.7; resize: vertical; }
-.import-panel fieldset { border: 0; padding: 0; margin: 0; min-width: 0; }
-.import-panel legend { font-size: 18px; font-weight: 600; }
-.import-panel pre { white-space: pre-wrap; overflow-wrap: anywhere; max-height: 360px; overflow: auto; font: inherit; line-height: 1.7; }
-.import-panel summary { cursor: pointer; min-height: 48px; align-content: center; }
-.import-panel a { color: hsl(var(--accent-foreground)); overflow-wrap: anywhere; }
-.import-actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
-.import-page .chip, .header-row .chip { min-height: 48px; }
-.import-panel .start-button { margin-top: 12px; min-height: 48px; }
-.import-notice { padding: 12px; border-left: 4px solid hsl(var(--brand)); background: hsl(var(--accent)); line-height: 1.6; overflow-wrap: anywhere; }
-.import-panel .import-confirm { flex-direction: row; align-items: center; min-height: 48px; line-height: 1.6; }
-.import-confirm input { width: 24px; height: 24px; flex-shrink: 0; accent-color: hsl(var(--brand)); }
-.import-page button:disabled, .import-page fieldset:disabled { opacity: .6; cursor: default; }
-.import-page :focus-visible { outline: 2px solid hsl(var(--brand)); outline-offset: 3px; }
-@media (max-width: 480px) { .import-panel { padding: 16px; } .header-row { flex-wrap: wrap; gap: 8px; } .import-page .import-actions .start-button { width: 100%; } }
+.editor-page { max-width: 720px; margin: 0 auto; padding: 16px 12px 64px; }
+.editor-page h1 { font-size: 22px; }
+.editor-panel { padding: 20px; margin: 16px 0; background: hsl(var(--card)); border: 1px solid hsl(var(--border)); border-radius: 16px; }
+.editor-panel label { display: flex; flex-direction: column; gap: 8px; margin: 16px 0; font-weight: 500; }
+.editor-panel input:not([type="checkbox"]), .editor-panel textarea, .editor-panel select { width: 100%; min-height: 48px; padding: 12px; border: 1px solid hsl(var(--border)); border-radius: 8px; background: hsl(var(--background)); color: hsl(var(--foreground)); font: inherit; }
+.editor-panel textarea { line-height: 1.7; resize: vertical; }
+.editor-panel fieldset { border: 0; padding: 0; margin: 0; min-width: 0; }
+.editor-panel legend { font-size: 18px; font-weight: 600; }
+.editor-panel pre { white-space: pre-wrap; overflow-wrap: anywhere; max-height: 360px; overflow: auto; font: inherit; line-height: 1.7; }
+.editor-panel summary { cursor: pointer; min-height: 48px; align-content: center; }
+.editor-panel a { color: hsl(var(--accent-foreground)); overflow-wrap: anywhere; }
+.editor-actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.editor-page .chip, .header-row .chip { min-height: 48px; }
+.editor-panel .start-button { margin-top: 12px; min-height: 48px; }
+.notice { padding: 12px; border-left: 4px solid hsl(var(--brand)); background: hsl(var(--accent)); line-height: 1.6; overflow-wrap: anywhere; }
+.editor-panel .confirm-field { flex-direction: row; align-items: center; min-height: 48px; line-height: 1.6; }
+.confirm-field input { width: 24px; height: 24px; flex-shrink: 0; accent-color: hsl(var(--brand)); }
+.editor-page button:disabled, .editor-page fieldset:disabled { opacity: .6; cursor: default; }
+.editor-page :focus-visible { outline: 2px solid hsl(var(--brand)); outline-offset: 3px; }
+@media (max-width: 480px) { .editor-panel { padding: 16px; } .header-row { flex-wrap: wrap; gap: 8px; } .editor-page .editor-actions .start-button { width: 100%; } }
 
 .import-status-title { display: flex; align-items: center; gap: 12px; margin: 0; font-size: 18px; line-height: 1.5; }
 .import-status-failed { border: 2px solid hsl(var(--brand)); background: hsl(var(--accent)); }
@@ -592,4 +592,4 @@ input::placeholder, textarea::placeholder { color: hsl(var(--muted-foreground));
 .detail-notes { white-space: pre-wrap; overflow-wrap: anywhere; }
 .recipe-error { border-color: hsl(var(--destructive)); background: color-mix(in srgb, hsl(var(--destructive)) 10%, hsl(var(--card))); }
 .recipe-detail input[type="number"] { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
-.recipe-detail .import-panel .import-actions { margin-top: var(--gap-stack); }
+.recipe-detail .editor-panel .editor-actions { margin-top: var(--gap-stack); }

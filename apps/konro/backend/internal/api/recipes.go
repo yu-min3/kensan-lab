@@ -1,42 +1,17 @@
 package api
 
 import (
-	"encoding/json"
 	"errors"
 	"github.com/yu-min3/kensan-lab/apps/konro/backend/internal/recipe"
-	"io"
 	"io/fs"
-	"mime"
 	"net/http"
-	"net/url"
 )
 
 func registerRecipeWrites(mux *http.ServeMux, dir string) {
-	decode := func(w http.ResponseWriter, r *http.Request, v any) bool {
-		media, _, err := mime.ParseMediaType(r.Header.Get("Content-Type"))
-		if err != nil || media != "application/json" {
-			http.Error(w, "application/json required", 415)
-			return false
-		}
-		if origin := r.Header.Get("Origin"); origin != "" {
-			u, e := url.Parse(origin)
-			if e != nil || (u.Scheme != "http" && u.Scheme != "https") || u.Host != r.Host {
-				http.Error(w, "origin rejected", 403)
-				return false
-			}
-		}
 
-		d := json.NewDecoder(http.MaxBytesReader(w, r.Body, 1<<20))
-		d.DisallowUnknownFields()
-		if d.Decode(v) != nil || d.Decode(new(any)) != io.EOF {
-			http.Error(w, "入力を確認してください（1MB以内）", 400)
-			return false
-		}
-		return true
-	}
 	mux.HandleFunc("POST /api/v1/recipes", func(w http.ResponseWriter, r *http.Request) {
 		var input recipe.Editable
-		if !decode(w, r, &input) {
+		if !decodeJSON(w, r, &input, 1<<20) {
 			return
 		}
 		rec, err := recipe.Create(dir, r.Header.Get("Idempotency-Key"), input)
@@ -53,7 +28,7 @@ func registerRecipeWrites(mux *http.ServeMux, dir string) {
 			recipe.Editable
 			Version string `json:"version"`
 		}
-		if !decode(w, r, &input) {
+		if !decodeJSON(w, r, &input, 1<<20) {
 			return
 		}
 		rec, err := recipe.Update(dir, r.PathValue("name"), input.Version, input.Editable)

@@ -42,8 +42,39 @@ type Draft struct {
 }
 type Service struct {
 	mu    sync.Mutex
+	locks map[string]*draftLock
 	dir   string
 	agent agentclient.Gateway
+}
+
+// References include waiters, so removing a lock can never split one draft's queue.
+type draftLock struct {
+	mu   sync.Mutex
+	refs int
+}
+
+func (s *Service) lock(id string) func() {
+	s.mu.Lock()
+	if s.locks == nil {
+		s.locks = map[string]*draftLock{}
+	}
+	l := s.locks[id]
+	if l == nil {
+		l = &draftLock{}
+		s.locks[id] = l
+	}
+	l.refs++
+	s.mu.Unlock()
+	l.mu.Lock()
+	return func() {
+		l.mu.Unlock()
+		s.mu.Lock()
+		l.refs--
+		if l.refs == 0 {
+			delete(s.locks, id)
+		}
+		s.mu.Unlock()
+	}
 }
 
 func New(dir string, agent agentclient.Gateway) *Service { return &Service{dir: dir, agent: agent} }
@@ -126,17 +157,18 @@ func (s *Service) Create(ctx context.Context, rawURL, text string) (*Draft, erro
 	if _, e = rand.Read(id[:]); e != nil {
 		return nil, e
 	}
-	d := &Draft{ID: hex.EncodeToString(id[:]), Revision: 1, Source: source, Content: c, Warnings: w, AgentAvailable: s.agent != nil}
-	s.mu.Lock()
-	defer s.mu.Unlock()
+	draftID := hex.EncodeToString(id[:])
+	d := &Draft{ID: draftID, Revision: 1, Source: source, Content: c, Warnings: w, AgentAvailable: s.agent != nil}
+	unlock := s.lock(draftID)
+	defer unlock()
 	if e = s.write(d); e != nil {
 		return nil, e
 	}
 	return d, nil
 }
 func (s *Service) Get(ctx context.Context, id string) (*Draft, error) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
+	unlock := s.lock(id)
+	defer unlock()
 	d, e := s.read(id)
 	if e != nil {
 		return nil, e
@@ -174,8 +206,8 @@ func active(d *Draft) bool {
 // Manual detaches the draft so an unavailable runtime cannot lock out editing.
 // A late result can no longer replace the user's work.
 func (s *Service) Manual(id string, revision int) (*Draft, error) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
+	unlock := s.lock(id)
+	defer unlock()
 	d, e := s.read(id)
 	if e != nil {
 		return nil, e
@@ -193,8 +225,8 @@ func (s *Service) Manual(id string, revision int) (*Draft, error) {
 }
 
 func (s *Service) Start(ctx context.Context, id string, revision int, mode string) (*Draft, error) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
+	unlock := s.lock(id)
+	defer unlock()
 	d, e := s.read(id)
 	if e != nil {
 		return nil, e
@@ -293,8 +325,8 @@ func (s *Service) apply(d *Draft) error {
 	return nil
 }
 func (s *Service) Action(ctx context.Context, id string, revision int, action string) (*Draft, error) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
+	unlock := s.lock(id)
+	defer unlock()
 	d, e := s.read(id)
 	if e != nil {
 		return nil, e
@@ -331,8 +363,8 @@ func (s *Service) Action(ctx context.Context, id string, revision int, action st
 	return d, nil
 }
 func (s *Service) Edit(id string, revision int, c Content) (*Draft, error) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
+	unlock := s.lock(id)
+	defer unlock()
 	d, e := s.read(id)
 	if e != nil {
 		return nil, e
@@ -351,8 +383,8 @@ func (s *Service) Edit(id string, revision int, c Content) (*Draft, error) {
 	return d, nil
 }
 func (s *Service) Save(id string, revision int) (*Draft, error) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
+	unlock := s.lock(id)
+	defer unlock()
 	d, e := s.read(id)
 	if e != nil {
 		return nil, e
@@ -383,15 +415,8 @@ func validateContent(c Content, complete bool) error {
 	if complete && (strings.TrimSpace(c.Title) == "" || len(c.Ingredients) == 0 || len(c.Steps) == 0) {
 		return errors.New("タイトル・材料・手順を入力してください")
 	}
-	if len(c.Title) > 300 || len(c.Servings) > 200 || strings.ContainsAny(c.Title+c.Servings, "\r\n") || len(c.Ingredients) > 100 || len(c.Steps) > 150 {
-		return errors.New("タイトル・材料・手順を入力してください（材料100件、手順150件まで）")
-	}
-	for _, list := range [][]string{c.Ingredients, c.Steps} {
-		for _, line := range list {
-			if strings.TrimSpace(line) == "" || len(line) > 3000 || strings.ContainsAny(line, "\r\n") {
-				return errors.New("材料・手順は1項目1行、3000バイト以内にしてください")
-			}
-		}
+	if recipe.ValidateContent(c) != nil {
+		return errors.New("タイトル・材料・手順を確認してください（材料100件、手順150件、1項目1行3000バイト以内）")
 	}
 	return nil
 }

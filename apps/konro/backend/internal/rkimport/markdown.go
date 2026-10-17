@@ -2,24 +2,17 @@ package rkimport
 
 import (
 	"fmt"
+	"github.com/yu-min3/kensan-lab/apps/konro/backend/internal/recipe"
 	"path"
+	"strconv"
 	"strings"
 )
 
 // Markdown renders a recipe as a konro recipe file: YAML frontmatter
 // (type: recipe) + 材料 / 手順 / メモ sections. imageDir is where the caller
 // will materialize image files ("images"); date fills created/updated.
-func Markdown(r Recipe, imageDir, date string) string {
-	var b strings.Builder
-	b.WriteString("---\n")
-	b.WriteString("type: recipe\n")
-	fmt.Fprintf(&b, "title: %s\n", yamlString(r.Title))
-	if r.RKID != "" {
-		fmt.Fprintf(&b, "rk_id: %s\n", r.RKID)
-	}
-
-	// collections are the user's own organization — they lead the tag list
-	var tags []string
+func Markdown(r Recipe, imageDir, date string) (string, error) {
+	tags := []string{}
 	seen := map[string]bool{}
 	for _, t := range append(append(append([]string{}, r.Collections...), r.Categories...), r.Courses...) {
 		if !seen[t] {
@@ -27,51 +20,23 @@ func Markdown(r Recipe, imageDir, date string) string {
 			tags = append(tags, t)
 		}
 	}
-	if len(tags) > 0 {
-		quoted := make([]string, len(tags))
-		for i, t := range tags {
-			quoted[i] = yamlString(t)
-		}
-		fmt.Fprintf(&b, "tags: [%s]\n", strings.Join(quoted, ", "))
+	images := []string{}
+	for _, img := range r.Images {
+		images = append(images, path.Join(imageDir, path.Base(img)))
 	}
-	if r.Yield != "" {
-		fmt.Fprintf(&b, "servings: %s\n", yamlString(r.Yield))
+	prep, cook := r.PrepTime, r.CookTime
+	if prep == "PT0S" {
+		prep = ""
 	}
-	// PT0S is Recipe Keeper's "not set"
-	if r.PrepTime != "" && r.PrepTime != "PT0S" {
-		fmt.Fprintf(&b, "prep_time: %s\n", r.PrepTime)
+	if cook == "PT0S" {
+		cook = ""
 	}
-	if r.CookTime != "" && r.CookTime != "PT0S" {
-		fmt.Fprintf(&b, "cook_time: %s\n", r.CookTime)
+	rating, _ := strconv.Atoi(r.Rating)
+	data, err := recipe.Encode(recipe.Recipe{Meta: recipe.Meta{Title: r.Title, RKID: r.RKID, Tags: tags, Servings: r.Yield, PrepTime: prep, CookTime: cook, Source: r.Source, Rating: rating, Images: images}, Ingredients: r.Ingredients, Steps: r.Steps, Notes: r.Notes}, date)
+	if err != nil {
+		return "", err
 	}
-	if r.Source != "" {
-		fmt.Fprintf(&b, "source: %s\n", yamlString(r.Source))
-	}
-	if r.Rating != "" && r.Rating != "0" {
-		fmt.Fprintf(&b, "rating: %s\n", r.Rating)
-	}
-	if len(r.Images) > 0 {
-		refs := make([]string, len(r.Images))
-		for i, img := range r.Images {
-			refs[i] = yamlString(path.Join(imageDir, path.Base(img)))
-		}
-		fmt.Fprintf(&b, "images: [%s]\n", strings.Join(refs, ", "))
-	}
-	fmt.Fprintf(&b, "created: %s\nupdated: %s\n", date, date)
-	b.WriteString("---\n\n## 材料\n\n")
-	for _, ing := range r.Ingredients {
-		fmt.Fprintf(&b, "- %s\n", ing)
-	}
-	b.WriteString("\n## 手順\n\n")
-	for i, step := range r.Steps {
-		fmt.Fprintf(&b, "%d. %s\n", i+1, step)
-	}
-	if r.Notes != "" {
-		b.WriteString("\n## メモ\n\n")
-		b.WriteString(r.Notes)
-		b.WriteString("\n")
-	}
-	return b.String()
+	return string(data), nil
 }
 
 // Filename derives a markdown filename from the title (Japanese kept as-is,
@@ -91,11 +56,4 @@ func Filename(title string, taken map[string]bool) string {
 	}
 	taken[candidate] = true
 	return candidate
-}
-
-func yamlString(s string) string {
-	s = strings.ReplaceAll(s, "\\", "\\\\")
-	s = strings.ReplaceAll(s, "\"", "\\\"")
-	s = strings.ReplaceAll(s, "\n", " ")
-	return "\"" + s + "\""
 }

@@ -125,7 +125,10 @@ func TestParseZip(t *testing.T) {
 
 func TestMarkdown(t *testing.T) {
 	res := parseFixture(t)
-	md := Markdown(res.Recipes[0], "images", "2026-07-19")
+	md, err := Markdown(res.Recipes[0], "images", "2026-07-19")
+	if err != nil {
+		t.Fatal(err)
+	}
 	for _, want := range []string{
 		"type: recipe\n",
 		`title: "鶏むね肉の南蛮漬け"`,
@@ -147,7 +150,10 @@ func TestMarkdown(t *testing.T) {
 	}
 
 	// rating 0 means "unrated" in Recipe Keeper — must be omitted
-	md2 := Markdown(res.Recipes[1], "images", "2026-07-19")
+	md2, err := Markdown(res.Recipes[1], "images", "2026-07-19")
+	if err != nil {
+		t.Fatal(err)
+	}
 	if strings.Contains(md2, "rating:") {
 		t.Errorf("unrated recipe should have no rating line\n---\n%s", md2)
 	}

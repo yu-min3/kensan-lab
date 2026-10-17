@@ -1,3 +1,5 @@
+import type { Recipe } from "./api";
+
 // Cooking-session state, persisted to localStorage so closing the browser
 // mid-cook (or an auth 401 → reload) never loses progress. Kitchen device is
 // a single phone — no server-side session (see app-plan.md).
@@ -12,6 +14,8 @@ export type Timer = {
 };
 
 export type Session = {
+  schemaVersion?: 2;
+  recipes?: Record<string, Recipe>;
   startedAt: number;
   files: string[];
   active: number;
@@ -25,7 +29,10 @@ const KEY = "konro-session-v1";
 export function loadSession(): Session | null {
   try {
     const raw = localStorage.getItem(KEY);
-    return raw ? (JSON.parse(raw) as Session) : null;
+    if (!raw) return null;
+    const s = JSON.parse(raw) as Session;
+    if (!s || !Array.isArray(s.files) || !s.files.length || !s.files.every((f) => typeof f === "string") || !Number.isInteger(s.active) || s.active < 0 || s.active >= s.files.length || !s.steps || !s.ingredients || !Array.isArray(s.timers)) return null;
+    return s;
   } catch {
     return null;
   }
@@ -36,8 +43,19 @@ export function saveSession(s: Session | null) {
   else localStorage.setItem(KEY, JSON.stringify(s));
 }
 
-export function newSession(files: string[]): Session {
+export function isPinnedSession(s: Session): boolean {
+  return s.schemaVersion === 2 && !!s.recipes && s.files.every((f) => {
+    const r = s.recipes?.[f];
+    return r?.file === f && typeof r.version === "string" && !!r.version && typeof r.title === "string" && (r.steps === null || Array.isArray(r.steps)) && (r.ingredients === null || Array.isArray(r.ingredients));
+  });
+}
+export function pinLegacySession(s: Session, recipes: Record<string, Recipe>): Session {
+  return { ...s, schemaVersion: 2, recipes, steps: {}, ingredients: {} };
+}
+export function newSession(files: string[], recipes: Record<string, Recipe>): Session {
   return {
+    schemaVersion: 2,
+    recipes,
     startedAt: Date.now(),
     files,
     active: 0,

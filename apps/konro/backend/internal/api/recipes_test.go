@@ -183,10 +183,10 @@ func TestRecipeWritesRejectCrossOriginAndNonJSON(t *testing.T) {
 	}
 }
 
-func TestUnsupportedEditableMetadataNeverLosesOriginal(t *testing.T) {
+func TestMultilineEditableMetadataRetainsValues(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "block.md")
-	for _, fm := range []string{"title: レシピ\ntags:\n  - 和食\n", "title: |\n  レシピ\n", "title: レシピ\ntags:\n- 和食\n- 魚\n", "\"title\": レシピ\n", " title: レシピ\n tags: []\n", "title : レシピ\n"} {
+	for _, fm := range []string{"title: レシピ\ntags:\n  - 和食\n", "title: |\n  レシピ\n", "title: レシピ\nservings: >\n  2人分\nsource: |\n  料理の本\n", "title: レシピ\ntags:\n- 和食\n- 魚\n", "\"title\": レシピ\n", " title: レシピ\n tags: []\n", "title : レシピ\n"} {
 		src := []byte("---\n" + fm + "---\n\n## 材料\n- 魚\n")
 		if err := os.WriteFile(path, src, 0600); err != nil {
 			t.Fatal(err)
@@ -195,12 +195,16 @@ func TestUnsupportedEditableMetadataNeverLosesOriginal(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if _, err = recipe.Update(dir, "block", r.Version, recipe.Editable{Title: "変更"}); err == nil {
-			t.Fatal("unsupported metadata rewritten")
+		_, err = recipe.Update(dir, "block", r.Version, recipe.Editable{Title: "変更", Servings: r.Servings, Source: r.Source, Tags: r.Tags, Ingredients: r.Ingredients, Steps: r.Steps, Notes: r.Notes})
+		if err != nil {
+			t.Fatal(err)
 		}
-		after, _ := os.ReadFile(path)
-		if !bytes.Equal(src, after) {
-			t.Fatal("unsupported data lost")
+		after, err := recipe.Load(dir, "block")
+		if err != nil {
+			t.Fatal(err)
+		}
+		if after.Servings != strings.TrimSpace(r.Servings) || after.Source != strings.TrimSpace(r.Source) || after.Title != "変更" || len(after.Tags) != len(r.Tags) || len(after.Ingredients) != len(r.Ingredients) {
+			t.Fatalf("data lost: %+v", after)
 		}
 	}
 }

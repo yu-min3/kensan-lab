@@ -33,7 +33,10 @@ func Materialize(res *Result, images map[string][]byte, outDir, date string) (Wr
 			res.Warnings = append(res.Warnings, fmt.Sprintf("%s: ingredients=%d steps=%d", r.Title, len(r.Ingredients), len(r.Steps)))
 		}
 		name := Filename(r.Title, taken)
-		md := Markdown(r, "images", date)
+		md, err := Markdown(r, "images", date)
+		if err != nil {
+			return stats, err
+		}
 		written, err := recipe.WriteLegacyImport(outDir, name, []byte(md))
 		if err != nil {
 			return stats, err

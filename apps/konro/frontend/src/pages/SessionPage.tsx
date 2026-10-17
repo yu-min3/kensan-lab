@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { fetchRecipe, formatDuration, Recipe } from "../api";
-import { formatRemaining, isIngredientGroup, Session, tabName, timerCandidates } from "../session";
+import { formatRemaining, isIngredientGroup, isPinnedSession, pinLegacySession, Session, tabName, timerCandidates } from "../session";
 import { alarm } from "../alerts";
 import { holdWakeLock, releaseWakeLock } from "../wakelock";
 
@@ -14,7 +14,9 @@ export function SessionPage({
   onUpdate: (s: Session) => void;
   onEnd: () => void;
 }) {
-  const [recipes, setRecipes] = useState<Record<string, Recipe>>({});
+  const [loaded, setRecipes] = useState<Record<string, Recipe>>({});
+  const pinned = isPinnedSession(session);
+  const recipes = pinned ? session.recipes! : loaded;
   const [loadErrors, setLoadErrors] = useState<Record<string, string>>({});
   const [now, setNow] = useState(Date.now());
   const [confirmEnd, setConfirmEnd] = useState(false);
@@ -34,9 +36,9 @@ export function SessionPage({
   };
 
   useEffect(() => {
-    session.files.forEach(loadRecipe);
+    if (!pinned) session.files.forEach(loadRecipe);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [session.files.join("|")]);
+  }, [session.files.join("|"), pinned]);
 
   // clock tick: drives countdowns and fires alarms exactly once per timer
   useEffect(() => {
@@ -129,7 +131,12 @@ export function SessionPage({
       </header>
 
       <main className="recipe-panel">
-        {!recipe && loadErrors[active] ? (
+        {!pinned ? <section className="editor-panel" aria-label="以前の調理セッションの確認">
+          <h2 className="h-serif">調理中のレシピを確認してください</h2>
+          <p>以前の版では開始時の内容を記録していません。最新の内容で再開すると、材料と手順のチェックをやり直します。動いているタイマーは引き継ぎます。</p>
+          {session.files.map((f) => <p key={f}>{loaded[f]?.title ?? f}{loadErrors[f] && <><span role="alert"> {loadErrors[f]}</span><button className="chip" onClick={() => loadRecipe(f)}>再読み込み</button></>}</p>)}
+          <button className="start-button" disabled={!session.files.every((f) => loaded[f])} onClick={() => onUpdate(pinLegacySession(session, loaded))}>最新の内容で再開する</button>
+        </section> : !recipe && loadErrors[active] ? (
           <div className="load-error">
             <p>レシピを読み込めませんでした</p>
             <p className="muted-small">{loadErrors[active]}</p>
