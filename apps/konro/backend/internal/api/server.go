@@ -33,6 +33,7 @@ func New(dataDir, staticDir string, opts ...Option) http.Handler {
 		opt(&config)
 	}
 	registerDrafts(mux, importer.New(dataDir, config.agent))
+	registerRecipeWrites(mux, dataDir)
 
 	mux.HandleFunc("GET /api/v1/recipes", func(w http.ResponseWriter, r *http.Request) {
 		metas, err := recipe.List(dataDir)
@@ -108,6 +109,7 @@ type importReport struct {
 
 func writeJSON(w http.ResponseWriter, v any) {
 	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Cache-Control", "no-store")
 	json.NewEncoder(w).Encode(v)
 }
 
