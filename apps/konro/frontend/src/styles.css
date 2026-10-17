@@ -593,3 +593,8 @@ input::placeholder, textarea::placeholder { color: hsl(var(--muted-foreground));
 .recipe-error { border-color: hsl(var(--destructive)); background: color-mix(in srgb, hsl(var(--destructive)) 10%, hsl(var(--card))); }
 .recipe-detail input[type="number"] { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
 .recipe-detail .editor-panel .editor-actions { margin-top: var(--gap-stack); }
+
+.web-results { list-style:none; margin:0; padding:0; display:grid; gap:var(--gap-stack); }
+.web-results h3 { margin:0; overflow-wrap:anywhere; }
+.web-results a { overflow-wrap:anywhere; }
+.search-page form { display:grid; gap:var(--gap-stack); }

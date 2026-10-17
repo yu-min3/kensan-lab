@@ -12,8 +12,8 @@ const reasons: Record<string, string> = {
   numbers_changed: "原文にない数値を検出したため、整形結果を採用していません。下書きを確認・編集できます。",
   invalid_recipe: "AIの応答がレシピの形式に合いませんでした。下書きはそのままです。再試行または手入力できます。",
 };
-export function ImportPage({ onClose, onSaved }: { onClose: () => void; onSaved: (file: string, title: string) => void }) {
-  const {kind,setKind,input,setInput,draft,content,setContent,ingredients,setIngredients,steps,setSteps,submitting,pollError,confirmed,setConfirmed,busy,error,resume,loading,active,perform,persist,start,action,discardView,adopt} = useImportJob();
+export function ImportPage({ onClose, onSaved, initialURL="" }: { initialURL?:string; onClose: () => void; onSaved: (file: string, title: string) => void }) {
+  const {savedDrafts,restoreDraft,kind,setKind,input,setInput,draft,content,setContent,ingredients,setIngredients,steps,setSteps,submitting,pollError,confirmed,setConfirmed,busy,error,resume,loading,active,perform,persist,start,action,discardView,adopt} = useImportJob(initialURL);
   const state = submitting ? "sending" : draft?.detached ? "manual" : draft?.pending ? "sending" : draft?.job?.state ?? "draft";
   const failed = state === "failed";
   const titles: Record<string, string> = { sending: "AIに送信中", queued: "AIの順番待ち", running: "AIが抽出・整形中", waiting: "AIは待機中", succeeded: "AIの整形が完了", failed: "AIの抽出・整形に失敗しました", cancelled: "AIを取り消しました", manual: "手入力で編集中", draft: "下書きを作成しました" };
@@ -34,6 +34,7 @@ export function ImportPage({ onClose, onSaved }: { onClose: () => void; onSaved:
           : <textarea rows={10} value={input} onChange={(e) => setInput(e.target.value)} />}
       </label>
       <button className="start-button" disabled={busy || !input.trim()} onClick={() => perform(async () => adopt(await draftRequest("", "POST", kind === "url" ? { url: input.trim(), text: "" } : { url: "", text: input }))) }>{busy ? "取り込み中…" : "下書きを作る"}</button>
+      {!!savedDrafts.length&&<details><summary>保存した下書き（{savedDrafts.length}件）</summary><ul className="web-results">{savedDrafts.map(ref=><li key={ref.id}><button className="chip" disabled={busy} onClick={()=>restoreDraft(ref.id)}>{ref.title}</button>{ref.url&&<p className="recipe-summary">{ref.url}</p>}</li>)}</ul></details>}
       {resume && <button className="chip" onClick={discardView}>別のレシピを取り込む</button>}
     </Panel>}
     {draft && <>
@@ -71,7 +72,7 @@ export function ImportPage({ onClose, onSaved }: { onClose: () => void; onSaved:
             <button className="chip" onClick={() => perform(async () => { await persist(); onClose(); })}>下書きを保存して戻る</button>
             <button className="start-button" disabled={!confirmed || !content.title.trim() || !ingredients.trim() || !steps.trim()} onClick={() => perform(async () => {
               const d = await persist(); const saved = await draftRequest(`/${d.id}/save`, "POST", { revision: d.revision });
-              clearImportDraft(); onSaved(saved.saved_file!, saved.content.title);
+              clearImportDraft(d.id); onSaved(saved.saved_file!, saved.content.title);
             })}>レシピとして保存</button>
           </div>
         </fieldset>

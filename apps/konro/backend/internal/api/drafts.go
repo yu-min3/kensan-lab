@@ -6,11 +6,19 @@ import (
 	"os"
 
 	"github.com/yu-min3/kensan-lab/apps/konro/backend/internal/agentclient"
+	"github.com/yu-min3/kensan-lab/apps/konro/backend/internal/discovery"
 	"github.com/yu-min3/kensan-lab/apps/konro/backend/internal/importer"
 )
 
 type Option func(*options)
-type options struct{ agent agentclient.Gateway }
+type options struct {
+	agent       agentclient.Gateway
+	searchFetch discovery.Fetcher
+}
+
+func WithSearchFetcher(fetch discovery.Fetcher) Option {
+	return func(o *options) { o.searchFetch = fetch }
+}
 
 func WithAgent(agent agentclient.Gateway) Option { return func(o *options) { o.agent = agent } }
 func registerDrafts(mux *http.ServeMux, s *importer.Service) {
