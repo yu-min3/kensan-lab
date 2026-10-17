@@ -23,3 +23,8 @@ Verifying density behavior: [`density-demo.html`](./density-demo.html) (the same
 
 - Rendered `density-demo.html` with the Whetstone tokens and confirmed via screenshot that toggling `data-density` between comfortable / compact actually changes rendered dimensions.
 - Token values (palette, typography, density) were finalized during the design phase. This commit implements and wires them up.
+
+
+## Konro (2026-10-17)
+
+Konro imports `packages/design-tokens/tokens.css` directly for all colors, typography and shadows. OS theme changes toggle the shared `.dark` selector; form controls set explicit foreground/placeholder colors. Docker preserves the relative token import. Kitchen touch targets and layout retain their existing geometry; full component/density adoption remains separate work.

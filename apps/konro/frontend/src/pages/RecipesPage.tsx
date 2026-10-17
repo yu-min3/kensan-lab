@@ -66,7 +66,7 @@ export function RecipesPage({ onStart }: { onStart: (files: string[]) => void })
     <div className="recipes-page">
       <header className="list-header">
         <div className="header-row">
-          <h1>konro</h1>
+          <h1 className="h-serif">konro</h1>
           <div className="import-actions"><button className="chip chip-on" onClick={() => setWebImport(true)}>レシピを追加</button>
           <label className="chip import-chip">
             {importing ? "取込中…" : "ZIP取込"}
@@ -93,6 +93,7 @@ export function RecipesPage({ onStart }: { onStart: (files: string[]) => void })
         )}
         <input
           type="search"
+          aria-label="レシピを検索"
           placeholder="レシピを検索"
           value={q}
           onChange={(e) => setQ(e.target.value)}
