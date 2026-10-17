@@ -5,6 +5,7 @@
 package recipe
 
 import (
+	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -32,12 +33,16 @@ type Recipe struct {
 	Ingredients []string `json:"ingredients"`
 	Steps       []string `json:"steps"`
 	Notes       string   `json:"notes,omitempty"`
+	Version     string   `json:"version"`
 }
 
 // List returns metadata for every .md file directly under dir, title-sorted.
 // Unparseable files are skipped rather than failing the listing.
 func List(dir string) ([]Meta, error) {
 	entries, err := os.ReadDir(dir)
+	if os.IsNotExist(err) {
+		return []Meta{}, nil
+	}
 	if err != nil {
 		return nil, err
 	}
@@ -71,12 +76,13 @@ func Load(dir, name string) (*Recipe, error) {
 	if !validName(name) {
 		return nil, fmt.Errorf("invalid recipe name %q", name)
 	}
-	data, err := os.ReadFile(filepath.Join(dir, name+".md"))
+	data, err := readSource(dir, name)
 	if err != nil {
 		return nil, err
 	}
 	r := parse(string(data))
 	r.File = name
+	r.Version = version(data)
 	if r.Title == "" {
 		r.Title = name
 	}
@@ -98,6 +104,9 @@ func parse(src string) *Recipe {
 
 func parseFrontmatter(fm string, r *Recipe) {
 	for _, line := range strings.Split(fm, "\n") {
+		if len(line) == 0 || line[0] == ' ' || line[0] == '\t' {
+			continue
+		}
 		key, val, ok := strings.Cut(line, ":")
 		if !ok {
 			continue
@@ -133,6 +142,10 @@ func parseBody(body string, r *Recipe) {
 	var notes []string
 	for _, line := range strings.Split(body, "\n") {
 		trimmed := strings.TrimSpace(line)
+		if section == "メモ" {
+			notes = append(notes, line)
+			continue
+		}
 		if strings.HasPrefix(trimmed, "## ") {
 			section = strings.TrimSpace(strings.TrimPrefix(trimmed, "## "))
 			continue
@@ -157,6 +170,10 @@ func parseList(val string) []string {
 	val = strings.TrimSpace(val)
 	if !strings.HasPrefix(val, "[") || !strings.HasSuffix(val, "]") {
 		return nil
+	}
+	var jsonList []string
+	if json.Unmarshal([]byte(val), &jsonList) == nil {
+		return jsonList
 	}
 	var out []string
 	for _, item := range strings.Split(val[1:len(val)-1], ",") {

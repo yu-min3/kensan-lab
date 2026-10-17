@@ -11,6 +11,7 @@ export type RecipeMeta = {
 };
 
 export type Recipe = RecipeMeta & {
+  version: string;
   ingredients: string[] | null;
   steps: string[] | null;
   notes?: string;
@@ -32,6 +33,7 @@ export type ImportReport = {
   recipes: number;
   images: number;
   emptySections: number;
+  skipped?: number;
   warnings: string[] | null;
   unknownProps: string[] | null;
 };
@@ -70,5 +72,16 @@ export async function draftRequest(path: string, method = "GET", body?: unknown)
     body: body === undefined ? undefined : JSON.stringify(body),
   });
   if (!res.ok) throw new Error((await res.text()).trim());
+  return res.json();
+}
+
+export type RecipeEdit = Pick<Recipe, "title" | "servings" | "tags" | "prepTime" | "cookTime" | "source" | "rating" | "ingredients" | "steps" | "notes">;
+export class RecipeWriteError extends Error { constructor(message: string, public status: number) { super(message); } }
+export async function saveRecipe(file: string | null, version: string, input: RecipeEdit, createID: string): Promise<Recipe> {
+  const res = await fetch(file ? `/api/v1/recipes/${encodeURIComponent(file)}` : "/api/v1/recipes", {
+    method: file ? "PUT" : "POST", headers: { "Content-Type": "application/json", "Idempotency-Key": createID },
+    body: JSON.stringify(file ? { ...input, version } : input),
+  });
+  if (!res.ok) throw new RecipeWriteError((await res.text()).trim(), res.status);
   return res.json();
 }

@@ -8,3 +8,8 @@
 apps/konro/frontend/node_modules
 apps/konro/frontend/dist
 apps/konro/backend/temp
+
+!packages/
+!packages/design-tokens/
+!packages/design-tokens/tokens.css
+!packages/design-tokens/tokens.json

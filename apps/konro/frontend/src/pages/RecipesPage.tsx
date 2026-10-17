@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { fetchRecipes, formatDuration, importRecipeZip, RecipeMeta } from "../api";
+import { RecipePage } from "./RecipePage";
 import { ImportPage } from "./ImportPage";
 import { normalizeQuery } from "../session";
 
@@ -7,6 +8,7 @@ import { normalizeQuery } from "../session";
 // then start the cooking session.
 export function RecipesPage({ onStart }: { onStart: (files: string[]) => void }) {
   const [webImport, setWebImport] = useState(false);
+  const [opened, setOpened] = useState<string | null>(null);
   const [recipes, setRecipes] = useState<RecipeMeta[]>([]);
   const [error, setError] = useState("");
   const [q, setQ] = useState("");
@@ -27,7 +29,7 @@ export function RecipesPage({ onStart }: { onStart: (files: string[]) => void })
       const drift = rep.unknownProps?.length
         ? `｜⚠ 未知フィールド ${rep.unknownProps.length} 種（形式が変わったかも）`
         : "";
-      setImportMsg(`✓ ${rep.recipes} 品を取り込みました（画像 ${rep.images} 枚）${drift}`);
+      setImportMsg(`✓ ${rep.recipes} 品を取り込みました（画像 ${rep.images} 枚）${rep.skipped ? `｜編集済み ${rep.skipped} 品を保持` : ""}${drift}`);
       setRecipes(await fetchRecipes());
     } catch (e) {
       setImportMsg(`取込に失敗しました: ${String(e)}`);
@@ -56,6 +58,11 @@ export function RecipesPage({ onStart }: { onStart: (files: string[]) => void })
   const toggle = (file: string) =>
     setSelected((sel) => (sel.includes(file) ? sel.filter((f) => f !== file) : [...sel, file]));
 
+  if (opened !== null) return <RecipePage key={opened} file={opened || null} selected={selected.includes(opened)} onBack={() => setOpened(null)} onToggle={toggle} onSaved={(r) => {
+    setOpened(r.file); setImportMsg(`✓ ${r.title} を保存しました`);
+    fetchRecipes().then(setRecipes).catch((e) => setError(String(e)));
+  }} />;
+
   if (webImport) return <ImportPage onClose={() => setWebImport(false)} onSaved={(file, title) => {
     setWebImport(false); setImportMsg(`✓ ${title} を保存しました`);
     setQ(""); setTag(""); setSelected((s) => s.includes(file) ? s : [...s, file]);
@@ -66,8 +73,9 @@ export function RecipesPage({ onStart }: { onStart: (files: string[]) => void })
     <div className="recipes-page">
       <header className="list-header">
         <div className="header-row">
-          <h1>konro</h1>
+          <h1 className="h-serif">konro</h1>
           <div className="import-actions"><button className="chip chip-on" onClick={() => setWebImport(true)}>レシピを追加</button>
+          <button className="chip" onClick={() => setOpened("")}>手入力で作成</button>
           <label className="chip import-chip">
             {importing ? "取込中…" : "ZIP取込"}
             <input
@@ -93,6 +101,7 @@ export function RecipesPage({ onStart }: { onStart: (files: string[]) => void })
         )}
         <input
           type="search"
+          aria-label="レシピを検索"
           placeholder="レシピを検索"
           value={q}
           onChange={(e) => setQ(e.target.value)}
@@ -127,10 +136,8 @@ export function RecipesPage({ onStart }: { onStart: (files: string[]) => void })
           const idx = selected.indexOf(r.file);
           return (
             <li key={r.file}>
-              <button
-                className={`recipe-card ${idx >= 0 ? "recipe-card-on" : ""}`}
-                onClick={() => toggle(r.file)}
-              >
+              <article className={`recipe-card ${idx >= 0 ? "recipe-card-on" : ""}`}>
+              <button className="recipe-open" aria-label={`${r.title}を開く`} onClick={() => setOpened(r.file)}>
                 {r.images?.[0] ? (
                   <img src={`/${r.images[0]}`} alt="" loading="lazy" />
                 ) : (
@@ -145,6 +152,8 @@ export function RecipesPage({ onStart }: { onStart: (files: string[]) => void })
                   </div>
                 </div>
               </button>
+              <button className={`recipe-select ${idx >= 0 ? "chip-on" : ""}`} aria-label={`${r.title}を調理に${idx >= 0 ? "選択済み" : "選ぶ"}`} aria-pressed={idx >= 0} onClick={() => toggle(r.file)}>{idx >= 0 ? "✓ 調理に選択済み" : "調理に選ぶ"}</button>
+              </article>
             </li>
           );
         })}

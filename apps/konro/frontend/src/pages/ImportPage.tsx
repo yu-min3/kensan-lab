@@ -101,7 +101,7 @@ export function ImportPage({ onClose, onSaved }: { onClose: () => void; onSaved:
   const descriptions: Record<string, string> = { sending: "送信状況を確認しています。", queued: "まだ抽出は始まっていません。順番が来ると実行します。", running: "材料と手順を整えています。この画面を閉じても処理は続きます。", waiting: "現在は処理していません。", succeeded: "原文と照らし合わせて確認・編集してから保存してください。", failed: "処理は停止しています。自動では再試行しません。", cancelled: "処理は停止しました。下書きを編集できます。", manual: "手入力に切り替えました。AIの結果は取り込みません。", draft: "必要ならAIで材料と手順を抽出できます。" };
   const processing = ["sending", "queued", "running"].includes(state) && !pollError;
   return <main className="import-page">
-    <header className="header-row"><h1>レシピを取り込む</h1><button className="chip" disabled={busy} onClick={() => { if (draft && !active) perform(async () => { await persist(); onClose(); }); else onClose(); }}>一覧へ</button></header>
+    <header className="header-row"><h1 className="h-serif">レシピを取り込む</h1><button className="chip" disabled={busy} onClick={() => { if (draft && !active) perform(async () => { await persist(); onClose(); }); else onClose(); }}>一覧へ</button></header>
     {loading && <p role="status">前の下書きを読み込んでいます…</p>}
     {error && <p className="import-notice" role="alert">{error}</p>}
     {!draft && !loading && <section className="import-panel">

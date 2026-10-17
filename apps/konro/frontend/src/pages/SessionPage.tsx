@@ -141,11 +141,11 @@ export function SessionPage({
           <p className="loading">読み込み中…</p>
         ) : (
           <>
-            <h2 className="recipe-title">{recipe.title}</h2>
+            <h2 className="recipe-title h-serif">{recipe.title}</h2>
             <div className="recipe-info">
               {recipe.servings && <span>{recipe.servings}</span>}
               {formatDuration(recipe.cookTime) && <span>⏱ {formatDuration(recipe.cookTime)}</span>}
-              {recipe.source && (
+              {recipe.source && /^https?:\/\//i.test(recipe.source) && (
                 <a href={recipe.source} target="_blank" rel="noreferrer">
                   出典
                 </a>

@@ -1,16 +1,9 @@
 /* konro — kitchen-first UI: bright, big touch targets, one hand, wet fingers */
 
-:root {
-  --bg: #faf7f2;
-  --panel: #ffffff;
-  --ink: #2b2622;
-  --muted: #8a8178;
-  --accent: #e85d2f;
-  --accent-soft: #fdeee7;
-  --line: #e8e2d9;
-  --done: #9aa79b;
-  --tab-h: 72px;
-}
+@import "../../../../packages/design-tokens/tokens.css";
+
+:root { --tab-h: 72px; color-scheme: light; }
+:root.dark { color-scheme: dark; }
 
 * {
   box-sizing: border-box;
@@ -20,9 +13,9 @@
 html,
 body {
   margin: 0;
-  background: var(--bg);
-  color: var(--ink);
-  font-family: -apple-system, "Hiragino Sans", "Noto Sans JP", sans-serif;
+  background: hsl(var(--background));
+  color: hsl(var(--foreground));
+  font-family: var(--font-sans);
   overscroll-behavior-y: none;
 }
 
@@ -46,7 +39,7 @@ button {
 .list-header h1 {
   margin: 4px 0 10px;
   font-size: 22px;
-  color: var(--accent);
+  color: hsl(var(--brand));
   letter-spacing: 0.04em;
 }
 
@@ -58,22 +51,23 @@ button {
 
 .import-chip {
   cursor: pointer;
-  color: var(--muted);
+  color: hsl(var(--muted-foreground));
 }
 
 .import-msg {
   margin: 0 0 10px;
   font-size: 13px;
-  color: var(--muted);
+  color: hsl(var(--muted-foreground));
 }
 
 .list-header input[type="search"] {
   width: 100%;
   font-size: 16px;
   padding: 12px 14px;
-  border: 1px solid var(--line);
+  border: 1px solid hsl(var(--border));
   border-radius: 12px;
-  background: var(--panel);
+  background: hsl(var(--card));
+  color: hsl(var(--foreground));
 }
 
 .tag-row {
@@ -88,15 +82,15 @@ button {
   flex: none;
   padding: 8px 14px;
   border-radius: 999px;
-  background: var(--panel);
-  border: 1px solid var(--line);
+  background: hsl(var(--card));
+  border: 1px solid hsl(var(--border));
   font-size: 14px;
 }
 
 .chip-on {
-  background: var(--accent);
-  border-color: var(--accent);
-  color: #fff;
+  background: hsl(var(--accent));
+  border-color: hsl(var(--brand));
+  color: hsl(var(--accent-foreground));
 }
 
 .recipe-grid {
@@ -113,15 +107,15 @@ button {
   display: block;
   width: 100%;
   text-align: left;
-  background: var(--panel);
-  border: 2px solid var(--line);
+  background: hsl(var(--card));
+  border: 2px solid hsl(var(--border));
   border-radius: 14px;
   overflow: hidden;
 }
 
 .recipe-card-on {
-  border-color: var(--accent);
-  box-shadow: 0 0 0 2px var(--accent-soft);
+  border-color: hsl(var(--brand));
+  box-shadow: 0 0 0 2px hsl(var(--accent));
 }
 
 .recipe-card img,
@@ -133,7 +127,7 @@ button {
   align-items: center;
   justify-content: center;
   font-size: 34px;
-  background: var(--accent-soft);
+  background: hsl(var(--accent));
 }
 
 .burner-badge {
@@ -143,8 +137,8 @@ button {
   width: 28px;
   height: 28px;
   border-radius: 50%;
-  background: var(--accent);
-  color: #fff;
+  background: hsl(var(--primary));
+  color: hsl(var(--primary-foreground));
   font-weight: 700;
   display: flex;
   align-items: center;
@@ -170,7 +164,7 @@ button {
   gap: 8px;
   margin-top: 4px;
   font-size: 12px;
-  color: var(--muted);
+  color: hsl(var(--muted-foreground));
 }
 
 .start-bar {
@@ -179,7 +173,7 @@ button {
   right: 0;
   bottom: 0;
   padding: 12px 16px calc(12px + env(safe-area-inset-bottom));
-  background: linear-gradient(to top, var(--bg) 70%, transparent);
+  background: linear-gradient(to top, hsl(var(--background)) 70%, transparent);
 }
 
 .start-button {
@@ -189,15 +183,15 @@ button {
   margin: 0 auto;
   padding: 16px;
   border-radius: 16px;
-  background: var(--accent);
-  color: #fff;
+  background: hsl(var(--primary));
+  color: hsl(var(--primary-foreground));
   font-size: 18px;
   font-weight: 700;
-  box-shadow: 0 4px 16px rgba(232, 93, 47, 0.35);
+  box-shadow: var(--shadow-sm);
 }
 
 .error {
-  color: #c0392b;
+  color: hsl(var(--destructive));
 }
 
 /* ---------- cooking session ---------- */
@@ -215,24 +209,24 @@ button {
   align-items: center;
   gap: 10px;
   padding: 10px 12px;
-  background: color-mix(in srgb, var(--bg) 88%, transparent);
+  background: color-mix(in srgb, hsl(var(--background)) 88%, transparent);
   backdrop-filter: blur(8px);
-  border-bottom: 1px solid var(--line);
+  border-bottom: 1px solid hsl(var(--border));
 }
 
 .end-button {
   flex: none;
   padding: 10px 14px;
   border-radius: 10px;
-  border: 1px solid var(--line);
-  background: var(--panel);
+  border: 1px solid hsl(var(--border));
+  background: hsl(var(--card));
   font-size: 14px;
 }
 
 .end-confirm {
-  background: #c0392b;
-  border-color: #c0392b;
-  color: #fff;
+  background: hsl(var(--destructive));
+  border-color: hsl(var(--destructive));
+  color: hsl(var(--brand-foreground));
   font-weight: 700;
 }
 
@@ -247,16 +241,16 @@ button {
   flex: none;
   padding: 10px 14px;
   border-radius: 999px;
-  background: var(--panel);
-  border: 1px solid var(--line);
+  background: hsl(var(--card));
+  border: 1px solid hsl(var(--border));
   font-size: 15px;
   font-variant-numeric: tabular-nums;
 }
 
 .timer-fired {
-  background: #c0392b;
-  border-color: #c0392b;
-  color: #fff;
+  background: hsl(var(--destructive));
+  border-color: hsl(var(--destructive));
+  color: hsl(var(--brand-foreground));
   font-weight: 700;
   animation: pulse 0.9s infinite;
 }
@@ -283,12 +277,12 @@ button {
   display: flex;
   gap: 12px;
   font-size: 14px;
-  color: var(--muted);
+  color: hsl(var(--muted-foreground));
   margin-bottom: 10px;
 }
 
 .recipe-info a {
-  color: var(--accent);
+  color: hsl(var(--accent-foreground));
 }
 
 .section-toggle,
@@ -297,7 +291,7 @@ button {
   margin: 14px 0 6px;
   font-size: 15px;
   font-weight: 700;
-  color: var(--muted);
+  color: hsl(var(--muted-foreground));
 }
 
 /* compact 2-col grid: median 9 lines must fit in ~3 rows, not fill the
@@ -306,8 +300,8 @@ button {
   list-style: none;
   margin: 0;
   padding: 4px 6px;
-  background: var(--panel);
-  border: 1px solid var(--line);
+  background: hsl(var(--card));
+  border: 1px solid hsl(var(--border));
   border-radius: 12px;
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
@@ -319,8 +313,8 @@ button {
   padding: 6px 6px 2px;
   font-size: 12px;
   font-weight: 700;
-  color: var(--accent);
-  border-bottom: 1px dashed var(--line);
+  color: hsl(var(--accent-foreground));
+  border-bottom: 1px dashed hsl(var(--border));
   margin-bottom: 2px;
 }
 
@@ -338,11 +332,11 @@ button {
   flex: none;
   width: 17px;
   height: 17px;
-  accent-color: var(--accent);
+  accent-color: hsl(var(--brand));
 }
 
 .ingredients .done {
-  color: var(--done);
+  color: hsl(var(--muted-foreground));
   text-decoration: line-through;
 }
 
@@ -356,8 +350,8 @@ button {
 }
 
 .step {
-  background: var(--panel);
-  border: 2px solid var(--line);
+  background: hsl(var(--card));
+  border: 2px solid hsl(var(--border));
   border-radius: 14px;
 }
 
@@ -375,7 +369,7 @@ button {
   width: 30px;
   height: 30px;
   border-radius: 50%;
-  background: var(--line);
+  background: hsl(var(--border));
   display: flex;
   align-items: center;
   justify-content: center;
@@ -390,13 +384,13 @@ button {
 }
 
 .step-current {
-  border-color: var(--accent);
-  box-shadow: 0 2px 12px rgba(232, 93, 47, 0.14);
+  border-color: hsl(var(--brand));
+  box-shadow: var(--shadow-sm);
 }
 
 .step-current .step-num {
-  background: var(--accent);
-  color: #fff;
+  background: hsl(var(--primary));
+  color: hsl(var(--primary-foreground));
 }
 
 .step-current .step-text {
@@ -405,12 +399,12 @@ button {
 }
 
 .step-done {
-  opacity: 0.55;
+  border-color: hsl(var(--border));
 }
 
 .step-done .step-text {
   text-decoration: line-through;
-  color: var(--done);
+  color: hsl(var(--muted-foreground));
 }
 
 .step-timers {
@@ -421,9 +415,9 @@ button {
 }
 
 .step-timers .chip {
-  background: var(--accent-soft);
-  border-color: var(--accent);
-  color: var(--accent);
+  background: hsl(var(--accent));
+  border-color: hsl(var(--accent-foreground));
+  color: hsl(var(--accent-foreground));
   font-weight: 700;
   font-size: 15px;
   padding: 10px 16px;
@@ -431,19 +425,19 @@ button {
 
 .notes {
   font-size: 14px;
-  color: var(--muted);
+  color: hsl(var(--muted-foreground));
   white-space: pre-wrap;
 }
 
 .loading {
-  color: var(--muted);
+  color: hsl(var(--muted-foreground));
 }
 
 .no-steps {
   font-size: 14px;
-  color: var(--muted);
-  background: var(--panel);
-  border: 1px dashed var(--line);
+  color: hsl(var(--muted-foreground));
+  background: hsl(var(--card));
+  border: 1px dashed hsl(var(--border));
   border-radius: 12px;
   padding: 12px;
 }
@@ -451,7 +445,7 @@ button {
 .timer-note {
   margin-left: 6px;
   font-size: 12px;
-  color: var(--muted);
+  color: hsl(var(--muted-foreground));
 }
 
 .timer-fired .timer-note {
@@ -460,7 +454,7 @@ button {
 
 .empty-state {
   text-align: center;
-  color: var(--muted);
+  color: hsl(var(--muted-foreground));
   padding: 40px 0 8px;
 }
 
@@ -469,14 +463,14 @@ button {
 }
 
 .load-error {
-  background: var(--panel);
-  border: 1px solid var(--line);
+  background: hsl(var(--card));
+  border: 1px solid hsl(var(--border));
   border-radius: 12px;
   padding: 16px;
 }
 
 .muted-small {
-  color: var(--muted);
+  color: hsl(var(--muted-foreground));
   font-size: 12px;
   word-break: break-all;
 }
@@ -493,8 +487,8 @@ button {
   height: calc(var(--tab-h) + env(safe-area-inset-bottom));
   padding: 6px 6px calc(6px + env(safe-area-inset-bottom));
   gap: 6px;
-  background: var(--panel);
-  border-top: 1px solid var(--line);
+  background: hsl(var(--card));
+  border-top: 1px solid hsl(var(--border));
 }
 
 .burner-tab {
@@ -507,13 +501,13 @@ button {
   align-items: center;
   justify-content: center;
   gap: 3px;
-  background: var(--bg);
+  background: hsl(var(--background));
   border: 2px solid transparent;
 }
 
 .burner-active {
-  border-color: var(--accent);
-  background: var(--accent-soft);
+  border-color: hsl(var(--brand));
+  background: hsl(var(--accent));
 }
 
 .burner-name {
@@ -527,7 +521,7 @@ button {
 
 .burner-sub {
   font-size: 12px;
-  color: var(--muted);
+  color: hsl(var(--muted-foreground));
   display: flex;
   gap: 4px;
   font-variant-numeric: tabular-nums;
@@ -535,54 +529,67 @@ button {
 
 .burner-timer {
   font-style: normal;
-  color: var(--accent);
+  color: hsl(var(--accent-foreground));
   font-weight: 700;
 }
 
 .burner-timer-fired {
-  color: #c0392b;
+  color: hsl(var(--foreground));
   animation: pulse 0.9s infinite;
-}
-
-/* night kitchen */
-@media (prefers-color-scheme: dark) {
-  :root {
-    --bg: #1b1713;
-    --panel: #262019;
-    --ink: #f0e9df;
-    --muted: #a2968a;
-    --accent: #f0703d;
-    --accent-soft: #3d2417;
-    --line: #3b332a;
-    --done: #75816f;
-  }
 }
 
 /* Source → draft → confirmed recipe. Shares the cooking UI's palette. */
 .import-page { max-width: 720px; margin: 0 auto; padding: 16px 12px 64px; }
 .import-page h1 { font-size: 22px; }
-.import-panel { padding: 20px; margin: 16px 0; background: var(--panel); border: 1px solid var(--line); border-radius: 16px; }
+.import-panel { padding: 20px; margin: 16px 0; background: hsl(var(--card)); border: 1px solid hsl(var(--border)); border-radius: 16px; }
 .import-panel label { display: flex; flex-direction: column; gap: 8px; margin: 16px 0; font-weight: 500; }
-.import-panel input:not([type="checkbox"]), .import-panel textarea, .import-panel select { width: 100%; min-height: 48px; padding: 12px; border: 1px solid var(--line); border-radius: 8px; background: var(--bg); color: var(--ink); font: inherit; }
+.import-panel input:not([type="checkbox"]), .import-panel textarea, .import-panel select { width: 100%; min-height: 48px; padding: 12px; border: 1px solid hsl(var(--border)); border-radius: 8px; background: hsl(var(--background)); color: hsl(var(--foreground)); font: inherit; }
 .import-panel textarea { line-height: 1.7; resize: vertical; }
 .import-panel fieldset { border: 0; padding: 0; margin: 0; min-width: 0; }
 .import-panel legend { font-size: 18px; font-weight: 600; }
 .import-panel pre { white-space: pre-wrap; overflow-wrap: anywhere; max-height: 360px; overflow: auto; font: inherit; line-height: 1.7; }
 .import-panel summary { cursor: pointer; min-height: 48px; align-content: center; }
-.import-panel a { color: var(--accent); overflow-wrap: anywhere; }
+.import-panel a { color: hsl(var(--accent-foreground)); overflow-wrap: anywhere; }
 .import-actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
 .import-page .chip, .header-row .chip { min-height: 48px; }
 .import-panel .start-button { margin-top: 12px; min-height: 48px; }
-.import-notice { padding: 12px; border-left: 4px solid var(--accent); background: var(--accent-soft); line-height: 1.6; overflow-wrap: anywhere; }
+.import-notice { padding: 12px; border-left: 4px solid hsl(var(--brand)); background: hsl(var(--accent)); line-height: 1.6; overflow-wrap: anywhere; }
 .import-panel .import-confirm { flex-direction: row; align-items: center; min-height: 48px; line-height: 1.6; }
-.import-confirm input { width: 24px; height: 24px; flex-shrink: 0; accent-color: var(--accent); }
+.import-confirm input { width: 24px; height: 24px; flex-shrink: 0; accent-color: hsl(var(--brand)); }
 .import-page button:disabled, .import-page fieldset:disabled { opacity: .6; cursor: default; }
-.import-page :focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+.import-page :focus-visible { outline: 2px solid hsl(var(--brand)); outline-offset: 3px; }
 @media (max-width: 480px) { .import-panel { padding: 16px; } .header-row { flex-wrap: wrap; gap: 8px; } .import-page .import-actions .start-button { width: 100%; } }
 
 .import-status-title { display: flex; align-items: center; gap: 12px; margin: 0; font-size: 18px; line-height: 1.5; }
-.import-status-failed { border: 2px solid var(--accent); background: var(--accent-soft); }
-.import-state-mark { color: var(--accent); font-weight: 700; flex-shrink: 0; }
-.import-spinner { width: 20px; height: 20px; flex-shrink: 0; border: 3px solid var(--line); border-top-color: var(--accent); border-radius: 50%; animation: import-spin 1s linear infinite; }
+.import-status-failed { border: 2px solid hsl(var(--brand)); background: hsl(var(--accent)); }
+.import-state-mark { color: hsl(var(--brand)); font-weight: 700; flex-shrink: 0; }
+.import-spinner { width: 20px; height: 20px; flex-shrink: 0; border: 3px solid hsl(var(--border)); border-top-color: hsl(var(--brand)); border-radius: 50%; animation: import-spin 1s linear infinite; }
 @keyframes import-spin { to { transform: rotate(360deg); } }
 @media (prefers-reduced-motion: reduce) { .import-spinner { animation: none; } }
+
+/* Form controls inherit no browser-default ink, including native dark controls. */
+input, textarea, select { font: inherit; color: hsl(var(--foreground)); caret-color: hsl(var(--foreground)); accent-color: hsl(var(--brand)); }
+input::placeholder, textarea::placeholder { color: hsl(var(--muted-foreground)); opacity: 1; }
+:focus-visible { outline: 2px solid hsl(var(--ring)); outline-offset: 3px; }
+.timer-chip, .burner-sub, .step-num { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+.import-status-failed { border-color: hsl(var(--destructive)); background: color-mix(in srgb, hsl(var(--destructive)) 10%, hsl(var(--card))); }
+.import-status-failed .import-state-mark { color: hsl(var(--destructive)); }
+.import-status:has(.import-state-mark) { color: hsl(var(--foreground)); }
+.error { color: hsl(var(--foreground)); border-left: 3px solid hsl(var(--destructive)); padding-left: var(--gap-inline); }
+.end-confirm, .timer-fired { color: hsl(var(--foreground)); background: color-mix(in srgb, hsl(var(--destructive)) 15%, hsl(var(--card))); }
+
+/* Library cards open the recipe; choosing it for cooking is a separate action. */
+.recipe-open { display: block; width: 100%; text-align: left; }
+.recipe-select { display: block; width: 100%; min-height: var(--row-h); border-top: 1px solid hsl(var(--border)); font-size: var(--text-size); }
+.recipe-cover { width: 100%; max-height: 320px; object-fit: cover; border-radius: var(--radius-xl); margin-top: var(--gap-stack); }
+.recipe-detail h2 { margin-top: 0; }
+.recipe-summary { color: hsl(var(--muted-foreground)); }
+.detail-tags { display: flex; flex-wrap: wrap; gap: var(--gap-inline); margin-bottom: var(--gap-stack); }
+.detail-ingredients, .detail-steps { margin: 0; padding-left: var(--card-pad-x); }
+.detail-ingredients li, .detail-steps li { padding: var(--gap-inline) 0; line-height: var(--text-lh); overflow-wrap: anywhere; }
+.detail-steps li + li { border-top: 1px solid hsl(var(--border)); }
+.detail-steps li::marker { font-family: var(--font-mono); color: hsl(var(--accent-foreground)); }
+.detail-notes { white-space: pre-wrap; overflow-wrap: anywhere; }
+.recipe-error { border-color: hsl(var(--destructive)); background: color-mix(in srgb, hsl(var(--destructive)) 10%, hsl(var(--card))); }
+.recipe-detail input[type="number"] { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+.recipe-detail .import-panel .import-actions { margin-top: var(--gap-stack); }

@@ -3,8 +3,9 @@
 
 # ---- frontend build ----
 FROM --platform=$BUILDPLATFORM node:22-slim AS frontend
-WORKDIR /build
-COPY apps/konro/frontend /build
+WORKDIR /workspace/apps/konro/frontend
+COPY apps/konro/frontend ./
+COPY packages/design-tokens/tokens.css packages/design-tokens/tokens.json /workspace/packages/design-tokens/
 RUN npm ci && npm run build
 
 # ---- backend build（クロスコンパイル: BUILDPLATFORM 上で TARGETARCH 向けに）----
@@ -17,7 +18,7 @@ RUN CGO_ENABLED=0 GOOS=linux GOARCH=$TARGETARCH go build -trimpath -ldflags="-s 
 # ---- runtime ----
 FROM gcr.io/distroless/static-debian12:nonroot
 COPY --from=backend /konro /usr/local/bin/konro
-COPY --from=frontend /build/dist /srv/dist
+COPY --from=frontend /workspace/apps/konro/frontend/dist /srv/dist
 ENV KONRO_STATIC_DIR=/srv/dist
 ENV KONRO_ADDR=:8080
 ENV KONRO_DATA_DIR=/data
