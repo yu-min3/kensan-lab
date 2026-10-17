@@ -50,7 +50,7 @@ export { formatDuration } from "./duration";
 export type ImportContent = { title: string; servings: string; ingredients: string[]; steps: string[] };
 export type ImportDraft = {
   id: string; revision: number;
-  source: { url?: string; raw: string; text: string };
+  source: { url?: string; raw: string; text: string; kind?:string };
   content: ImportContent; warnings: string[];
   pending: boolean; detached: boolean; agent_available: boolean; saved_file?: string;
   job?: { id: string; state: string; reason?: string };
@@ -73,4 +73,16 @@ export async function saveRecipe(file: string | null, version: string, input: Re
   });
   if (!res.ok) throw new RecipeWriteError((await res.text()).trim(), res.status);
   return res.json();
+}
+
+export type SearchSite = {id:string;name:string};
+export type WebRecipe = {title:string;url:string;site:string;siteName:string};
+export type SearchResults = {results:WebRecipe[];warnings:string[]};
+export async function searchSites():Promise<SearchSite[]> {
+ const r=await fetch('/api/v1/discovery/sites');if(!r.ok)throw new Error('検索サイトを読み込めません');return r.json();
+}
+export async function searchWebRecipes(q:string,site:string,signal:AbortSignal):Promise<SearchResults> {
+ const params=new URLSearchParams({q,site});
+ const r=await fetch(`/api/v1/discovery/search?${params}`,{signal});
+ if(!r.ok)throw new Error((await r.text()).trim()||'検索できませんでした');return r.json();
 }

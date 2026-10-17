@@ -1,12 +1,12 @@
 import { useEffect, useRef, useState } from "react";
 import { draftRequest, ImportContent, ImportDraft } from "../api";
-const storageKey = "konro.import-draft";
-export const clearImportDraft = () => localStorage.removeItem(storageKey);
+import {storageKey,readDraftRefs,rememberDraft,clearImportDraft} from "../importDraftStorage";
+export {clearImportDraft} from "../importDraftStorage";
 const empty: ImportContent = { title: "", servings: "", ingredients: [], steps: [] };
 
-export function useImportJob() {
+export function useImportJob(initialURL="") {
   const [kind, setKind] = useState<"url" | "text">("url");
-  const [input, setInput] = useState("");
+  const [input, setInput] = useState(initialURL);
   const [draft, setDraft] = useState<ImportDraft | null>(null);
   const [content, setContent] = useState<ImportContent>(empty);
   const [ingredients, setIngredients] = useState("");
@@ -16,27 +16,29 @@ export function useImportJob() {
   const [confirmed, setConfirmed] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
-  const [resume, setResume] = useState(() => localStorage.getItem(storageKey) ?? "");
+  const [savedDrafts,setSavedDrafts]=useState(readDraftRefs);
+  const [resume, setResume] = useState(() => initialURL ? readDraftRefs().find(r=>r.url===initialURL)?.id??"" : localStorage.getItem(storageKey) ?? "");
   const [loading, setLoading] = useState(!!resume);
+ const [resumeAttempt,setResumeAttempt]=useState(0);
   const mounted = useRef(true);
   useEffect(() => { mounted.current = true; return () => { mounted.current = false; }; }, []);
   const adopt = (d: ImportDraft) => {
     setPollError("");
     setDraft(d); setContent(d.content); setIngredients((d.content.ingredients ?? []).join("\n"));
     setSteps((d.content.steps ?? []).join("\n")); setConfirmed(false);
-    localStorage.setItem(storageKey, d.id);
+    setSavedDrafts(rememberDraft(d));
   };
   useEffect(() => {
     if (!resume) return;
     let live = true;
     draftRequest(`/${resume}`).then((d) => {
       if (!live) return;
-      if (d.saved_file) { localStorage.removeItem(storageKey); setResume(""); }
+      if (d.saved_file) { clearImportDraft(d.id);setSavedDrafts(readDraftRefs()); setResume(""); }
       else adopt(d);
     }).catch((e) => { if (live) setError(String(e.message)); })
       .finally(() => { if (live) setLoading(false); });
     return () => { live = false; };
-  }, [resume]);
+  }, [resume,resumeAttempt]);
   const active = !!draft && !draft.detached && (draft.pending || ["queued", "running", "waiting"].includes(draft.job?.state ?? ""));
   useEffect(() => {
     if (!draft || !active || busy) return;
@@ -83,7 +85,8 @@ export function useImportJob() {
   const action = (name: string) => perform(async () => {
     if (draft) adopt(await draftRequest(`/${draft.id}/${name}`, "POST", { revision: draft.revision }));
   });
-  const discardView = () => { localStorage.removeItem(storageKey); setResume(""); setDraft(null); setInput(""); setError(""); };
+  const discardView = () => { clearImportDraft();setSavedDrafts(readDraftRefs()); setResume(""); setDraft(null); setInput(""); setError(""); };
 
- return {kind,setKind,input,setInput,draft,content,setContent,ingredients,setIngredients,steps,setSteps,submitting,pollError,confirmed,setConfirmed,busy,error,resume,loading,active,perform,persist,start,action,discardView,adopt};
+ const restoreDraft=(id:string)=>{setResumeAttempt(n=>n+1);setLoading(true);setDraft(null);setResume(id);setError("");};
+  return {savedDrafts,restoreDraft,kind,setKind,input,setInput,draft,content,setContent,ingredients,setIngredients,steps,setSteps,submitting,pollError,confirmed,setConfirmed,busy,error,resume,loading,active,perform,persist,start,action,discardView,adopt};
 }

@@ -3,141 +3,76 @@ package importer
 import (
 	"context"
 	"encoding/json"
-	"errors"
-	"io"
-	"net"
-	"net/http"
-	"net/netip"
-	"net/url"
+	"github.com/yu-min3/kensan-lab/apps/konro/backend/internal/discovery"
+	"github.com/yu-min3/kensan-lab/apps/konro/backend/internal/webpage"
 	"strings"
-	"time"
+	"unicode/utf8"
 
 	"github.com/PuerkitoBio/goquery"
 	"github.com/yu-min3/kensan-lab/apps/konro/backend/internal/recipe"
 )
 
-const MaxSource = 5 << 20
+const MaxSource = webpage.MaxSource
 const MaxText = 128 << 10
 
 type Source struct {
 	URL  string `json:"url,omitempty"`
 	Raw  string `json:"raw"`
 	Text string `json:"text"`
+	Kind string `json:"kind,omitempty"`
 }
 type Content = recipe.Content
 
-// PublicIP excludes local/private/link-local and transition ranges which can
-// otherwise reach metadata endpoints or tunnel an embedded private IPv4.
-func PublicIP(ip net.IP) bool {
-	a, ok := netip.AddrFromSlice(ip)
-	if !ok {
-		return false
-	}
-	a = a.Unmap()
-	if !a.IsGlobalUnicast() || a.IsPrivate() || a.IsLoopback() || a.IsLinkLocalUnicast() {
-		return false
-	}
-	for _, s := range []string{"100.64.0.0/10", "192.0.0.0/24", "192.0.2.0/24", "198.18.0.0/15", "198.51.100.0/24", "203.0.113.0/24", "2001::/23", "2002::/16", "64:ff9b::/96", "64:ff9b:1::/48"} {
-		if netip.MustParsePrefix(s).Contains(a) {
-			return false
-		}
-	}
-	return true
-}
-func validURL(raw string) (*url.URL, error) {
-	raw = strings.TrimSpace(raw)
-	if strings.HasPrefix(raw, "//") {
-		raw = "https:" + raw
-	} else if raw != "" && !strings.Contains(raw, "://") {
-		raw = "https://" + raw
-	}
-	u, e := url.Parse(raw)
-	if e != nil || u.User != nil || u.Host == "" || (u.Scheme != "http" && u.Scheme != "https") {
-		return nil, errors.New("http/httpsのURLを入力してください")
-	}
-	if port := u.Port(); port != "" && port != "80" && port != "443" {
-		return nil, errors.New("標準ポートのURLのみ取り込めます")
-	}
-	u.Fragment = ""
-	return u, nil
-}
+// PublicIP remains available to callers validating import targets.
+var PublicIP = webpage.PublicIP
+var validURL = webpage.NormalizeURL
+
 func Fetch(ctx context.Context, raw string) (Source, error) {
-	u, e := validURL(raw)
-	if e != nil {
-		return Source{}, e
+	if canonical, ok := discovery.Canonical(raw); ok {
+		raw = canonical
 	}
-	ctx, cancel := context.WithTimeout(ctx, 15*time.Second)
-	defer cancel()
-	transport := &http.Transport{Proxy: nil, TLSHandshakeTimeout: 5 * time.Second, ResponseHeaderTimeout: 8 * time.Second, MaxResponseHeaderBytes: 32768, DialContext: func(ctx context.Context, network, address string) (net.Conn, error) {
-		host, port, e := net.SplitHostPort(address)
-		if e != nil {
-			return nil, e
-		}
-		ips, e := net.DefaultResolver.LookupIPAddr(ctx, host)
-		if e != nil || len(ips) == 0 {
-			return nil, errors.New("名前解決できません")
-		}
-		for _, ip := range ips {
-			if !PublicIP(ip.IP) {
-				return nil, errors.New("ローカルネットワークのURLは取り込めません")
-			}
-		}
-		var last error
-		for _, ip := range ips {
-			c, e := (&net.Dialer{Timeout: 5 * time.Second}).DialContext(ctx, "tcp", net.JoinHostPort(ip.IP.String(), port))
-			if e == nil {
-				return c, nil
-			}
-			last = e
-		}
-		return nil, last
-	}}
-	defer transport.CloseIdleConnections()
-	client := &http.Client{Transport: transport, CheckRedirect: func(r *http.Request, via []*http.Request) error {
-		if len(via) >= 4 {
-			return errors.New("リダイレクトが多すぎます")
-		}
-		_, e := validURL(r.URL.String())
-		return e
-	}}
-	req, e := http.NewRequestWithContext(ctx, "GET", u.String(), nil)
-	if e != nil {
-		return Source{}, e
+	p, err := webpage.Fetch(ctx, raw)
+	if err != nil {
+		return Source{}, err
 	}
-	req.Header.Set("User-Agent", "Konro/1.0 Recipe Import")
-	req.Header.Set("Accept", "text/html,application/xhtml+xml")
-	res, e := client.Do(req)
-	if e != nil {
-		return Source{}, errors.New("サイトを取得できません。本文を貼り付けて取り込めます")
+	if discovery.SiteID(raw) == "youtube" && discovery.SiteID(p.URL) != "youtube" {
+		return Source{URL: raw, Raw: p.HTML, Kind: "youtube_description"}, nil
 	}
-	defer res.Body.Close()
-	if res.StatusCode != 200 {
-		return Source{}, errors.New("サイトが取得を許可していません。本文を貼り付けてください")
-	}
-	ct := strings.ToLower(res.Header.Get("Content-Type"))
-	if !strings.Contains(ct, "text/html") && !strings.Contains(ct, "application/xhtml+xml") {
-		return Source{}, errors.New("HTMLページのみ取り込めます")
-	}
-	b, e := io.ReadAll(io.LimitReader(res.Body, MaxSource+1))
-	if e != nil || len(b) > MaxSource {
-		return Source{}, errors.New("ページが大きすぎます（最大5MiB）")
-	}
-	s := Source{URL: res.Request.URL.String(), Raw: string(b)}
+	return sourceFromPage(p)
+}
+func sourceFromPage(p webpage.Page) (Source, error) {
+	s := Source{URL: p.URL, Raw: p.HTML}
 	doc, e := goquery.NewDocumentFromReader(strings.NewReader(s.Raw))
 	if e != nil {
 		return Source{}, e
 	}
-	doc.Find("script,style,nav,header,footer,iframe,noscript").Remove()
-	selection := doc.Find("main,article").First()
-	if selection.Length() == 0 {
-		selection = doc.Find("body")
+	if discovery.SiteID(s.URL) == "youtube" {
+		title, description, ok := youtubeDescription(s.Raw, s.URL)
+		s.Kind = "youtube_description"
+		if !ok {
+			s.Text = ""
+			return s, nil
+		}
+		s.Text = limitText(title + "\n\n" + description)
+		return s, nil
 	}
-	s.Text = clean(selection.Text())
-	if len(s.Text) > MaxText {
-		s.Text = string([]rune(s.Text)[:min(len([]rune(s.Text)), MaxText/4)])
-	}
+	selection := recipeSelection(doc, s.URL)
+	selection.Find("script,style,nav,header,footer,iframe,noscript").Remove()
+	s.Text = limitText(selection.Text())
 	return s, nil
 }
+func limitText(s string) string {
+	if len(s) <= MaxText {
+		return s
+	}
+	// Truncate only at a UTF-8 boundary.
+	b := []byte(s)[:MaxText]
+	for len(b) > 0 && !utf8.Valid(b) {
+		b = b[:len(b)-1]
+	}
+	return string(b)
+}
+
 func clean(s string) string {
 	doc, e := goquery.NewDocumentFromReader(strings.NewReader("<body>" + s + "</body>"))
 	if e != nil {
@@ -174,6 +109,9 @@ func Extract(s Source) (Content, []string) {
 	doc, e := goquery.NewDocumentFromReader(strings.NewReader(s.Raw))
 	if e != nil {
 		return c, []string{"ページを解析できません"}
+	}
+	if c, w, ok := extractSite(s, doc); ok {
+		return c, w
 	}
 	var recipes []map[string]any
 	var walk func(any, int)
@@ -226,5 +164,8 @@ func Extract(s Source) (Content, []string) {
 	}
 	c.Ingredients = stringsOf(r["recipeIngredient"])
 	c.Steps = stringsOf(r["recipeInstructions"])
+	if len(c.Ingredients) == 0 || len(c.Steps) == 0 {
+		warnings = append(warnings, "材料または手順をすべて取得できていません。取り込み元を確認し、AIまたは手入力で補ってください")
+	}
 	return c, warnings
 }

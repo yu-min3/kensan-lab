@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
 import { fetchRecipes, formatDuration, importRecipeZip, RecipeMeta } from "../api";
 import { RecipePage } from "./RecipePage";
+import { SearchPage } from "./SearchPage";
+import { useRecipeSearch } from "../hooks/useRecipeSearch";
 import { ImportPage } from "./ImportPage";
 import { useRecipeRoute } from "../hooks/useRecipeRoute";
 import { normalizeQuery } from "../session";
@@ -9,6 +11,9 @@ import { normalizeQuery } from "../session";
 // then start the cooking session.
 export function RecipesPage({ onStart, starting = false }: { onStart: (files: string[]) => void; starting?: boolean }) {
   const [webImport, setWebImport] = useState(false);
+ const [discovering,setDiscovering]=useState(false);
+ const [importURL,setImportURL]=useState("");
+ const search=useRecipeSearch(discovering);
   const { opened, navigate: setOpened, onGuard } = useRecipeRoute();
   const [recipes, setRecipes] = useState<RecipeMeta[]>([]);
   const [error, setError] = useState("");
@@ -64,8 +69,10 @@ export function RecipesPage({ onStart, starting = false }: { onStart: (files: st
     fetchRecipes().then(setRecipes).catch((e) => setError(String(e)));
   }} />;
 
-  if (webImport) return <ImportPage onClose={() => setWebImport(false)} onSaved={(file, title) => {
-    setWebImport(false); setImportMsg(`✓ ${title} を保存しました`);
+  if (discovering) return <SearchPage search={search} onClose={()=>setDiscovering(false)} onImport={(url)=>{setDiscovering(false);setImportURL(url);setWebImport(true);}} />;
+
+  if (webImport) return <ImportPage initialURL={importURL} onClose={() => {setWebImport(false);if(importURL)setDiscovering(true);setImportURL("");}} onSaved={(file, title) => {
+    setWebImport(false); setImportURL(""); setImportMsg(`✓ ${title} を保存しました`);
     setQ(""); setTag(""); setSelected((s) => s.includes(file) ? s : [...s, file]);
     fetchRecipes().then(setRecipes).catch((e) => setError(String(e)));
   }} />;
@@ -75,7 +82,7 @@ export function RecipesPage({ onStart, starting = false }: { onStart: (files: st
       <header className="list-header">
         <div className="header-row">
           <h1 className="h-serif">konro</h1>
-          <div className="editor-actions"><button className="chip chip-on" onClick={() => setWebImport(true)}>レシピを追加</button>
+          <div className="editor-actions"><button className="chip chip-on" onClick={()=>setDiscovering(true)}>Webで探す</button><button className="chip" onClick={() => {setImportURL("");setWebImport(true);}}>レシピを追加</button>
           <button className="chip" onClick={() => setOpened("")}>手入力で作成</button>
           <label className="chip import-chip">
             {importing ? "取込中…" : "ZIP取込"}
