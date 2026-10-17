@@ -55,3 +55,52 @@ func TestCodecRejectsAmbiguousYAML(t *testing.T) {
 		}
 	}
 }
+
+func TestEditRetainsAliasToRemovedListItem(t *testing.T) {
+	d, err := DecodeDocument([]byte("---\ntitle: 魚\ntags: [&tag 和食]\ncustom: *tag\n---\n\n## 材料\n- 魚\n\n## 手順\n1. 煮る\n"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	e := editable(&d.Recipe)
+	e.Tags = []string{"洋食"}
+	b, err := d.render(e, "", true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	got, err := DecodeDocument(b)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(got.Recipe.Tags) != 1 || got.Recipe.Tags[0] != "洋食" {
+		t.Fatal(got.Recipe.Tags)
+	}
+	var meta map[string]any
+	if err := got.meta.Decode(&meta); err != nil {
+		t.Fatal(err)
+	}
+	if meta["custom"] != "和食" {
+		t.Fatalf("lost referenced value: %s", b)
+	}
+}
+func TestEditMissingSectionsBeforeMemo(t *testing.T) {
+	for _, body := range []string{"## メモ\n残すメモ\n", "## 材料\n- 魚\n\n## メモ\n残すメモ\n"} {
+		d, err := DecodeDocument([]byte("---\ntitle: 魚\n---\n\n" + body))
+		if err != nil {
+			t.Fatal(err)
+		}
+		e := editable(&d.Recipe)
+		e.Ingredients = []string{"魚"}
+		e.Steps = []string{"煮る"}
+		b, err := d.render(e, "", true)
+		if err != nil {
+			t.Fatal(err)
+		}
+		got, err := DecodeDocument(b)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !reflect.DeepEqual(got.Recipe.Steps, e.Steps) || !reflect.DeepEqual(got.Recipe.Ingredients, e.Ingredients) || got.Recipe.Notes != "残すメモ" {
+			t.Fatalf("sections swallowed by memo: %s", b)
+		}
+	}
+}

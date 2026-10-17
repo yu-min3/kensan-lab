@@ -2,13 +2,14 @@ import { useEffect, useMemo, useState } from "react";
 import { fetchRecipes, formatDuration, importRecipeZip, RecipeMeta } from "../api";
 import { RecipePage } from "./RecipePage";
 import { ImportPage } from "./ImportPage";
+import { useRecipeRoute } from "../hooks/useRecipeRoute";
 import { normalizeQuery } from "../session";
 
 // Recipe browser + session builder: tap cards to put recipes "on the stove",
 // then start the cooking session.
 export function RecipesPage({ onStart, starting = false }: { onStart: (files: string[]) => void; starting?: boolean }) {
   const [webImport, setWebImport] = useState(false);
-  const [opened, setOpened] = useState<string | null>(null);
+  const { opened, navigate: setOpened, onGuard } = useRecipeRoute();
   const [recipes, setRecipes] = useState<RecipeMeta[]>([]);
   const [error, setError] = useState("");
   const [q, setQ] = useState("");
@@ -58,8 +59,8 @@ export function RecipesPage({ onStart, starting = false }: { onStart: (files: st
   const toggle = (file: string) =>
     setSelected((sel) => (sel.includes(file) ? sel.filter((f) => f !== file) : [...sel, file]));
 
-  if (opened !== null) return <RecipePage key={opened} file={opened || null} selected={selected.includes(opened)} onBack={() => setOpened(null)} onToggle={toggle} onSaved={(r) => {
-    setOpened(r.file); setImportMsg(`✓ ${r.title} を保存しました`);
+  if (opened !== null) return <RecipePage onGuard={onGuard} key={opened} file={opened || null} selected={selected.includes(opened)} onBack={() => setOpened(null)} onToggle={toggle} onSaved={(r) => {
+    setOpened(r.file, true); setImportMsg(`✓ ${r.title} を保存しました`);
     fetchRecipes().then(setRecipes).catch((e) => setError(String(e)));
   }} />;
 
@@ -74,7 +75,7 @@ export function RecipesPage({ onStart, starting = false }: { onStart: (files: st
       <header className="list-header">
         <div className="header-row">
           <h1 className="h-serif">konro</h1>
-          <div className="import-actions"><button className="chip chip-on" onClick={() => setWebImport(true)}>レシピを追加</button>
+          <div className="editor-actions"><button className="chip chip-on" onClick={() => setWebImport(true)}>レシピを追加</button>
           <button className="chip" onClick={() => setOpened("")}>手入力で作成</button>
           <label className="chip import-chip">
             {importing ? "取込中…" : "ZIP取込"}

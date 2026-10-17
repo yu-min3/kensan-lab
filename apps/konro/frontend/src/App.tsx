@@ -45,6 +45,6 @@ export function App() {
   return session ? (
     <SessionPage session={session} onUpdate={update} onEnd={end} />
   ) : (
-    <><div aria-live="polite">{starting && <p className="import-notice" role="status">調理用のレシピを準備しています…</p>}{startError && <p className="import-notice" role="alert">{startError}</p>}</div><RecipesPage onStart={start} starting={starting} /></>
+    <><div aria-live="polite">{starting && <p className="notice" role="status">調理用のレシピを準備しています…</p>}{startError && <p className="notice" role="alert">{startError}</p>}</div><RecipesPage onStart={start} starting={starting} /></>
   );
 }

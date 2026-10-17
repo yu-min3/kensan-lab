@@ -7,6 +7,7 @@ import (
 	"os"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/yu-min3/kensan-lab/apps/konro/backend/internal/agentclient"
 	"github.com/yu-min3/kensan-lab/apps/konro/backend/internal/recipe"
@@ -220,5 +221,62 @@ func TestNumberValidationUsesTextNotJSONEscapes(t *testing.T) {
 				t.Fatalf("valid text rejected: %+v", d)
 			}
 		})
+	}
+}
+
+type blockingAgent struct {
+	fakeAgent
+	entered, release chan struct{}
+}
+
+func (a *blockingAgent) Get(ctx context.Context, id string) (agentclient.Job, error) {
+	close(a.entered)
+	select {
+	case <-a.release:
+		return agentclient.Job{ID: id, State: "running"}, nil
+	case <-ctx.Done():
+		return agentclient.Job{}, ctx.Err()
+	}
+}
+func TestSlowRuntimeDoesNotBlockAnotherDraft(t *testing.T) {
+	ctx := context.Background()
+	a := &blockingAgent{entered: make(chan struct{}), release: make(chan struct{})}
+	s := New(t.TempDir(), a)
+	first, err := s.Create(ctx, "", "魚 2切れ 10分煮る")
+	if err != nil {
+		t.Fatal(err)
+	}
+	first, err = s.Start(ctx, first.ID, first.Revision, "steps")
+	if err != nil {
+		t.Fatal(err)
+	}
+	other, err := s.Create(ctx, "", "野菜を切る")
+	if err != nil {
+		t.Fatal(err)
+	}
+	done := make(chan error, 1)
+	go func() { _, e := s.Get(ctx, first.ID); done <- e }()
+	<-a.entered
+	defer func() {
+		close(a.release)
+		if e := <-done; e != nil {
+			t.Error(e)
+		}
+	}()
+	edited := make(chan error, 1)
+	go func() {
+		d, e := s.Edit(other.ID, other.Revision, Content{Title: "手入力", Ingredients: []string{"野菜"}, Steps: []string{"切る"}})
+		if e == nil {
+			_, e = s.Manual(d.ID, d.Revision)
+		}
+		edited <- e
+	}()
+	select {
+	case e := <-edited:
+		if e != nil {
+			t.Fatal(e)
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("one runtime request blocked an unrelated draft")
 	}
 }

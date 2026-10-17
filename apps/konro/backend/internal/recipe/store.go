@@ -38,6 +38,8 @@ func editable(r *Recipe) Editable {
 }
 func normalizeEdit(e Editable) Editable {
 	e.Title = strings.TrimSpace(e.Title)
+	e.Servings = strings.TrimSpace(e.Servings)
+	e.Source = strings.TrimSpace(e.Source)
 	e.Notes = strings.TrimSpace(e.Notes)
 	if e.Tags == nil {
 		e.Tags = []string{}

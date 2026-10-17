@@ -45,18 +45,7 @@ export async function importRecipeZip(file: File): Promise<ImportReport> {
   return res.json();
 }
 
-/** "PT1H20M" → "1時間20分" */
-export function formatDuration(iso?: string): string {
-  if (!iso) return "";
-  const m = iso.match(/^PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?$/);
-  if (!m) return iso;
-  const [, h, min, s] = m;
-  let out = "";
-  if (h) out += `${h}時間`;
-  if (min) out += `${min}分`;
-  if (s && !h && !min) out += `${s}秒`;
-  return out;
-}
+export { formatDuration } from "./duration";
 
 export type ImportContent = { title: string; servings: string; ingredients: string[]; steps: string[] };
 export type ImportDraft = {

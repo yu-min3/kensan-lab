@@ -131,7 +131,7 @@ export function SessionPage({
       </header>
 
       <main className="recipe-panel">
-        {!pinned ? <section className="import-panel" aria-label="以前の調理セッションの確認">
+        {!pinned ? <section className="editor-panel" aria-label="以前の調理セッションの確認">
           <h2 className="h-serif">調理中のレシピを確認してください</h2>
           <p>以前の版では開始時の内容を記録していません。最新の内容で再開すると、材料と手順のチェックをやり直します。動いているタイマーは引き継ぎます。</p>
           {session.files.map((f) => <p key={f}>{loaded[f]?.title ?? f}{loadErrors[f] && <><span role="alert"> {loadErrors[f]}</span><button className="chip" onClick={() => loadRecipe(f)}>再読み込み</button></>}</p>)}

@@ -88,6 +88,9 @@ func (d *Document) set(key string, value any, flow bool) error {
 	for i := 0; i < len(d.meta.Content); i += 2 {
 		if d.meta.Content[i].Value == key {
 			old := d.meta.Content[i+1]
+			if err := d.detachChildAliases(old); err != nil {
+				return err
+			}
 			n.HeadComment = old.HeadComment
 			n.LineComment = old.LineComment
 			n.FootComment = old.FootComment
@@ -99,6 +102,63 @@ func (d *Document) set(key string, value any, flow bool) error {
 	d.meta.Content = append(d.meta.Content, &yaml.Node{Kind: yaml.ScalarNode, Tag: "!!str", Value: key}, &n)
 	return nil
 }
+
+// Child anchors removed by replacing an editable list can still be referenced
+// by unowned metadata. Resolve those references before publishing the document.
+func (d *Document) detachChildAliases(old *yaml.Node) error {
+	children := map[*yaml.Node]bool{}
+	var collect func(*yaml.Node)
+	collect = func(n *yaml.Node) {
+		for _, c := range n.Content {
+			children[c] = true
+			collect(c)
+		}
+	}
+	collect(old)
+	var clone func(*yaml.Node, map[*yaml.Node]bool) (*yaml.Node, error)
+	clone = func(n *yaml.Node, path map[*yaml.Node]bool) (*yaml.Node, error) {
+		if path[n] {
+			return nil, fmt.Errorf("%w: 循環するYAML参照は編集できません", ErrInvalid)
+		}
+		path[n] = true
+		defer delete(path, n)
+		if n.Kind == yaml.AliasNode {
+			return clone(n.Alias, path)
+		}
+		copy := *n
+		copy.Anchor = ""
+		copy.Content = nil
+		for _, c := range n.Content {
+			v, err := clone(c, path)
+			if err != nil {
+				return nil, err
+			}
+			copy.Content = append(copy.Content, v)
+		}
+		return &copy, nil
+	}
+	var walk func(*yaml.Node) error
+	walk = func(n *yaml.Node) error {
+		if n.Kind == yaml.AliasNode && children[n.Alias] {
+			v, err := clone(n.Alias, map[*yaml.Node]bool{})
+			if err != nil {
+				return err
+			}
+			v.HeadComment = n.HeadComment
+			v.LineComment = n.LineComment
+			v.FootComment = n.FootComment
+			*n = *v
+		}
+		for _, c := range n.Content {
+			if err := walk(c); err != nil {
+				return err
+			}
+		}
+		return nil
+	}
+	return walk(d.meta)
+}
+
 func (d *Document) Edited() bool {
 	for i := 0; i < len(d.meta.Content); i += 2 {
 		if d.meta.Content[i].Value == "konro_edited" {
@@ -108,7 +168,7 @@ func (d *Document) Edited() bool {
 	}
 	return false
 }
-func (d *Document) render(e Editable, date string, edited bool) ([]byte, error) {
+func (d *Document) setEditable(e Editable) error {
 	values := []struct {
 		key   string
 		value any
@@ -118,8 +178,14 @@ func (d *Document) render(e Editable, date string, edited bool) ([]byte, error) 
 	}
 	for _, v := range values {
 		if err := d.set(v.key, v.value, v.flow); err != nil {
-			return nil, err
+			return err
 		}
+	}
+	return nil
+}
+func (d *Document) render(e Editable, date string, edited bool) ([]byte, error) {
+	if err := d.setEditable(e); err != nil {
+		return nil, err
 	}
 	if date != "" {
 		_ = d.set("updated", date, false)
@@ -164,9 +230,11 @@ func Encode(r Recipe, date string) ([]byte, error) {
 		_ = d.set("created", date, false)
 	}
 	e := normalizeEdit(editable(&r))
-	_, err := d.render(e, date, false)
-	if err != nil {
+	if err := d.setEditable(e); err != nil {
 		return nil, err
+	}
+	if date != "" {
+		_ = d.set("updated", date, false)
 	}
 	// Keep unset optional metadata absent in newly created files.
 	for _, key := range []string{"servings", "source", "prep_time", "cook_time", "rating"} {
@@ -227,6 +295,15 @@ func replaceBody(body string, e Editable) (string, error) {
 					return "", fmt.Errorf("%w: 材料と手順は1項目1行で記録してください", ErrInvalid)
 				}
 				j++
+			}
+		}
+		// A memo owns the remaining body. Insert missing structured sections before it.
+		if title == "メモ" {
+			for _, missing := range []string{"材料", "手順"} {
+				if !seen[missing] {
+					out.WriteString("## " + missing + "\n\n" + contents[missing] + "\n")
+					seen[missing] = true
+				}
 			}
 		}
 		out.WriteString("## " + title + "\n\n" + contents[title] + "\n")

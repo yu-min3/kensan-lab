@@ -1,11 +1,8 @@
 package api
 
 import (
-	"encoding/json"
 	"errors"
-	"io"
 	"net/http"
-	"net/url"
 	"os"
 
 	"github.com/yu-min3/kensan-lab/apps/konro/backend/internal/agentclient"
@@ -17,26 +14,7 @@ type options struct{ agent agentclient.Gateway }
 
 func WithAgent(agent agentclient.Gateway) Option { return func(o *options) { o.agent = agent } }
 func registerDrafts(mux *http.ServeMux, s *importer.Service) {
-	decode := func(w http.ResponseWriter, r *http.Request, v any) bool {
-		if r.Header.Get("Content-Type") != "application/json" {
-			http.Error(w, "application/json required", 415)
-			return false
-		}
-		if origin := r.Header.Get("Origin"); origin != "" {
-			u, e := url.Parse(origin)
-			if e != nil || u.Host != r.Host {
-				http.Error(w, "origin rejected", 403)
-				return false
-			}
-		}
-		d := json.NewDecoder(http.MaxBytesReader(w, r.Body, 256<<10))
-		d.DisallowUnknownFields()
-		if d.Decode(v) != nil || d.Decode(new(any)) != io.EOF {
-			http.Error(w, "invalid JSON", 400)
-			return false
-		}
-		return true
-	}
+
 	result := func(w http.ResponseWriter, d *importer.Draft, e error) {
 		if e != nil {
 			code := 400
@@ -57,7 +35,7 @@ func registerDrafts(mux *http.ServeMux, s *importer.Service) {
 			URL  string `json:"url"`
 			Text string `json:"text"`
 		}
-		if !decode(w, r, &in) {
+		if !decodeJSON(w, r, &in, 256<<10) {
 			return
 		}
 		d, e := s.Create(r.Context(), in.URL, in.Text)
@@ -72,7 +50,7 @@ func registerDrafts(mux *http.ServeMux, s *importer.Service) {
 			Revision int              `json:"revision"`
 			Content  importer.Content `json:"content"`
 		}
-		if !decode(w, r, &in) {
+		if !decodeJSON(w, r, &in, 256<<10) {
 			return
 		}
 		d, e := s.Edit(r.PathValue("id"), in.Revision, in.Content)
@@ -83,7 +61,7 @@ func registerDrafts(mux *http.ServeMux, s *importer.Service) {
 			Revision int    `json:"revision"`
 			Mode     string `json:"mode,omitempty"`
 		}
-		if !decode(w, r, &in) {
+		if !decodeJSON(w, r, &in, 256<<10) {
 			return
 		}
 		var d *importer.Draft
