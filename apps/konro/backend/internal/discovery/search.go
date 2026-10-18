@@ -4,19 +4,23 @@ import (
 	"context"
 	"encoding/xml"
 	"errors"
+	"net"
 	"net/url"
 	"strings"
 	"sync"
 	"unicode/utf8"
 
+	"github.com/PuerkitoBio/goquery"
 	"github.com/yu-min3/kensan-lab/apps/konro/backend/internal/webpage"
 )
 
 type Result struct {
-	Title    string `json:"title"`
-	URL      string `json:"url"`
-	Site     string `json:"site"`
-	SiteName string `json:"siteName"`
+	Title       string `json:"title"`
+	URL         string `json:"url"`
+	Site        string `json:"site"`
+	SiteName    string `json:"siteName"`
+	Image       string `json:"image,omitempty"`
+	Description string `json:"description,omitempty"`
 }
 type Response struct {
 	Results  []Result `json:"results"`
@@ -123,7 +127,7 @@ func (s *Service) Search(ctx context.Context, q, site string) (Response, error) 
 func parseResults(page webpage.Page, site string) []Result {
 	results := []Result{}
 	seen := map[string]bool{}
-	add := func(raw, title string) {
+	add := func(raw, title, image, description string) {
 		base, err := url.Parse(page.URL)
 		if err != nil {
 			return
@@ -141,7 +145,16 @@ func parseResults(page webpage.Page, site string) []Result {
 			return
 		}
 		seen[canonical] = true
-		results = append(results, Result{title, canonical, site, Name(site)})
+		if site == "delish" && (image == "" || strings.Contains(image, "/s/images/")) {
+			recipeURL, _ := url.Parse(canonical)
+			image = "https://image.delishkitchen.tv/recipe/" + strings.TrimPrefix(recipeURL.Path, "/recipes/") + "/1.jpg?w=600"
+		}
+		description = strings.Join(strings.Fields(description), " ")
+		description = strings.TrimSpace(strings.ReplaceAll(description, title, ""))
+		if len([]rune(description)) > 160 {
+			description = string([]rune(description)[:160]) + "…"
+		}
+		results = append(results, Result{Title: title, URL: canonical, Site: site, SiteName: Name(site), Image: previewImage(page.URL, image), Description: description})
 	}
 	if site == "youtube" {
 		if v, ok := webpage.ScriptObject(page.HTML, "ytInitialData"); ok {
@@ -154,7 +167,7 @@ func parseResults(page webpage.Page, site string) []Result {
 				case map[string]any:
 					if r, ok := x["videoRenderer"].(map[string]any); ok {
 						id, _ := r["videoId"].(string)
-						add("https://www.youtube.com/watch?v="+id, jsonText(r["title"]))
+						add("https://www.youtube.com/watch?v="+id, jsonText(r["title"]), "https://i.ytimg.com/vi/"+id+"/hqdefault.jpg", jsonText(r["longBylineText"]))
 					}
 					for _, key := range []string{"contents", "twoColumnSearchResultsRenderer", "primaryContents", "sectionListRenderer", "itemSectionRenderer", "richItemRenderer", "content"} {
 						if child, ok := x[key]; ok {
@@ -180,7 +193,7 @@ func parseResults(page webpage.Page, site string) []Result {
 		}
 		if xml.Unmarshal([]byte(page.HTML), &feed) == nil {
 			for _, item := range feed.Items {
-				add(item.Link, item.Title)
+				add(item.Link, item.Title, "", "")
 			}
 		}
 		if len(results) > 8 {
@@ -189,6 +202,21 @@ func parseResults(page webpage.Page, site string) []Result {
 		return results
 	}
 
+	if site == "nhk" {
+		if doc, err := goquery.NewDocumentFromReader(strings.NewReader(page.HTML)); err == nil {
+			doc.Find(".recipe--sort-row .recipe--category-recipe[data-url]").EachWithBreak(func(_ int, card *goquery.Selection) bool {
+				raw, _ := card.Attr("data-url")
+				image, _ := card.Find(".thumb img").First().Attr("src")
+				title := card.Find(".recipe-name").Text()
+				description := card.Find(".recipe-time, .recipe-creator, .value > p").Map(func(_ int, s *goquery.Selection) string { return s.Text() })
+				add(raw, title, image, strings.Join(description, " · "))
+				return len(results) < 8
+			})
+			if len(results) > 0 {
+				return results
+			}
+		}
+	}
 	resultLinks(page.HTML, site, add, func() bool { return len(results) >= 8 })
 	return results
 }
@@ -210,4 +238,27 @@ func jsonText(v any) string {
 		}
 	}
 	return out
+}
+
+// Preview URLs are displayed by the browser, never fetched by Konro's server.
+func previewImage(base, raw string) string {
+	if raw == "" || len(raw) > 4096 {
+		return ""
+	}
+	b, e := url.Parse(base)
+	if e != nil {
+		return ""
+	}
+	u, e := b.Parse(raw)
+	if e != nil || u.Scheme != "https" || u.User != nil || u.Port() != "" && u.Port() != "443" {
+		return ""
+	}
+	host := strings.ToLower(u.Hostname())
+	if !strings.Contains(host, ".") || strings.HasSuffix(host, ".local") || strings.HasSuffix(host, ".localhost") || strings.HasSuffix(host, ".internal") {
+		return ""
+	}
+	if ip := net.ParseIP(host); ip != nil && !webpage.PublicIP(ip) {
+		return ""
+	}
+	return u.String()
 }

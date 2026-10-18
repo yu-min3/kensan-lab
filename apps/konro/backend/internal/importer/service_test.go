@@ -280,3 +280,50 @@ func TestSlowRuntimeDoesNotBlockAnotherDraft(t *testing.T) {
 		t.Fatal("one runtime request blocked an unrelated draft")
 	}
 }
+
+func TestAutomaticExtractionOnlyFallsBackForMissingContent(t *testing.T) {
+	ctx := context.Background()
+	a := &fakeAgent{}
+	s := New(t.TempDir(), a)
+	d, err := s.Create(ctx, "", "魚2切れを10分煮る")
+	if err != nil {
+		t.Fatal(err)
+	}
+	d.Content = Content{Title: "魚", Ingredients: []string{"魚2切れ"}, Steps: []string{"10分煮る"}}
+	if err = s.write(d); err != nil {
+		t.Fatal(err)
+	}
+	if _, err = s.extractMissing(ctx, d); err != nil || len(a.requests) != 0 {
+		t.Fatal("complete recipe used fallback", err)
+	}
+	d.Content.Steps = nil
+	if err = s.write(d); err != nil {
+		t.Fatal(err)
+	}
+	d, err = s.extractMissing(ctx, d)
+	if err != nil || d.Job == nil || len(a.requests) != 1 {
+		t.Fatal("missing steps did not use fallback", d, err)
+	}
+	// Reload follows the same job rather than scheduling another inference.
+	a.result = agentclient.Job{ID: "generic-job", State: "queued"}
+	if _, err = s.Get(ctx, d.ID); err != nil || len(a.requests) != 1 {
+		t.Fatal("duplicate fallback", err)
+	}
+}
+
+type unavailableAgent struct{ fakeAgent }
+
+func (a *unavailableAgent) Create(context.Context, agentclient.Request) (agentclient.Job, error) {
+	return agentclient.Job{}, context.DeadlineExceeded
+}
+func TestAutomaticSubmissionFailureRetainsRecoverableDraft(t *testing.T) {
+	s := New(t.TempDir(), &unavailableAgent{})
+	d, err := s.Import(context.Background(), "", "魚を煮る")
+	if err != nil || d == nil || !d.Pending || d.JobKey == "" {
+		t.Fatal(d, err)
+	}
+	saved, err := s.read(d.ID)
+	if err != nil || saved.Source.Text != "魚を煮る" || saved.JobKey != d.JobKey {
+		t.Fatal(saved, err)
+	}
+}

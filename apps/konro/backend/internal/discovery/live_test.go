@@ -17,7 +17,13 @@ func TestLiveSearch(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			t.Logf("results=%d warnings=%v", len(r.Results), r.Warnings)
+			images := 0
+			for _, result := range r.Results {
+				if result.Image != "" {
+					images++
+				}
+			}
+			t.Logf("results=%d images=%d warnings=%v", len(r.Results), images, r.Warnings)
 			if len(r.Results) == 0 {
 				t.Error("no live results")
 			}

@@ -68,8 +68,8 @@ try {
     if (await button("別のレシピを取り込む").count()) await button("別のレシピを取り込む").click();
     await button("本文を貼り付ける").click();
     await page.getByLabel("レシピの本文", { exact: true }).fill(source);
-    await button("下書きを作る").click();
-    await page.getByLabel("タイトル", { exact: true }).waitFor();
+    await button("取り込む").click();
+    await page.locator(".import-status").waitFor();
   };
   const waitText = async (text) => page.getByText(text, { exact: false }).first().waitFor({ timeout: 30000 });
   await create();
@@ -90,8 +90,9 @@ try {
 
   await create();
   assert.equal(await page.getByRole("combobox").count(), 0);
-  await button("AIで抽出・整形").click();
-  await waitText("AIの整形が完了");
+  assert.equal(await page.getByRole("button",{name:/AI/}).count(),0);
+
+  await waitText("取り込めました");
   assert.equal(await page.getByLabel("タイトル", { exact: true }).inputValue(), output.title);
   await page.getByText("取り込み元を確認", { exact: true }).click();
   assert.equal(await page.locator("pre").first().textContent(), source);
@@ -101,45 +102,45 @@ try {
   await button("レシピを追加").waitFor();
   console.log("passed step", results.length + 1); results.push("AI normalization over real HTTP; source comparison; confirmation save; no horizontal mobile overflow");
 
-  await fixture("success",{...output,steps:[]});await create();await button("AIで抽出・整形").click();
-  await waitText("材料または手順が不足しています");
+  await fixture("success",{...output,steps:[]});await create();
+  await waitText("一部を取り込めませんでした");
   assert.equal(await page.getByLabel("手順（1行に1つの手順）",{exact:true}).inputValue(),"");
   assert((await page.getByLabel("材料（1行に1項目）",{exact:true}).inputValue()).includes("鮭 2切れ"));
   await page.getByRole("checkbox").check();assert.equal(await button("レシピとして保存").isEnabled(),false);
   console.log("passed step",results.length+1);results.push("partial AI result keeps known ingredients and blocks saving until missing steps are entered");
 
-  await fixture("wait"); await create(); await button("AIで抽出・整形").click();
+  await fixture("wait"); await create();
   await waitText("利用枠が空くのを待っています");
-  await fixture("success"); await button("利用枠を再確認").click(); await waitText("AIの整形が完了");
+  await fixture("success"); await button("取り込みを再開").click(); await waitText("取り込めました");
   console.log("passed step", results.length + 1); results.push("quota waits visibly and retries explicitly");
 
   await fixture("success", { ...output, steps: ["200度で焼く"] });
-  await create(); await button("AIで抽出・整形").click(); await waitText("原文にない数値を検出");
+  await create(); await waitText("原文にない数値を検出");
   assert.equal(await page.getByLabel("タイトル", { exact: true }).inputValue(), "");
   console.log("passed step", results.length + 1); results.push("new temperature rejected without replacing original draft");
 
   await fixture("success", { ...output, steps: "invalid" });
-  await create(); await button("AIで抽出・整形").click(); await waitText("AIの抽出・整形に失敗しました");
-  await waitText("自動では再試行しません");
-  assert.equal(await button("AIでもう一度試す").isEnabled(), true);
+  await create(); await waitText("取り込みに失敗しました");
+  await waitText("処理は停止しています");
+  assert.equal(await button("取り込みを再試行").isEnabled(), true);
   await page.screenshot({ path: path.join(artifacts, "ai-failure-mobile.png"), fullPage: true });
   assert.equal(await page.getByLabel("タイトル", { exact: true }).inputValue(), "");
-  await fixture("success"); await button("AIでもう一度試す").click(); await waitText("AIの整形が完了");
+  await fixture("success"); await button("取り込みを再試行").click(); await waitText("取り込めました");
   console.log("passed step", results.length + 1); results.push("runtime output-schema failure is visibly stopped and explicitly retries");
 
-  await fixture("delay"); await create(); await button("AIで抽出・整形").click();
-  await waitText("材料と手順を整えています"); await button("AIを取り消す").click(); await waitText("AIを取り消しました");
+  await fixture("delay"); await create();
+  await waitText("この画面を閉じても処理は続きます"); await button("取り込みを中止").click(); await waitText("取り込みを中止しました");
   assert.equal(await page.getByLabel("タイトル", { exact: true }).isEnabled(), true);
   console.log("passed step", results.length + 1); results.push("running job cancellation unlocks editor");
 
-  await create(); await button("AIで抽出・整形").click(); await waitText("材料と手順を整えています");
-  await stop(runtime); runtime = await startRuntime(); await waitText("AIの接続先が処理中に再起動しました");
+  await create(); await waitText("この画面を閉じても処理は続きます");
+  await stop(runtime); runtime = await startRuntime(); await waitText("抽出サービスとの接続が中断しました");
   console.log("passed step", results.length + 1); results.push("runtime restart reports interrupted, never success or automatic rerun");
 
-  await create(); await button("AIで抽出・整形").click(); await waitText("材料と手順を整えています");
-  await stop(runtime); await waitText("AIの状態を確認できません");
+  await create(); await waitText("この画面を閉じても処理は続きます");
+  await stop(runtime); await waitText("取り込みの状態を確認できません");
   assert.equal(await page.locator(".import-spinner").count(), 0);
-  await button("AIの結果を使わず編集する").click(); await waitText("手入力に切り替えました");
+  await button("手入力に切り替える").click(); await waitText("後から届く抽出結果で上書きされることはありません");
   await page.getByLabel("タイトル", { exact: true }).fill("接続なしでも編集");
   assert.equal(await page.getByLabel("タイトル", { exact: true }).isEnabled(), true);
   console.log("passed step", results.length + 1); results.push("unavailable runtime can be detached locally for manual editing");

@@ -76,7 +76,7 @@ export async function saveRecipe(file: string | null, version: string, input: Re
 }
 
 export type SearchSite = {id:string;name:string};
-export type WebRecipe = {title:string;url:string;site:string;siteName:string};
+export type WebRecipe = {title:string;url:string;site:string;siteName:string;image?:string;description?:string};
 export type SearchResults = {results:WebRecipe[];warnings:string[]};
 export async function searchSites():Promise<SearchSite[]> {
  const r=await fetch('/api/v1/discovery/sites');if(!r.ok)throw new Error('検索サイトを読み込めません');return r.json();

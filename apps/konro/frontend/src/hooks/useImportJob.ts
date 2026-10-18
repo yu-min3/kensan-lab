@@ -18,7 +18,7 @@ export function useImportJob(initialURL="") {
   const [error, setError] = useState("");
   const [savedDrafts,setSavedDrafts]=useState(readDraftRefs);
   const [resume, setResume] = useState(() => initialURL ? readDraftRefs().find(r=>r.url===initialURL)?.id??"" : localStorage.getItem(storageKey) ?? "");
-  const [loading, setLoading] = useState(!!resume);
+  const [loading, setLoading] = useState(!!resume || !!initialURL);
  const [resumeAttempt,setResumeAttempt]=useState(0);
   const mounted = useRef(true);
   useEffect(() => { mounted.current = true; return () => { mounted.current = false; }; }, []);
@@ -39,6 +39,15 @@ export function useImportJob(initialURL="") {
       .finally(() => { if (live) setLoading(false); });
     return () => { live = false; };
   }, [resume,resumeAttempt]);
+  const initialRequest = useRef<Promise<ImportDraft> | null>(null);
+  useEffect(() => {
+    if (!initialURL || resume) return;
+    let live = true;
+    initialRequest.current ??= draftRequest("", "POST", {url:initialURL,text:""});
+    initialRequest.current.then(d=>{if(live)adopt(d);}).catch(e=>{if(live)setError(e.message);}).finally(()=>{if(live)setLoading(false);});
+    return ()=>{live=false;};
+  }, [initialURL]);
+  const create = () => perform(async()=>adopt(await draftRequest("", "POST", kind === "url" ? {url:input.trim(),text:""} : {url:"",text:input})));
   const active = !!draft && !draft.detached && (draft.pending || ["queued", "running", "waiting"].includes(draft.job?.state ?? ""));
   useEffect(() => {
     if (!draft || !active || busy) return;
@@ -49,7 +58,7 @@ export function useImportJob(initialURL="") {
         if (!live) return;
         setPollError("");
         if (d.revision !== draft.revision) adopt(d); else setDraft(d);
-      }).catch(() => { if (live) setPollError("接続できず、AIの状態を確認できません。通信が戻ると自動で確認します。"); })
+      }).catch(() => { if (live) setPollError("接続できず、取り込みが終わったか確認できません。通信が戻ると自動で確認します。"); })
         .finally(() => { if (live) timer = window.setTimeout(poll, delay); });
     };
     const delay = draft.job?.state === "waiting" ? 10000 : 2000;
@@ -88,5 +97,5 @@ export function useImportJob(initialURL="") {
   const discardView = () => { clearImportDraft();setSavedDrafts(readDraftRefs()); setResume(""); setDraft(null); setInput(""); setError(""); };
 
  const restoreDraft=(id:string)=>{setResumeAttempt(n=>n+1);setLoading(true);setDraft(null);setResume(id);setError("");};
-  return {savedDrafts,restoreDraft,kind,setKind,input,setInput,draft,content,setContent,ingredients,setIngredients,steps,setSteps,submitting,pollError,confirmed,setConfirmed,busy,error,resume,loading,active,perform,persist,start,action,discardView,adopt};
+  return {create,savedDrafts,restoreDraft,kind,setKind,input,setInput,draft,content,setContent,ingredients,setIngredients,steps,setSteps,submitting,pollError,confirmed,setConfirmed,busy,error,resume,loading,active,perform,persist,start,action,discardView,adopt};
 }

@@ -46,7 +46,7 @@ func registerDrafts(mux *http.ServeMux, s *importer.Service) {
 		if !decodeJSON(w, r, &in, 256<<10) {
 			return
 		}
-		d, e := s.Create(r.Context(), in.URL, in.Text)
+		d, e := s.Import(r.Context(), in.URL, in.Text)
 		result(w, d, e)
 	})
 	mux.HandleFunc("GET /api/v1/import/drafts/{id}", func(w http.ResponseWriter, r *http.Request) {
