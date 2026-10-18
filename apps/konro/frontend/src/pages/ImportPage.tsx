@@ -1,5 +1,6 @@
 import { draftRequest } from "../api";
 import { useImportJob, clearImportDraft } from "../hooks/useImportJob";
+import {SourceCredit} from "../components/SourceCredit";
 import { Field, Panel } from "../components/Editor";
 
 const reasons: Record<string, string> = {
@@ -64,6 +65,7 @@ export function ImportPage({ onClose, onSaved, initialURL="" }: { initialURL?:st
       {!active && <Panel id="import-editor">
         <fieldset disabled={busy || active}>
           <legend>レシピを確認・編集</legend>
+          <SourceCredit info={draft.source.info}/>
           <Field id="import-title" label="タイトル" value={content.title} maxLength={300} onChange={(title)=>{setContent({...content,title});setConfirmed(false);}} />
           <Field id="import-servings" label="何人分" value={content.servings} onChange={(servings)=>{setContent({...content,servings});setConfirmed(false);}} />
           <Field id="import-ingredients" label="材料（1行に1項目）" rows={6} value={ingredients} onChange={(value)=>{setIngredients(value);setConfirmed(false);}} />

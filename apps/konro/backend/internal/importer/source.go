@@ -9,6 +9,7 @@ import (
 	"unicode/utf8"
 
 	"github.com/PuerkitoBio/goquery"
+	"github.com/yu-min3/kensan-lab/apps/konro/backend/internal/provenance"
 	"github.com/yu-min3/kensan-lab/apps/konro/backend/internal/recipe"
 )
 
@@ -16,10 +17,11 @@ const MaxSource = webpage.MaxSource
 const MaxText = 128 << 10
 
 type Source struct {
-	URL  string `json:"url,omitempty"`
-	Raw  string `json:"raw"`
-	Text string `json:"text"`
-	Kind string `json:"kind,omitempty"`
+	URL  string           `json:"url,omitempty"`
+	Raw  string           `json:"raw"`
+	Text string           `json:"text"`
+	Kind string           `json:"kind,omitempty"`
+	Info *provenance.Info `json:"info,omitempty"`
 }
 type Content = recipe.Content
 
@@ -46,6 +48,7 @@ func sourceFromPage(p webpage.Page) (Source, error) {
 	if e != nil {
 		return Source{}, e
 	}
+	s.Info = provenance.FromDocument(doc, s.URL)
 	if discovery.SiteID(s.URL) == "youtube" {
 		title, description, ok := youtubeDescription(s.Raw, s.URL)
 		s.Kind = "youtube_description"

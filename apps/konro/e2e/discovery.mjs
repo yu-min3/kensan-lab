@@ -68,5 +68,27 @@ try{
   await page.screenshot({path:path.join(artifacts,`fallback-${scheme}.png`),fullPage:true});
  }
  checks.push('missing/broken photos retain selectable cards and long titles fit 320px in both themes');
+ await page.unroute('**/api/v1/discovery/search?**');
+ const chefURL='https://www.kurashiru.com/recipes/6938e7e7-dbcc-4da0-8760-f1286f19684e';
+ const preferred={title:'中村シェフのオムライス',url:chefURL,site:'kurashiru',siteName:'クラシル',preferred:true,info:{creator:{id:'kurashiru:chef:6',name:'中村和成'}},image:'https://video.kurashiru.com/production/videos/6938e7e7-dbcc-4da0-8760-f1286f19684e/compressed_thumbnail_square_normal.jpg'};
+ await page.route('**/api/v1/discovery/search?**',r=>r.fulfill({status:200,contentType:'application/json',body:JSON.stringify({results:[preferred,{title:'評価がなくても選べる料理',url:'https://delishkitchen.tv/recipes/456',site:'delish',siteName:'デリッシュ'}],warnings:[]})}));
+ await page.route('**/api/v1/discovery/preview?**',async r=>{if(new URL(r.request().url()).searchParams.get('url')===chefURL){await new Promise(resolve=>setTimeout(resolve,150));return r.fulfill({status:200,contentType:'application/json',body:JSON.stringify({creator:{id:'kurashiru:chef:6',name:'中村和成'},publisher:{name:'クラシル公式'},rating:{value:4.55,best:5,count:486}})})}return r.fulfill({status:503,body:'取得できません'})});
+ for(const scheme of ['light','dark']){
+  await page.emulateMedia({colorScheme:scheme});await page.setViewportSize({width:390,height:844});
+  await page.getByLabel('料理名・材料').fill('オムライス');await button('検索する').click();
+  const cards=page.locator('.web-recipe-card');await cards.first().getByText('好きな作り手',{exact:true}).waitFor();
+  await cards.first().scrollIntoViewIfNeeded();await cards.first().getByLabel('出典の評価 4.55、5点満点、486件',{exact:true}).waitFor();
+  assert((await cards.first().innerText()).includes('料理人：中村和成'));assert((await cards.first().innerText()).includes('配信元：クラシル公式'));
+  assert.equal(await cards.nth(1).locator('.source-rating').count(),0);
+  assert.deepEqual(await cards.locator('h3').allTextContents(),[preferred.title,'評価がなくても選べる料理']);
+  assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false);
+  await page.screenshot({path:path.join(artifacts,`creator-${scheme}.png`)});
+ }
+ checks.push('creator, publisher and rating/count are distinct; late metadata leaves order stable and missing ratings do not block cards');
+ await page.locator('.web-recipe-card').first().getByRole('button',{name:/を取り込む$/}).click();await page.getByRole('group',{name:'レシピを確認・編集'}).waitFor({timeout:20000});
+ await page.getByText('料理人：中村和成',{exact:true}).waitFor();await page.getByLabel('タイトル',{exact:true}).fill('出典つきオムライス');await page.getByRole('checkbox').check();await button('レシピとして保存').click();
+ await button('出典つきオムライスを開く').click();await page.getByText('料理人：中村和成',{exact:true}).waitFor();
+ const saved=await(await fetch(base+'/api/v1/recipes')).json();const item=saved.find(r=>r.title==='出典つきオムライス');assert.equal(item.sourceInfo.creator.id,'kurashiru:chef:6');assert(item.sourceInfo.rating.value>0);assert.equal(item.rating??0,0);
+ checks.push('real source chef and rating persist through direct import/save/detail without overwriting personal rating');
  assert.deepEqual(errors,[]);await writeFile(path.join(artifacts,'results.json'),JSON.stringify({status:'passed',checks,browserErrors:errors},null,2));console.log(JSON.stringify({status:'passed',checks:checks.length,artifacts}));
 }finally{await browser?.close();server.kill('SIGTERM');console.error('Artifacts:',artifacts)}

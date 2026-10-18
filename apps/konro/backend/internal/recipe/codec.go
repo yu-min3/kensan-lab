@@ -49,6 +49,8 @@ func DecodeDocument(data []byte) (*Document, error) {
 			target = &d.Recipe.Title
 		case "servings":
 			target = &d.Recipe.Servings
+		case "source_info":
+			target = &d.Recipe.SourceInfo
 		case "source":
 			target = &d.Recipe.Source
 		case "tags":
@@ -105,7 +107,7 @@ func (d *Document) set(key string, value any, flow bool) error {
 
 // Child anchors removed by replacing an editable list can still be referenced
 // by unowned metadata. Resolve those references before publishing the document.
-func (d *Document) detachChildAliases(old *yaml.Node) error {
+func (d *Document) detachChildAliases(old *yaml.Node, includeRoot ...bool) error {
 	children := map[*yaml.Node]bool{}
 	var collect func(*yaml.Node)
 	collect = func(n *yaml.Node) {
@@ -115,6 +117,9 @@ func (d *Document) detachChildAliases(old *yaml.Node) error {
 		}
 	}
 	collect(old)
+	if len(includeRoot) > 0 && includeRoot[0] {
+		children[old] = true
+	}
 	var clone func(*yaml.Node, map[*yaml.Node]bool) (*yaml.Node, error)
 	clone = func(n *yaml.Node, path map[*yaml.Node]bool) (*yaml.Node, error) {
 		if path[n] {
@@ -184,6 +189,18 @@ func (d *Document) setEditable(e Editable) error {
 	return nil
 }
 func (d *Document) render(e Editable, date string, edited bool) ([]byte, error) {
+	if e.Source != d.Recipe.Source {
+		for i := 0; i < len(d.meta.Content); i += 2 {
+			if d.meta.Content[i].Value == "source_info" {
+				if err := d.detachChildAliases(d.meta.Content[i+1], true); err != nil {
+					return nil, err
+				}
+				d.meta.Content = append(d.meta.Content[:i], d.meta.Content[i+2:]...)
+				break
+			}
+		}
+	}
+
 	if err := d.setEditable(e); err != nil {
 		return nil, err
 	}
@@ -222,6 +239,9 @@ func Encode(r Recipe, date string) ([]byte, error) {
 	_ = d.set("title", r.Title, false)
 	if r.RKID != "" {
 		_ = d.set("rk_id", r.RKID, false)
+	}
+	if r.SourceInfo != nil {
+		_ = d.set("source_info", r.SourceInfo, false)
 	}
 	if len(r.Images) > 0 {
 		_ = d.set("images", r.Images, true)

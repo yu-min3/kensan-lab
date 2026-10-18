@@ -445,7 +445,7 @@ func (s *Service) Save(id string, revision int) (*Draft, error) {
 		return d, e
 	}
 	file := "imported/" + d.ID
-	rec := recipe.Recipe{Meta: recipe.Meta{File: file, Title: d.Content.Title, Servings: d.Content.Servings, Source: d.Source.URL}, Ingredients: d.Content.Ingredients, Steps: d.Content.Steps}
+	rec := recipe.Recipe{Meta: recipe.Meta{File: file, Title: d.Content.Title, Servings: d.Content.Servings, Source: d.Source.URL, SourceInfo: d.Source.Info}, Ingredients: d.Content.Ingredients, Steps: d.Content.Steps}
 	if e = recipe.SaveImported(s.dir, d.ID, rec); e != nil {
 		return d, e
 	}

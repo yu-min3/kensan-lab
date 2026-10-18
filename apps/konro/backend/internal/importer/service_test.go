@@ -11,6 +11,7 @@ import (
 
 	"github.com/yu-min3/kensan-lab/apps/konro/backend/internal/agentclient"
 	"github.com/yu-min3/kensan-lab/apps/konro/backend/internal/recipe"
+	"github.com/yu-min3/kensan-lab/apps/konro/backend/internal/webpage"
 )
 
 func TestJSONLDGraphAndSections(t *testing.T) {
@@ -325,5 +326,42 @@ func TestAutomaticSubmissionFailureRetainsRecoverableDraft(t *testing.T) {
 	saved, err := s.read(d.ID)
 	if err != nil || saved.Source.Text != "魚を煮る" || saved.JobKey != d.JobKey {
 		t.Fatal(saved, err)
+	}
+}
+
+func TestSourceCreditsSurviveImportAndPersonalEdit(t *testing.T) {
+	dir := t.TempDir()
+	s := New(dir, nil)
+	ctx := context.Background()
+	source, err := sourceFromPage(webpage.Page{URL: "https://example.com/fish", HTML: `<script type="application/ld+json">{"@type":"Recipe","name":"煮魚","author":{"name":"料理人"},"aggregateRating":{"ratingValue":4.5,"ratingCount":42},"recipeIngredient":["魚2切れ"],"recipeInstructions":["10分煮る"]}</script>`})
+	if err != nil {
+		t.Fatal(err)
+	}
+	d, err := s.Create(ctx, "", "魚2切れを10分煮る")
+	if err != nil {
+		t.Fatal(err)
+	}
+	d.Source = source
+	d.Content, _ = Extract(source)
+	if err = s.write(d); err != nil {
+		t.Fatal(err)
+	}
+	d, err = s.Save(d.ID, d.Revision)
+	if err != nil {
+		t.Fatal(err)
+	}
+	rec, err := recipe.Load(dir, d.SavedFile)
+	if err != nil || rec.SourceInfo.Creator.Name != "料理人" || rec.SourceInfo.Rating.Count != 42 || rec.Rating != 0 {
+		t.Fatal(rec, err)
+	}
+	input := recipe.Editable{Title: rec.Title, Source: rec.Source, Rating: 3, Ingredients: rec.Ingredients, Steps: []string{"10分煮る", "盛りつける"}}
+	rec, err = recipe.Update(dir, d.SavedFile, rec.Version, input)
+	if err != nil || rec.SourceInfo.Rating.Value != 4.5 || rec.Rating != 3 {
+		t.Fatal(rec, err)
+	}
+	input.Source = "https://example.com/other"
+	rec, err = recipe.Update(dir, d.SavedFile, rec.Version, input)
+	if err != nil || rec.SourceInfo != nil {
+		t.Fatal("stale source info", rec, err)
 	}
 }
