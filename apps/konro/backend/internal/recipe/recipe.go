@@ -6,6 +6,7 @@ package recipe
 
 import (
 	"fmt"
+	"github.com/yu-min3/kensan-lab/apps/konro/backend/internal/provenance"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -14,16 +15,17 @@ import (
 )
 
 type Meta struct {
-	File     string   `json:"file"` // filename without .md — the recipe id
-	Title    string   `json:"title"`
-	Tags     []string `json:"tags"`
-	Servings string   `json:"servings,omitempty"`
-	PrepTime string   `json:"prepTime,omitempty"` // ISO8601
-	CookTime string   `json:"cookTime,omitempty"`
-	Source   string   `json:"source,omitempty"`
-	Rating   int      `json:"rating,omitempty"`
-	Images   []string `json:"images,omitempty"`
-	RKID     string   `json:"rkId,omitempty"`
+	File       string           `json:"file"` // filename without .md — the recipe id
+	Title      string           `json:"title"`
+	Tags       []string         `json:"tags"`
+	Servings   string           `json:"servings,omitempty"`
+	PrepTime   string           `json:"prepTime,omitempty"` // ISO8601
+	CookTime   string           `json:"cookTime,omitempty"`
+	Source     string           `json:"source,omitempty"`
+	Rating     int              `json:"rating,omitempty"`
+	Images     []string         `json:"images,omitempty"`
+	RKID       string           `json:"rkId,omitempty"`
+	SourceInfo *provenance.Info `json:"sourceInfo,omitempty"`
 }
 
 type Recipe struct {

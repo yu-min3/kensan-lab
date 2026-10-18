@@ -8,19 +8,23 @@ import (
 	"net/url"
 	"strings"
 	"sync"
+	"time"
 	"unicode/utf8"
 
 	"github.com/PuerkitoBio/goquery"
+	"github.com/yu-min3/kensan-lab/apps/konro/backend/internal/provenance"
 	"github.com/yu-min3/kensan-lab/apps/konro/backend/internal/webpage"
 )
 
 type Result struct {
-	Title       string `json:"title"`
-	URL         string `json:"url"`
-	Site        string `json:"site"`
-	SiteName    string `json:"siteName"`
-	Image       string `json:"image,omitempty"`
-	Description string `json:"description,omitempty"`
+	Title       string           `json:"title"`
+	URL         string           `json:"url"`
+	Site        string           `json:"site"`
+	SiteName    string           `json:"siteName"`
+	Image       string           `json:"image,omitempty"`
+	Description string           `json:"description,omitempty"`
+	Info        *provenance.Info `json:"info,omitempty"`
+	Preferred   bool             `json:"preferred,omitempty"`
 }
 type Response struct {
 	Results  []Result `json:"results"`
@@ -28,8 +32,13 @@ type Response struct {
 }
 type Fetcher func(context.Context, string) (webpage.Page, error)
 type Service struct {
-	fetch Fetcher
-	slots chan struct{}
+	fetch       Fetcher
+	slots       chan struct{}
+	previewMu   sync.Mutex
+	previews    map[string]previewEntry
+	chefMu      sync.Mutex
+	chefResults []Result
+	chefUntil   time.Time
 }
 
 func New(fetch Fetcher) *Service {
@@ -41,7 +50,7 @@ func New(fetch Fetcher) *Service {
 			return webpage.FetchSearch(ctx, raw, false)
 		}
 	}
-	return &Service{fetch: fetch, slots: make(chan struct{}, 2)}
+	return &Service{fetch: fetch, slots: make(chan struct{}, 2), previews: map[string]previewEntry{}}
 }
 
 var ErrQuery = errors.New("料理名や材料を100文字以内で入力してください")
@@ -122,6 +131,11 @@ func (s *Service) Search(ctx context.Context, q, site string) (Response, error) 
 			out.Warnings = append(out.Warnings, w)
 		}
 	}
+	groupsExtra, failed := s.favoriteResults(ctx, q, site)
+	out.Results = rank(out.Results, groupsExtra)
+	if failed {
+		out.Warnings = append(out.Warnings, "好きな作り手の候補を一部取得できませんでした。通常の検索結果は表示しています")
+	}
 	return out, nil
 }
 func parseResults(page webpage.Page, site string) []Result {
@@ -167,7 +181,18 @@ func parseResults(page webpage.Page, site string) []Result {
 				case map[string]any:
 					if r, ok := x["videoRenderer"].(map[string]any); ok {
 						id, _ := r["videoId"].(string)
-						add("https://www.youtube.com/watch?v="+id, jsonText(r["title"]), "https://i.ytimg.com/vi/"+id+"/hqdefault.jpg", jsonText(r["longBylineText"]))
+						before := len(results)
+						add("https://www.youtube.com/watch?v="+id, jsonText(r["title"]), "https://i.ytimg.com/vi/"+id+"/hqdefault.jpg", "")
+						if len(results) > before {
+							owner := channelPerson(r["longBylineText"])
+							if owner == nil {
+								owner = channelPerson(r["ownerText"])
+							}
+							if owner != nil {
+								results[len(results)-1].Info = &provenance.Info{Creator: owner}
+								results[len(results)-1].Preferred = preferred(results[len(results)-1].Info)
+							}
+						}
 					}
 					for _, key := range []string{"contents", "twoColumnSearchResultsRenderer", "primaryContents", "sectionListRenderer", "itemSectionRenderer", "richItemRenderer", "content"} {
 						if child, ok := x[key]; ok {
@@ -208,8 +233,17 @@ func parseResults(page webpage.Page, site string) []Result {
 				raw, _ := card.Attr("data-url")
 				image, _ := card.Find(".thumb img").First().Attr("src")
 				title := card.Find(".recipe-name").Text()
-				description := card.Find(".recipe-time, .recipe-creator, .value > p").Map(func(_ int, s *goquery.Selection) string { return s.Text() })
+				description := card.Find(".recipe-time, .value > p").Map(func(_ int, s *goquery.Selection) string { return s.Text() })
+				before := len(results)
 				add(raw, title, image, strings.Join(description, " · "))
+				if len(results) > before {
+					a := card.Find(".recipe-creator a").First()
+					href := a.AttrOr("href", "")
+					name := strings.Join(strings.Fields(a.Text()), " ")
+					if name != "" && strings.HasPrefix(href, "/teacher/detail/") {
+						results[len(results)-1].Info = &provenance.Info{Creator: &provenance.Person{ID: "nhk:" + href, Name: name, URL: "https://www.kyounoryouri.jp" + href}}
+					}
+				}
 				return len(results) < 8
 			})
 			if len(results) > 0 {

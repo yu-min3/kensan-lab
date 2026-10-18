@@ -2,6 +2,7 @@ import { useEffect, useLayoutEffect, useRef } from "react";
 import { ArrowLeft, Pencil, Plus, Check } from "lucide-react";
 import { formatDuration, Recipe } from "../api";
 import { useRecipeEditor } from "../hooks/useRecipeEditor";
+import {SourceCredit} from "../components/SourceCredit";
 import { Field, Panel } from "../components/Editor";
 
 export function RecipePage({ file, selected, onBack, onToggle, onSaved, onGuard }: {
@@ -61,7 +62,8 @@ export function RecipePage({ file, selected, onBack, onToggle, onSaved, onGuard 
     {!loading && !editing && recipe && <>
       <Panel>
         <h1 className="h-serif recipe-name">{recipe.title}</h1>
-        <p className="recipe-summary">{[recipe.servings, recipe.prepTime && `下準備 ${formatDuration(recipe.prepTime)}`, recipe.cookTime && `調理 ${formatDuration(recipe.cookTime)}`, recipe.rating ? "★".repeat(recipe.rating) : ""].filter(Boolean).join(" · ")}</p>
+        <SourceCredit info={recipe.sourceInfo}/>
+        <p className="recipe-summary">{[recipe.servings, recipe.prepTime && `下準備 ${formatDuration(recipe.prepTime)}`, recipe.cookTime && `調理 ${formatDuration(recipe.cookTime)}`, recipe.rating ? "自分の評価 " + "★".repeat(recipe.rating) : ""].filter(Boolean).join(" · ")}</p>
         {!!recipe.tags?.length && <div className="detail-tags">{recipe.tags.map((tag, i) => <span className="recipe-tag" key={i}>{tag}</span>)}</div>}
         {recipe.images?.[0] && <img className="recipe-cover" src={`/${recipe.images[0]}`} alt="" />}
         <button type="button" className="recipe-action recipe-action-primary recipe-cook" aria-pressed={selected} onClick={() => onToggle(recipe.file)}>{selected ? <Check aria-hidden="true" /> : <Plus aria-hidden="true" />}{selected ? "追加済み・外す" : "調理に追加"}</button>

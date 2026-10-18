@@ -1,3 +1,5 @@
+export type SourcePerson={id?:string;name:string;url?:string};
+export type SourceInfo={creator?:SourcePerson;publisher?:SourcePerson;rating?:{value:number;best:number;count?:number}};
 export type RecipeMeta = {
   file: string;
   title: string;
@@ -7,6 +9,7 @@ export type RecipeMeta = {
   cookTime?: string;
   source?: string;
   rating?: number;
+  sourceInfo?:SourceInfo;
   images?: string[];
 };
 
@@ -50,7 +53,7 @@ export { formatDuration } from "./duration";
 export type ImportContent = { title: string; servings: string; ingredients: string[]; steps: string[] };
 export type ImportDraft = {
   id: string; revision: number;
-  source: { url?: string; raw: string; text: string; kind?:string };
+  source: { url?: string; raw: string; text: string; kind?:string;info?:SourceInfo };
   content: ImportContent; warnings: string[];
   pending: boolean; detached: boolean; agent_available: boolean; saved_file?: string;
   job?: { id: string; state: string; reason?: string };
@@ -76,7 +79,7 @@ export async function saveRecipe(file: string | null, version: string, input: Re
 }
 
 export type SearchSite = {id:string;name:string};
-export type WebRecipe = {title:string;url:string;site:string;siteName:string;image?:string;description?:string};
+export type WebRecipe = {title:string;url:string;site:string;siteName:string;image?:string;description?:string;info?:SourceInfo;preferred?:boolean};
 export type SearchResults = {results:WebRecipe[];warnings:string[]};
 export async function searchSites():Promise<SearchSite[]> {
  const r=await fetch('/api/v1/discovery/sites');if(!r.ok)throw new Error('検索サイトを読み込めません');return r.json();

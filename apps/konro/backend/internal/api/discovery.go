@@ -8,6 +8,15 @@ import (
 )
 
 func registerDiscovery(mux *http.ServeMux, service *discovery.Service) {
+	mux.HandleFunc("GET /api/v1/discovery/preview", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Cache-Control", "no-store")
+		info, err := service.Preview(r.Context(), r.URL.Query().Get("url"))
+		if err != nil {
+			http.Error(w, "出典情報を取得できませんでした", http.StatusServiceUnavailable)
+			return
+		}
+		writeJSON(w, info)
+	})
 	mux.HandleFunc("GET /api/v1/discovery/sites", func(w http.ResponseWriter, r *http.Request) { writeJSON(w, discovery.Sites) })
 	mux.HandleFunc("GET /api/v1/discovery/search", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Cache-Control", "no-store")

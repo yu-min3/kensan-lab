@@ -3,14 +3,17 @@ import { ImageOff, Download, ExternalLink } from 'lucide-react';
 import {Panel,Field} from '../components/Editor';
 import {useRecipeSearch} from '../hooks/useRecipeSearch';
 import {WebRecipe} from '../api';
+import {SourceCredit} from '../components/SourceCredit';
+import {useSourcePreview} from '../hooks/useSourcePreview';
 
 type Search=ReturnType<typeof useRecipeSearch>;
 function SearchCard({result,onImport}:{result:WebRecipe;onImport:(url:string)=>void}) {
  const [failed,setFailed]=useState(false);
- return <li className="web-recipe-card">
+ const {ref,info}=useSourcePreview(result.url,result.info);
+ return <li ref={ref} className="web-recipe-card">
   <button className="web-recipe-pick" onClick={()=>onImport(result.url)} aria-label={`${result.title}を取り込む`}>
    <div className="web-recipe-photo">{result.image&&!failed?<img src={result.image} alt="" loading="lazy" referrerPolicy="no-referrer" onError={()=>setFailed(true)}/>:<span className="web-recipe-no-photo"><ImageOff aria-hidden="true"/>写真なし</span>}</div>
-   <div className="web-recipe-body"><p className="recipe-summary">{result.siteName}{result.site==='youtube'?' · 動画':''}</p><h3 className="h-serif">{result.title}</h3>{result.description&&<p className="web-recipe-description">{result.description}</p>}<span className="web-recipe-import"><Download aria-hidden="true"/>取り込む</span></div>
+   <div className="web-recipe-body">{result.preferred&&<span className="recipe-tag">好きな作り手</span>}<h3 className="h-serif">{result.title}</h3><SourceCredit info={info} showPublisher={false}/><p className="recipe-summary">配信元：{info?.publisher?.name||result.siteName}{result.site==='youtube'?' · 動画':''}</p>{result.description&&<p className="web-recipe-description">{result.description}</p>}<span className="web-recipe-import"><Download aria-hidden="true"/>取り込む</span></div>
   </button>
   <a className="web-recipe-source" href={result.url} target="_blank" rel="noreferrer">元のページを見る<ExternalLink aria-hidden="true"/></a>
  </li>;
@@ -29,6 +32,7 @@ export function SearchPage({search:s,onClose,onImport}:{search:Search;onClose:()
   {s.error&&<p className="notice" role="alert">{s.error}</p>}
   {s.data&&<>
    <h2 className="h-serif">「{s.submitted}」の検索結果</h2>
+   {s.data.results.some(r=>r.preferred)&&<p className="recipe-summary">検索内容に合う好きな作り手を先に表示しています。</p>}
    {s.data.warnings.length>0&&<details className="editor-panel" open={!s.data.results.length}><summary>検索の補足（{s.data.warnings.length}件）</summary>{s.data.warnings.map((w,i)=><p key={i}>{w}</p>)}</details>}
    {!s.data.results.length&&<p role="status">候補が見つかりませんでした。言葉やサイトを変えるか、URLから取り込んでください。</p>}
    <ul className="web-results web-recipe-grid">{s.data.results.map(result=><SearchCard key={result.url} result={result} onImport={onImport}/>)}</ul>

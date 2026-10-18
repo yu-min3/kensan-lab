@@ -104,3 +104,21 @@ func TestEditMissingSectionsBeforeMemo(t *testing.T) {
 		}
 	}
 }
+
+func TestChangingSourceDetachesSourceInfoAliases(t *testing.T) {
+	raw := []byte("---\ntitle: 魚\nsource: https://example.com/old\nsource_info: &credit\n  creator:\n    name: 本人\ncredit_copy: *credit\n---\n\n## 材料\n- 魚\n\n## 手順\n1. 煮る\n")
+	d, err := DecodeDocument(raw)
+	if err != nil {
+		t.Fatal(err)
+	}
+	e := editable(&d.Recipe)
+	e.Source = "https://example.com/new"
+	encoded, err := d.render(e, "2026-10-18", true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	loaded, err := DecodeDocument(encoded)
+	if err != nil || loaded.Recipe.SourceInfo != nil || !strings.Contains(string(encoded), "credit_copy:") {
+		t.Fatal(string(encoded), err)
+	}
+}

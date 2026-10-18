@@ -47,7 +47,7 @@ func TestSearchPartialFailureAndQueryValidation(t *testing.T) {
 		return webpage.Page{}, errors.New("unavailable")
 	})
 	r, e := s.Search(context.Background(), "試験", "all")
-	if e != nil || len(r.Results) != 1 || len(r.Warnings) != 4 {
+	if e != nil || len(r.Results) != 1 || len(r.Warnings) != 5 {
 		t.Fatalf("%+v %v", r, e)
 	}
 	for _, q := range []string{"", strings.Repeat("あ", 101), "a\nb"} {
