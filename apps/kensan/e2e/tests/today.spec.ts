@@ -32,24 +32,23 @@ test("空のプロジェクト一覧でも次の操作を案内する", async ({
   await expect(page.getByRole("link", { name: "プロジェクトを作る", exact: true })).toHaveAttribute("href", "/projects");
 });
 
-test("モバイルの最上段から1行日記を残し、日別実績もタッチで確認できる", async ({ page }) => {
+test("ダッシュボードの最上段で日記を読み書きし、全文編集へ進める", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
-  await page.goto("/today");
+  await page.goto("/");
   const input = page.getByLabel("今日の日記（1 行）");
   await expect(input).toBeInViewport();
   expect((await input.boundingBox())!.y).toBeLessThan(320);
-  expect((await page.locator("main header").first().boundingBox())!.height).toBeLessThan(250);
   const date = (await (await page.request.get("/api/v1/today")).json()).date;
   await input.fill("E2Eの1行日記");
   await input.press("Enter");
   await expect(page.getByText("日記に追記しました", { exact: true })).toBeVisible();
   await expect(input).toHaveValue("");
-  await expect(page.getByTestId("diary-days")).toContainText("今日書いた");
+  await expect(page.getByLabel("今日の日記の本文")).toContainText("E2Eの1行日記");
+  await page.reload();
+  await expect(page.getByLabel("今日の日記の本文")).toContainText("E2Eの1行日記");
   const daily = await (await page.request.get(`/api/v1/daily?date=${date}`)).json();
   expect(daily.content).toMatch(/## 日記\n\n- \d{2}:\d{2} E2Eの1行日記\n/);
-  await page.getByLabel("日別の記録を確認").fill(date);
-  await expect(page.getByRole("status").filter({ hasText: date })).toBeVisible();
-  await page.getByRole("link", { name: "日記ページで書く", exact: true }).click();
+  await page.getByRole("link", { name: "全文を編集", exact: true }).click();
   await expect(page).toHaveURL(new RegExp(`/daily\\?date=${date}$`));
   await expect(page.getByRole("button", { name: "日記を作成", exact: true })).toHaveCount(0);
 });
@@ -112,7 +111,6 @@ for (const mode of ["light", "dark"] as const) {
 test("やったことを1行で残すと、選んだプロジェクトに予定外の完了として入る", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto("/today");
-  await page.getByRole("tab", { name: "やったこと", exact: true }).click();
   await page.getByLabel("プロジェクト").selectOption("today-demo");
   const before = (await (await page.request.get("/api/v1/today")).json()).doneToday.unplanned;
   const input = page.getByLabel("やったこと（1 行）");
@@ -135,3 +133,32 @@ test("今日の予定が3件を超えると明日へ回すよう促す", async (
   await expect(page.getByText(/今日の予定が\s*4\s*件あります/)).toBeVisible();
   await expect(page.getByRole("link", { name: "タスク画面で明日へ回す →" })).toHaveAttribute("href", "/tasks");
 });
+
+
+test("日記の取得・保存失敗は見える形で表示し、入力を保持する", async ({ page }) => {
+  await page.route("**/api/v1/files/daily/**", route => route.fulfill({ status: 500, json: { error: "読み取り失敗" } }));
+  await page.route("**/api/v1/daily/line", route => route.fulfill({ status: 500, json: { error: "保存失敗" } }));
+  await page.route("**/api/v1/portfolio", route => route.fulfill({ status: 500, json: { error: "集計失敗" } }));
+  await page.goto("/");
+  const input = page.getByLabel("今日の日記（1 行）");
+  await expect(input).toBeVisible();
+  await input.fill("今日は散歩したい");
+  await input.press("Enter");
+  await expect(page.getByRole("alert").filter({ hasText: "保存失敗" })).toBeVisible();
+  await expect(input).toHaveValue("今日は散歩したい");
+  await expect(page.getByText("HTTP 500: 読み取り失敗", { exact: true })).toBeVisible();
+  await expect(page.getByText("今日はまだ書いていません。やりたいことを一つ、ここから。", { exact: true })).toHaveCount(0);
+});
+
+for (const mode of ["light", "dark"] as const) {
+  test(`日記ダッシュボード: ${mode}でスマホ幅に収まる`, async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.goto("/");
+    await page.evaluate(dark => document.documentElement.classList.toggle("dark", dark), mode === "dark");
+    await expect(page.getByRole("heading", { name: "今日の日記", exact: true })).toBeVisible();
+    await expect(page.getByLabel("今日の日記（1 行）")).toBeInViewport();
+    expect((await page.getByLabel("今日の日記（1 行）").boundingBox())!.height).toBeGreaterThanOrEqual(32);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(390);
+    await page.screenshot({ path: `../../../temp/kensan-dashboard-diary-${mode}.png`, fullPage: false });
+  });
+}
