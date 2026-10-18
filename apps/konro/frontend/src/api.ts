@@ -89,3 +89,9 @@ export async function searchWebRecipes(q:string,site:string,signal:AbortSignal,c
  const r=await fetch(`/api/v1/discovery/search?${params}`,{signal});
  if(!r.ok)throw new Error((await r.text()).trim()||'検索できませんでした');return r.json();
 }
+
+export async function saveRecipePhoto(file:string,version:string,photo:Blob):Promise<Recipe>{
+ const res=await fetch(`/api/v1/recipe-photos/${encodeURIComponent(file)}`,{method:'PUT',headers:{'Content-Type':'image/jpeg','If-Match':`"${version}"`},body:photo});
+ if(!res.ok)throw new RecipeWriteError((await res.text()).trim(),res.status);
+ return res.json();
+}

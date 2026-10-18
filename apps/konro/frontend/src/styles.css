@@ -736,3 +736,11 @@ html:has(.recipe-detail) { scroll-padding-top: calc(var(--row-h) + var(--gap-inl
  .recipes-page:has(.library-selection) { padding-bottom: var(--gap-stack); }
 }
 @media (min-width: 1200px) { .recipe-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+
+/* Recipe photos share the detail panel and existing action controls. */
+.recipe-photo { display: grid; gap: var(--gap-stack); margin-block: var(--gap-stack); }
+.recipe-photo .recipe-cover { margin: 0; }
+.recipe-photo .editor-actions { flex-wrap: wrap; }
+.recipe-photo-empty { display: grid; justify-items: center; gap: var(--gap-inline); padding: var(--card-pad-y) var(--card-pad-x); border: 1px dashed hsl(var(--border)); border-radius: var(--radius-lg); background: hsl(var(--muted)); color: hsl(var(--muted-foreground)); }
+.recipe-photo-empty svg { width: var(--row-h); height: var(--row-h); }
+.recipe-photo-empty p, .recipe-photo > p { margin: 0; }

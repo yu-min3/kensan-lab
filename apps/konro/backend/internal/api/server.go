@@ -36,6 +36,7 @@ func New(dataDir, staticDir string, opts ...Option) http.Handler {
 	}
 	registerDrafts(mux, importer.New(dataDir, config.agent))
 	registerRecipeWrites(mux, dataDir)
+	registerPhotos(mux, dataDir)
 	creatorStore := creatorprefs.New(dataDir)
 	searchService := discovery.New(config.searchFetch).WithPreferences(creatorStore)
 	registerDiscovery(mux, searchService)
