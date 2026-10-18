@@ -54,7 +54,7 @@ export type ImportContent = { title: string; servings: string; ingredients: stri
 export type ImportDraft = {
   id: string; revision: number;
   source: { url?: string; raw: string; text: string; kind?:string;info?:SourceInfo };
-  content: ImportContent; warnings: string[];
+  content: ImportContent; warnings: string[]; assessment?: string;
   pending: boolean; detached: boolean; agent_available: boolean; saved_file?: string;
   job?: { id: string; state: string; reason?: string };
 };

@@ -89,7 +89,7 @@ try {
   await page.getByLabel("手順（1行に1つの手順）", { exact: true }).fill("10分煮る");
   await button("レシピを保存").click(); await page.getByRole("heading", { name: "新しいスープ", exact: true }).waitFor();
   await button("調理に追加").click(); await button("一覧へ").click();
-  await button("🔥 1 品でコンロを開始").click(); await page.getByText("10分煮る", { exact: true }).waitFor();
+  await button("1品でコンロを開始").click(); await page.getByText("10分煮る", { exact: true }).waitFor();
   await checkContrast(page.locator(".step-current .step-num"), "dark current step number");
   await checkContrast(page.locator(".step-timers .chip").first(), "dark timer action");
   await page.locator(".step-timers .chip").first().click();
@@ -146,7 +146,7 @@ try {
   results.push("recipe URL reload and Back/Forward work; cancelling Back retains unsaved input and URL");
   await button("一覧へ").click();await button("パスタを調理に選ぶ").click();
   await page.route("**/api/v1/recipes/**",r=>r.abort());
-  await button("🔥 1 品でコンロを開始").click();await page.getByRole("alert").getByText(/調理を開始できませんでした/).waitFor();
+  await button("1品でコンロを開始").click();await page.getByRole("alert").getByText(/調理を開始できませんでした/).waitFor();
   assert.equal(await page.evaluate(()=>localStorage.getItem("konro-session-v1")),null);
   await page.unroute("**/api/v1/recipes/**");
   results.push("failed initial recipe fetch never creates a partial cooking session");

@@ -1,3 +1,4 @@
+import {Star,Clock,Flame,X} from 'lucide-react';
 import { useEffect, useMemo, useState } from "react";
 import { fetchRecipes, formatDuration, importRecipeZip, RecipeMeta } from "../api";
 import { RecipePage } from "./RecipePage";
@@ -10,11 +11,10 @@ import { normalizeQuery } from "../session";
 // Recipe browser + session builder: tap cards to put recipes "on the stove",
 // then start the cooking session.
 export function RecipesPage({ onStart, starting = false }: { onStart: (files: string[]) => void; starting?: boolean }) {
-  const [webImport, setWebImport] = useState(false);
- const [discovering,setDiscovering]=useState(false);
- const [importURL,setImportURL]=useState("");
- const search=useRecipeSearch(discovering);
-  const { opened, navigate: setOpened, onGuard } = useRecipeRoute();
+  const { route, navigate, back, onGuard } = useRecipeRoute();
+  const discovering=route.page==='search'||route.page==='creators';
+  const search=useRecipeSearch(discovering);
+  const setOpened=(file:string|null,replace=false)=>navigate(file===null?{page:'list'}:{page:'recipe',file},replace);
   const [recipes, setRecipes] = useState<RecipeMeta[]>([]);
   const [error, setError] = useState("");
   const [q, setQ] = useState("");
@@ -64,15 +64,16 @@ export function RecipesPage({ onStart, starting = false }: { onStart: (files: st
   const toggle = (file: string) =>
     setSelected((sel) => (sel.includes(file) ? sel.filter((f) => f !== file) : [...sel, file]));
 
-  if (opened !== null) return <RecipePage onGuard={onGuard} key={opened} file={opened || null} selected={selected.includes(opened)} onBack={() => setOpened(null)} onToggle={toggle} onSaved={(r) => {
+  if (route.page === "recipe") { const opened=route.file; return <RecipePage onGuard={onGuard} key={opened} file={opened || null} selected={selected.includes(opened)} onBack={() => back({page:"list"})} onToggle={toggle} onSaved={(r) => {
     setOpened(r.file, true); setImportMsg(`✓ ${r.title} を保存しました`);
     fetchRecipes().then(setRecipes).catch((e) => setError(String(e)));
   }} />;
 
-  if (discovering) return <SearchPage search={search} onClose={()=>setDiscovering(false)} onImport={(url)=>{setDiscovering(false);setImportURL(url);setWebImport(true);}} />;
+  }
+  if (discovering) return <SearchPage search={search} managing={route.page==='creators'} onManage={()=>navigate({page:'creators'})} onCloseManage={()=>back({page:'search'})} onClose={()=>back({page:'list'})} onImport={(url)=>navigate({page:'import',url,fromSearch:true})} />;
 
-  if (webImport) return <ImportPage initialURL={importURL} onClose={() => {setWebImport(false);if(importURL)setDiscovering(true);setImportURL("");}} onSaved={(file, title) => {
-    setWebImport(false); setImportURL(""); setImportMsg(`✓ ${title} を保存しました`);
+  if (route.page==='import') return <ImportPage key={route.url||route.draft||'manual'} initialURL={route.url} initialDraft={route.draft} returnToSearch={route.fromSearch} onGuard={onGuard} onDraft={(id)=>navigate({...route,draft:id},true)} onClose={()=>back({page:route.fromSearch?'search':'list'},true)} onSaved={(file, title) => {
+    navigate({page:'list'},true); setImportMsg(`✓ ${title} を保存しました`);
     setQ(""); setTag(""); setSelected((s) => s.includes(file) ? s : [...s, file]);
     fetchRecipes().then(setRecipes).catch((e) => setError(String(e)));
   }} />;
@@ -82,7 +83,7 @@ export function RecipesPage({ onStart, starting = false }: { onStart: (files: st
       <header className="list-header">
         <div className="header-row">
           <h1 className="h-serif">konro</h1>
-          <div className="editor-actions"><button className="chip chip-on" onClick={()=>setDiscovering(true)}>Webで探す</button><button className="chip" onClick={() => {setImportURL("");setWebImport(true);}}>レシピを追加</button>
+          <div className="editor-actions"><button className="chip chip-on" onClick={()=>navigate({page:"search"})}>Webで探す</button><button className="chip" onClick={() => navigate({page:"import",url:"",fromSearch:false})}>レシピを追加</button>
           <button className="chip" onClick={() => setOpened("")}>手入力で作成</button>
           <label className="chip import-chip">
             {importing ? "取込中…" : "ZIP取込"}
@@ -138,7 +139,7 @@ export function RecipesPage({ onStart, starting = false }: { onStart: (files: st
         </div>
       )}
 
-      {!error && recipes.length === 0 && <div className="empty-state"><p>最初のレシピを追加しましょう</p><button className="chip" onClick={() => setWebImport(true)}>URL・本文から取り込む</button></div>}
+      {!error && recipes.length === 0 && <div className="empty-state"><p>最初のレシピを追加しましょう</p><button className="chip" onClick={() => navigate({page:"import",url:"",fromSearch:false})}>URL・本文から取り込む</button></div>}
       <ul className="recipe-grid">
         {shown.map((r) => {
           const idx = selected.indexOf(r.file);
@@ -155,12 +156,13 @@ export function RecipesPage({ onStart, starting = false }: { onStart: (files: st
                 <div className="card-body">
                   <div className="card-title">{r.title}</div>
                   <div className="card-meta">
-                    {formatDuration(r.cookTime) && <span>⏱ {formatDuration(r.cookTime)}</span>}
-                    {r.rating ? <span>{"★".repeat(r.rating)}</span> : null}
+                    {formatDuration(r.cookTime) && <span className="recipe-duration"><Clock aria-hidden="true"/>{formatDuration(r.cookTime)}</span>}
                   </div>
+                  {r.rating ? <div className="personal-rating" aria-label={`自分の評価 ${r.rating}、5点満点`}><span>自分の評価</span><span className="personal-rating-value"><span className="personal-rating-stars" aria-hidden="true">{[1,2,3,4,5].map(n=><Star key={n} fill={n<=r.rating!?'currentColor':'none'} className={n<=r.rating!?'rated-star':'unrated-star'}/>)}</span><strong className="tnum">{r.rating} / 5</strong></span></div>:<p className="recipe-summary personal-rating-empty">自分の評価：未設定</p>}
+
                 </div>
               </button>
-              <button className={`recipe-select ${idx >= 0 ? "chip-on" : ""}`} aria-label={`${r.title}を調理に${idx >= 0 ? "選択済み" : "選ぶ"}`} aria-pressed={idx >= 0} onClick={() => toggle(r.file)}>{idx >= 0 ? "✓ 調理に選択済み" : "調理に選ぶ"}</button>
+              <button disabled={starting} className={`recipe-select ${idx >= 0 ? "chip-on" : ""}`} aria-label={`${r.title}を調理に${idx >= 0 ? "選択済み" : "選ぶ"}`} aria-pressed={idx >= 0} onClick={() => toggle(r.file)}>{idx >= 0 ? "✓ 調理に選択済み" : "調理に選ぶ"}</button>
               </article>
             </li>
           );
@@ -168,11 +170,13 @@ export function RecipesPage({ onStart, starting = false }: { onStart: (files: st
       </ul>
 
       {selected.length > 0 && (
-        <div className="start-bar">
-          <button className="start-button" disabled={starting} onClick={() => onStart(selected)}>
-            🔥 {selected.length} 品でコンロを開始
-          </button>
-        </div>
+        <section className="start-bar" aria-label="今回調理するレシピ">
+          <div className="cooking-selection">
+            <div className="header-row"><h2><Flame aria-hidden="true"/>今回調理するレシピ（{selected.length}品）</h2><button className="chip" disabled={starting} onClick={()=>setSelected([])}>すべて外す</button></div>
+            <ol className="cooking-selection-list">{selected.map((file,i)=>{const recipe=recipes.find(r=>r.file===file);return <li key={file}><span className="selection-order tnum">{i+1}</span><span>{recipe?.title??file}</span><button className="chip" disabled={starting} aria-label={`${recipe?.title??file}を今回の調理から外す`} onClick={()=>toggle(file)}><X aria-hidden="true"/>外す</button></li>})}</ol>
+            <button className="start-button" disabled={starting} onClick={() => onStart(selected)}><Flame aria-hidden="true"/>{starting?'準備中…':`${selected.length}品でコンロを開始`}</button>
+          </div>
+        </section>
       )}
     </div>
   );

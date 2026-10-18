@@ -25,7 +25,7 @@ await writeFile(tokenFile, token, { mode: 0o600 });
 const freePort = () => new Promise((resolve) => { const s = net.createServer(); s.listen(0, "127.0.0.1", () => { const p = s.address().port; s.close(() => resolve(p)); }); });
 const runtimePort = await freePort(), appPort = await freePort();
 const runtimeURL = `http://127.0.0.1:${runtimePort}`, appURL = `http://127.0.0.1:${appPort}`;
-const output = { title: "鮭の煮物", servings: "2人分", ingredients: ["鮭 2切れ", "水 100ml"], steps: ["水を沸かす", "鮭を10分煮る"] };
+const output = { assessment:"本文から材料と調理手順を読み取れました。分量を確認して保存してください。", title: "鮭の煮物", servings: "2人分", ingredients: ["鮭 2切れ", "水 100ml"], steps: ["水を沸かす", "鮭を10分煮る"] };
 const fixture = async (mode, value = output) => writeFile(control, JSON.stringify({ mode, output: value }));
 await fixture("success");
 const launch = (binary, args, env, name) => {
@@ -77,12 +77,13 @@ try {
   await page.getByLabel("材料（1行に1項目）", { exact: true }).fill("鮭 2切れ\n水 100ml");
   await page.getByLabel("手順（1行に1つの手順）", { exact: true }).fill("水を沸かす\n10分煮る");
   await button("下書きを保存して戻る").click();
+  await button("レシピを追加").waitFor();
   await page.reload(); await button("レシピを追加").click();
   await page.getByLabel("タイトル", { exact: true }).waitFor();
   assert.equal(await page.getByLabel("タイトル", { exact: true }).inputValue(), "手入力の鮭");
   assert.equal(await button("レシピとして保存").isEnabled(), false);
   await page.getByRole("checkbox").check(); await button("レシピとして保存").click();
-  await button("🔥 1 品でコンロを開始").click();
+  await button("1品でコンロを開始").click();
   await waitText("10分煮る");
   await page.screenshot({ path: path.join(artifacts, "cooking-mobile.png"), fullPage: true });
   console.log("passed step", results.length + 1); results.push("manual draft persists after reload; confirmed recipe enters existing cooking session");
@@ -94,6 +95,7 @@ try {
 
   await waitText("取り込めました");
   assert.equal(await page.getByLabel("タイトル", { exact: true }).inputValue(), output.title);
+  await page.getByText(output.assessment,{exact:true}).waitFor();
   await page.getByText("取り込み元を確認", { exact: true }).click();
   assert.equal(await page.locator("pre").first().textContent(), source);
   assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth), false);

@@ -365,3 +365,29 @@ func TestSourceCreditsSurviveImportAndPersonalEdit(t *testing.T) {
 		t.Fatal("stale source info", rec, err)
 	}
 }
+
+func TestAIExplainsUnavailableContentWithoutInventingRecipe(t *testing.T) {
+	if !json.Valid([]byte(Schema)) {
+		t.Fatal("invalid output schema")
+	}
+	a := &fakeAgent{result: agentclient.Job{ID: "generic-job", State: "succeeded", Output: json.RawMessage(`{"title":"会員向けの魚料理","servings":"","ingredients":[],"steps":[],"assessment":"会員限定の案内と料理の紹介文は読めましたが、材料・手順は本文に含まれていません。"}`)}}
+	s := New(t.TempDir(), a)
+	d, err := s.Import(context.Background(), "", "会員向けの魚料理。このレシピは会員限定です。材料・手順はログイン後に表示します。")
+	if err != nil {
+		t.Fatal(err)
+	}
+	d, err = s.Get(context.Background(), d.ID)
+	if err != nil || d.Job.State != "succeeded" || d.Assessment == "" || len(d.Content.Ingredients) != 0 || len(d.Content.Steps) != 0 {
+		t.Fatal(d, err)
+	}
+	if !strings.Contains(a.requests[0].Prompt, "assessment") || !strings.Contains(a.requests[0].Prompt, "原因が不明なら断定しない") {
+		t.Fatal("missing explanation instruction")
+	}
+	stored, err := New(s.dir, nil).Get(context.Background(), d.ID)
+	if err != nil || stored.Assessment != d.Assessment {
+		t.Fatal(stored, err)
+	}
+	if _, err = s.Save(d.ID, d.Revision); err == nil {
+		t.Fatal("missing recipe was saved")
+	}
+}

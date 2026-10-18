@@ -1,40 +1,58 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from 'react';
 
-const key = "konroRouteIndex";
-function readRoute(): string | null {
- if (location.hash === "#new") return "";
- if (!location.hash.startsWith("#recipe/")) return null;
- try { return decodeURIComponent(location.hash.slice(8)); } catch { return null; }
+export type Route = {page:'list'} | {page:'recipe';file:string} | {page:'search'} | {page:'creators'} | {page:'import';url:string;draft?:string;fromSearch:boolean};
+export type LeaveGuard=()=>boolean|Promise<boolean>;
+const key='konroRouteIndex', previousKey='konroPreviousRoute';
+function readRoute():Route {
+ const [path,query='']=location.hash.slice(1).split('?');
+ if(path==='new')return {page:'recipe',file:''};
+ if(path.startsWith('recipe/')){try{return {page:'recipe',file:decodeURIComponent(path.slice(7))}}catch{return {page:'list'}}}
+ if(path==='search'||path==='creators')return {page:path};
+ if(path==='import'){const p=new URLSearchParams(query);return {page:'import',url:p.get('url')??'',draft:/^[a-f0-9]{32}$/.test(p.get('draft')??'')?p.get('draft')!:undefined,fromSearch:p.get('from')==='search'}};
+ return {page:'list'};
 }
-const hashFor = (file: string | null) => file === null ? "" : file === "" ? "#new" : `#recipe/${encodeURIComponent(file)}`;
+const hashFor=(r:Route):string=>{
+ switch(r.page){
+  case 'list':return '';
+  case 'recipe':return r.file?`#recipe/${encodeURIComponent(r.file)}`:'#new';
+  case 'search':case 'creators':return '#'+r.page;
+  case 'import':{const p=new URLSearchParams();if(r.url)p.set('url',r.url);if(r.draft)p.set('draft',r.draft);if(r.fromSearch)p.set('from','search');return '#import'+(p.size?'?'+p:'')}
+ }
+};
 
-/** Recipe URLs survive reload; Back/Forward observes the editor's discard guard. */
-export function useRecipeRoute() {
- const [opened,setOpened] = useState(readRoute);
- const guard = useRef<(()=>boolean)|null>(null);
- const current = useRef({ index: Number(history.state?.[key] ?? 0), file: opened });
- const restoring = useRef(false);
- const onGuard = useCallback((value:(()=>boolean)|null)=>{guard.current=value;},[]);
+/** One history for recipe, search, creator and import screens. */
+export function useRecipeRoute(){
+ const [route,setRoute]=useState(readRoute);
+ const guard=useRef<LeaveGuard|null>(null);
+ const current=useRef({index:Number(history.state?.[key]??0),route});
+ const restoring=useRef(false),checking=useRef(false),bypass=useRef(false);
+ const requested=useRef(current.current);
+ const onGuard=useCallback((value:LeaveGuard|null)=>{guard.current=value},[]);
  useEffect(()=>{
-  history.replaceState({...history.state,[key]:current.current.index},"",location.href);
-  const pop = () => {
-   if (restoring.current) { restoring.current=false; return; }
-   const nextIndex=Number(history.state?.[key] ?? 0);
-   if (guard.current && !guard.current()) {
-    const delta=current.current.index-nextIndex;
-    if (delta) { restoring.current=true; history.go(delta); }
-    else { history.replaceState({...history.state,[key]:current.current.index},"",`${location.pathname}${location.search}${hashFor(current.current.file)}`); }
-    return;
-   }
-   const file=readRoute(); current.current={index:nextIndex,file}; setOpened(file);
+  history.replaceState({...history.state,[key]:current.current.index},'',location.href);
+  const pop=()=>{
+   if(restoring.current){restoring.current=false;return}
+   requested.current={index:Number(history.state?.[key]??0),route:readRoute()};
+   if(bypass.current){bypass.current=false;current.current=requested.current;setRoute(current.current.route);return}
+   if(checking.current)return;
+   checking.current=true;
+   Promise.resolve().then(()=>guard.current?.()??true).catch(()=>false).then(allow=>{
+    checking.current=false;const next=requested.current;
+    if(allow){current.current=next;setRoute(next.route);return}
+    const delta=current.current.index-next.index;
+    if(delta){restoring.current=true;history.go(delta)}
+    else history.replaceState({...history.state,[key]:current.current.index},'',`${location.pathname}${location.search}${hashFor(current.current.route)}`);
+   });
   };
-  addEventListener("popstate",pop);
-  return ()=>removeEventListener("popstate",pop);
+  addEventListener('popstate',pop);return()=>removeEventListener('popstate',pop);
  },[]);
- const navigate = useCallback((file:string|null, replace=false)=>{
+ const navigate=useCallback((next:Route,replace=false)=>{
   const index=current.current.index+(replace?0:1);
-  history[replace?"replaceState":"pushState"]({...history.state,[key]:index},"",`${location.pathname}${location.search}${hashFor(file)}`);
-  current.current={index,file}; setOpened(file);
+  history[replace?'replaceState':'pushState']({...history.state,[key]:index,...(!replace?{[previousKey]:hashFor(current.current.route)}:{})},'',`${location.pathname}${location.search}${hashFor(next)}`);
+  current.current={index,route:next};setRoute(next);
  },[]);
- return {opened,navigate,onGuard};
+ const back=useCallback((fallback:Route,alreadySaved=false)=>{
+  if(current.current.index>0&&history.state?.[previousKey]===hashFor(fallback)){bypass.current=alreadySaved;history.back()}else navigate(fallback);
+ },[navigate]);
+ return {route,navigate,back,onGuard};
 }

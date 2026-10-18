@@ -32,14 +32,14 @@ function SearchCard({result,onImport,favorites:f}:{result:WebRecipe;onImport:(ur
   <a className="web-recipe-source" href={result.url} target="_blank" rel="noreferrer">元のページを見る<ExternalLink aria-hidden="true"/></a>
  </li>;
 }
-export function SearchPage({search:s,onClose,onImport}:{search:Search;onClose:()=>void;onImport:(url:string)=>void}){
- const favorites=useFavoriteCreators();const [managing,setManaging]=useState(false);
+export function SearchPage({search:s,onClose,onImport,managing,onManage,onCloseManage}:{search:Search;onClose:()=>void;onImport:(url:string)=>void;managing:boolean;onManage:()=>void;onCloseManage:()=>void}){
+ const favorites=useFavoriteCreators();
  useEffect(()=>{if(favorites.settings&&s.creator&&!favorites.creators.some(c=>c.id===s.creator)){s.setCreator('');if(s.q.trim())void s.search('');else s.clearResults();}},[favorites.settings,s.creator]);
- const select=(id:string)=>{s.setCreator(id);setManaging(false);if(s.q.trim())void s.search(id);else s.clearResults();};
- if(managing)return <CreatorsPage favorites={favorites} onClose={()=>setManaging(false)} onSelect={select}/>;
+ const select=(id:string)=>{s.setCreator(id);if(managing)onCloseManage();if(s.q.trim())void s.search(id);else s.clearResults();};
+ if(managing)return <CreatorsPage favorites={favorites} onClose={onCloseManage} onSelect={select}/>;
  return <main className="editor-page search-page">
   <header className="header-row"><h1 className="h-serif">Webでレシピを探す</h1><button className="chip" onClick={onClose}>一覧へ</button></header>
-  <div className="creator-search-tools"><button className="recipe-action" onClick={()=>setManaging(true)}><Heart aria-hidden="true"/>好きな作り手を管理</button></div>
+  <div className="creator-search-tools"><button className="recipe-action" onClick={onManage}><Heart aria-hidden="true"/>好きな作り手を管理</button></div>
   <CreatorNotice favorites={favorites}/>
   <div className="creator-filters" role="group" aria-label="作り手を指定"><button className={`chip ${!s.creator?'chip-on':''}`} aria-pressed={!s.creator} onClick={()=>select('')}>すべて</button>{favorites.creators.map(c=><button key={c.id} className={`chip ${s.creator===c.id?'chip-on':''}`} aria-pressed={s.creator===c.id} onClick={()=>select(c.id)}>{c.name}</button>)}</div>
   <Panel>

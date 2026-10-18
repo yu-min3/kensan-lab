@@ -4,7 +4,7 @@ import {storageKey,readDraftRefs,rememberDraft,clearImportDraft} from "../import
 export {clearImportDraft} from "../importDraftStorage";
 const empty: ImportContent = { title: "", servings: "", ingredients: [], steps: [] };
 
-export function useImportJob(initialURL="") {
+export function useImportJob(initialURL="", initialDraft="") {
   const [kind, setKind] = useState<"url" | "text">("url");
   const [input, setInput] = useState(initialURL);
   const [draft, setDraft] = useState<ImportDraft | null>(null);
@@ -17,7 +17,7 @@ export function useImportJob(initialURL="") {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [savedDrafts,setSavedDrafts]=useState(readDraftRefs);
-  const [resume, setResume] = useState(() => initialURL ? readDraftRefs().find(r=>r.url===initialURL)?.id??"" : localStorage.getItem(storageKey) ?? "");
+  const [resume, setResume] = useState(() => initialDraft || (initialURL ? readDraftRefs().find(r=>r.url===initialURL)?.id??"" : localStorage.getItem(storageKey) ?? ""));
   const [loading, setLoading] = useState(!!resume || !!initialURL);
  const [resumeAttempt,setResumeAttempt]=useState(0);
   const mounted = useRef(true);
@@ -41,7 +41,7 @@ export function useImportJob(initialURL="") {
   }, [resume,resumeAttempt]);
   const initialRequest = useRef<Promise<ImportDraft> | null>(null);
   useEffect(() => {
-    if (!initialURL || resume) return;
+    if (!initialURL || resume || initialDraft) return;
     let live = true;
     initialRequest.current ??= draftRequest("", "POST", {url:initialURL,text:""});
     initialRequest.current.then(d=>{if(live)adopt(d);}).catch(e=>{if(live)setError(e.message);}).finally(()=>{if(live)setLoading(false);});
@@ -97,5 +97,7 @@ export function useImportJob(initialURL="") {
   const discardView = () => { clearImportDraft();setSavedDrafts(readDraftRefs()); setResume(""); setDraft(null); setInput(""); setError(""); };
 
  const restoreDraft=(id:string)=>{setResumeAttempt(n=>n+1);setLoading(true);setDraft(null);setResume(id);setError("");};
-  return {create,savedDrafts,restoreDraft,kind,setKind,input,setInput,draft,content,setContent,ingredients,setIngredients,steps,setSteps,submitting,pollError,confirmed,setConfirmed,busy,error,resume,loading,active,perform,persist,start,action,discardView,adopt};
+  const dirty=!!draft&&JSON.stringify(edited())!==JSON.stringify(draft.content);
+  const leave=async()=>{if(busy||loading)return false;if(!dirty||active)return true;let saved=false;await perform(async()=>{await persist();saved=true});return saved};
+  return {leave,dirty,create,savedDrafts,restoreDraft,kind,setKind,input,setInput,draft,content,setContent,ingredients,setIngredients,steps,setSteps,submitting,pollError,confirmed,setConfirmed,busy,error,resume,loading,active,perform,persist,start,action,discardView,adopt};
 }
