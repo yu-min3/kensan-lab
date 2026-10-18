@@ -7,7 +7,7 @@ date: 2026-09-10
 
 The dashboard combines three levels of useful information: the map shows the relationship between direction and evidence, the original project cards show the work being pursued, and the diary captures daily intentions and observations. The technical radar and annual view retain their original role.
 
-The diary can be read, created, edited and appended to in place, with date navigation and a calendar. Its content stays free-form.
+The diary can be read, created, edited and appended to in place, with date navigation and a calendar. Its content stays free-form. A one-line input below the reading view appends a plain paragraph to the selected date, or creates the diary when missing. Enter and the save button both submit; the full editor remains available. Appends to existing diaries share the editor save queue and conflict recovery rather than using the legacy section-based diary API.
 
 ## Removed management UI
 
