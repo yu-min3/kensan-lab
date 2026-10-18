@@ -84,8 +84,8 @@ export type SearchResults = {results:WebRecipe[];warnings:string[]};
 export async function searchSites():Promise<SearchSite[]> {
  const r=await fetch('/api/v1/discovery/sites');if(!r.ok)throw new Error('検索サイトを読み込めません');return r.json();
 }
-export async function searchWebRecipes(q:string,site:string,signal:AbortSignal):Promise<SearchResults> {
- const params=new URLSearchParams({q,site});
+export async function searchWebRecipes(q:string,site:string,signal:AbortSignal,creator=""):Promise<SearchResults> {
+ const params=new URLSearchParams({q,site,...(creator?{creator}: {})});
  const r=await fetch(`/api/v1/discovery/search?${params}`,{signal});
  if(!r.ok)throw new Error((await r.text()).trim()||'検索できませんでした');return r.json();
 }

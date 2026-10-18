@@ -22,7 +22,13 @@ func registerDiscovery(mux *http.ServeMux, service *discovery.Service) {
 		w.Header().Set("Cache-Control", "no-store")
 		ctx, cancel := context.WithTimeout(r.Context(), 20*time.Second)
 		defer cancel()
-		result, err := service.Search(ctx, r.URL.Query().Get("q"), r.URL.Query().Get("site"))
+		var result discovery.Response
+		var err error
+		if creator := r.URL.Query().Get("creator"); creator != "" {
+			result, err = service.SearchCreator(ctx, r.URL.Query().Get("q"), creator)
+		} else {
+			result, err = service.Search(ctx, r.URL.Query().Get("q"), r.URL.Query().Get("site"))
+		}
 		if err != nil {
 			http.Error(w, err.Error(), 400)
 			return

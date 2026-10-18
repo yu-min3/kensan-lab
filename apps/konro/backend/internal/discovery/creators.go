@@ -3,28 +3,33 @@ package discovery
 import (
 	"context"
 	"github.com/PuerkitoBio/goquery"
+	"github.com/yu-min3/kensan-lab/apps/konro/backend/internal/creatorprefs"
 	"github.com/yu-min3/kensan-lab/apps/konro/backend/internal/provenance"
 	"github.com/yu-min3/kensan-lab/apps/konro/backend/internal/webpage"
 	"golang.org/x/text/unicode/norm"
 	"net/url"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
 	"unicode"
 )
 
-// Stable source IDs, verified against official profiles on 2026-10-18.
-var favoriteCreators = []struct{ ID, Name, Query string }{
-	{"youtube:UCLcqrpFhRlJnm6etuLQblWg", "笠原将弘", "笠原将弘"},
-	{"youtube:UCP2gnyy_-ToZeIDw6qeI6HA", "ジョージ（城二郎）", "ジョージ 城二郎"},
-	{"kurashiru:chef:6", "中村和成", ""},
-}
+// The old three creators are migration defaults, not the runtime preference list.
+var favoriteCreators = creatorprefs.Initial()
 
-func preferred(info *provenance.Info) bool {
+func (s *Service) Creators() ([]creatorprefs.Creator, error) {
+	if s.preferences == nil {
+		return creatorprefs.Initial(), nil
+	}
+	snap, err := s.preferences.Get()
+	return snap.Creators, err
+}
+func preferred(info *provenance.Info, creators []creatorprefs.Creator) bool {
 	if info == nil || info.Creator == nil {
 		return false
 	}
-	for _, c := range favoriteCreators {
+	for _, c := range creators {
 		if info.Creator.ID == c.ID {
 			return true
 		}
@@ -72,80 +77,119 @@ func (s *Service) fetchPage(ctx context.Context, raw string) (webpage.Page, erro
 	defer func() { <-s.slots }()
 	return s.fetch(ctx, raw)
 }
-func (s *Service) favoriteResults(ctx context.Context, q, site string) ([][]Result, bool) {
+
+func creatorSite(c creatorprefs.Creator) string {
+	if strings.HasPrefix(c.ID, "youtube:") {
+		return "youtube"
+	}
+	if strings.HasPrefix(c.ID, "kurashiru:chef:") {
+		return "kurashiru"
+	}
+	return ""
+}
+func (s *Service) creatorResults(ctx context.Context, q string, c creatorprefs.Creator, limit int) ([]Result, error) {
+	var candidates []Result
+	var err error
+	switch creatorSite(c) {
+	case "youtube":
+		term := strings.NewReplacer("（", " ", "）", " ").Replace(c.Name)
+		var p webpage.Page
+		p, err = s.fetchPage(ctx, searchURL("youtube", q+" "+term))
+		if err == nil {
+			candidates = parseResults(p, "youtube")
+		}
+	case "kurashiru":
+		candidates, err = s.chefCatalog(ctx, c)
+	default:
+		return nil, creatorprefs.ErrInvalid
+	}
+	out := []Result{}
+	seen := map[string]bool{}
+	for _, r := range candidates {
+		if r.Info == nil || r.Info.Creator == nil || r.Info.Creator.ID != c.ID || !queryMatches(q, r.Title) || seen[r.URL] {
+			continue
+		}
+		r.Preferred = true
+		seen[r.URL] = true
+		out = append(out, r)
+		if len(out) == limit {
+			break
+		}
+	}
+	return out, err
+}
+func (s *Service) favoriteResults(ctx context.Context, q, site string, creators []creatorprefs.Creator) ([][]Result, bool) {
 	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
-	groups := make([][]Result, 3)
+	chosen := []creatorprefs.Creator{}
+	for _, c := range creators {
+		if c.Additional && (site == "all" || site == "" || site == creatorSite(c)) {
+			chosen = append(chosen, c)
+			if len(chosen) == 3 {
+				break
+			}
+		}
+	}
+	groups := make([][]Result, len(chosen))
 	var wg sync.WaitGroup
 	var mu sync.Mutex
 	failed := false
-	for i, c := range favoriteCreators {
-		if i < 2 && site != "all" && site != "" && site != "youtube" {
-			continue
-		}
-		if i == 2 && site != "all" && site != "" && site != "kurashiru" {
-			continue
-		}
+	for i, c := range chosen {
 		wg.Add(1)
-		go func(i int, id, name, term string) {
+		go func(i int, c creatorprefs.Creator) {
 			defer wg.Done()
-			var candidates []Result
-			var err error
-			if i < 2 {
-				var p webpage.Page
-				p, err = s.fetchPage(ctx, searchURL("youtube", q+" "+term))
-				if err == nil {
-					candidates = parseResults(p, "youtube")
-				}
-			} else {
-				candidates, err = s.chefCatalog(ctx)
-			}
+			results, err := s.creatorResults(ctx, q, c, 3)
+			groups[i] = results
 			if err != nil {
 				mu.Lock()
 				failed = true
 				mu.Unlock()
 			}
-			for _, r := range candidates {
-				if r.Info == nil || r.Info.Creator == nil || r.Info.Creator.ID != id || !queryMatches(q, r.Title) {
-					continue
-				}
-				r.Preferred = true
-				groups[i] = append(groups[i], r)
-				if len(groups[i]) == 3 {
-					break
-				}
-			}
-		}(i, c.ID, c.Name, c.Query)
+		}(i, c)
 	}
 	wg.Wait()
 	return groups, failed
 }
-func (s *Service) chefCatalog(ctx context.Context) ([]Result, error) {
+
+type chefEntry struct {
+	results []Result
+	until   time.Time
+}
+
+func (s *Service) chefCatalog(ctx context.Context, c creatorprefs.Creator) ([]Result, error) {
 	s.chefMu.Lock()
 	defer s.chefMu.Unlock()
-	if time.Now().Before(s.chefUntil) {
-		return append([]Result(nil), s.chefResults...), nil
+	if entry, ok := s.chefs[c.ID]; ok && time.Now().Before(entry.until) {
+		return append([]Result(nil), entry.results...), nil
 	}
-	var out []Result
+	if !creatorprefs.Valid(c) || creatorSite(c) != "kurashiru" {
+		return nil, creatorprefs.ErrInvalid
+	}
+	expected, _ := url.Parse(c.URL)
+	out := []Result{}
 	for page := 1; page <= 3; page++ {
-		raw := "https://www.kurashiru.com/chefs/6"
+		raw := c.URL
 		if page > 1 {
-			raw += "?page=" + string(rune('0'+page))
+			raw += "?page=" + strconv.Itoa(page)
 		}
 		p, err := s.fetchPage(ctx, raw)
 		if err != nil {
 			return out, err
 		}
+		actual, e := url.Parse(p.URL)
+		if e != nil || actual.Hostname() != expected.Hostname() || actual.Path != expected.Path {
+			return out, creatorprefs.ErrInvalid
+		}
 		doc, err := goquery.NewDocumentFromReader(strings.NewReader(p.HTML))
 		if err != nil {
 			return out, err
 		}
-		if u, e := url.Parse(p.URL); e != nil || u.Hostname() != "www.kurashiru.com" || u.Path != "/chefs/6" || strings.TrimSpace(doc.Find(".ChefsShow-name").First().Text()) != "中村和成" {
-			return out, ErrQuery
+		name := strings.Join(strings.Fields(doc.Find(".ChefsShow-name").First().Text()), " ")
+		if name == "" || len([]rune(name)) > 120 {
+			return out, creatorprefs.ErrInvalid
 		}
-		// Only this official chef's own recipe list, never page recommendations.
 		doc.Find(`.ChefsShow-videosList a.thumbnail-wrapper[href^="/recipes/"]`).Each(func(_ int, a *goquery.Selection) {
-			href, _ := a.Attr("href")
+			href := a.AttrOr("href", "")
 			canonical, ok := Canonical("https://www.kurashiru.com" + href)
 			if !ok {
 				return
@@ -167,14 +211,19 @@ func (s *Service) chefCatalog(ctx context.Context) ([]Result, error) {
 					}
 				})
 			}
-			out = append(out, Result{Title: title, URL: canonical, Site: "kurashiru", SiteName: Name("kurashiru"), Image: previewImage(p.URL, image), Info: &provenance.Info{Creator: &provenance.Person{ID: "kurashiru:chef:6", Name: "中村和成", URL: "https://www.kurashiru.com/chefs/6"}}})
+			out = append(out, Result{Title: title, URL: canonical, Site: "kurashiru", SiteName: Name("kurashiru"), Image: previewImage(p.URL, image), Info: &provenance.Info{Creator: &provenance.Person{ID: c.ID, Name: name, URL: c.URL}}})
 		})
 	}
-	s.chefResults = out
-	s.chefUntil = time.Now().Add(15 * time.Minute)
+	if len(s.chefs) >= 32 {
+		for id := range s.chefs {
+			delete(s.chefs, id)
+			break
+		}
+	}
+	s.chefs[c.ID] = chefEntry{out, time.Now().Add(15 * time.Minute)}
 	return append([]Result(nil), out...), nil
 }
-func rank(base []Result, groups [][]Result) []Result {
+func rank(base []Result, groups [][]Result, creators []creatorprefs.Creator) []Result {
 	out := []Result{}
 	seen := map[string]bool{}
 	add := func(r Result) {
@@ -191,15 +240,39 @@ func rank(base []Result, groups [][]Result) []Result {
 		}
 	}
 	for _, r := range base {
-		if preferred(r.Info) {
+		if preferred(r.Info, creators) {
 			r.Preferred = true
 			add(r)
 		}
 	}
 	for _, r := range base {
+		r.Preferred = preferred(r.Info, creators)
 		add(r)
 	}
 	return out
+}
+func (s *Service) SearchCreator(ctx context.Context, q, id string) (Response, error) {
+	out := Response{Results: []Result{}, Warnings: []string{}}
+	if !validQuery(q) {
+		return out, ErrQuery
+	}
+	creators, err := s.Creators()
+	if err != nil {
+		return out, err
+	}
+	for _, c := range creators {
+		if c.ID == id {
+			ctx, cancel := context.WithTimeout(ctx, 8*time.Second)
+			defer cancel()
+			results, err := s.creatorResults(ctx, strings.TrimSpace(q), c, 8)
+			out.Results = results
+			if err != nil {
+				out.Warnings = append(out.Warnings, "この作り手の候補を取得できませんでした。時間をおいて、もう一度試してください")
+			}
+			return out, nil
+		}
+	}
+	return out, creatorprefs.ErrInvalid
 }
 
 // Preview is metadata-only. All network access keeps the existing public-URL

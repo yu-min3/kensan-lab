@@ -644,7 +644,7 @@ input::placeholder, textarea::placeholder { color: hsl(var(--muted-foreground));
 html:has(.recipe-detail) { scroll-padding-top: calc(var(--row-h) + var(--gap-inline) * 2 + var(--gap-stack) + env(safe-area-inset-top, 0px)); }
 
 /* Search results are recipe previews; the whole photo/title area imports. */
-.web-recipe-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 9rem), 1fr)); gap: var(--gap-stack); }
+.web-recipe-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, calc(var(--row-h) * 6)), 1fr)); gap: var(--gap-stack); }
 .web-recipe-card { min-width: 0; overflow: hidden; border: 1px solid hsl(var(--border)); border-radius: var(--radius-xl); background: hsl(var(--card)); }
 .web-recipe-pick { display: flex; flex-direction: column; width: 100%; min-height: 100%; padding: 0; border: 0; border-radius: 0; background: transparent; color: hsl(var(--foreground)); text-align: left; }
 .web-recipe-photo { width: 100%; aspect-ratio: 16 / 10; background: hsl(var(--muted)); overflow: hidden; }
@@ -671,3 +671,20 @@ html:has(.recipe-detail) { scroll-padding-top: calc(var(--row-h) + var(--gap-inl
 .source-creator > span { font-weight: 400; }
 .source-rating { display: flex; flex-wrap: wrap; align-items: center; gap: var(--gap-inline); color: hsl(var(--foreground)); }
 .source-rating svg { width: 1rem; height: 1rem; flex-shrink: 0; }
+
+/* Following a creator is separate from importing the recipe. */
+.creator-search-tools, .creator-notice { display: flex; flex-wrap: wrap; align-items: center; gap: var(--gap-inline); }
+.creator-notice { padding: var(--gap-stack); border: 1px solid hsl(var(--border)); border-radius: var(--radius-md); background: hsl(var(--card)); }
+.creator-filters { display: flex; gap: var(--gap-inline); overflow-x: auto; padding-block: var(--gap-inline); }
+.web-recipe-meta { display: grid; gap: var(--gap-stack); padding: 0 var(--gap-stack) var(--gap-stack); }
+.creator-follow-row { display: flex; flex-direction: column; align-items: flex-start; gap: var(--gap-inline); }
+.creator-follow-row p { width: 100%; min-width: 0; margin: 0; font-size: var(--text-size); line-height: var(--text-lh); overflow-wrap: anywhere; }
+.creator-follow-button { display: inline-flex; flex-shrink: 0; white-space: nowrap; align-items: center; gap: var(--gap-inline); min-height: var(--row-h); padding: var(--gap-inline) var(--gap-stack); border: 1px solid hsl(var(--border-strong)); border-radius: var(--radius-md); color: hsl(var(--foreground)); background: hsl(var(--card)); font-size: var(--text-size); }
+.creator-follow-button[aria-pressed="true"] { color: hsl(var(--accent-foreground)); border-color: hsl(var(--brand)); background: hsl(var(--accent)); }
+.creator-follow-button svg, .creator-list h3 svg, .creator-confirmation svg { width: 1rem; height: 1rem; flex-shrink: 0; }
+.creator-list { display: grid; gap: var(--gap-stack); list-style: none; padding: 0; }
+.creator-list h3 { display: flex; align-items: center; gap: var(--gap-inline); overflow-wrap: anywhere; }
+.creator-list a, .creator-confirmation a { overflow-wrap: anywhere; }
+.editor-panel .creator-additional { display: flex; flex-direction: row; align-items: center; gap: var(--gap-inline); min-height: var(--row-h); }
+.creator-additional input { width: var(--gap-stack); height: var(--gap-stack); accent-color: hsl(var(--brand)); }
+.creator-confirmation { display: grid; gap: var(--gap-stack); margin-top: var(--gap-stack); padding: var(--gap-stack); border: 1px solid hsl(var(--border)); border-radius: var(--radius-md); }
