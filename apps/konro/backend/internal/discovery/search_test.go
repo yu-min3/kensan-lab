@@ -81,3 +81,21 @@ func TestSearchTitleDoesNotBecomeBadgeLabel(t *testing.T) {
 		t.Fatal(r)
 	}
 }
+
+func TestRecipePreviewsStayWithTheirResult(t *testing.T) {
+	for _, tc := range []struct{ site, body, want string }{
+		{"delish", `<div class="delish-search"><a href="/recipes/987"><p class="item-card__title">魚</p><p>魚としょうゆ</p></a></div>`, "https://image.delishkitchen.tv/recipe/987/1.jpg?w=600"},
+		{"kurashiru", `<div class="SearchIndex-DlyMasonry"><a href="/recipes/82b3201b-29f4-4db9-9fbb-82a1ce16d247"><img src="" alt="魚"><noscript><img src="https://video.kurashiru.com/fish.jpg" alt="魚"></noscript></a></div>`, "https://video.kurashiru.com/fish.jpg"},
+		{"nhk", `<div class="recipe--sort-row"><div class="recipe--category-recipe" data-url="/recipe/123_fish.html"><div class="thumb"><img src="/fish.jpg"></div><div class="recipe-name"><a>魚</a></div><span class="recipe-time">10分</span></div></div>`, "https://www.kyounoryouri.jp/fish.jpg"},
+	} {
+		r := parseResults(webpage.Page{URL: searchURL(tc.site, "魚"), HTML: tc.body}, tc.site)
+		if len(r) != 1 || r[0].Image != tc.want || strings.Contains(r[0].Description, "<img") {
+			t.Fatalf("%s: %+v", tc.site, r)
+		}
+	}
+	for _, raw := range []string{"javascript:alert(1)", "http://example.com/a.jpg", "https://127.0.0.1/a.jpg", "https://x.local/a.jpg", "https://user:pw@example.com/a.jpg"} {
+		if previewImage("https://example.com", raw) != "" {
+			t.Fatal("unsafe image", raw)
+		}
+	}
+}

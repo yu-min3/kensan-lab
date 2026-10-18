@@ -74,7 +74,9 @@ func TestDraftHTTPContractAndZipIsolation(t *testing.T) {
 	}
 	d := read(request("POST", "/api/v1/import/drafts", map[string]string{"text": "魚 2人分 魚2切れ 10分煮る"}))
 	base := "/api/v1/import/drafts/" + d.ID
-	d = read(request("POST", base+"/normalize", map[string]any{"revision": d.Revision, "mode": "steps"}))
+	if d.Job == nil || calls.Load() != 1 {
+		t.Fatal("automatic fallback not started", d)
+	}
 	d = read(request("GET", base, nil))
 	if d.Job.State != "succeeded" || d.Content.Title != "魚" || calls.Load() != 1 {
 		t.Fatalf("%+v calls %d", d, calls.Load())

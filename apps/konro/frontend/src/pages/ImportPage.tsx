@@ -4,24 +4,25 @@ import { Field, Panel } from "../components/Editor";
 
 const reasons: Record<string, string> = {
   quota_wait: "利用枠が空くのを待っています。自動での再実行はしません。時間をおいて再確認してください。",
-  auth_required: "AIのログイン確認が必要です。管理者が接続を確認してから再試行してください。",
-  billing_blocked: "追加課金OFFを確認できないため停止しています。管理者が接続を確認するまで実行しません。",
-  interrupted: "AIの接続先が処理中に再起動しました。再試行できます。",
-  invalid_output: "AIの応答を読み取れませんでした。下書きはそのままです。もう一度試すか、手入力で編集できます。",
-  execution_failed: "AI側で処理に失敗しました。下書きはそのままです。もう一度試すか、手入力で編集できます。",
+  auth_required: "抽出サービスに接続できません。読み取れた内容は残しています。手入力するか、時間をおいて再試行してください。",
+  billing_blocked: "抽出サービスを利用できないため停止しています。読み取れた内容を編集できます。",
+  interrupted: "抽出サービスとの接続が中断しました。再試行できます。",
+  invalid_output: "抽出結果を読み取れませんでした。下書きはそのままです。もう一度試すか、手入力で編集できます。",
+  execution_failed: "材料と手順を読み取れませんでした。下書きはそのままです。もう一度試すか、手入力で編集できます。",
   numbers_changed: "原文にない数値を検出したため、整形結果を採用していません。下書きを確認・編集できます。",
-  invalid_recipe: "AIの応答がレシピの形式に合いませんでした。下書きはそのままです。再試行または手入力できます。",
+  invalid_recipe: "抽出結果がレシピの形式に合いませんでした。下書きはそのままです。再試行または手入力できます。",
 };
 export function ImportPage({ onClose, onSaved, initialURL="" }: { initialURL?:string; onClose: () => void; onSaved: (file: string, title: string) => void }) {
-  const {savedDrafts,restoreDraft,kind,setKind,input,setInput,draft,content,setContent,ingredients,setIngredients,steps,setSteps,submitting,pollError,confirmed,setConfirmed,busy,error,resume,loading,active,perform,persist,start,action,discardView,adopt} = useImportJob(initialURL);
+  const {create,savedDrafts,restoreDraft,kind,setKind,input,setInput,draft,content,setContent,ingredients,setIngredients,steps,setSteps,submitting,pollError,confirmed,setConfirmed,busy,error,resume,loading,active,perform,persist,start,action,discardView} = useImportJob(initialURL);
+  const complete = !!content.title.trim() && !!ingredients.trim() && !!steps.trim();
   const state = submitting ? "sending" : draft?.detached ? "manual" : draft?.pending ? "sending" : draft?.job?.state ?? "draft";
   const failed = state === "failed";
-  const titles: Record<string, string> = { sending: "AIに送信中", queued: "AIの順番待ち", running: "AIが抽出・整形中", waiting: "AIは待機中", succeeded: "AIの整形が完了", failed: "AIの抽出・整形に失敗しました", cancelled: "AIを取り消しました", manual: "手入力で編集中", draft: "下書きを作成しました" };
-  const descriptions: Record<string, string> = { sending: "送信状況を確認しています。", queued: "まだ抽出は始まっていません。順番が来ると実行します。", running: "材料と手順を整えています。この画面を閉じても処理は続きます。", waiting: "現在は処理していません。", succeeded: "原文と照らし合わせて確認・編集してから保存してください。", failed: "処理は停止しています。自動では再試行しません。", cancelled: "処理は停止しました。下書きを編集できます。", manual: "手入力に切り替えました。AIの結果は取り込みません。", draft: "必要ならAIで材料と手順を抽出できます。" };
+  const titles: Record<string, string> = { sending: "材料と手順を読み取っています", queued: "取り込みの順番を待っています", running: "材料と手順を読み取っています", waiting: "取り込みは待機中です", succeeded: complete ? "取り込めました" : "一部を取り込めませんでした", failed: "取り込みに失敗しました", cancelled: "取り込みを中止しました", manual: "内容を入力・編集できます", draft: complete ? "取り込めました" : "一部を取り込めませんでした" };
+  const descriptions: Record<string, string> = { sending: "ページから読み取れなかった部分を、別の方法で抽出しています。", queued: "受付済みです。順番が来ると自動で読み取ります。", running: "この画面を閉じても処理は続きます。", waiting: "現在は処理していません。時間をおいて再開するか、手入力できます。", succeeded: complete ? "材料と手順を確認して保存してください。" : "元のページを確認し、足りない材料・手順を入力してください。", failed: "処理は停止しています。再試行するか、読み取れた内容を編集できます。", cancelled: "処理は停止しました。読み取れた内容は残しています。", manual: "後から届く抽出結果で上書きされることはありません。", draft: complete ? "材料と手順を確認して保存してください。" : "読み取れた内容は残しています。元のページを確認して入力できます。" };
   const processing = ["sending", "queued", "running"].includes(state) && !pollError;
   return <main className="editor-page">
-    <header className="header-row"><h1 className="h-serif">レシピを取り込む</h1><button className="chip" disabled={busy} onClick={() => { if (draft && !active) perform(async () => { await persist(); onClose(); }); else onClose(); }}>一覧へ</button></header>
-    {loading && <p role="status">前の下書きを読み込んでいます…</p>}
+    <header className="header-row"><h1 className="h-serif">レシピを取り込む</h1><button className="chip" disabled={busy || loading} onClick={() => { if (draft && !active) perform(async () => { await persist(); onClose(); }); else onClose(); }}>{initialURL ? "検索結果へ" : "一覧へ"}</button></header>
+    {loading && <Panel><p role="status"><span className="import-spinner" aria-hidden="true"/>{initialURL ? "レシピを取り込んでいます…" : "前の下書きを読み込んでいます…"}</p><p>材料と手順を読み取っています。完了すると確認画面へ進みます。</p></Panel>}
     {error && <p className="notice" role="alert">{error}</p>}
     {!draft && !loading && <Panel>
       <p>URLを貼るだけで材料と手順を取り込めます。取得できないサイトは、本文を貼り付けてください。</p>
@@ -33,34 +34,34 @@ export function ImportPage({ onClose, onSaved, initialURL="" }: { initialURL?:st
         {kind === "url" ? <input type="text" inputMode="url" autoCapitalize="none" autoCorrect="off" value={input} onChange={(e) => setInput(e.target.value)} placeholder="例: www.sirogohan.com/recipe/…" />
           : <textarea rows={10} value={input} onChange={(e) => setInput(e.target.value)} />}
       </label>
-      <button className="start-button" disabled={busy || !input.trim()} onClick={() => perform(async () => adopt(await draftRequest("", "POST", kind === "url" ? { url: input.trim(), text: "" } : { url: "", text: input }))) }>{busy ? "取り込み中…" : "下書きを作る"}</button>
+      <button className="start-button" disabled={busy || !input.trim()} onClick={create}>{busy ? "取り込み中…" : "取り込む"}</button>
       {!!savedDrafts.length&&<details><summary>保存した下書き（{savedDrafts.length}件）</summary><ul className="web-results">{savedDrafts.map(ref=><li key={ref.id}><button className="chip" disabled={busy} onClick={()=>restoreDraft(ref.id)}>{ref.title}</button>{ref.url&&<p className="recipe-summary">{ref.url}</p>}</li>)}</ul></details>}
       {resume && <button className="chip" onClick={discardView}>別のレシピを取り込む</button>}
     </Panel>}
     {draft && <>
       <Panel className={`import-status ${failed ? "import-status-failed" : ""}`} aria-label="取り込み状態" aria-busy={processing}>
         <div role={failed ? "alert" : "status"} aria-live={failed ? "assertive" : "polite"}>
-          <h2 className="import-status-title"><span className={processing ? "import-spinner" : "import-state-mark"} aria-hidden="true">{processing ? "" : failed ? "×" : state === "succeeded" ? "✓" : state === "waiting" ? "Ⅱ" : "·"}</span>{pollError ? "AIの状態を確認できません" : titles[state] ?? "AIの状態を確認しています"}</h2>
+          <h2 className="import-status-title"><span className={processing ? "import-spinner" : "import-state-mark"} aria-hidden="true">{processing ? "" : failed ? "×" : state === "succeeded" ? "✓" : state === "waiting" ? "Ⅱ" : "·"}</span>{pollError ? "取り込みの状態を確認できません" : titles[state] ?? "取り込み状況を確認しています"}</h2>
           <p>{pollError || descriptions[state]}</p>
           {!draft.detached && !submitting && !draft.pending && draft.job?.reason && <p>{reasons[draft.job.reason] ?? "処理を完了できませんでした。再試行または手入力できます。"}</p>}
         </div>
-        {draft.warnings?.map((w, i) => <p className="notice" key={i}>{w}</p>)}
+        {!!draft.warnings?.length && <details><summary>取り込みの補足</summary>{draft.warnings.map((w,i)=><p key={i}>{w}</p>)}</details>}
         {draft.agent_available ? <>
           <div className="editor-actions">
             {failed && <button className="chip" disabled={busy} onClick={() => document.getElementById("import-editor")?.scrollIntoView({ behavior: "smooth" })}>手入力で編集する</button>}
-            {!active && <button className="chip" disabled={busy} onClick={start}>{failed || state === "cancelled" ? "AIでもう一度試す" : "AIで抽出・整形"}</button>}
-            {active && draft.job?.state === "waiting" && <button className="chip" disabled={busy} onClick={() => action("retry")}>利用枠を再確認</button>}
-            {active && <><button className="chip" disabled={busy} onClick={() => action("cancel")}>AIを取り消す</button>
-              <button className="chip" disabled={busy} onClick={() => action("manual")}>AIの結果を使わず編集する</button></>}
+            {!active && !complete && <button className="chip" disabled={busy} onClick={start}>取り込みを再試行</button>}
+            {active && draft.job?.state === "waiting" && <button className="chip" disabled={busy} onClick={() => action("retry")}>取り込みを再開</button>}
+            {active && <><button className="chip" disabled={busy} onClick={() => action("cancel")}>取り込みを中止</button>
+              <button className="chip" disabled={busy} onClick={() => action("manual")}>手入力に切り替える</button></>}
           </div>
-        </> : <p>AIは未接続です。材料と手順を入力して保存できます。</p>}
+        </> : !complete && <p>自動抽出を利用できません。読み取れた内容を編集して保存できます。</p>}
       </Panel>
       <details className="editor-panel"><summary>取り込み元を確認</summary>
         {draft.source.url && <p><a href={draft.source.url} target="_blank" rel="noreferrer">元のページを開く</a></p>}
         <pre>{draft.source.text || draft.source.raw}</pre>
         {draft.source.url && <details><summary>取得したHTML</summary><pre>{draft.source.raw}</pre></details>}
       </details>
-      <Panel id="import-editor">
+      {!active && <Panel id="import-editor">
         <fieldset disabled={busy || active}>
           <legend>レシピを確認・編集</legend>
           <Field id="import-title" label="タイトル" value={content.title} maxLength={300} onChange={(title)=>{setContent({...content,title});setConfirmed(false);}} />
@@ -76,7 +77,7 @@ export function ImportPage({ onClose, onSaved, initialURL="" }: { initialURL?:st
             })}>レシピとして保存</button>
           </div>
         </fieldset>
-      </Panel>
+      </Panel>}
       {!active && <button className="chip" disabled={busy} onClick={discardView}>別のレシピを取り込む</button>}
     </>}
   </main>;

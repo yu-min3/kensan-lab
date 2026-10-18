@@ -166,6 +166,31 @@ func (s *Service) Create(ctx context.Context, rawURL, text string) (*Draft, erro
 	}
 	return d, nil
 }
+
+// Import chooses extraction on behalf of the caller. A failed fallback keeps the
+// persisted draft (including the idempotency key) available for recovery.
+func (s *Service) Import(ctx context.Context, rawURL, text string) (*Draft, error) {
+	d, err := s.Create(ctx, rawURL, text)
+	if err != nil {
+		return nil, err
+	}
+	return s.extractMissing(ctx, d)
+}
+func (s *Service) extractMissing(ctx context.Context, d *Draft) (*Draft, error) {
+	if Validate(d.Content) == nil || s.agent == nil || strings.TrimSpace(d.Source.Text) == "" {
+		return d, nil
+	}
+	next, err := s.Start(ctx, d.ID, d.Revision, "steps")
+	if err == nil {
+		return next, nil
+	}
+	// Start persists Pending before contacting the runtime; return that identity
+	// even if the response was lost, so polling never creates a second job.
+	if next != nil {
+		return next, nil
+	}
+	return d, err
+}
 func (s *Service) Get(ctx context.Context, id string) (*Draft, error) {
 	unlock := s.lock(id)
 	defer unlock()
