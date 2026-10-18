@@ -14,6 +14,7 @@
     "test:discovery": "node ../e2e/discovery.mjs"
   },
   "dependencies": {
+    "lucide-react": "^0.468.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1"
   },
