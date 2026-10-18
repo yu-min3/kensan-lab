@@ -76,7 +76,7 @@ export function LifeGoalsPage() {
             </CardBody>
           ) : (
             <CardBody>
-              <MilkdownEditor key={file.editorKey} defaultValue={file.initialBody} onChange={file.onChange} minHeight="60vh" />
+              <MilkdownEditor key={file.editorKey} defaultValue={file.draft} onChange={file.onChange} minHeight="60vh" />
             </CardBody>
           )}
         </Card>

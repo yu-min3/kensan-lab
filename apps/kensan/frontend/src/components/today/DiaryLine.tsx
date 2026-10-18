@@ -1,5 +1,4 @@
 import { useState, type FormEvent } from "react";
-import { Link } from "react-router-dom";
 import { useMutation } from "@tanstack/react-query";
 import { api, type TodayView } from "../../lib/api";
 import { useWorkspaceRefresh } from "../../hooks/useWorkspaceRefresh";
@@ -31,7 +30,7 @@ export function DiaryLine({ view }: { view: TodayView }) {
   const { planned, unplanned } = view.doneToday;
   return (
     <Card>
-      <CardHead title="やったこと" actions={<Link to="/" className="text-sm text-brand">今日の日記へ</Link>} />
+      <CardHead title="やったこと" />
       <CardBody className="ds-stack">
         <form onSubmit={submit} className="flex flex-col sm:flex-row gap-2">
           <label htmlFor="done-project" className="sr-only">
@@ -75,8 +74,7 @@ export function DiaryLine({ view }: { view: TodayView }) {
           </p>
         )}
         <p className="text-xs text-muted-foreground" data-testid="done-split">
-          今日の完了 · 予定どおり<span className="font-mono tnum"> {planned} </span>· 予定外
-          <span className="font-mono tnum"> {unplanned}</span>
+          今日の実績<span className="font-mono tnum"> {planned + unplanned} </span>件
         </p>
       </CardBody>
     </Card>

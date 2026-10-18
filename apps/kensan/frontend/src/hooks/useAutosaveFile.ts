@@ -1,158 +1,168 @@
-import { useEffect, useRef, useState } from "react";
-import { useMutation, useQuery } from "@tanstack/react-query";
+import { useEffect, useMemo, useState } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { api, ApiError } from "../lib/api";
 import type { SaveState } from "../components/ui/save-status";
 
-// workspace ファイルの「非制御エディタ + 自動保存」を 1 箇所に集約する hook。
-// 日記 / プロジェクトのフリースペース / 人生でやりたいこと が共有する:
-//   - 800ms デバウンス + 離脱（unmount / path 切替）時 flush
-//   - mtime 楽観ロック（Claude Code / VSCode の外部編集は 409 で顕在化）
-//   - 非制御エディタ（Milkdown）向けの initialBody + editorKey remount
-//
-// read/write でファイル全文 ⇄ 編集対象本文の対応を差し替えられる。
-// 既定は frontmatter を隠して本文だけ編集（保存時に前置して戻す）。
-
-// frontmatter（--- ... ---）と本文を分ける
 export function splitFrontmatter(content: string): { fm: string; body: string } {
-  const m = content.match(/^---\n[\s\S]*?\n---\n?/);
+  const m = content.match(/^---\r?\n[\s\S]*?\r?\n---\r?\n?/);
   if (m) return { fm: m[0].replace(/\n*$/, "\n"), body: content.slice(m[0].length).replace(/^\n+/, "") };
   return { fm: "", body: content };
 }
-
 const defaultRead = (content: string) => splitFrontmatter(content).body;
 const defaultWrite = (content: string, body: string) => splitFrontmatter(content).fm + body;
-
+const draftKey = (path: string) => `kensan:draft:${path}`;
+function storeDraft(path: string, body: string, mtime: string) {
+  try { sessionStorage.setItem(draftKey(path), JSON.stringify({ body, mtime })); } catch { /* Storage may be unavailable. */ }
+}
+function clearDraft(path: string) {
+  try { sessionStorage.removeItem(draftKey(path)); } catch { /* Storage may be unavailable. */ }
+}
 export interface UseAutosaveFileOptions {
   path: string;
-  /** ファイル全文 → 編集対象本文（既定: frontmatter を除いた本文） */
   read?: (content: string) => string;
-  /** (最新の全文, 新しい本文) → 保存する全文（既定: frontmatter を前置） */
   write?: (content: string, body: string) => string;
   onSaved?: () => void;
   debounceMs?: number;
 }
 
+interface SaveSession {
+  path: string; full: string; mtime: string; saved: string; latest: string; initial: string | null;
+  recovery: string; key: number; error: Error | null; running: Promise<boolean> | null;
+  timer: ReturnType<typeof setTimeout> | null;
+  listeners: Set<() => void>;
+  read: (content: string) => string;
+  write: (content: string, body: string) => string;
+  onSaved?: () => void;
+}
+const sessions = new WeakMap<object, Map<string, SaveSession>>();
+
+// Each path owns its draft, mtime and queue. Old responses never update a new file.
+// A tab-local recovery copy survives a collapsed editor or a failed unmount save.
 export function useAutosaveFile({ path, read = defaultRead, write = defaultWrite, onSaved, debounceMs = 800 }: UseAutosaveFileOptions) {
+  const client = useQueryClient();
+  const [, redraw] = useState(0);
+  const session = useMemo(() => {
+    let files = sessions.get(client);
+    if (!files) { files = new Map(); sessions.set(client, files); }
+    let entry = files.get(path);
+    if (!entry) {
+      entry = { path, full: "", mtime: "", saved: "", latest: "", initial: null, recovery: "", key: 0,
+        error: null, running: null, timer: null, listeners: new Set(), read, write, onSaved };
+      files.set(path, entry);
+    }
+    return entry;
+  }, [client, path]);
+  session.read = read;
+  session.write = write;
+  session.onSaved = onSaved;
+  const notify = (s: SaveSession) => s.listeners.forEach(listener => listener());
   const query = useQuery({
-    queryKey: ["file", path],
-    queryFn: () => api.file(path),
+    queryKey: ["file", path], queryFn: () => api.file(path),
     retry: (count, err) => !(err instanceof ApiError && err.status === 404) && count < 2,
   });
-
-  // initialBody は非制御エディタの defaultValue。editorKey の変更で作り直す。
-  const [initialBody, setInitialBody] = useState<string | null>(null);
-  const [editorKey, setEditorKey] = useState(0);
-  const [dirty, setDirty] = useState(false);
-
-  const pathRef = useRef(path); // 現在の本文が属するファイル（flush が path 切替後でも正しい先へ保存するため）
-  const full = useRef(""); // 最新の既知の全文
-  const baseMtime = useRef("");
-  const savedBody = useRef(""); // 最後に保存した本文（dirty 判定）
-  const latest = useRef(""); // 最新の編集内容（flush 用）
-  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const readRef = useRef(read);
-  const writeRef = useRef(write);
-  readRef.current = read;
-  writeRef.current = write;
-
-  const save = useMutation({
-    mutationFn: (next: string) => {
-      const newFull = writeRef.current(full.current, next);
-      return api.putFile(pathRef.current, newFull, baseMtime.current).then((res) => ({ res, newFull, next }));
-    },
-    onSuccess: ({ res, newFull, next }) => {
-      baseMtime.current = res.doc.mtime;
-      full.current = newFull;
-      savedBody.current = next;
-      setDirty(latest.current !== next);
-      onSaved?.();
-    },
-  });
-  const saveRef = useRef(save);
-  saveRef.current = save;
-
-  // サーバ値が来たら（未取り込みなら）本文を切り出してエディタを作る
-  useEffect(() => {
-    if (query.data && initialBody === null) {
-      pathRef.current = path;
-      full.current = query.data.content;
-      const b = readRef.current(query.data.content);
-      savedBody.current = b;
-      latest.current = b;
-      baseMtime.current = query.data.doc.mtime;
-      setInitialBody(b);
-      setEditorKey((k) => k + 1);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [query.data, initialBody]);
-
-  function flushNow() {
-    if (timer.current) {
-      clearTimeout(timer.current);
-      timer.current = null;
-    }
-    if (initialBodyRef.current !== null && latest.current !== savedBody.current) {
-      saveRef.current.mutate(latest.current);
-    }
+  async function drain(s: typeof session, retry = false): Promise<boolean> {
+    if (s.timer) { clearTimeout(s.timer); s.timer = null; }
+    if (s.running) return s.running;
+    if (retry) s.error = null;
+    if (s.error) return false;
+    if (s.initial === null) return true;
+    if (s.latest === s.saved) return true;
+    s.running = Promise.resolve().then(async () => {
+      while (s.latest !== s.saved) {
+        const body = s.latest;
+        const full = s.write(s.full, body);
+        const baseMtime = s.mtime;
+        const savedCallback = s.onSaved;
+        try {
+          const res = await api.putFile(s.path, full, baseMtime);
+          s.full = full;
+          s.mtime = res.doc.mtime;
+          s.saved = body;
+          s.initial = body;
+          if (s.latest === body) clearDraft(s.path);
+          else storeDraft(s.path, s.latest, s.mtime);
+          client.setQueryData(["file", s.path], { doc: res.doc, content: full });
+          savedCallback?.();
+          for (const key of ["today", "portfolio", "dailyList", "project", "projects"]) {
+            void client.invalidateQueries({ queryKey: [key] });
+          }
+        } catch (error) {
+          s.error = error instanceof Error ? error : new Error(String(error));
+          storeDraft(s.path, s.latest, s.mtime);
+          return false;
+        }
+      }
+      return true;
+    }).finally(() => { s.running = null; notify(s); });
+    notify(s);
+    return s.running;
   }
-  const initialBodyRef = useRef(initialBody);
-  initialBodyRef.current = initialBody;
-  const flushRef = useRef(flushNow);
-  flushRef.current = flushNow;
-
-  // path が変わる・unmount する時: 未保存分を旧ファイルへ flush してから編集状態をリセット
   useEffect(() => {
-    return () => {
-      flushRef.current();
+    const listener = () => redraw(n => n + 1);
+    session.listeners.add(listener);
+    return () => { session.listeners.delete(listener); void drain(session); };
+  }, [session]);
+  useEffect(() => {
+    const data = query.data;
+    if (!data || session.running || (session.initial !== null && (session.latest !== session.saved || session.error))) return;
+    if (session.initial !== null && session.mtime === data.doc.mtime) return;
+    session.full = data.content;
+    session.mtime = data.doc.mtime;
+    session.saved = session.read(data.content);
+    session.latest = session.saved;
+    try {
+      const raw = sessionStorage.getItem(draftKey(path));
+      if (raw) {
+        const draft = JSON.parse(raw);
+        if (typeof draft.body === "string" && draft.body !== session.saved) {
+          session.latest = draft.body;
+          if (draft.mtime !== session.mtime) session.error = new ApiError(409, "保存前の入力を復元しました。ファイルにも変更があるため、内容を確認してください。");
+        }
+      }
+    } catch { /* A broken recovery copy must not prevent reading the real file. */ }
+    try { session.recovery = sessionStorage.getItem(`kensan:recovery:${path}`) ?? session.recovery; } catch { /* Storage may be unavailable. */ }
+    session.initial = session.latest;
+    session.key++;
+    notify(session);
+    if (session.latest !== session.saved && !session.error) void drain(session);
+  }, [query.data, session, session.initial]);
+  useEffect(() => {
+    const warn = (event: BeforeUnloadEvent) => {
+      if (session.latest !== session.saved) { event.preventDefault(); event.returnValue = ""; }
     };
-  }, [path]);
-  useEffect(() => {
-    if (pathRef.current !== path) {
-      setInitialBody(null);
-      setDirty(false);
-      baseMtime.current = "";
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [path]);
-
-  function onChange(next: string) {
-    latest.current = next;
-    setDirty(next !== savedBody.current);
-    if (timer.current) clearTimeout(timer.current);
-    timer.current = setTimeout(() => {
-      if (latest.current !== savedBody.current) saveRef.current.mutate(latest.current);
-    }, debounceMs);
+    window.addEventListener("beforeunload", warn);
+    return () => window.removeEventListener("beforeunload", warn);
+  }, [session]);
+  function onChange(body: string) {
+    session.latest = body;
+    if (body !== session.saved) storeDraft(path, body, session.mtime);
+    else clearDraft(path);
+    if (session.timer) clearTimeout(session.timer);
+    session.timer = setTimeout(() => { void drain(session); }, debounceMs);
+    notify(session);
   }
-
-  /** エディタの中身をプログラムから差し替えて保存する（履歴からの復元など） */
-  function replace(body: string) {
-    latest.current = body;
-    setInitialBody(body);
-    setEditorKey((k) => k + 1);
-    save.mutate(body);
-  }
-
-  /** 409 / エラーからの復帰: 編集状態を捨ててサーバ値を取り直す */
   function retry() {
-    save.reset();
-    setInitialBody(null);
-    setDirty(false);
-    query.refetch();
+    if (session.latest !== session.saved) {
+      session.recovery = session.latest;
+      try { sessionStorage.setItem(`kensan:recovery:${path}`, session.latest); } catch { /* Storage may be unavailable. */ }
+    }
+    clearDraft(path);
+    session.error = null;
+    session.initial = null;
+    session.latest = session.saved;
+    notify(session);
+    void query.refetch();
   }
-
-  const conflict = save.error instanceof ApiError && save.error.status === 409;
+  function replace(body: string) {
+    onChange(body);
+    session.initial = body;
+    session.key++;
+    return drain(session, true);
+  }
+  const conflict = session.error instanceof ApiError && session.error.status === 409;
+  const dirty = session.latest !== session.saved;
   const notFound = query.error instanceof ApiError && query.error.status === 404;
-  const saveState: SaveState = conflict
-    ? "conflict"
-    : save.isError
-      ? "error"
-      : save.isPending
-        ? "saving"
-        : dirty
-          ? "dirty"
-          : query.data
-            ? "saved"
-            : "idle";
-
-  return { query, initialBody, editorKey, saveState, conflict, notFound, dirty, saveError: save.error, onChange, flush: flushNow, replace, retry };
+  const saveState: SaveState = conflict ? "conflict" : session.error ? "error" : session.running ? "saving" : dirty ? "dirty" : query.data ? "saved" : "idle";
+  return { query, initialBody: session.initial, editorKey: session.key, saveState, conflict, notFound, dirty,
+    draft: session.latest, recovery: session.recovery, saveError: session.error, onChange, flush: () => drain(session, true), replace, retry };
 }

@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { cleanup, renderHook, waitFor } from "@testing-library/react";
+import { act, cleanup, renderHook, waitFor } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { splitFrontmatter, useAutosaveFile } from "./useAutosaveFile";
 import { api, ApiError } from "../lib/api";
@@ -54,6 +54,7 @@ describe("splitFrontmatter", () => {
 
 describe("useAutosaveFile", () => {
   beforeEach(() => {
+    sessionStorage.clear();
     mocked.file.mockResolvedValue({ content: CONTENT, doc: doc("t1") });
     mocked.putFile.mockResolvedValue({ doc: doc("t2") });
   });
@@ -140,4 +141,39 @@ describe("useAutosaveFile", () => {
     unmount();
     expect(mocked.putFile).not.toHaveBeenCalled();
   });
+
+  it("serializes additional typing behind a slow response and uses its returned mtime", async () => {
+    let finish!: (value: unknown) => void;
+    mocked.putFile.mockImplementationOnce(() => new Promise(resolve => { finish = resolve; }));
+    const { result } = renderHook(() => useAutosaveFile({ path: "daily/2026/07/07.md", debounceMs: 10 }), { wrapper });
+    await waitFor(() => expect(result.current.initialBody).not.toBeNull());
+    act(() => result.current.onChange("first"));
+    await waitFor(() => expect(mocked.putFile).toHaveBeenCalledTimes(1));
+    act(() => result.current.onChange("second"));
+    await new Promise(resolve => setTimeout(resolve, 30));
+    expect(mocked.putFile).toHaveBeenCalledTimes(1);
+    await act(async () => finish({ doc: doc("after-first") }));
+    await waitFor(() => expect(mocked.putFile).toHaveBeenCalledTimes(2));
+    expect(mocked.putFile.mock.calls[1]).toEqual(["daily/2026/07/07.md", "---\ntype: daily\n---\nsecond", "after-first"]);
+    await waitFor(() => expect(result.current.saveState).toBe("saved"));
+  });
+
+  it("does not mix a late response into the next date", async () => {
+    let finish!: (value: unknown) => void;
+    mocked.putFile.mockImplementationOnce(() => new Promise(resolve => { finish = resolve; }));
+    mocked.file.mockImplementation(async (path: string) => ({ content: CONTENT, doc: { ...doc(path), path } }));
+    const { result, rerender } = renderHook(({ path }) => useAutosaveFile({ path, debounceMs: 10 }), {
+      initialProps: { path: "daily/2026/07/07.md" }, wrapper,
+    });
+    await waitFor(() => expect(result.current.initialBody).not.toBeNull());
+    act(() => result.current.onChange("old day"));
+    await waitFor(() => expect(mocked.putFile).toHaveBeenCalledTimes(1));
+    rerender({ path: "daily/2026/07/08.md" });
+    await waitFor(() => expect(result.current.initialBody).toBe("今日の本文\n"));
+    await act(async () => finish({ doc: doc("old-response") }));
+    act(() => result.current.onChange("new day"));
+    await waitFor(() => expect(mocked.putFile).toHaveBeenCalledTimes(2));
+    expect(mocked.putFile.mock.calls[1]).toEqual(["daily/2026/07/08.md", "---\ntype: daily\n---\nnew day", "daily/2026/07/08.md"]);
+  });
+
 });

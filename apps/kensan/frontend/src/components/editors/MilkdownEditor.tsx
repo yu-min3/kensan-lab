@@ -1,5 +1,8 @@
 import { useEffect, useRef, type CSSProperties } from "react";
 import { Crepe } from "@milkdown/crepe";
+import { serializerCtx } from "@milkdown/kit/core";
+import { Plugin } from "@milkdown/kit/prose/state";
+import { $prose } from "@milkdown/kit/utils";
 import "@milkdown/crepe/theme/common/style.css";
 import "@milkdown/crepe/theme/frame.css";
 
@@ -31,22 +34,23 @@ export function MilkdownEditor({
         [Crepe.Feature.Placeholder]: { text: placeholder ?? "", mode: "block" },
       },
     });
-    // Crepe は create 時に正規化済みの初回 markdownUpdated を発火する。これを onChange に
-    // 流すと「開いただけ」で dirty 判定 → 自動保存が走り本文がリフォーマットされ得る
-    // （git で版管理する文書では特に困る）。初回 1 回だけスキップする。
-    let initialEmit = true;
-    crepe.on((listener) => {
-      listener.markdownUpdated((_ctx, markdown) => {
-        if (initialEmit) {
-          initialEmit = false;
-          return;
-        }
-        cbRef.current?.(markdown);
-      });
-    });
-    crepe.create();
+    // The standard markdownUpdated event is debounced by 200ms. Observe document
+    // transactions immediately so leaving the editor can flush the last keystroke.
+    // Initialization is excluded, so opening a file never reformats/saves it.
+    let ready = false;
+    crepe.editor.use($prose(ctx => new Plugin({
+      view: () => ({
+        update: (view, previous) => {
+          if (ready && !previous.doc.eq(view.state.doc)) {
+            cbRef.current?.(ctx.get(serializerCtx)(view.state.doc));
+          }
+        },
+      }),
+    })));
+    void crepe.create().then(() => { ready = true; });
     return () => {
-      crepe.destroy();
+      ready = false;
+      void crepe.destroy();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);

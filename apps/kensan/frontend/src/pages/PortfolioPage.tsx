@@ -6,8 +6,7 @@ import { api, type PortfolioCell, type PortfolioProposal, type PortfolioView } f
 import { useWorkspaceRefresh } from "../hooks/useWorkspaceRefresh";
 import { Button } from "../components/ui/button";
 import { ErrorState, SkeletonRows } from "../components/ui/states";
-import { ProjectsPanel, RadarPanel } from "./PortfolioProjects";
-import { TodayDiary } from "../components/today/TodayDiary";
+import { RadarPanel } from "./PortfolioProjects";
 import { useToast } from "../components/ui/toast";
 
 // ダッシュボード: North Star に対して、どこに証拠があり（地図）、時間がどこへ向いていて（羅針盤）、
@@ -25,7 +24,6 @@ export function PortfolioPage() {
   const pick = (name: string) => setTech((cur) => (cur === name ? null : name));
   return (
     <div className="pf ds-section">
-      <TodayDiary />
       {data.isPending ? <SkeletonRows rows={8} /> : data.isError ? (
         <ErrorState error={data.error} onRetry={() => data.refetch()} />
       ) : <PortfolioContent v={data.data} tab={tab} setTab={setTab} tech={tech} pick={pick} />}
@@ -65,7 +63,6 @@ function PortfolioContent({ v, tab, setTab, tech, pick }: {
             <MapPanel v={v} />
             <CompassPanel v={v} />
           </div>
-          <ProjectsPanel v={v} tech={tech} onPick={pick} />
           <RadarPanel v={v} tech={tech} onPick={pick} />
         </>
       ) : (

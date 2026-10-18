@@ -22,12 +22,13 @@ import {
   ChevronDown,
 } from "lucide-react";
 import clsx from "clsx";
-import { api, ApiError, todayISO, type Doc, type ProjectSummary, type ProjectDetail, type MetricBrief, type ProjectMetric, type ProjectState, type RelatedItem, type Task } from "../lib/api";
+import { api, todayISO, type Doc, type ProjectSummary, type ProjectDetail, type MetricBrief, type ProjectMetric, type ProjectState, type RelatedItem, type Task } from "../lib/api";
 import { PageHeader } from "../components/PageHeader";
 import { markportURL } from "../lib/markport";
 import { MilkdownEditor } from "../components/editors/MilkdownEditor";
 import { useAutosaveFile } from "../hooks/useAutosaveFile";
 import { Card, CardBody } from "../components/ui/card";
+import { FileSaveRecovery } from "../components/FileSaveRecovery";
 import { SaveStatus } from "../components/ui/save-status";
 import { Badge } from "../components/ui/badge";
 import { Button } from "../components/ui/button";
@@ -36,9 +37,15 @@ import { Empty, ErrorState, SkeletonRows, Skeleton } from "../components/ui/stat
 const STATUSES = ["active", "paused", "completed", "cancelled"];
 
 // プロジェクト一覧 + 詳細（List·Detail）。マイルストーン操作・メタ編集・新規作成に対応。
-export function ProjectsPage() {
+export function ProjectsPage({ embedded = false }: { embedded?: boolean }) {
   const [params, setParams] = useSearchParams();
-  const selected = params.get("name");
+  const selectionKey = embedded ? "project" : "name";
+  const selected = params.get(selectionKey);
+  const select = (name: string) => setParams(previous => {
+    const result = new URLSearchParams(previous);
+    result.set(selectionKey, name);
+    return result;
+  });
   const refresh = useWorkspaceRefresh();
   const projects = useQuery({ queryKey: ["projects"], queryFn: api.projects });
   const [creating, setCreating] = useState(false);
@@ -50,17 +57,17 @@ export function ProjectsPage() {
       setCreating(false);
       setNewName("");
       refresh();
-      setParams({ name: res.name });
+      select(res.name);
     },
   });
 
   return (
     <>
-      <PageHeader
+      {!embedded && <PageHeader
         eyebrow="プロジェクト · projects/"
         title="プロジェクト"
         sub="目標・マイルストーン・タスク・ログを構造化して見る・編集する。中身は各 README が正本。"
-      />
+      />}
       <div className="grid grid-cols-1 lg:grid-cols-[300px_1fr] gap-6 items-start">
         <Card>
           <div className="ds-card flex items-center justify-between border-b border-border !pb-2">
@@ -102,7 +109,7 @@ export function ProjectsPage() {
               <ul className="ds-stack !gap-1">
                 {(projects.data.projects ?? []).map((p) => (
                   <li key={p.name}>
-                    <ProjectRow project={p} active={selected === p.name} onClick={() => setParams({ name: p.name })} />
+                    <ProjectRow project={p} active={selected === p.name} onClick={() => select(p.name)} />
                   </li>
                 ))}
               </ul>
@@ -1021,25 +1028,18 @@ function FreeSpace({ name, onSaved }: { name: string; onSaved: () => void }) {
   });
 
   if (file.query.isError) return <ErrorState error={file.query.error} onRetry={() => file.query.refetch()} />;
-  if (file.conflict) {
-    return (
-      <ErrorState
-        error={new ApiError(409, "他のクライアント（Claude Code / VSCode）が先に編集しました。再読込してください。")}
-        onRetry={file.retry}
-      />
-    );
-  }
   if (file.query.isPending || file.initialBody === null) return <Skeleton className="h-40 w-full" />;
 
   return (
     <div className="ds-stack !gap-2">
+      <FileSaveRecovery file={file} />
       <div className="flex justify-end">
         <SaveStatus state={file.saveState} />
       </div>
       <div className="rounded-md border border-border bg-card p-3">
         <MilkdownEditor
           key={file.editorKey}
-          defaultValue={file.initialBody}
+          defaultValue={file.draft}
           onChange={file.onChange}
           minHeight="14rem"
           placeholder="このプロジェクトの自由メモ。設計の走り書き・関連リンク（[[…]] や URL）・なんでも。"

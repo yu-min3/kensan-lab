@@ -5,20 +5,21 @@ import { expect, test } from "@playwright/test";
 
 test("ダッシュボードが表示され、フィクスチャの North Star が出る", async ({ page }) => {
   await page.goto("/");
+  await page.locator("#portfolio > summary").click();
   await expect(page.getByText("E2E テスト用の North Star")).toBeVisible();
 });
 
 test("かんばんページに遷移でき、今週バンドのタスクが見える", async ({ page }) => {
   await page.goto("/");
-  await page.getByRole("link", { name: "タスク", exact: true }).click();
-  await expect(page).toHaveURL(/\/tasks$/);
+  await page.locator("#tasks > summary").click();
+  await expect(page).toHaveURL(/\/$/);
   await expect(page.getByText("今週のサンプルタスク")).toBeVisible();
 });
 
 test("日記ページで未作成の日を作成できる", async ({ page }) => {
   // フィクスチャに存在しない過去日を指定 → 空状態 → 作成
   await page.goto("/daily?date=2026-01-15");
-  const createButton = page.getByRole("button", { name: "日記を作成" });
+  const createButton = page.getByRole("button", { name: "日記を書く" });
   await expect(createButton).toBeVisible();
   await createButton.click();
   // 作成後は空状態のボタンが消え、エディタ（日記セクション）に切り替わる
