@@ -1,4 +1,5 @@
-import { useEffect } from "react";
+import { useEffect, useLayoutEffect, useRef } from "react";
+import { ArrowLeft, Pencil, Plus, Check } from "lucide-react";
 import { formatDuration, Recipe } from "../api";
 import { useRecipeEditor } from "../hooks/useRecipeEditor";
 import { Field, Panel } from "../components/Editor";
@@ -8,12 +9,38 @@ export function RecipePage({ file, selected, onBack, onToggle, onSaved, onGuard 
 }) {
   const { recipe, form, editing, setEditing, loading, saving, error, conflict, dirty, adopt, discard, change, save, loadLatest } = useRecipeEditor(file,onSaved);
   useEffect(() => { onGuard?.(() => !saving && discard()); return () => onGuard?.(null); }, [onGuard, dirty, saving]);
+  const editButton = useRef<HTMLButtonElement>(null);
+  const formElement = useRef<HTMLFormElement>(null);
+  const readPosition = useRef(0);
+  const wasEditing = useRef(editing);
+  useLayoutEffect(() => {
+    if (loading) return;
+    if (editing) {
+      window.scrollTo({ top: 0, behavior: "instant" });
+      formElement.current?.querySelector<HTMLInputElement>("#recipe-title")?.focus({ preventScroll: true });
+    } else if (wasEditing.current) {
+      window.scrollTo({ top: readPosition.current, behavior: "instant" });
+      editButton.current?.focus({ preventScroll: true });
+    }
+    wasEditing.current = editing;
+  }, [editing, loading]);
+  const beginEdit = () => { readPosition.current = window.scrollY; setEditing(true); };
+  const cancelEdit = () => { if (!discard()) return; if (recipe) adopt(recipe); else onBack(); };
   const field = (name: keyof typeof form, label: string, options: {rows?:number;type?:string;max?:number} = {}) => <Field id={`recipe-${name}`} label={label} value={form[name]} onChange={(value)=>change(name,value)} rows={options.rows} type={options.type} maxLength={options.max} />;
   return <main className="recipe-detail editor-page">
-    <header className="header-row"><h1 className="h-serif">{editing ? file ? "レシピを編集" : "レシピを作成" : "レシピを見る"}</h1><button className="chip" disabled={saving} onClick={() => { if (discard()) onBack(); }}>一覧へ</button></header>
+    <header className="recipe-toolbar" aria-label={editing ? "レシピの編集操作" : "レシピの操作"}>
+      {editing ? <>
+        <button type="button" className="recipe-action recipe-action-ghost" disabled={saving} onClick={cancelEdit}>キャンセル</button>
+        <h1 className="recipe-toolbar-title">{file ? "レシピを編集" : "レシピを作成"}</h1>
+        <button type="submit" form="recipe-edit-form" className="recipe-action recipe-action-primary" aria-label="レシピを保存" disabled={loading || saving || !form.title.trim()}>{saving ? "保存中…" : "保存"}</button>
+      </> : <>
+        <button type="button" className="recipe-action recipe-action-ghost" onClick={onBack}><ArrowLeft aria-hidden="true" />一覧へ</button>
+        {!loading && recipe && <button type="button" className="recipe-action" ref={editButton} onClick={beginEdit}><Pencil aria-hidden="true" />編集</button>}
+      </>}
+    </header>
     {loading && <p role="status">レシピを読み込んでいます…</p>}
     {error && <div className="notice recipe-error" role="alert"><p>{error}</p>{conflict && <><p>入力は残しています。変更内容を控えてから最新版を確認してください。</p><button className="chip" disabled={saving} onClick={() => void loadLatest()}>{file ? "最新版を読み込む" : "作成済みのレシピを確認"}</button></>}</div>}
-    {!loading && editing && <form className="editor-panel" onSubmit={(e) => { e.preventDefault(); void save(); }}>
+    {!loading && editing && <form id="recipe-edit-form" ref={formElement} className="editor-panel" onSubmit={(e) => { e.preventDefault(); void save(); }}>
       <fieldset disabled={saving}>
         <legend>{dirty ? "変更はまだ保存されていません" : "レシピの内容"}</legend>
         {field("title", "タイトル", { max: 300 })}
@@ -28,17 +55,16 @@ export function RecipePage({ file, selected, onBack, onToggle, onSaved, onGuard 
           {field("source", "出典（URL・書籍など）", { max: 2048 })}
           <label htmlFor="recipe-rating"><span id="recipe-rating-label">お気に入り度</span><select aria-labelledby="recipe-rating-label" id="recipe-rating" value={form.rating} onChange={(e) => change("rating", e.target.value)}>{[0, 1, 2, 3, 4, 5].map((n) => <option key={n} value={n}>{n ? "★".repeat(n) : "未設定"}</option>)}</select></label>
         </details>
-        <div className="editor-actions"><button type="submit" className="start-button" disabled={!form.title.trim() || saving}>{saving ? "保存中…" : "レシピを保存"}</button>
-          <button type="button" className="chip" onClick={() => { if (!discard()) return; if (recipe) adopt(recipe); else onBack(); }}>キャンセル</button></div>
+
       </fieldset>
     </form>}
     {!loading && !editing && recipe && <>
-      {recipe.images?.[0] && <img className="recipe-cover" src={`/${recipe.images[0]}`} alt="" />}
       <Panel>
-        <h2 className="h-serif">{recipe.title}</h2>
+        <h1 className="h-serif recipe-name">{recipe.title}</h1>
         <p className="recipe-summary">{[recipe.servings, recipe.prepTime && `下準備 ${formatDuration(recipe.prepTime)}`, recipe.cookTime && `調理 ${formatDuration(recipe.cookTime)}`, recipe.rating ? "★".repeat(recipe.rating) : ""].filter(Boolean).join(" · ")}</p>
-        {!!recipe.tags?.length && <div className="detail-tags">{recipe.tags.map((tag, i) => <span className="chip" key={i}>{tag}</span>)}</div>}
-        <div className="editor-actions"><button className="chip" onClick={() => setEditing(true)}>編集する</button><button className={`chip ${selected ? "chip-on" : ""}`} aria-pressed={selected} onClick={() => onToggle(recipe.file)}>{selected ? "調理から外す" : "調理に追加"}</button></div>
+        {!!recipe.tags?.length && <div className="detail-tags">{recipe.tags.map((tag, i) => <span className="recipe-tag" key={i}>{tag}</span>)}</div>}
+        {recipe.images?.[0] && <img className="recipe-cover" src={`/${recipe.images[0]}`} alt="" />}
+        <button type="button" className="recipe-action recipe-action-primary recipe-cook" aria-pressed={selected} onClick={() => onToggle(recipe.file)}>{selected ? <Check aria-hidden="true" /> : <Plus aria-hidden="true" />}{selected ? "追加済み・外す" : "調理に追加"}</button>
       </Panel>
       <Panel><h2 className="h-serif">材料</h2>{recipe.ingredients?.length ? <ul className="detail-ingredients">{recipe.ingredients.map((s, i) => <li key={i}>{s}</li>)}</ul> : <p className="recipe-summary">材料はまだ登録されていません</p>}</Panel>
       <Panel><h2 className="h-serif">手順</h2>{recipe.steps?.length ? <ol className="detail-steps">{recipe.steps.map((s, i) => <li key={i}>{s}</li>)}</ol> : <p className="recipe-summary">手順はまだ登録されていません</p>}</Panel>

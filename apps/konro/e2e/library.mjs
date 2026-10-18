@@ -13,6 +13,12 @@ const data = path.join(artifacts, "data"); await mkdir(path.join(data, "images")
 await writeFile(path.join(data, "images", "fish.svg"), '<svg xmlns="http://www.w3.org/2000/svg" width="300" height="150"><rect width="300" height="150" fill="tan"/></svg>');
 await writeFile(path.join(data, "煮魚.md"), '---\ntitle: 煮魚\nservings: 2人分\ntags: [和食]\ncook_time: PT10M\nrk_id: keeper-original\nimages: [images/fish.svg]\ncreated: 2026-07-01\ncustom: keep-me\n---\n\n## 材料\n- 魚 2切れ\n- 水 100ml\n\n## 手順\n1. 10分煮る\n\n## メモ\n元のメモ\n');
 await writeFile(path.join(data, "パスタ.md"), '---\ntitle: パスタ\ntags: [洋食]\ncook_time: PT1M30S\n---\n\n## 材料\n- 麺\n\n## 手順\n1. ゆでる\n');
+const longTitle="鶏むね肉とたっぷり野菜のさっぱり南蛮漬け";
+for (const [name,photo] of [["長文写真あり",true],["長文写真なし",false]]) {
+ const tags=["和食","作り置き","主菜","平日のお弁当", "verylongtag".repeat(12)];
+ const steps=Array.from({length:30},(_,i)=>`${i+1}. 手順${i+1}：材料を確認し、順番に準備して調理を進める。調味料はレシピの分量を確認する。`).join("\n");
+ await writeFile(path.join(data,name+".md"),`---\ntitle: ${JSON.stringify(longTitle)}\ntags: ${JSON.stringify(tags)}\n${photo?"images: [images/fish.svg]\n":""}---\n\n## 材料\n- 鶏むね肉 1枚\n- 野菜\n\n## 手順\n${steps}\n`);
+}
 const port = await new Promise((resolve) => { const s = net.createServer(); s.listen(0, "127.0.0.1", () => { const p = s.address().port; s.close(() => resolve(p)); }); });
 const base = `http://127.0.0.1:${port}`;
 const backend = spawn(process.env.KONRO_TEST_BINARY, [], { env: { ...process.env, KONRO_DATA_DIR: data, KONRO_STATIC_DIR: path.join(app, "frontend/dist"), KONRO_ADDR: `127.0.0.1:${port}` }, stdio: "ignore" });
@@ -42,7 +48,7 @@ try {
     assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth), false);
     await button("煮魚を開く").click(); await page.getByRole("heading", { name: "煮魚", exact: true }).waitFor();
     assert.equal(await page.locator(".start-bar").count(), 0);
-    await button("編集する").click(); await checkContrast(page.getByLabel("タイトル", { exact: true }), `${scheme} edit input`);
+    await button("編集").click(); await checkContrast(page.getByLabel("タイトル", { exact: true }), `${scheme} edit input`);
     await page.screenshot({ path: path.join(artifacts, `editor-${scheme}.png`), fullPage: true });
     await button("キャンセル").click(); await button("一覧へ").click();
   }
@@ -52,7 +58,7 @@ try {
   await page.emulateMedia({ colorScheme: "dark" });
   await page.waitForFunction(() => document.documentElement.classList.contains("dark"));
   results.push("OS color-scheme changes apply without reloading");
-  await button("煮魚を開く").click(); await button("編集する").click();
+  await button("煮魚を開く").click(); await button("編集").click();
   await page.getByLabel("タイトル", { exact: true }).fill("魚 & 野菜");
   await page.getByLabel("材料（1行に1項目）", { exact: true }).fill("魚 2切れ\n野菜 100g");
   await page.getByLabel("手順（1行に1つの手順）", { exact: true }).fill("10分煮る\n盛り付ける");
@@ -69,13 +75,13 @@ try {
   await page.reload(); await page.getByText("翌日も食べる", { exact: false }).waitFor();
   await page.screenshot({ path: path.join(artifacts, "detail-dark.png"), fullPage: true });
   results.push("legacy recipe edits persist after reload; source identity, image, metadata, comma tag and markdown note preserved");
-  await button("編集する").click(); await page.getByLabel("タイトル", { exact: true }).fill("こちらの変更");
+  await button("編集").click(); await page.getByLabel("タイトル", { exact: true }).fill("こちらの変更");
   const other = await browser.newPage(); await other.goto(base); await other.getByRole("button", { name: "魚 & 野菜を開く", exact: true }).click();
-  await other.getByRole("button", { name: "編集する", exact: true }).click(); await other.getByLabel("タイトル", { exact: true }).fill("別タブの保存");
+  await other.getByRole("button", { name: "編集", exact: true }).click(); await other.getByLabel("タイトル", { exact: true }).fill("別タブの保存");
   await other.getByRole("button", { name: "レシピを保存", exact: true }).click(); await other.getByRole("heading", { name: "別タブの保存", exact: true }).waitFor();
   await button("レシピを保存").click(); await page.getByRole("alert").getByText("レシピは別の操作で更新されています。再読み込みして確認してください", { exact: true }).waitFor();
   assert.equal(await page.getByLabel("タイトル", { exact: true }).inputValue(), "こちらの変更");
-  page.once("dialog", (d) => d.accept()); await button("一覧へ").click();
+  page.once("dialog", (d) => d.accept()); await button("キャンセル").click(); await button("一覧へ").click();
   results.push("concurrent tab save rejects stale edit and retains input; unsaved exit asks before discarding");
   await page.reload(); await button("手入力で作成").click();
   await page.getByLabel("タイトル", { exact: true }).fill("新しいスープ");
@@ -130,7 +136,7 @@ try {
   await button("パスタを開く").click();assert(page.url().includes("#recipe/"));
   await page.getByText("調理 1分30秒",{exact:false}).waitFor();
   const detailURL=page.url(); await page.reload();await page.getByRole("heading",{name:"パスタ",exact:true}).waitFor();
-  await button("一覧へ").click();await button("パスタを開く").click();await button("編集する").click();
+  await button("一覧へ").click();await button("パスタを開く").click();await button("編集").click();
   await page.getByLabel("タイトル",{exact:true}).fill("未保存のパスタ");
   let dismissed=0;page.once("dialog",async d=>{dismissed++;await d.dismiss();});
   await page.goBack();await page.waitForTimeout(250);
@@ -144,6 +150,48 @@ try {
   assert.equal(await page.evaluate(()=>localStorage.getItem("konro-session-v1")),null);
   await page.unroute("**/api/v1/recipes/**");
   results.push("failed initial recipe fetch never creates a partial cooking session");
+  // A: edit is a fixed page action, with no overlap with long content or passive tags.
+  for (const scheme of ["light","dark"]) {
+    await page.emulateMedia({colorScheme:scheme});
+    for (const name of ["長文写真あり","長文写真なし"]) {
+      await page.setViewportSize({width:320,height:700});
+      await page.goto(base+"/#recipe/"+encodeURIComponent(name));
+      await page.reload();
+      await page.getByRole("heading",{name:longTitle,level:1,exact:true}).waitFor();
+      assert.equal(await page.getByRole("heading",{name:"レシピを見る",exact:true}).count(),0);
+      assert.equal(await page.locator(".detail-tags button").count(),0);
+      assert.equal(await page.locator(".recipe-tag").count(),5);
+      assert.equal(await page.locator(".recipe-cover").count(),name==="長文写真あり"?1:0);
+      assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false);
+      await checkContrast(button("編集"),`${scheme} toolbar edit`);
+      await checkContrast(button("調理に追加"),`${scheme} cook selection`);
+      await checkContrast(page.locator(".recipe-tag").first(),`${scheme} passive tag`);
+      await page.screenshot({path:path.join(artifacts,`toolbar-${scheme}-${name}.png`)});
+      await page.evaluate(()=>window.scrollTo(0,document.body.scrollHeight));
+      const before=await page.evaluate(()=>scrollY);
+      const box=await button("編集").boundingBox();assert(box.y>=0&&box.y+box.height<=700);
+      await page.screenshot({path:path.join(artifacts,`toolbar-scrolled-${scheme}-${name}.png`)});
+      await button("編集").evaluate(el=>el.focus({preventScroll:true}));await page.keyboard.press("Enter");
+      await page.getByLabel("タイトル",{exact:true}).waitFor();
+      assert.equal(await page.evaluate(()=>document.activeElement.id),"recipe-title");
+      const inputBox=await page.getByLabel("タイトル",{exact:true}).boundingBox(),bar=await page.locator(".recipe-toolbar").boundingBox();assert(inputBox.y>=bar.y+bar.height);
+      await page.getByLabel("タイトル",{exact:true}).fill("保存しない変更");
+      page.once("dialog",d=>d.dismiss());await button("キャンセル").click();
+      assert.equal(await page.getByLabel("タイトル",{exact:true}).inputValue(),"保存しない変更");
+      page.once("dialog",d=>d.accept());await button("キャンセル").click();
+      await page.getByRole("heading",{name:longTitle,level:1,exact:true}).waitFor();
+      assert(Math.abs((await page.evaluate(()=>scrollY))-before)<=1, JSON.stringify({scheme,name,before,after:await page.evaluate(()=>scrollY)}));
+      assert.equal(await button("編集").evaluate(el=>el===document.activeElement),true);
+    }
+  }
+  results.push("fixed edit toolbar survives 320px long titles/tags, photo/no photo and both themes; keyboard editing and cancel restore reading position and focus");
+  await button("編集").click();await page.getByLabel("メモ",{exact:true}).fill("末尾まで読んで保存する");
+  await page.setViewportSize({width:320,height:480});await page.evaluate(()=>window.scrollTo(0,document.body.scrollHeight));
+  const saveBox=await button("レシピを保存").boundingBox();assert(saveBox.y>=0&&saveBox.y+saveBox.height<=480);
+  await button("レシピを保存").click();await page.getByRole("heading",{name:longTitle,level:1,exact:true}).waitFor();
+  assert.equal(await page.getByText("末尾まで読んで保存する",{exact:true}).count(),1);
+  assert.equal(await button("編集").evaluate(el=>el===document.activeElement),true);
+  results.push("save remains reachable from the bottom of a long form at reduced viewport height and returns to the recipe");
   assert.deepEqual(errors, []);
   await writeFile(path.join(artifacts, "results.json"), JSON.stringify({ status: "passed", results, contrast, browserErrors: errors }, null, 2));
   console.log(JSON.stringify({ status: "passed", artifacts, checks: results.length, contrast }, null, 2));
