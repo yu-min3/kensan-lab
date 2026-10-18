@@ -188,3 +188,64 @@ test("カードがないプロジェクトには空のリンクを出さず、�
   await expect(page).toHaveURL(/\/$/);
   await expect(page.getByRole("heading", { name: "地図 · どこが埋まっているか" })).toBeVisible();
 });
+
+
+test("1行追加で日記を作成し、本文編集後にも自由な本文へ追記できる", async ({ page }) => {
+  const date = "2026-01-10";
+  await page.goto(`/?date=${date}`);
+  await page.getByLabel("日記（1 行）", { exact: true }).fill("朝は散歩に出たい");
+  await page.getByRole("button", { name: "残す", exact: true }).click();
+  await expect(page.getByLabel("今日の日記の本文")).toContainText("朝は散歩に出たい");
+  await page.getByRole("button", { name: "編集・追記", exact: true }).click();
+  await editor(page).press("ControlOrMeta+End");
+  await page.keyboard.press("Enter");
+  await page.keyboard.insertText("本文からも書ける");
+  await page.getByRole("button", { name: "編集を終える" }).click();
+  await page.getByLabel("日記（1 行）", { exact: true }).fill("夕方は読書した");
+  await page.getByLabel("日記（1 行）", { exact: true }).press("Enter");
+  await expect(page.getByLabel("今日の日記の本文")).toContainText("夕方は読書した");
+  await page.reload();
+  const daily = await (await page.request.get(`/api/v1/daily?date=${date}`)).json();
+  expect(daily.content).toContain("朝は散歩に出たい");
+  expect(daily.content).toContain("本文からも書ける");
+  expect(daily.content).toContain("夕方は読書した");
+  expect(daily.content).not.toContain("## 日記");
+});
+
+test("1行追加の保存失敗では本文ドラフトに入力が残る", async ({ page }) => {
+  await createDiary(page, "2026-01-09");
+  await page.getByRole("button", { name: "編集を終える" }).click();
+  await page.route("**/api/v1/files/daily/**", async route => {
+    if (route.request().method() === "PUT") await route.fulfill({ status: 409, json: { error: "別の場所で編集済み" } });
+    else await route.continue();
+  });
+  await page.getByLabel("日記（1 行）", { exact: true }).fill("消さずに残したい一行");
+  await page.getByRole("button", { name: "残す", exact: true }).click();
+  await expect(page.getByLabel("保存できていない入力")).toContainText("消さずに残したい一行");
+  await page.reload();
+  await expect(page.getByLabel("保存できていない入力")).toContainText("消さずに残したい一行");
+});
+
+
+test("未作成日への1行追加が遅延して失敗しても、別画面から戻ると入力を回収できる", async ({ page }) => {
+  const date = "2026-01-08";
+  await page.goto(`/?date=${date}`);
+  let release!: () => void;
+  const held = new Promise<void>(resolve => { release = resolve; });
+  await page.route("**/api/v1/files", async route => {
+    if (route.request().method() === "POST") {
+      await held;
+      await route.fulfill({ status: 500, json: { error: "作成失敗" } }).catch(() => {});
+    } else await route.continue();
+  });
+  await page.getByLabel("日記（1 行）", { exact: true }).fill("失敗しても残す一行");
+  const request = page.waitForRequest(req => req.method() === "POST" && req.url().endsWith("/api/v1/files"));
+  await page.getByRole("button", { name: "残す", exact: true }).click();
+  await request;
+  await page.getByRole("link", { name: "メモ", exact: true }).click();
+  release();
+  await page.goto(`/?date=${date}`);
+  await expect(page.getByLabel("日記（1 行）", { exact: true })).toHaveValue("失敗しても残す一行");
+  await page.reload();
+  await expect(page.getByLabel("日記（1 行）", { exact: true })).toHaveValue("失敗しても残す一行");
+});
