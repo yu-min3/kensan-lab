@@ -1,3 +1,5 @@
+import {useEffect} from 'react';
+import type {LeaveGuard} from '../hooks/useRecipeRoute';
 import { draftRequest } from "../api";
 import { useImportJob, clearImportDraft } from "../hooks/useImportJob";
 import {SourceCredit} from "../components/SourceCredit";
@@ -13,8 +15,10 @@ const reasons: Record<string, string> = {
   numbers_changed: "原文にない数値を検出したため、整形結果を採用していません。下書きを確認・編集できます。",
   invalid_recipe: "抽出結果がレシピの形式に合いませんでした。下書きはそのままです。再試行または手入力できます。",
 };
-export function ImportPage({ onClose, onSaved, initialURL="" }: { initialURL?:string; onClose: () => void; onSaved: (file: string, title: string) => void }) {
-  const {create,savedDrafts,restoreDraft,kind,setKind,input,setInput,draft,content,setContent,ingredients,setIngredients,steps,setSteps,submitting,pollError,confirmed,setConfirmed,busy,error,resume,loading,active,perform,persist,start,action,discardView} = useImportJob(initialURL);
+export function ImportPage({ onClose, onSaved, initialURL="",initialDraft="",returnToSearch=false,onGuard,onDraft }: { initialURL?:string;initialDraft?:string;returnToSearch?:boolean;onGuard?:(guard:LeaveGuard|null)=>void;onDraft?:(id:string)=>void; onClose: () => void; onSaved: (file: string, title: string) => void }) {
+  const {leave,dirty,create,savedDrafts,restoreDraft,kind,setKind,input,setInput,draft,content,setContent,ingredients,setIngredients,steps,setSteps,submitting,pollError,confirmed,setConfirmed,busy,error,resume,loading,active,perform,persist,start,action,discardView} = useImportJob(initialURL,initialDraft);
+  useEffect(()=>{if(draft&&draft.id!==initialDraft)onDraft?.(draft.id)},[draft?.id,initialDraft,onDraft]);
+  useEffect(()=>{onGuard?.(leave);return()=>onGuard?.(null)},[onGuard,dirty,active,busy,loading,draft,content,ingredients,steps]);
   const complete = !!content.title.trim() && !!ingredients.trim() && !!steps.trim();
   const state = submitting ? "sending" : draft?.detached ? "manual" : draft?.pending ? "sending" : draft?.job?.state ?? "draft";
   const failed = state === "failed";
@@ -22,7 +26,7 @@ export function ImportPage({ onClose, onSaved, initialURL="" }: { initialURL?:st
   const descriptions: Record<string, string> = { sending: "ページから読み取れなかった部分を、別の方法で抽出しています。", queued: "受付済みです。順番が来ると自動で読み取ります。", running: "この画面を閉じても処理は続きます。", waiting: "現在は処理していません。時間をおいて再開するか、手入力できます。", succeeded: complete ? "材料と手順を確認して保存してください。" : "元のページを確認し、足りない材料・手順を入力してください。", failed: "処理は停止しています。再試行するか、読み取れた内容を編集できます。", cancelled: "処理は停止しました。読み取れた内容は残しています。", manual: "後から届く抽出結果で上書きされることはありません。", draft: complete ? "材料と手順を確認して保存してください。" : "読み取れた内容は残しています。元のページを確認して入力できます。" };
   const processing = ["sending", "queued", "running"].includes(state) && !pollError;
   return <main className="editor-page">
-    <header className="header-row"><h1 className="h-serif">レシピを取り込む</h1><button className="chip" disabled={busy || loading} onClick={() => { if (draft && !active) perform(async () => { await persist(); onClose(); }); else onClose(); }}>{initialURL ? "検索結果へ" : "一覧へ"}</button></header>
+    <header className="header-row"><h1 className="h-serif">レシピを取り込む</h1><button className="chip" disabled={busy || loading} onClick={() => { if (draft && !active) perform(async () => { await persist(); onClose(); }); else onClose(); }}>{returnToSearch ? "検索結果へ" : "一覧へ"}</button></header>
     {loading && <Panel><p role="status"><span className="import-spinner" aria-hidden="true"/>{initialURL ? "レシピを取り込んでいます…" : "前の下書きを読み込んでいます…"}</p><p>材料と手順を読み取っています。完了すると確認画面へ進みます。</p></Panel>}
     {error && <p className="notice" role="alert">{error}</p>}
     {!draft && !loading && <Panel>
@@ -46,6 +50,7 @@ export function ImportPage({ onClose, onSaved, initialURL="" }: { initialURL?:st
           <p>{pollError || descriptions[state]}</p>
           {!draft.detached && !submitting && !draft.pending && draft.job?.reason && <p>{reasons[draft.job.reason] ?? "処理を完了できませんでした。再試行または手入力できます。"}</p>}
         </div>
+        {draft.assessment&&<p className="import-assessment" role="status">{draft.assessment}</p>}
         {!!draft.warnings?.length && <details><summary>取り込みの補足</summary>{draft.warnings.map((w,i)=><p key={i}>{w}</p>)}</details>}
         {draft.agent_available ? <>
           <div className="editor-actions">
