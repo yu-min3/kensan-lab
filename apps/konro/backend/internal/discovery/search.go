@@ -8,10 +8,10 @@ import (
 	"net/url"
 	"strings"
 	"sync"
-	"time"
 	"unicode/utf8"
 
 	"github.com/PuerkitoBio/goquery"
+	"github.com/yu-min3/kensan-lab/apps/konro/backend/internal/creatorprefs"
 	"github.com/yu-min3/kensan-lab/apps/konro/backend/internal/provenance"
 	"github.com/yu-min3/kensan-lab/apps/konro/backend/internal/webpage"
 )
@@ -37,20 +37,33 @@ type Service struct {
 	previewMu   sync.Mutex
 	previews    map[string]previewEntry
 	chefMu      sync.Mutex
-	chefResults []Result
-	chefUntil   time.Time
+	chefs       map[string]chefEntry
+	preferences *creatorprefs.Store
 }
 
 func New(fetch Fetcher) *Service {
 	if fetch == nil {
 		fetch = func(ctx context.Context, raw string) (webpage.Page, error) {
+			// Channel home pages include substantially more metadata than search
+			// results. Keep search bounded at 2 MiB, profiles at the 5 MiB source cap.
+			if strings.HasPrefix(raw, "https://www.youtube.com/@") || strings.HasPrefix(raw, "https://www.youtube.com/channel/") {
+				return webpage.Fetch(ctx, raw)
+			}
 			if strings.HasPrefix(raw, "https://www.bing.com/search?") {
 				return webpage.FetchSearch(ctx, raw, true)
 			}
 			return webpage.FetchSearch(ctx, raw, false)
 		}
 	}
-	return &Service{fetch: fetch, slots: make(chan struct{}, 2), previews: map[string]previewEntry{}}
+	return &Service{fetch: fetch, slots: make(chan struct{}, 2), previews: map[string]previewEntry{}, chefs: map[string]chefEntry{}}
+}
+
+func (s *Service) WithPreferences(store *creatorprefs.Store) *Service {
+	s.preferences = store
+	return s
+}
+func validQuery(q string) bool {
+	return strings.TrimSpace(q) != "" && utf8.RuneCountInString(q) <= 100 && utf8.ValidString(q) && !strings.ContainsAny(q, "\r\n\x00")
 }
 
 var ErrQuery = errors.New("料理名や材料を100文字以内で入力してください")
@@ -81,7 +94,7 @@ func searchURL(site, q string) string {
 func (s *Service) Search(ctx context.Context, q, site string) (Response, error) {
 	out := Response{Results: []Result{}, Warnings: []string{}}
 	q = strings.TrimSpace(q)
-	if q == "" || utf8.RuneCountInString(q) > 100 || !utf8.ValidString(q) || strings.ContainsAny(q, "\r\n\x00") {
+	if !validQuery(q) {
 		return out, ErrQuery
 	}
 	selected := []string{site}
@@ -131,8 +144,12 @@ func (s *Service) Search(ctx context.Context, q, site string) (Response, error) 
 			out.Warnings = append(out.Warnings, w)
 		}
 	}
-	groupsExtra, failed := s.favoriteResults(ctx, q, site)
-	out.Results = rank(out.Results, groupsExtra)
+	creators, prefErr := s.Creators()
+	if prefErr != nil {
+		out.Warnings = append(out.Warnings, "好きな作り手の設定を読み込めませんでした。通常結果を表示しています")
+	}
+	groupsExtra, failed := s.favoriteResults(ctx, q, site, creators)
+	out.Results = rank(out.Results, groupsExtra, creators)
 	if failed {
 		out.Warnings = append(out.Warnings, "好きな作り手の候補を一部取得できませんでした。通常の検索結果は表示しています")
 	}
@@ -190,7 +207,7 @@ func parseResults(page webpage.Page, site string) []Result {
 							}
 							if owner != nil {
 								results[len(results)-1].Info = &provenance.Info{Creator: owner}
-								results[len(results)-1].Preferred = preferred(results[len(results)-1].Info)
+
 							}
 						}
 					}

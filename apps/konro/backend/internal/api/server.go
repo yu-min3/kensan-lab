@@ -13,6 +13,7 @@ import (
 	"path/filepath"
 	"time"
 
+	"github.com/yu-min3/kensan-lab/apps/konro/backend/internal/creatorprefs"
 	"github.com/yu-min3/kensan-lab/apps/konro/backend/internal/discovery"
 	"github.com/yu-min3/kensan-lab/apps/konro/backend/internal/importer"
 	"github.com/yu-min3/kensan-lab/apps/konro/backend/internal/recipe"
@@ -35,7 +36,10 @@ func New(dataDir, staticDir string, opts ...Option) http.Handler {
 	}
 	registerDrafts(mux, importer.New(dataDir, config.agent))
 	registerRecipeWrites(mux, dataDir)
-	registerDiscovery(mux, discovery.New(config.searchFetch))
+	creatorStore := creatorprefs.New(dataDir)
+	searchService := discovery.New(config.searchFetch).WithPreferences(creatorStore)
+	registerDiscovery(mux, searchService)
+	registerCreators(mux, creatorStore, searchService)
 
 	mux.HandleFunc("GET /api/v1/recipes", func(w http.ResponseWriter, r *http.Request) {
 		metas, err := recipe.List(dataDir)

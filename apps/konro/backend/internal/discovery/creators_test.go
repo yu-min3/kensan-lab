@@ -79,7 +79,7 @@ func TestPreviewCacheAndRedirectIdentity(t *testing.T) {
 }
 func TestRankKeepsRegularOrderAndUnratedRecipes(t *testing.T) {
 	base := []Result{{URL: "a"}, {URL: "b", Info: &provenance.Info{Rating: &provenance.Rating{Value: 5, Best: 5}}}, {URL: "c"}}
-	out := rank(base, nil)
+	out := rank(base, nil, nil)
 	if len(out) != 3 || out[0].URL != "a" || out[1].URL != "b" || out[2].URL != "c" {
 		t.Fatal(out)
 	}
