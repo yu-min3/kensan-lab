@@ -32,25 +32,21 @@ test("空のプロジェクト一覧でも次の操作を案内する", async ({
   await expect(page.getByRole("link", { name: "プロジェクトを作る", exact: true })).toHaveAttribute("href", "/projects");
 });
 
-test("ダッシュボードの最上段で日記を読み書きし、全文編集へ進める", async ({ page }) => {
+test("ダッシュボードで自由な日記本文を表示し、全文編集へ進める", async ({ page }) => {
+  const date = (await (await page.request.get("/api/v1/today")).json()).date;
+  await page.route("**/api/v1/files/daily/**", route => route.fulfill({ json: {
+    content: `---\ntype: daily\n---\n# ${date}\n\n朝のメモ。今日は散歩したい。\n\n## 自由な見出し\n\n夕方に書き足したこと。`,
+  } }));
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto("/");
-  const input = page.getByLabel("今日の日記（1 行）");
-  await expect(input).toBeInViewport();
-  expect((await input.boundingBox())!.y).toBeLessThan(320);
-  const date = (await (await page.request.get("/api/v1/today")).json()).date;
-  await input.fill("E2Eの1行日記");
-  await input.press("Enter");
-  await expect(page.getByText("日記に追記しました", { exact: true })).toBeVisible();
-  await expect(input).toHaveValue("");
-  await expect(page.getByLabel("今日の日記の本文")).toContainText("E2Eの1行日記");
-  await page.reload();
-  await expect(page.getByLabel("今日の日記の本文")).toContainText("E2Eの1行日記");
-  const daily = await (await page.request.get(`/api/v1/daily?date=${date}`)).json();
-  expect(daily.content).toMatch(/## 日記\n\n- \d{2}:\d{2} E2Eの1行日記\n/);
+  const body = page.getByLabel("今日の日記の本文");
+  await expect(body).toBeInViewport();
+  await expect(body).toContainText("朝のメモ。今日は散歩したい。");
+  await expect(body).toContainText("夕方に書き足したこと。");
+  await expect(page.getByRole("heading", { name: "自由な見出し" })).toBeVisible();
+  await expect(page.getByRole("textbox", { name: "今日の日記（1 行）" })).toHaveCount(0);
   await page.getByRole("link", { name: "全文を編集", exact: true }).click();
   await expect(page).toHaveURL(new RegExp(`/daily\\?date=${date}$`));
-  await expect(page.getByRole("button", { name: "日記を作成", exact: true })).toHaveCount(0);
 });
 
 test("目標カードは現在地を日付付きで出し、次の節目と分ける", async ({ page }) => {
@@ -135,19 +131,11 @@ test("今日の予定が3件を超えると明日へ回すよう促す", async (
 });
 
 
-test("日記の取得・保存失敗は見える形で表示し、入力を保持する", async ({ page }) => {
+test("日記の取得失敗を未記入と区別する", async ({ page }) => {
   await page.route("**/api/v1/files/daily/**", route => route.fulfill({ status: 500, json: { error: "読み取り失敗" } }));
-  await page.route("**/api/v1/daily/line", route => route.fulfill({ status: 500, json: { error: "保存失敗" } }));
-  await page.route("**/api/v1/portfolio", route => route.fulfill({ status: 500, json: { error: "集計失敗" } }));
   await page.goto("/");
-  const input = page.getByLabel("今日の日記（1 行）");
-  await expect(input).toBeVisible();
-  await input.fill("今日は散歩したい");
-  await input.press("Enter");
-  await expect(page.getByRole("alert").filter({ hasText: "保存失敗" })).toBeVisible();
-  await expect(input).toHaveValue("今日は散歩したい");
   await expect(page.getByText("HTTP 500: 読み取り失敗", { exact: true })).toBeVisible();
-  await expect(page.getByText("今日はまだ書いていません。やりたいことを一つ、ここから。", { exact: true })).toHaveCount(0);
+  await expect(page.getByText("今日の日記はまだありません。「全文を編集」から書けます。", { exact: true })).toHaveCount(0);
 });
 
 for (const mode of ["light", "dark"] as const) {
@@ -156,8 +144,6 @@ for (const mode of ["light", "dark"] as const) {
     await page.goto("/");
     await page.evaluate(dark => document.documentElement.classList.toggle("dark", dark), mode === "dark");
     await expect(page.getByRole("heading", { name: "今日の日記", exact: true })).toBeVisible();
-    await expect(page.getByLabel("今日の日記（1 行）")).toBeInViewport();
-    expect((await page.getByLabel("今日の日記（1 行）").boundingBox())!.height).toBeGreaterThanOrEqual(32);
     expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(390);
     await page.screenshot({ path: `../../../temp/kensan-dashboard-diary-${mode}.png`, fullPage: false });
   });
