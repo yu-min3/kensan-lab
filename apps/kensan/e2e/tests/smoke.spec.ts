@@ -5,15 +5,13 @@ import { expect, test } from "@playwright/test";
 
 test("ダッシュボードが表示され、フィクスチャの North Star が出る", async ({ page }) => {
   await page.goto("/");
-  await page.locator("#portfolio > summary").click();
   await expect(page.getByText("E2E テスト用の North Star")).toBeVisible();
 });
 
-test("かんばんページに遷移でき、今週バンドのタスクが見える", async ({ page }) => {
+test("ホームには独立したタスク管理の入口がない", async ({ page }) => {
   await page.goto("/");
-  await page.locator("#tasks > summary").click();
-  await expect(page).toHaveURL(/\/$/);
-  await expect(page.getByText("今週のサンプルタスク")).toBeVisible();
+  await expect(page.getByRole("link", { name: "タスク", exact: true })).toHaveCount(0);
+  await expect(page.getByRole("heading", { name: "かんばん", exact: true })).toHaveCount(0);
 });
 
 test("日記ページで未作成の日を作成できる", async ({ page }) => {

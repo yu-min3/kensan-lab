@@ -1,12 +1,13 @@
-import { useState } from "react";
-import { Link } from "react-router-dom";
+import { useEffect, useState } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { Check, X } from "lucide-react";
 import { api, type PortfolioCell, type PortfolioProposal, type PortfolioView } from "../lib/api";
 import { useWorkspaceRefresh } from "../hooks/useWorkspaceRefresh";
 import { Button } from "../components/ui/button";
 import { ErrorState, SkeletonRows } from "../components/ui/states";
-import { RadarPanel } from "./PortfolioProjects";
+import { ProjectsPanel, RadarPanel } from "./PortfolioProjects";
+import { TodayDiary } from "../components/today/TodayDiary";
 import { useToast } from "../components/ui/toast";
 
 // ダッシュボード: North Star に対して、どこに証拠があり（地図）、時間がどこへ向いていて（羅針盤）、
@@ -15,15 +16,29 @@ import { useToast } from "../components/ui/toast";
 // 夜に拾われた証拠の候補（reflect/inbox）は、ここで採用か却下を押すだけ。
 
 const STATUS_LABEL = { public: "外から見える", internal: "社内だけ", empty: "空き" } as const;
-const projectURL = (name: string) => `/projects?name=${encodeURIComponent(name)}`;
+const projectURL = (name: string) => `#project-${encodeURIComponent(name)}`;
 
 export function PortfolioPage() {
   const data = useQuery({ queryKey: ["portfolio"], queryFn: api.portfolio, refetchInterval: 120_000 });
+  const location = useLocation();
+  const navigate = useNavigate();
+  useEffect(() => {
+    if (!data.isSuccess || !location.hash.startsWith("#project-")) return;
+    let id: string;
+    try { id = decodeURIComponent(location.hash.slice(1)); } catch { return; }
+    const frame = requestAnimationFrame(() => {
+      const card = document.getElementById(id);
+      if (card) card.scrollIntoView({ block: "start" });
+      else navigate({ pathname: "/", search: location.search }, { replace: true });
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [data.isSuccess, location.hash]);
   const [tab, setTab] = useState<"map" | "annual">("map");
   const [tech, setTech] = useState<string | null>(null);
   const pick = (name: string) => setTech((cur) => (cur === name ? null : name));
   return (
     <div className="pf ds-section">
+      <section id="diary"><TodayDiary /></section>
       {data.isPending ? <SkeletonRows rows={8} /> : data.isError ? (
         <ErrorState error={data.error} onRetry={() => data.refetch()} />
       ) : <PortfolioContent v={data.data} tab={tab} setTab={setTab} tech={tech} pick={pick} />}
@@ -63,6 +78,7 @@ function PortfolioContent({ v, tab, setTab, tech, pick }: {
             <MapPanel v={v} />
             <CompassPanel v={v} />
           </div>
+          <ProjectsPanel v={v} tech={tech} onPick={pick} />
           <RadarPanel v={v} tech={tech} onPick={pick} />
         </>
       ) : (
@@ -214,7 +230,7 @@ function CellDetail({ v, c }: { v: PortfolioView; c: PortfolioCell }) {
           <span>
             <b className="pf-gap">{a.project}</b> が埋めに行く{a.next ? ` · 次の節目「${a.next}」` : ""}
           </span>
-          <Link to={projectURL(a.project)} className="text-brand text-sm">プロジェクトを開く →</Link>
+          <a href={projectURL(a.project)} className="text-brand text-sm">プロジェクト概要へ →</a>
         </div>
       ))}
     </div>
@@ -238,7 +254,9 @@ function CompassPanel({ v }: { v: PortfolioView }) {
         <div className="flex flex-col gap-3">
           {c.allocs.map((a) => (
             <div key={a.project} className="grid grid-cols-[5.5rem_minmax(0,1fr)_2.8rem] gap-2.5 items-center text-sm">
-              <Link to={projectURL(a.project)} className="truncate hover:underline">{a.project}</Link>
+              {v.projects.some(project => project.name === a.project)
+                ? <a href={projectURL(a.project)} className="truncate hover:underline">{a.project}</a>
+                : <span className="truncate">{a.project}</span>}
               <div className="flex flex-col gap-1.5">
                 <div className="relative h-4 rounded bg-muted" role="img" aria-label={`${a.project} 実際 ${a.actual}% 狙い ${a.target}%`}>
                   <i className="absolute inset-y-0 left-0 rounded bg-brand" style={{ width: `${a.actual}%` }} />

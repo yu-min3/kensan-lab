@@ -64,8 +64,8 @@ go run ./cmd/kensan
 | PUT | `/api/v1/files/{path...}` | ファイル更新 |
 | DELETE | `/api/v1/files/{path...}` | ファイル削除 |
 | GET | `/api/v1/daily?date=YYYY-MM-DD` / `?limit=N` | daily 取得 / 直近一覧 |
-| GET | `/api/v1/tasks` | タスクボード（today / stock / someday / milestones、project 紐付き） |
-| POST | `/api/v1/tasks/move` | タスク行をファイル間で移動（かんばんの DnD） |
+| GET | `/api/v1/tasks` | タスク取得（旧クライアント互換） |
+| POST | `/api/v1/tasks/move` | タスク行をファイル間で移動（旧クライアント互換） |
 | PATCH | `/api/v1/tasks` | タスクのチェック状態変更 |
 | GET | `/api/v1/tags` | タグ集計 |
 | GET | `/api/v1/reviews` | レビュー成果物一覧（weekly/daily/monthly の HTML） |
@@ -82,10 +82,10 @@ go run ./cmd/kensan
 
 デプロイ定義は `kubernetes/apps/app-kensan/`（`charts/app-base` chart の最初の消費者）。`app-kensan` 専用 namespace で動く。
 
-- **画面構成** — ダッシュボード / daily / memo に加えて、
-  - **タスクかんばん**（`frontend/src/pages/TasksPage.tsx`）— ストック（`projects/<p>/README.md` の `## タスク`）と今日やる（`todo.md` の `## Now`）を DnD で行移動。`/morning` が Claude 側で行う操作と対称。
-  - **レビュービューワ**（`frontend/src/pages/ReviewsPage.tsx`）— `/weekly-review`・`/reflection` が生成した `reviews/` 配下の HTML をそのまま表示（可視化の進化は Claude の HTML 生成側が担う契約）。
-  - **ノート閲覧は持たない** — ノート一覧・全文検索・Markdown Viewer は 2026-10-09 にローカルの [markport](https://github.com/yomon8/markport) へ統合した。project の関連ドキュメントは `VITE_MARKPORT_URL`（既定 `http://127.0.0.1:3000`）の markport で開く。旧 `/notes` `/view` は markport への案内だけを返す。
+- **ダッシュボード** — 地図で目指す姿と実績の位置を見渡し、元のプロジェクトカードで活動と次の節目を把握する。技術レーダー・年報と、日記の閲覧・編集・追記を同じホームで使う。
+- **使う機能に集中する** — 独立した「今日」「タスク」「プロジェクト管理」のUIは廃止。旧URLはホームまたは元の概要カードへ案内する。管理操作を折りたたみとして残さない。既存Markdownと互換APIは保持する。
+- **その他の画面** — メモ、フィード、人生でやりたいこと、レビューを使える。レビューは `reviews/` のHTMLをそのまま表示する。
+- **ノート閲覧** — ローカルの [markport](https://github.com/yomon8/markport) を使う。旧 `/notes` `/view` はmarkportへの案内を返す。
 - **workspace volume** — Markdown の実体は Longhorn 上の `kensan-workspace` PVC（Retain）。app pod に `/data`（`KENSAN_DATA_DIR`）でマウント。
 - **Syncthing 同期** — Mac のローカル workspace ⇄ クラスタ volume を Syncthing で双方向同期する（`resources/syncthing.yaml`）。
   - **LAN-only** — 同期ポート 22000 を Cilium L2 の **VIP 192.168.0.245** で LAN に出し、Mac が direct 接続。global discovery / relay / NAT traversal は無効。
