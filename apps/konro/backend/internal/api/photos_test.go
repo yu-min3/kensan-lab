@@ -7,6 +7,7 @@ import (
 	"image"
 	"image/color"
 	"image/png"
+	"io"
 	"net/http/httptest"
 	"os"
 	"path/filepath"
@@ -112,5 +113,43 @@ func TestPhotoRejectsDimensionsAndSymlink(t *testing.T) {
 	entries, _ := os.ReadDir(outside)
 	if len(entries) != 0 {
 		t.Fatal("wrote through symlink")
+	}
+}
+
+// A request blocked on its body must occupy the upload slot. The rejected
+// request's body must not be read at all, so it cannot allocate another 8MB.
+type heldPhotoBody struct {
+	started chan struct{}
+	release chan struct{}
+}
+
+func (b *heldPhotoBody) Read(p []byte) (int, error) { close(b.started); <-b.release; return 0, io.EOF }
+
+type unexpectedPhotoBody struct{ t *testing.T }
+
+func (b unexpectedPhotoBody) Read(p []byte) (int, error) {
+	b.t.Error("busy upload body was read")
+	return 0, io.EOF
+}
+func TestPhotoUploadAdmissionBeforeBody(t *testing.T) {
+	handler := New(t.TempDir(), "")
+	held := &heldPhotoBody{make(chan struct{}), make(chan struct{})}
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		handler.ServeHTTP(httptest.NewRecorder(), httptest.NewRequest("PUT", "/api/v1/recipe-photos/fish", held))
+	}()
+	<-held.started
+	w := httptest.NewRecorder()
+	handler.ServeHTTP(w, httptest.NewRequest("PUT", "/api/v1/recipe-photos/fish", unexpectedPhotoBody{t}))
+	if w.Code != 429 || w.Header().Get("Retry-After") != "1" {
+		t.Errorf("busy response: %d %v", w.Code, w.Header())
+	}
+	close(held.release)
+	<-done
+	w = httptest.NewRecorder()
+	handler.ServeHTTP(w, httptest.NewRequest("PUT", "/api/v1/recipe-photos/fish", nil))
+	if w.Code != 400 {
+		t.Fatalf("slot not released: %d", w.Code)
 	}
 }
