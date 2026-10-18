@@ -484,8 +484,7 @@ export function reviewContentURL(path: string): string {
 }
 
 export function todayISO(): string {
-  const d = new Date();
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  return new Intl.DateTimeFormat("sv-SE", { timeZone: "Asia/Tokyo", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date());
 }
 
 export function dailyPath(date: string): string {
@@ -504,6 +503,5 @@ updated: ${date}
 
 # ${date}
 
-## 日記
 `;
 }

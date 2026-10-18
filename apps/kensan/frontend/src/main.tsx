@@ -4,15 +4,12 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { AppShell } from "./components/AppShell";
 import { ToastProvider } from "./components/ui/toast";
-import { Dashboard } from "./pages/Dashboard";
-import { PortfolioPage } from "./pages/PortfolioPage";
-import { DailyPage } from "./pages/DailyPage";
 import { MemoPage } from "./pages/MemoPage";
-import { TasksPage } from "./pages/TasksPage";
-import { ProjectsPage } from "./pages/ProjectsPage";
 import { ReviewsPage } from "./pages/ReviewsPage";
 import { LifeGoalsPage } from "./pages/LifeGoalsPage";
 import { MarkportRedirect } from "./pages/MarkportRedirect";
+import { HomePage } from "./pages/HomePage";
+import { HomeRedirect } from "./pages/HomeRedirect";
 import { NotFoundPage } from "./pages/NotFoundPage";
 import { FeedPage } from "./pages/FeedPage";
 import "./index.css";
@@ -30,13 +27,12 @@ createRoot(document.getElementById("root")!).render(
         <ToastProvider>
           <AppShell>
             <Routes>
-              {/* ダッシュボード = ポートフォリオ（地図・羅針盤・年報）。今日画面は /today */}
-              <Route path="/" element={<PortfolioPage />} />
-              <Route path="/today" element={<Dashboard />} />
-              <Route path="/tasks" element={<TasksPage />} />
-              <Route path="/projects" element={<ProjectsPage />} />
+              <Route path="/" element={<HomePage />} />
+              <Route path="/today" element={<HomeRedirect panel="activity" />} />
+              <Route path="/tasks" element={<HomeRedirect panel="tasks" />} />
+              <Route path="/projects" element={<HomeRedirect panel="projects" />} />
               <Route path="/feed" element={<FeedPage />} />
-              <Route path="/daily" element={<DailyPage />} />
+              <Route path="/daily" element={<HomeRedirect panel="diary" />} />
               <Route path="/memos" element={<MemoPage />} />
               <Route path="/life" element={<LifeGoalsPage />} />
               <Route path="/reviews" element={<ReviewsPage />} />

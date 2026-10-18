@@ -11,14 +11,14 @@ import { ProjectBadge } from "../components/ProjectBadge";
 // タスクページ = 時間軸バンドのかんばん（今日 / 今週 / 今月 / いつか）。
 // タスクは project の ## タスク に住み、行内タグ（@today/@week/@month）でバンドが決まる。
 // その下にマイルストーンを折りたたみで補助表示する。
-export function TasksPage() {
+export function TasksPage({ embedded = false }: { embedded?: boolean }) {
   return (
     <>
-      <PageHeader
+      {!embedded && <PageHeader
         eyebrow="タスク"
         title="かんばん"
         sub="レーン間ドラッグ = バンドの張り替え（今日/今週/今月/中期）。行は project ファイルのまま動かない。"
-      />
+      />}
       <div className="ds-section">
         <TaskBoard />
         <Backlog />

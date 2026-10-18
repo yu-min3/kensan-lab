@@ -1,13 +1,18 @@
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import { Badge } from "./ui/badge";
 
 // タスクに付く project バッジ = その project 詳細（/projects?name=）へのリンク。
 // 「このタスク何だっけ」からプロジェクトの状況（概要・現在地・ログ）へ 1 クリックで辿れる。
 // クリックは行のドラッグ・編集ダイアログに伝播させない（stopPropagation）。
 export function ProjectBadge({ project }: { project: string }) {
+  const [params] = useSearchParams();
+  const target = new URLSearchParams(params);
+  target.set("project", project);
+  target.set("panel", "projects");
   return (
     <Link
-      to={`/projects?name=${encodeURIComponent(project)}`}
+      to={`/?${target.toString()}#projects`}
+      state={{ homeSection: "projects" }}
       className="shrink-0 rounded-sm hover:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring transition-opacity"
       title={`プロジェクト「${project}」を開く`}
       onClick={(e) => e.stopPropagation()}

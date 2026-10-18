@@ -3,9 +3,29 @@ title: Today Dashboard
 date: 2026-09-10
 ---
 
-# Today Dashboard
+# Unified home
 
-The home page connects project goals to today's tasks and routines. Markdown is the only source of truth, history included: there is no database and no separate event log. Every record the screen shows can be read and edited in the same files as everything else, and reaches the Mac through the same Syncthing volume.
+The dashboard is the daily workspace. Markdown remains the only source of truth; no files are migrated or deleted by this UI integration.
+
+## Layout and routes
+
+| Section | Behavior |
+|---|---|
+| Diary | Always visible. Read, create, edit and append to the same free-form document. Date navigation and a collapsible calendar stay on the home page. New entries start with the date title; no diary/intention sections are imposed. |
+| Records and habits | Expand to record completed work, check routines and browse activity history. |
+| Projects | Expand to list/create projects and operate the existing detail editor in place. The redundant portfolio project cards and Today goal cards are removed. |
+| Tasks | Expand to operate the existing band board and milestones. Triage and the three-task warning are not required daily steps. |
+| Portfolio | Expand to browse the North Star, map, compass, annual report and technical radar. |
+
+The sidebar links to the dashboard, feed, memos and reviews, plus life goals. `/today`, `/tasks`, `/projects?name=...` and `/daily?date=...` redirect to the relevant home section. `panel`, `project` and `date` query parameters coexist, so selecting a project does not clear the diary date. Sections mount on first expansion and remain mounted when folded to preserve in-progress input.
+
+## Diary saves
+
+Edits are serialized per query-client/file. Each session owns its path, draft and base mtime; an old response cannot overwrite another date. The editor observes document transactions immediately, before the Milkdown listener's 200ms debounce, so closing immediately after typing can flush the final input. Opening and closing without editing does not rewrite a file.
+
+Date changes and ending an edit wait for pending saves; failures leave the editor and date intact. Unmounting sends pending changes, while a tab-local `sessionStorage` draft supports recovery after failed requests. Conflict recovery retains a separate copy of the input before loading the server version. Browser shutdown delivery is not guaranteed; unsaved changes trigger the normal unload warning. This is a recovery cache, not a second canonical store.
+
+Dates use JST. A diary already open across midnight keeps its selected date; the Today button opens the new date after saving. New project and task operations keep their existing server-side contracts.
 
 ## Data contract
 
@@ -13,15 +33,11 @@ The home page connects project goals to today's tasks and routines. Markdown is 
 |---|---|
 | `goals.md` | North Star and explicitly linked focus projects |
 | `projects/<name>/README.md` | Goals, milestones, tasks and routine definitions |
-| `todo.md` | Existing standalone tasks; still visible on Today |
-| `daily/YYYY/MM/DD.md` | Diary (`## 日記`), routine records (`## 習慣`) and archived tasks |
-
-The diary counts as written only when `## 日記` has prose of its own. Headings and the `### 完了タスク` block that reflection archives into it do not count, and a one-line entry is inserted above that block.
+| `todo.md` | Existing standalone tasks in the integrated board |
+| `daily/YYYY/MM/DD.md` | Free-form diary, routine records (`## 習慣`) and archived tasks |
 | Project metrics files | Current measurements and evidence-based forecasts |
 
-`GET /api/v1/today` joins these sources. Task edits retain the existing task API; `PUT /api/v1/routines/state` records a routine check or cancellation, `POST /api/v1/tasks/triage` accepts `today`, `later`, or `skip`, and `POST /api/v1/daily/line` appends one diary line.
-
-The dashboard (`/`) starts with **今日の日記**: it displays today's Markdown body as written, excluding frontmatter and the redundant date title, and links to the full editor. There is no inline input or prescribed section layout. Missing files are not created by viewing; read errors remain visible. The preview refreshes on focus and every 30 seconds, with dates in JST. The diary is available even if portfolio loading fails. **やったこと** remains at the top of `/today`; `POST /api/v1/tasks/done` adds `- [x] text @done(today)` to the chosen project's `## タスク`, or to `todo.md ## Now` for "プロジェクト外". These lines have no `@today`, so they count as unplanned: `doneToday` splits today's completions into planned (`@today`) and unplanned. When more than three tasks are planned for today, the screen suggests moving the rest to tomorrow; it never blocks adding more.
+`GET /api/v1/today` still supplies records/routines/history. `PUT /api/v1/routines/state` records a routine; `POST /api/v1/tasks/done` adds a completed task to the selected project or `todo.md`. The legacy triage and one-line diary APIs remain available to existing clients. Their `@seen` and `## 日記`-based written-day statistics retain their historical meaning; the home does not use them to classify free-form prose.
 
 ## History in Markdown
 
@@ -53,4 +69,4 @@ Existing incomplete routine copies in `todo.md` are retained for explicit migrat
 
 ## Verification
 
-Run `go test -race ./...` in `backend`, `npm test` in `frontend`, and `npx playwright test` in `e2e`. Browser tests use isolated fixture data and cover completion/cancellation persistence, triage restoration, project links, cross-screen cache updates, empty projects, the diary preview and full-editor link at the top of the mobile dashboard, the current-state card, accessible daily activity values, and mobile light/dark overflow. Go tests cover completion/triage/routine retries, `@done` surviving archival to daily, habit-section edits that leave the diary untouched, and history read back from Markdown.
+Run `go test -race ./...` in `backend`, `npm test` in `frontend`, and `npx playwright test` in `e2e`. Tests cover immediate editor close, append/reload, delayed date changes, conflict recovery, read-only viewing, project/date coexistence, task completion/undo, routine persistence, legacy redirects, sidebar navigation and desktop/mobile light/dark layout. All browser writes use isolated fixtures.
