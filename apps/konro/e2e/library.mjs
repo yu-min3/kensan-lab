@@ -83,7 +83,7 @@ try {
   assert.equal(await page.getByLabel("タイトル", { exact: true }).inputValue(), "こちらの変更");
   page.once("dialog", (d) => d.accept()); await button("キャンセル").click(); await button("一覧へ").click();
   results.push("concurrent tab save rejects stale edit and retains input; unsaved exit asks before discarding");
-  await page.reload(); await button("手入力で作成").click();
+  await page.reload(); await page.locator(".recipe-add-menu > summary").click(); await button("手入力で作成").click();
   await page.getByLabel("タイトル", { exact: true }).fill("新しいスープ");
   await page.getByLabel("材料（1行に1項目）", { exact: true }).fill("水 100ml\n野菜");
   await page.getByLabel("手順（1行に1つの手順）", { exact: true }).fill("10分煮る");
@@ -133,6 +133,9 @@ try {
   results.push("legacy cooking requires explicit reset, preserves timers and pins the latest content");
   await button("終了").click();await button("終了する（進捗・タイマーは消えます）").click();
   await page.goto(base);
+  await button("Webで探す").waitFor();
+  if(await button("絞り込みを解除").count())await button("絞り込みを解除").click();
+  if(await page.locator('.library-selection[data-selected="true"]').count()){if(await page.locator('.selection-details').getAttribute('open')===null)await page.locator('.selection-details > summary').click();await button("すべて外す").click()}
   await button("パスタを開く").click();assert(page.url().includes("#recipe/"));
   await page.getByText("調理 1分30秒",{exact:false}).waitFor();
   const detailURL=page.url(); await page.reload();await page.getByRole("heading",{name:"パスタ",exact:true}).waitFor();

@@ -62,7 +62,7 @@ try {
   const source = "鮭の煮物 2人分\n材料 鮭2切れ 水100ml\n水を沸かす。鮭を10分煮る。";
   const create = async () => {
     await page.goto(appURL);
-    await button("レシピを追加").click();
+    await page.locator(".recipe-add-menu > summary").click();await page.getByLabel("レシピの追加方法").getByRole("button",{name:"URL・本文から取り込む",exact:true}).click();
     await page.getByRole("button", { name: /^(本文を貼り付ける|別のレシピを取り込む)$/ }).first().waitFor();
     // Every scenario starts a fresh import while older source files stay intact.
     if (await button("別のレシピを取り込む").count()) await button("別のレシピを取り込む").click();
@@ -77,8 +77,8 @@ try {
   await page.getByLabel("材料（1行に1項目）", { exact: true }).fill("鮭 2切れ\n水 100ml");
   await page.getByLabel("手順（1行に1つの手順）", { exact: true }).fill("水を沸かす\n10分煮る");
   await button("下書きを保存して戻る").click();
-  await button("レシピを追加").waitFor();
-  await page.reload(); await button("レシピを追加").click();
+  await page.locator(".recipe-add-menu > summary").waitFor();
+  await page.reload(); await page.locator(".recipe-add-menu > summary").click();await page.getByLabel("レシピの追加方法").getByRole("button",{name:"URL・本文から取り込む",exact:true}).click();
   await page.getByLabel("タイトル", { exact: true }).waitFor();
   assert.equal(await page.getByLabel("タイトル", { exact: true }).inputValue(), "手入力の鮭");
   assert.equal(await button("レシピとして保存").isEnabled(), false);
@@ -101,7 +101,7 @@ try {
   assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth), false);
   await page.screenshot({ path: path.join(artifacts, "ai-draft-mobile.png"), fullPage: true });
   await page.getByRole("checkbox").check(); await button("レシピとして保存").click();
-  await button("レシピを追加").waitFor();
+  await page.locator(".recipe-add-menu > summary").waitFor();
   console.log("passed step", results.length + 1); results.push("AI normalization over real HTTP; source comparison; confirmation save; no horizontal mobile overflow");
 
   await fixture("success",{...output,steps:[]});await create();

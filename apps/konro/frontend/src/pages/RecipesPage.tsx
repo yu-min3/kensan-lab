@@ -1,31 +1,36 @@
-import {Star,Clock,Flame,X} from 'lucide-react';
+import {Clock,ChefHat} from 'lucide-react';
+import {RecipeAddMenu} from '../components/RecipeAddMenu';
+import {PersonalRating} from '../components/PersonalRating';
+import {CookingSelection} from '../components/CookingSelection';
 import { useEffect, useMemo, useState } from "react";
 import { fetchRecipes, formatDuration, importRecipeZip, RecipeMeta } from "../api";
 import { RecipePage } from "./RecipePage";
 import { SearchPage } from "./SearchPage";
 import { useRecipeSearch } from "../hooks/useRecipeSearch";
 import { ImportPage } from "./ImportPage";
-import { useRecipeRoute } from "../hooks/useRecipeRoute";
-import { normalizeQuery } from "../session";
+import { useRecipeRoute,Route } from "../hooks/useRecipeRoute";
+import {libraryRecipes,LibrarySort} from "../library";
+import {useLibraryView} from "../hooks/useLibraryView";
 
 // Recipe browser + session builder: tap cards to put recipes "on the stove",
 // then start the cooking session.
 export function RecipesPage({ onStart, starting = false }: { onStart: (files: string[]) => void; starting?: boolean }) {
-  const { route, navigate, back, onGuard } = useRecipeRoute();
+  const { route, navigate:routeNavigate, back, onGuard } = useRecipeRoute();
   const discovering=route.page==='search'||route.page==='creators';
   const search=useRecipeSearch(discovering);
   const setOpened=(file:string|null,replace=false)=>navigate(file===null?{page:'list'}:{page:'recipe',file},replace);
   const [recipes, setRecipes] = useState<RecipeMeta[]>([]);
   const [error, setError] = useState("");
-  const [q, setQ] = useState("");
-  const [tag, setTag] = useState("");
-  const [selected, setSelected] = useState<string[]>([]);
+  const [loaded,setLoaded]=useState(false);
+  const {capturePosition,q,setQ,tag,setTag,rating,setRating,sort,setSort,selected,setSelected,clearFilters}=useLibraryView(route.page==='list',loaded);
+  const navigate=(next:Route,replace=false)=>{capturePosition();routeNavigate(next,replace)};
   const [importing, setImporting] = useState(false);
   const [importMsg, setImportMsg] = useState("");
 
   useEffect(() => {
-    fetchRecipes().then(setRecipes).catch((e) => setError(String(e)));
+    fetchRecipes().then(setRecipes).catch((e) => setError(String(e))).finally(()=>setLoaded(true));
   }, []);
+  useEffect(()=>{if(!loaded||error)return;setSelected(current=>{const next=current.filter(file=>recipes.some(r=>r.file===file));return next.length===current.length?current:next})},[recipes,loaded,error]);
 
   const importZip = async (file: File) => {
     setImporting(true);
@@ -50,16 +55,7 @@ export function RecipesPage({ onStart, starting = false }: { onStart: (files: st
     return [...count.entries()].sort((a, b) => b[1] - a[1]).slice(0, 12).map(([t]) => t);
   }, [recipes]);
 
-  const shown = useMemo(() => {
-    const nq = normalizeQuery(q);
-    return recipes.filter(
-      (r) =>
-        (!tag || (r.tags ?? []).includes(tag)) &&
-        (!nq ||
-          normalizeQuery(r.title).includes(nq) ||
-          (r.tags ?? []).some((t) => normalizeQuery(t).includes(nq))),
-    );
-  }, [recipes, q, tag]);
+  const shown=useMemo(()=>libraryRecipes(recipes,q,tag,rating,sort),[recipes,q,tag,rating,sort]);
 
   const toggle = (file: string) =>
     setSelected((sel) => (sel.includes(file) ? sel.filter((f) => f !== file) : [...sel, file]));
@@ -83,22 +79,7 @@ export function RecipesPage({ onStart, starting = false }: { onStart: (files: st
       <header className="list-header">
         <div className="header-row">
           <h1 className="h-serif">konro</h1>
-          <div className="editor-actions"><button className="chip chip-on" onClick={()=>navigate({page:"search"})}>Webで探す</button><button className="chip" onClick={() => navigate({page:"import",url:"",fromSearch:false})}>レシピを追加</button>
-          <button className="chip" onClick={() => setOpened("")}>手入力で作成</button>
-          <label className="chip import-chip">
-            {importing ? "取込中…" : "ZIP取込"}
-            <input
-              type="file"
-              accept=".zip,application/zip"
-              hidden
-              disabled={importing}
-              onChange={(e) => {
-                const f = e.target.files?.[0];
-                if (f) importZip(f);
-                e.target.value = "";
-              }}
-            />
-          </label></div>
+          <div className="editor-actions"><button className="recipe-action" onClick={()=>navigate({page:"search"})}>Webで探す</button><RecipeAddMenu importing={importing} onImport={()=>navigate({page:'import',url:'',fromSearch:false})} onNew={()=>setOpened('')} onZip={file=>void importZip(file)}/></div>
         </div>
         {importMsg && (
           <p
@@ -108,13 +89,11 @@ export function RecipesPage({ onStart, starting = false }: { onStart: (files: st
             {importMsg}
           </p>
         )}
-        <input
-          type="search"
-          aria-label="レシピを検索"
-          placeholder="レシピを検索"
-          value={q}
-          onChange={(e) => setQ(e.target.value)}
-        />
+        <div className="library-search-tools">
+          <label className="library-query" htmlFor="library-query"><span>レシピを探す</span><input id="library-query" type="search" aria-label="レシピを検索" placeholder="料理名・タグで検索" value={q} onChange={e=>setQ(e.target.value)}/></label>
+          <label htmlFor="library-sort"><span id="library-sort-label">並べ替え</span><select aria-labelledby="library-sort-label" id="library-sort" value={sort} onChange={e=>setSort(e.target.value as LibrarySort)}><option value="rating">評価が高い順</option><option value="name">名前順</option><option value="time">調理時間が短い順</option></select></label>
+        </div>
+        <div className="library-rating-filters" role="group" aria-label="自分の評価で絞る">{([['all','すべて'],['high','★4以上'],['unrated','未評価']] as const).map(([value,label])=><button key={value} className={`chip ${rating===value?'chip-on':''}`} aria-pressed={rating===value} onClick={()=>setRating(value)}>{label}</button>)}</div>
         <div className="tag-row">
           {topTags.map((t) => (
             <button
@@ -130,16 +109,18 @@ export function RecipesPage({ onStart, starting = false }: { onStart: (files: st
 
       {error && <p className="error">{error}</p>}
 
-      {!error && recipes.length > 0 && shown.length === 0 && (
+      <div className="library-result-info"><p className="recipe-summary" aria-live="polite">{loaded?`${shown.length}品 / 全${recipes.length}品`:'レシピを読み込んでいます…'} · 星は自分の評価</p>{(q||tag||rating!=='all')&&<button className="chip" onClick={clearFilters}>絞り込みを解除</button>}</div>
+      <div className="library-layout"><div className="library-results">
+      {!error && loaded && recipes.length > 0 && shown.length === 0 && (
         <div className="empty-state">
-          <p>「{q || tag}」に合うレシピが見つかりませんでした</p>
-          <button className="chip" onClick={() => { setQ(""); setTag(""); }}>
+          <p>今の絞り込みに合うレシピが見つかりませんでした</p>
+          <button className="chip" onClick={clearFilters}>
             検索をクリア
           </button>
         </div>
       )}
 
-      {!error && recipes.length === 0 && <div className="empty-state"><p>最初のレシピを追加しましょう</p><button className="chip" onClick={() => navigate({page:"import",url:"",fromSearch:false})}>URL・本文から取り込む</button></div>}
+      {!error && loaded && recipes.length === 0 && <div className="empty-state"><p>最初のレシピを追加しましょう</p><button className="chip" onClick={() => navigate({page:"import",url:"",fromSearch:false})}>URL・本文から取り込む</button></div>}
       <ul className="recipe-grid">
         {shown.map((r) => {
           const idx = selected.indexOf(r.file);
@@ -150,7 +131,7 @@ export function RecipesPage({ onStart, starting = false }: { onStart: (files: st
                 {r.images?.[0] ? (
                   <img src={`/${r.images[0]}`} alt="" loading="lazy" />
                 ) : (
-                  <div className="thumb-placeholder">🍳</div>
+                  <div className="thumb-placeholder"><ChefHat aria-hidden="true"/><span>写真なし</span></div>
                 )}
                 {idx >= 0 && <span className="burner-badge">{idx + 1}</span>}
                 <div className="card-body">
@@ -158,7 +139,7 @@ export function RecipesPage({ onStart, starting = false }: { onStart: (files: st
                   <div className="card-meta">
                     {formatDuration(r.cookTime) && <span className="recipe-duration"><Clock aria-hidden="true"/>{formatDuration(r.cookTime)}</span>}
                   </div>
-                  {r.rating ? <div className="personal-rating" aria-label={`自分の評価 ${r.rating}、5点満点`}><span>自分の評価</span><span className="personal-rating-value"><span className="personal-rating-stars" aria-hidden="true">{[1,2,3,4,5].map(n=><Star key={n} fill={n<=r.rating!?'currentColor':'none'} className={n<=r.rating!?'rated-star':'unrated-star'}/>)}</span><strong className="tnum">{r.rating} / 5</strong></span></div>:<p className="recipe-summary personal-rating-empty">自分の評価：未設定</p>}
+                  <PersonalRating rating={r.rating}/>
 
                 </div>
               </button>
@@ -169,15 +150,7 @@ export function RecipesPage({ onStart, starting = false }: { onStart: (files: st
         })}
       </ul>
 
-      {selected.length > 0 && (
-        <section className="start-bar" aria-label="今回調理するレシピ">
-          <div className="cooking-selection">
-            <div className="header-row"><h2><Flame aria-hidden="true"/>今回調理するレシピ（{selected.length}品）</h2><button className="chip" disabled={starting} onClick={()=>setSelected([])}>すべて外す</button></div>
-            <ol className="cooking-selection-list">{selected.map((file,i)=>{const recipe=recipes.find(r=>r.file===file);return <li key={file}><span className="selection-order tnum">{i+1}</span><span>{recipe?.title??file}</span><button className="chip" disabled={starting} aria-label={`${recipe?.title??file}を今回の調理から外す`} onClick={()=>toggle(file)}><X aria-hidden="true"/>外す</button></li>})}</ol>
-            <button className="start-button" disabled={starting} onClick={() => onStart(selected)}><Flame aria-hidden="true"/>{starting?'準備中…':`${selected.length}品でコンロを開始`}</button>
-          </div>
-        </section>
-      )}
+      </div><CookingSelection selected={selected} recipes={recipes} starting={starting} onRemove={toggle} onClear={()=>setSelected([])} onStart={()=>onStart(selected)}/></div>
     </div>
   );
 }
