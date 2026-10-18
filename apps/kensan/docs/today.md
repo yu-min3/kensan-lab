@@ -3,21 +3,19 @@ title: Today Dashboard
 date: 2026-09-10
 ---
 
-# Unified home
+# Focused dashboard
 
-The dashboard is the daily workspace. Markdown remains the only source of truth; no files are migrated or deleted by this UI integration.
+The dashboard combines three levels of useful information: the map shows the relationship between direction and evidence, the original project cards show the work being pursued, and the diary captures daily intentions and observations. The technical radar and annual view retain their original role.
 
-## Layout and routes
+The diary can be read, created, edited and appended to in place, with date navigation and a calendar. Its content stays free-form.
 
-| Section | Behavior |
-|---|---|
-| Diary | Always visible. Read, create, edit and append to the same free-form document. Date navigation and a collapsible calendar stay on the home page. New entries start with the date title; no diary/intention sections are imposed. |
-| Records and habits | Expand to record completed work, check routines and browse activity history. |
-| Projects | Expand to list/create projects and operate the existing detail editor in place. The redundant portfolio project cards and Today goal cards are removed. |
-| Tasks | Expand to operate the existing band board and milestones. Triage and the three-task warning are not required daily steps. |
-| Portfolio | Expand to browse the North Star, map, compass, annual report and technical radar. |
+## Removed management UI
 
-The sidebar links to the dashboard, feed, memos and reviews, plus life goals. `/today`, `/tasks`, `/projects?name=...` and `/daily?date=...` redirect to the relevant home section. `panel`, `project` and `date` query parameters coexist, so selecting a project does not clear the diary date. Sections mount on first expansion and remain mounted when folded to preserve in-progress input.
+The separate Today, task board and full project management interfaces are retired. Their components and drag-and-drop dependencies are deleted rather than hidden behind expandable sections. There are no task triage, routine check, completed-work input, project creation or project metadata editors on the dashboard.
+
+The original project cards are restored from the pre-integration implementation: headline, progress, next milestone, technologies and achievements. Selecting a technology still highlights the radar. Project references on the map/compass point to the corresponding card, not to a separate management interface.
+
+Legacy `/today` and `/tasks` URLs redirect to the dashboard. `/projects?name=...` points to the corresponding summary card; `/daily?date=...` opens that diary on the dashboard. Old management query parameters do not revive removed features. Existing Markdown and backend compatibility APIs are preserved.
 
 ## Diary saves
 
@@ -25,7 +23,7 @@ Edits are serialized per query-client/file. Each session owns its path, draft an
 
 Date changes and ending an edit wait for pending saves; failures leave the editor and date intact. Unmounting sends pending changes, while a tab-local `sessionStorage` draft supports recovery after failed requests. Conflict recovery retains a separate copy of the input before loading the server version. Browser shutdown delivery is not guaranteed; unsaved changes trigger the normal unload warning. This is a recovery cache, not a second canonical store.
 
-Dates use JST. A diary already open across midnight keeps its selected date; the Today button opens the new date after saving. New project and task operations keep their existing server-side contracts.
+Dates use JST. A diary already open across midnight keeps its selected date; the Today button opens the new date after saving.
 
 ## Data contract
 
@@ -33,11 +31,11 @@ Dates use JST. A diary already open across midnight keeps its selected date; the
 |---|---|
 | `goals.md` | North Star and explicitly linked focus projects |
 | `projects/<name>/README.md` | Goals, milestones, tasks and routine definitions |
-| `todo.md` | Existing standalone tasks in the integrated board |
+| `todo.md` | Existing standalone records; not exposed as a task-management screen |
 | `daily/YYYY/MM/DD.md` | Free-form diary, routine records (`## 習慣`) and archived tasks |
 | Project metrics files | Current measurements and evidence-based forecasts |
 
-`GET /api/v1/today` still supplies records/routines/history. `PUT /api/v1/routines/state` records a routine; `POST /api/v1/tasks/done` adds a completed task to the selected project or `todo.md`. The legacy triage and one-line diary APIs remain available to existing clients. Their `@seen` and `## 日記`-based written-day statistics retain their historical meaning; the home does not use them to classify free-form prose.
+`GET /api/v1/today` remains a compatibility API and is not loaded by the dashboard. `PUT /api/v1/routines/state` records a routine; `POST /api/v1/tasks/done` adds a completed task to the selected project or `todo.md`. The legacy triage and one-line diary APIs remain available to existing clients. Their `@seen` and `## 日記`-based written-day statistics retain their historical meaning; the home does not use them to classify free-form prose.
 
 ## History in Markdown
 
@@ -69,4 +67,4 @@ Existing incomplete routine copies in `todo.md` are retained for explicit migrat
 
 ## Verification
 
-Run `go test -race ./...` in `backend`, `npm test` in `frontend`, and `npx playwright test` in `e2e`. Tests cover immediate editor close, append/reload, delayed date changes, conflict recovery, read-only viewing, project/date coexistence, task completion/undo, routine persistence, legacy redirects, sidebar navigation and desktop/mobile light/dark layout. All browser writes use isolated fixtures.
+Run `npm test` and `npm run build` in `frontend`, and `npx playwright test` in `e2e`. Tests cover diary creation/edit/append, immediate editor close, delayed date changes, conflict recovery, read-only viewing, original project-card/radar/annual interactions, retired routes, no management-data requests, and desktop/mobile light/dark layout. All browser writes use isolated fixtures. Backend history contracts remain unchanged.

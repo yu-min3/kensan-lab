@@ -73,77 +73,26 @@ test("保存競合では入力を残し、日付を勝手に切り替えない",
   await expect(page.getByLabel("日記の日付", { exact: true })).toHaveValue("2026-01-18");
 });
 
-test("プロジェクトを選んでも日記の日付を保持し、同じホームで詳細を編集できる", async ({ page }) => {
-  await page.goto("/?date=2026-01-16&panel=projects");
-  await page.locator("#projects").getByRole("button", { name: /today-demo/ }).click();
-  await expect(page).toHaveURL(/date=2026-01-16/);
-  await expect(page).toHaveURL(/project=today-demo/);
-  await expect(page.getByText("今日の一歩を確かめる", { exact: true }).first()).toBeVisible();
-  await page.locator("#projects").locator("summary").first().click();
-  await expect(page.locator("#projects")).not.toHaveAttribute("open", "");
-  await page.locator("#projects").locator("summary").first().click();
-  await expect(page.getByText("今日の一歩を確かめる", { exact: true }).first()).toBeVisible();
-});
 
-test("タスクをホーム内で完了・取消できる", async ({ page }) => {
-  await page.goto("/tasks");
-  await expect(page).toHaveURL(/\/\?panel=tasks#tasks$/);
-  const task = page.getByRole("checkbox", { name: "履歴を残すテスト を完了にする", exact: true });
-  await task.click();
-  await expect(task).toHaveCount(0);
-  await page.getByRole("button", { name: /完了済み/ }).first().click();
-  const undo = page.getByRole("checkbox", { name: "履歴を残すテスト を未完了に戻す", exact: true });
-  await undo.click();
-  await expect(task).toBeVisible();
 
-});
 
-test("やったことと習慣をホームから記録し、再読込で保持する", async ({ page }) => {
-  await page.goto("/today");
-  await expect(page).toHaveURL(/\/\?panel=activity#activity$/);
-  await page.getByLabel("プロジェクト", { exact: true }).selectOption("today-demo");
-  const input = page.getByLabel("やったこと（1 行）");
-  await input.fill("ホームで記録した実績");
-  await input.press("Enter");
-  await expect(page.getByText("やったことを残しました", { exact: true })).toBeVisible();
-  const routine = page.getByRole("checkbox", { name: /テスト読書/ });
-  await routine.check();
-  await page.reload();
-  await expect(routine).toBeChecked();
-  await routine.uncheck();
-  await expect(page.getByText(/今日の予定が/)).toHaveCount(0);
-});
 
-test("古いプロジェクトと日記のURLは対応するホームへ移動する", async ({ page }) => {
-  await page.goto("/projects?name=today-demo");
-  await expect(page).toHaveURL(/project=today-demo/);
-  await expect(page.getByText("今日の一歩を確かめる", { exact: true }).first()).toBeVisible();
-  await page.goto("/daily?date=2026-01-16");
-  await expect(page).toHaveURL(/\/\?date=2026-01-16#diary$/);
-  await expect(page.getByLabel("今日の日記の本文")).toContainText("朝に書いた自由な日記");
-});
+
+
+
 
 for (const mode of ["light", "dark"] as const) {
-  test(`${mode}: ホームと展開した詳細はスマホ幅に収まる`, async ({ page }) => {
+  test(`${mode}: 日記と元のプロジェクトカードはスマホ幅に収まる`, async ({ page }) => {
     await page.setViewportSize({ width: 390, height: 844 });
-    await page.goto("/?date=2026-01-16&panel=projects&project=today-demo");
+    await page.goto("/?date=2026-01-16");
     await page.evaluate(dark => document.documentElement.classList.toggle("dark", dark), mode === "dark");
-    await expect(page.getByText("今日の一歩を確かめる", { exact: true }).first()).toBeVisible();
+    await expect(page.getByText("E2E で目指すことを 1 行で見せる", { exact: true }).first()).toBeVisible();
     expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(390);
     await page.screenshot({ path: `../../../temp/kensan-home-${mode}.png`, fullPage: true });
   });
 }
 
-test("日記入力中にプロジェクトを選んでもドラフトを保持する", async ({ page }) => {
-  await createDiary(page, "2026-01-19");
-  await editor(page).press("ControlOrMeta+End");
-  await page.keyboard.press("Enter");
-  await page.keyboard.insertText("詳細を開いても保持する本文");
-  await page.locator("#projects > summary").click();
-  await page.locator("#projects").getByRole("button", { name: /today-demo/ }).click();
-  await expect(editor(page)).toContainText("詳細を開いても保持する本文");
-  await expect(page.getByLabel("日記の日付", { exact: true })).toHaveValue("2026-01-19");
-});
+
 
 
 test("日記を開いて読むだけではファイルを書き換えない", async ({ page }) => {
@@ -180,35 +129,62 @@ test("競合から最新を読み込んだ後も元の入力を回収できる",
 });
 
 
-test("同じプロジェクトのバッジから閉じた詳細を開き直せる", async ({ page }) => {
-  await page.goto("/?panel=projects&project=today-demo");
-  await expect(page.getByText("今日の一歩を確かめる", { exact: true }).first()).toBeVisible();
-  await page.locator("#projects > summary").click();
-  await page.locator("#tasks > summary").click();
-  const badge = page.locator("#tasks").getByRole("link", { name: "today-demo", exact: true }).first();
-  await badge.click();
-  await expect(page.getByText("今日の一歩を確かめる", { exact: true }).first()).toBeVisible();
-  await page.locator("#projects > summary").click();
-  await badge.click();
-  await expect(page.getByText("今日の一歩を確かめる", { exact: true }).first()).toBeVisible();
+
+
+
+
+
+test("元のプロジェクトカードがあり、管理機能はロードされない", async ({ page }) => {
+  const management: string[] = [];
+  page.on("request", request => {
+    if (/\/api\/v1\/(today|tasks|projects)(?:[/?]|$)/.test(request.url())) management.push(request.url());
+  });
+  await page.goto("/");
+  await expect(page.getByText("E2E で目指すことを 1 行で見せる", { exact: true })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "地図 · どこが埋まっているか" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "技術レーダー · 何を採り、何をやめたか" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "やったこと", exact: true })).toHaveCount(0);
+  await expect(page.locator("#activity, #tasks, #projects")).toHaveCount(0);
+  expect(management).toEqual([]);
 });
 
-test("保存に失敗したプロジェクトの自由メモは戻ったエディタにも残る", async ({ page }) => {
-  await page.goto("/?panel=projects&project=today-demo");
-  const projects = page.locator("#projects");
-  const memo = projects.locator('[contenteditable="true"]');
-  await expect(memo).toBeVisible();
-  await page.route("**/api/v1/files/projects/**", async route => {
-    if (route.request().method() === "PUT") {
-      await new Promise(resolve => setTimeout(resolve, 300));
-      await route.fulfill({ status: 500, json: { error: "一時的な保存失敗" } });
-    } else await route.continue();
+test("旧管理URLから機能が復活せず、プロジェクト概要へ移動する", async ({ page }) => {
+  for (const url of ["/today", "/tasks"]) {
+    await page.goto(url);
+    await expect(page).toHaveURL(/\/$/);
+    await expect(page.getByText("E2E で目指すことを 1 行で見せる", { exact: true })).toBeVisible();
+    await expect(page.getByRole("button", { name: "新規", exact: true })).toHaveCount(0);
+  }
+  await page.goto("/projects?name=today-demo&date=2026-01-16");
+  await expect(page).toHaveURL(/date=2026-01-16#project-today-demo$/);
+  await expect(page.locator("#project-today-demo")).toBeInViewport();
+  await page.goto("/daily?date=2026-01-16");
+  await expect(page.getByLabel("今日の日記の本文")).toContainText("朝に書いた自由な日記");
+});
+
+test("日記を書きながら技術を選んでも編集内容を保持する", async ({ page }) => {
+  await createDiary(page, "2026-01-21");
+  await editor(page).press("ControlOrMeta+End");
+  await page.keyboard.press("Enter");
+  await page.keyboard.insertText("技術を見ながら考えたこと");
+  await page.getByRole("button", { name: "kind", exact: true }).first().click();
+  await expect(page.getByText("見に来た人が 2 分で試せる入口")).toBeVisible();
+  await expect(editor(page)).toContainText("技術を見ながら考えたこと");
+  await expect(page.getByLabel("日記の日付", { exact: true })).toHaveValue("2026-01-21");
+});
+
+
+test("カードがないプロジェクトには空のリンクを出さず、旧URLはホームへ戻す", async ({ page }) => {
+  await page.route("**/api/v1/portfolio", async route => {
+    const view = await (await route.fetch()).json();
+    await route.fulfill({ json: { ...view, compass: { ...view.compass,
+      allocs: [...view.compass.allocs, { ...view.compass.allocs[0], project: "not-on-dashboard" }],
+    } } });
   });
-  await memo.fill("残しておきたいメモ");
-  await page.getByRole("link", { name: "メモ", exact: true }).click();
-  await page.getByRole("link", { name: "ダッシュボード", exact: true }).click();
-  await page.locator("#projects > summary").click();
-  await projects.getByRole("button", { name: /today-demo/ }).click();
-  await expect(memo).toContainText("残しておきたいメモ");
-  await expect(projects.getByLabel("保存できていない入力")).toContainText("残しておきたいメモ");
+  await page.goto("/");
+  await expect(page.getByText("not-on-dashboard", { exact: true })).toBeVisible();
+  await expect(page.getByRole("link", { name: "not-on-dashboard", exact: true })).toHaveCount(0);
+  await page.goto("/projects?name=not-on-dashboard");
+  await expect(page).toHaveURL(/\/$/);
+  await expect(page.getByRole("heading", { name: "地図 · どこが埋まっているか" })).toBeVisible();
 });
