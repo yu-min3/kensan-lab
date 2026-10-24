@@ -191,6 +191,7 @@ test("カードがないプロジェクトには空のリンクを出さず、�
 
 
 test("1行追加で日記を作成し、本文編集後にも自由な本文へ追記できる", async ({ page }) => {
+  await page.clock.install({ time: new Date("2026-10-21T00:05:00Z") });
   const date = "2026-01-10";
   await page.goto(`/?date=${date}`);
   await page.getByLabel("日記（1 行）", { exact: true }).fill("朝は散歩に出たい");
@@ -206,9 +207,9 @@ test("1行追加で日記を作成し、本文編集後にも自由な本文へ�
   await expect(page.getByLabel("今日の日記の本文")).toContainText("夕方は読書した");
   await page.reload();
   const daily = await (await page.request.get(`/api/v1/daily?date=${date}`)).json();
-  expect(daily.content).toContain("朝は散歩に出たい");
+  expect(daily.content).toContain("09:05 朝は散歩に出たい");
   expect(daily.content).toContain("本文からも書ける");
-  expect(daily.content).toContain("夕方は読書した");
+  expect(daily.content).toContain("09:05 夕方は読書した");
   expect(daily.content).not.toContain("## 日記");
 });
 
@@ -248,4 +249,22 @@ test("未作成日への1行追加が遅延して失敗しても、別画面か�
   await expect(page.getByLabel("日記（1 行）", { exact: true })).toHaveValue("失敗しても残す一行");
   await page.reload();
   await expect(page.getByLabel("日記（1 行）", { exact: true })).toHaveValue("失敗しても残す一行");
+});
+
+
+test("空行を含む箇条書きも項目内の段落余白を重ねない", async ({ page }) => {
+  await page.route("**/api/v1/files/daily/**", route => route.fulfill({ json: {
+    doc: { path: "daily/2026/01/07.md", mtime: "2026-01-07T00:00:00Z" },
+    content: "# 2026-01-07\n\n- 一つ目\n\n- 二つ目\n\n  補足の段落\n\n  - 子の項目\n\n通常の段落\n",
+  } }));
+  await page.goto("/?date=2026-01-07");
+  const body = page.getByLabel("今日の日記の本文");
+  const paragraphs = body.locator("li > p");
+  await expect(paragraphs.first()).toBeVisible();
+  for (const paragraph of await paragraphs.all()) {
+    await expect(paragraph).toHaveCSS("margin-top", "0px");
+    await expect(paragraph).toHaveCSS("margin-bottom", "0px");
+  }
+  await expect(body.getByText("通常の段落", { exact: true })).toHaveCSS("margin-top", "12px");
+  await expect(body.locator("li ul")).toHaveCSS("margin-top", "4px");
 });
