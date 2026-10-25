@@ -776,3 +776,7 @@ html:has(.recipe-detail) { scroll-padding-top: calc(var(--row-h) + var(--gap-inl
 .recipe-photo-empty { display: grid; justify-items: center; gap: var(--gap-inline); padding: var(--card-pad-y) var(--card-pad-x); border: 1px dashed hsl(var(--border)); border-radius: var(--radius-lg); background: hsl(var(--muted)); color: hsl(var(--muted-foreground)); }
 .recipe-photo-empty svg { width: var(--row-h); height: var(--row-h); }
 .recipe-photo-empty p, .recipe-photo > p { margin: 0; }
+.photo-rating-guard { border:0; padding:0; margin:0; min-width:0; }
+.recipe-rating-editor { display:flex; align-items:center; gap:var(--gap-inline); flex-wrap:wrap; margin-block:var(--gap-stack); }
+.recipe-rating-editor label { display:flex; align-items:center; gap:var(--gap-inline); margin:0; }
+.recipe-rating-editor select { width:auto; }
