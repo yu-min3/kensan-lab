@@ -60,7 +60,7 @@ export function RecipesPage({ onStart, starting = false, routing, cooking=false,
 
   const toggle = (file: string) =>
     setSelected((sel) => (sel.includes(file) ? sel.filter((f) => f !== file) : [...sel, file]));
-  if(route.page==='shopping')return <ShoppingPage key={route.id} id={route.id} selected={selected} onBack={()=>back({page:'list'})} onOpen={id=>navigate({page:'shopping',id})} onRecipe={file=>navigate({page:'recipe',file})} onCook={onStartPlan}/>;
+  if(route.page==='shopping')return <ShoppingPage key={route.id} id={route.id} selected={selected} onBack={()=>back({page:'list'})} onOpen={id=>navigate({page:'shopping',id})} onRecipe={file=>navigate({page:'recipe',file})} onCook={onStartPlan} onGuard={onGuard}/>;
 
   if (route.page === "recipe") { const opened=route.file; return <RecipePage onGuard={onGuard} key={opened} file={opened || null} selected={selected.includes(opened)} onBack={() => back({page:"list"})} onToggle={toggle} onSaved={(r) => {
     setOpened(r.file, true); setImportMsg(`✓ ${r.title} を保存しました`);
