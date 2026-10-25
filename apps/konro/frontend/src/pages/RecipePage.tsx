@@ -7,6 +7,7 @@ import {useRecipePhoto} from "../hooks/useRecipePhoto";
 import {SourceCredit} from "../components/SourceCredit";
 import { Field, Panel } from "../components/Editor";
 import {RecipeRating} from '../components/RecipeRating';
+import {Dialog} from '../components/Dialog';
 
 export function RecipePage({ file, selected, onBack, onToggle, onSaved, onGuard }: {
   file: string | null; selected: boolean; onBack: () => void; onToggle: (file: string) => void; onSaved: (recipe: Recipe) => void; onGuard?: (guard: (()=>boolean) | null)=>void;
@@ -14,6 +15,9 @@ export function RecipePage({ file, selected, onBack, onToggle, onSaved, onGuard 
   const { recipe, form, editing, setEditing, loading, saving, error, conflict, dirty, adopt, discard, change, save, loadLatest } = useRecipeEditor(file,onSaved);
   const photo=useRecipePhoto(recipe,r=>{adopt(r);onSaved(r)});
   const [ratingBusy,setRatingBusy]=useState(false);
+  const [confirmChanges,setConfirmChanges]=useState(false);
+  const lines=(value:string)=>value.split('\n').map(v=>v.trim()).filter(Boolean);
+  const submit=()=>{if(recipe&&(JSON.stringify(lines(form.ingredients))!==JSON.stringify(recipe.ingredients??[])||JSON.stringify(lines(form.steps))!==JSON.stringify(recipe.steps??[])))setConfirmChanges(true);else void save()};
   useEffect(() => { onGuard?.(() => !saving && !ratingBusy && !photo.busy && !photo.preparing && discard() && photo.discard()); return () => onGuard?.(null); }, [onGuard, dirty, saving, ratingBusy, photo.dirty, photo.busy, photo.preparing]);
   const editButton = useRef<HTMLButtonElement>(null);
   const formElement = useRef<HTMLFormElement>(null);
@@ -46,7 +50,7 @@ export function RecipePage({ file, selected, onBack, onToggle, onSaved, onGuard 
     </header>
     {loading && <p role="status">レシピを読み込んでいます…</p>}
     {error && <div className="notice recipe-error" role="alert"><p>{error}</p>{conflict && <><p>入力は残しています。変更内容を控えてから最新版を確認してください。</p><button className="chip" disabled={saving} onClick={() => void loadLatest()}>{file ? "最新版を読み込む" : "作成済みのレシピを確認"}</button></>}</div>}
-    {!loading && editing && <form id="recipe-edit-form" ref={formElement} className="editor-panel" onSubmit={(e) => { e.preventDefault(); void save(); }}>
+    {!loading && editing && <form id="recipe-edit-form" ref={formElement} className="editor-panel" onSubmit={(e) => { e.preventDefault(); submit(); }}>
       <fieldset disabled={saving}>
         <legend>{dirty ? "変更はまだ保存されていません" : "レシピの内容"}</legend>
         {field("title", "タイトル", { max: 300 })}
@@ -64,6 +68,7 @@ export function RecipePage({ file, selected, onBack, onToggle, onSaved, onGuard 
 
       </fieldset>
     </form>}
+    {confirmChanges&&recipe&&<Dialog title="材料と手順の変更を確認" onDismiss={()=>setConfirmChanges(false)}><p>変更前と保存後を比較してください。まだ元のレシピは変更していません。</p>{(['ingredients','steps'] as const).map(key=><section key={key}><h3>{key==='ingredients'?'材料':'手順'}</h3><div className="recipe-diff"><div><h4>変更前</h4><pre>{(recipe[key]??[]).join('\n')}</pre></div><div><h4>保存後</h4><pre>{lines(form[key]).join('\n')}</pre></div></div></section>)}<div className="editor-actions"><button autoFocus className="recipe-action" onClick={()=>setConfirmChanges(false)}>編集に戻る</button><button className="recipe-action recipe-action-primary" disabled={saving} onClick={()=>{setConfirmChanges(false);void save()}}>変更を確認して保存</button></div></Dialog>}
     {!loading && !editing && recipe && <>
       <Panel>
         <h1 className="h-serif recipe-name">{recipe.title}</h1>
