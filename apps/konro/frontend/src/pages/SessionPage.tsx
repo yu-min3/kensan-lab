@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { fetchRecipe, formatDuration, Recipe } from "../api";
 import { formatRemaining, isIngredientGroup, isPinnedSession, pinLegacySession, Session, tabName, timerCandidates } from "../session";
 import { holdWakeLock, releaseWakeLock } from "../wakelock";
@@ -13,7 +13,7 @@ export function SessionPage({
   onBrowse,
 }: {
   session: Session;
-  onUpdate: (s: Session) => void;
+  onUpdate: (s: Session | ((previous:Session)=>Session)) => void;
   onEnd: () => void;
   onBrowse: () => void;
 }) {
@@ -24,7 +24,6 @@ export function SessionPage({
   const [now, setNow] = useState(Date.now());
   const [confirmEnd, setConfirmEnd] = useState(false);
   const [timerDetail, setTimerDetail] = useState<string | null>(null);
-  const [showIngredients, setShowIngredients] = useState(true);
 
   useEffect(() => {
     holdWakeLock();
@@ -54,6 +53,18 @@ export function SessionPage({
 
   const active = session.files[session.active];
   const recipe = recipes[active];
+  const latest=useRef(session);latest.current=session;
+  const showIngredients=session.views?.[active]?.ingredientsOpen??true;
+  useLayoutEffect(()=>{
+    if(!pinned)return;
+    const previous=history.scrollRestoration;history.scrollRestoration='manual';
+    window.scrollTo({top:latest.current.views?.[active]?.scroll??0,behavior:'instant'});
+    let timer=0;
+    const save=()=>onUpdate(s=>({...s,views:{...s.views,[active]:{scroll:window.scrollY,ingredientsOpen:s.views?.[active]?.ingredientsOpen??true}}}));
+    const capture=()=>{window.clearTimeout(timer);timer=window.setTimeout(save,150)};
+    window.addEventListener('scroll',capture,{passive:true});
+    return()=>{window.clearTimeout(timer);window.removeEventListener('scroll',capture);save();history.scrollRestoration=previous;};
+  },[active,pinned,onUpdate]);
 
   const checkedSteps = session.steps[active] ?? [];
   const currentStep = useMemo(() => {
@@ -170,7 +181,7 @@ export function SessionPage({
             </div>
 
             <section>
-              <button className="section-toggle" onClick={() => setShowIngredients(!showIngredients)}>
+              <button className="section-toggle" aria-expanded={showIngredients} onClick={() => onUpdate(s=>({...s,views:{...s.views,[active]:{scroll:window.scrollY,ingredientsOpen:!showIngredients}}}))}>
                 材料 {showIngredients ? "▾" : "▸"}
               </button>
               {showIngredients && (
@@ -199,6 +210,7 @@ export function SessionPage({
 
             <section>
               <h3 className="section-label">手順</h3>
+              {currentStep<(recipe.steps?.length??0)&&<button className="chip next-step" onClick={()=>document.querySelector('.step-current')?.scrollIntoView({block:'center',behavior:'instant'})}>次の手順へ</button>}
               {(recipe.steps ?? []).length === 0 && (
                 <p className="no-steps">取り込み元 に手順が未登録のレシピです（材料のみ）。出典リンクから手順を確認してください。</p>
               )}
