@@ -132,7 +132,7 @@ func Rank(c Conditions, candidates []Candidate, p Policy) []Candidate {
 		value := float64(v.Recipe.Rating) * p.RatingWeight
 		for _, preferred := range c.Use {
 			for _, line := range v.Recipe.Ingredients {
-				if strings.Contains(normalized(line), normalized(preferred)) {
+				if materialMatches(line, preferred) {
 					value += p.UseWeight
 					break
 				}

@@ -13,6 +13,7 @@ import (
 )
 
 type fakeAgent struct {
+	state   string
 	creates int
 	job     agentclient.Job
 	output  string
@@ -26,7 +27,11 @@ func (a *fakeAgent) Create(_ context.Context, r agentclient.Request) (agentclien
 	return a.job, nil
 }
 func (a *fakeAgent) Get(_ context.Context, id string) (agentclient.Job, error) {
-	return agentclient.Job{ID: id, State: "succeeded", Output: json.RawMessage(a.output)}, nil
+	state := a.state
+	if state == "" {
+		state = "succeeded"
+	}
+	return agentclient.Job{ID: id, State: state, Output: json.RawMessage(a.output)}, nil
 }
 func (a *fakeAgent) Action(_ context.Context, id, action string) (agentclient.Job, error) {
 	state := "running"
@@ -158,5 +163,34 @@ func TestAdoptionRejectsChangedPreferenceAndPolicy(t *testing.T) {
 				t.Fatal(err)
 			}
 		})
+	}
+}
+
+func TestAbandonedJobReconciliationAndRecovery(t *testing.T) {
+	root := fixture(t)
+	agent := &fakeAgent{state: "running", output: `{"menus":[{"picks":[{"file":"1"}]}]}`}
+	s := New(root, agent, mealplan.New(root))
+	c := Conditions{Count: 1, Servings: "2"}
+	first, err := s.Create(context.Background(), c, "ai")
+	if err != nil {
+		t.Fatal(err)
+	}
+	c.Seed++
+	if _, err = s.Create(context.Background(), c, "ai"); !errors.Is(err, ErrConflict) {
+		t.Fatal("parallel job accepted", err)
+	}
+	active, err := s.Active(context.Background())
+	if err != nil || len(active) != 1 || active[0].ID != first.ID {
+		t.Fatal(active, err)
+	}
+	// The browser never polls the original job. A later request must reconcile it.
+	agent.state = "succeeded"
+	second, err := s.Create(context.Background(), c, "ai")
+	if err != nil || second.ID == first.ID || agent.creates != 2 {
+		t.Fatal(second, err)
+	}
+	old, err := s.read(first.ID)
+	if err != nil || old.State != "succeeded" || len(old.Menus) != 1 {
+		t.Fatal(old, err)
 	}
 }

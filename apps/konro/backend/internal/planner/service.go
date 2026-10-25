@@ -164,18 +164,41 @@ func (s *Service) write(p *Proposal) error {
 	}
 	return AtomicJSON(filepath.Join(s.dir, p.ID+".json"), p)
 }
-func (s *Service) busy() bool {
-	entries, _ := os.ReadDir(s.dir)
+
+// Active reconciles persisted state with the runtime before reserving a new job.
+func (s *Service) Active(ctx context.Context) ([]*Proposal, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.activeLocked(ctx)
+}
+func (s *Service) activeLocked(ctx context.Context) ([]*Proposal, error) {
+	result := []*Proposal{}
+	entries, err := os.ReadDir(s.dir)
+	if errors.Is(err, os.ErrNotExist) {
+		return result, nil
+	}
+	if err != nil {
+		return nil, err
+	}
 	for _, entry := range entries {
 		if filepath.Ext(entry.Name()) != ".json" {
 			continue
 		}
-		p, e := s.read(entry.Name()[:len(entry.Name())-5])
-		if e == nil && (p.Pending || p.State == "running" || p.State == "queued" || p.State == "waiting") {
-			return true
+		p, err := s.read(strings.TrimSuffix(entry.Name(), ".json"))
+		if err != nil {
+			return nil, err
+		}
+		if p.Pending || p.State == "running" || p.State == "queued" || p.State == "waiting" {
+			p, err = s.getLocked(ctx, p.ID)
+			if err != nil {
+				return nil, err
+			}
+			if p.Pending || p.State == "running" || p.State == "queued" || p.State == "waiting" {
+				result = append(result, p)
+			}
 		}
 	}
-	return false
+	return result, nil
 }
 func (s *Service) Create(ctx context.Context, c Conditions, mode string) (*Proposal, error) {
 	s.mu.Lock()
@@ -212,8 +235,14 @@ func (s *Service) Create(ctx context.Context, c Conditions, mode string) (*Propo
 	} else if !errors.Is(e, os.ErrNotExist) {
 		return nil, e
 	}
-	if mode == "ai" && s.busy() {
-		return nil, fmt.Errorf("%w: 先の提案を完了または中止してください", ErrConflict)
+	if mode == "ai" {
+		active, err := s.activeLocked(ctx)
+		if err != nil {
+			return nil, err
+		}
+		if len(active) > 0 {
+			return nil, fmt.Errorf("%w: 進行中の提案を開いて完了または中止してください", ErrConflict)
+		}
 	}
 	p := &Proposal{Schema: 1, ID: id, Revision: 1, Conditions: c, Candidates: candidates, Mode: mode, PreferenceVersion: pv, PolicyVersion: sv, Preferences: preferences, Policy: policy, Adopted: map[string]string{}}
 	if mode == "rules" {
@@ -279,6 +308,9 @@ func (s *Service) apply(p *Proposal) {
 func (s *Service) Get(ctx context.Context, id string) (*Proposal, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	return s.getLocked(ctx, id)
+}
+func (s *Service) getLocked(ctx context.Context, id string) (*Proposal, error) {
 	p, e := s.read(id)
 	if e != nil {
 		return nil, e

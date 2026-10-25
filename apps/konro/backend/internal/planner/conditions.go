@@ -56,6 +56,13 @@ func BaseServings(raw string) string {
 	return r.RatString()
 }
 func normalized(s string) string { return strings.ToLower(norm.NFKC.String(s)) }
+func materialMatches(line, name string) bool {
+	if strings.Contains(normalized(line), normalized(strings.TrimSpace(name))) {
+		return true
+	}
+	parsed := ingredients.Parse(line)
+	return strings.Contains(normalized(parsed.Name), normalized(ingredients.Canonical(name)))
+}
 func contains(tags []string, tag string) bool {
 	for _, t := range tags {
 		if t == tag {
@@ -116,7 +123,7 @@ func Candidates(root string, c Conditions) ([]Candidate, error) {
 				excluded = true
 			}
 			for _, name := range c.Avoid {
-				if strings.Contains(normalized(line), normalized(name)) {
+				if materialMatches(line, name) {
 					excluded = true
 				}
 			}

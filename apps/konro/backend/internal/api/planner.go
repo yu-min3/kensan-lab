@@ -65,6 +65,7 @@ func registerPlanner(mux *http.ServeMux, s *planner.Service) {
 		v, e := s.Create(r.Context(), in.Conditions, in.Mode)
 		respond(w, v, e)
 	})
+	mux.HandleFunc("GET /api/v1/menu-proposals/active", func(w http.ResponseWriter, r *http.Request) { v, e := s.Active(r.Context()); respond(w, v, e) })
 	mux.HandleFunc("GET /api/v1/menu-proposals/{id}", func(w http.ResponseWriter, r *http.Request) {
 		v, e := s.Get(r.Context(), r.PathValue("id"))
 		respond(w, v, e)
