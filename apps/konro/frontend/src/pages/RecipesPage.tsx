@@ -3,7 +3,7 @@ import {RecipeAddMenu} from '../components/RecipeAddMenu';
 import {PersonalRating} from '../components/PersonalRating';
 import {CookingSelection} from '../components/CookingSelection';
 import { useEffect, useMemo, useState } from "react";
-import { fetchRecipes, formatDuration, importRecipeZip, RecipeMeta } from "../api";
+import { fetchRecipes, formatDuration, importRecipeZip, RecipeMeta, MealPlan } from "../api";
 import { RecipePage } from "./RecipePage";
 import { SearchPage } from "./SearchPage";
 import { useRecipeSearch } from "../hooks/useRecipeSearch";
@@ -16,7 +16,7 @@ import {ShoppingPage} from './ShoppingPage';
 
 // Recipe browser + session builder: tap cards to put recipes "on the stove",
 // then start the cooking session.
-export function RecipesPage({ onStart, starting = false, routing, cooking=false }: { onStart: (files: string[]) => void; starting?: boolean; routing:ReturnType<typeof useRecipeRoute>; cooking?:boolean }) {
+export function RecipesPage({ onStart, starting = false, routing, cooking=false, onStartPlan }: { onStart: (files: string[]) => void; starting?: boolean; routing:ReturnType<typeof useRecipeRoute>; cooking?:boolean;onStartPlan:(plan:MealPlan)=>void }) {
   const { route, navigate:routeNavigate, back, onGuard } = routing;
   const discovering=route.page==='search'||route.page==='creators';
   const search=useRecipeSearch(discovering);
@@ -60,7 +60,7 @@ export function RecipesPage({ onStart, starting = false, routing, cooking=false 
 
   const toggle = (file: string) =>
     setSelected((sel) => (sel.includes(file) ? sel.filter((f) => f !== file) : [...sel, file]));
-  if(route.page==='shopping')return <ShoppingPage key={route.id} id={route.id} selected={selected} onBack={()=>back({page:'list'})} onOpen={id=>navigate({page:'shopping',id})} onRecipe={file=>navigate({page:'recipe',file})}/>;
+  if(route.page==='shopping')return <ShoppingPage key={route.id} id={route.id} selected={selected} onBack={()=>back({page:'list'})} onOpen={id=>navigate({page:'shopping',id})} onRecipe={file=>navigate({page:'recipe',file})} onCook={onStartPlan}/>;
 
   if (route.page === "recipe") { const opened=route.file; return <RecipePage onGuard={onGuard} key={opened} file={opened || null} selected={selected.includes(opened)} onBack={() => back({page:"list"})} onToggle={toggle} onSaved={(r) => {
     setOpened(r.file, true); setImportMsg(`✓ ${r.title} を保存しました`);

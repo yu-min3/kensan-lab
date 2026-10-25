@@ -25,6 +25,7 @@ export type Session = {
   timers: Timer[];
   stoppedTimer?: Timer;
   views?: Record<string, {scroll: number; ingredientsOpen: boolean}>;
+  mealPlan?: {id:string;revision:number};
 };
 
 const KEY = "konro-session-v1";

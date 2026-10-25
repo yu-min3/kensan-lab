@@ -25,6 +25,16 @@ func registerMealplans(mux *http.ServeMux, dir string) *mealplan.Store {
 		writeJSON(w, v)
 	}
 	mux.HandleFunc("GET /api/v1/meal-plans", func(w http.ResponseWriter, r *http.Request) { v, e := store.List(); respond(w, v, e) })
+	mux.HandleFunc("POST /api/v1/meal-plans/{id}/cooking", func(w http.ResponseWriter, r *http.Request) {
+		var in struct {
+			Revision int `json:"revision"`
+		}
+		if !decodeJSON(w, r, &in, 4096) {
+			return
+		}
+		v, e := store.Cooking(r.PathValue("id"), in.Revision)
+		respond(w, v, e)
+	})
 	mux.HandleFunc("POST /api/v1/meal-plans", func(w http.ResponseWriter, r *http.Request) {
 		var in mealplan.Change
 		if !decodeJSON(w, r, &in, 1<<20) {

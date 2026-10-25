@@ -199,9 +199,14 @@ func (s *Store) items(selections []Selection, old []Item) ([]Item, error) {
 	}
 	result := []Item{}
 	seen := map[string]bool{}
+	seenFiles := map[string]bool{}
 	for i, v := range selections {
+		if seenFiles[v.File] {
+			return nil, ErrInvalid
+		}
+		seenFiles[v.File] = true
 		if _, e := ingredients.Multiply("1", v.Scale); e != nil {
-			return nil, e
+			return nil, fmt.Errorf("%w: %v", ErrInvalid, e)
 		}
 		var snap *recipe.Recipe
 		for _, item := range old {
@@ -232,6 +237,49 @@ func (s *Store) items(selections []Selection, old []Item) ([]Item, error) {
 			}
 		}
 		result = append(result, Item{ID: id, Recipe: *snap, Scale: v.Scale, Overrides: v.Overrides})
+	}
+	return result, nil
+}
+
+func (s Shopping) MarshalJSON() ([]byte, error) {
+	type plain Shopping
+	return json.Marshal(struct {
+		plain
+		Needed string `json:"needed"`
+	}{plain(s), s.Remaining()})
+}
+
+func (s *Store) Cooking(id string, revision int) ([]recipe.Recipe, error) {
+	p, e := s.Get(id)
+	if e != nil {
+		return nil, e
+	}
+	if p.Revision != revision {
+		return nil, ErrConflict
+	}
+	result := []recipe.Recipe{}
+	for _, item := range p.Items {
+		r := item.Recipe
+		r.Ingredients = make([]string, 0, len(item.Recipe.Ingredients))
+		for row, raw := range item.Recipe.Ingredients {
+			line := ingredients.Parse(raw)
+			if replacement, ok := item.Overrides[row]; ok {
+				line = ingredients.Parse(replacement)
+			}
+			scaled, e := line.Scaled(item.Scale)
+			if e != nil {
+				return nil, e
+			}
+			text := scaled.Text()
+			if scaled.Kind == "unparsed" && item.Scale != "1" {
+				text = fmt.Sprintf("%s（元の分量×%s・数量は要確認）", text, item.Scale)
+			}
+			r.Ingredients = append(r.Ingredients, text)
+		}
+		if item.Scale != "1" {
+			r.Servings = strings.TrimSpace(r.Servings) + " × " + item.Scale + "（手順内の分量と加熱時間は原文）"
+		}
+		result = append(result, r)
 	}
 	return result, nil
 }
