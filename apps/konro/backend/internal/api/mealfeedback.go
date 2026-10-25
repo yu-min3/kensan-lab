@@ -31,6 +31,7 @@ func registerMealFeedback(mux *http.ServeMux, s *mealfeedback.Store) {
 		respond(w, v, e)
 	})
 	mux.HandleFunc("GET /api/v1/cook-history/{id}", func(w http.ResponseWriter, r *http.Request) { v, e := s.GetCook(r.PathValue("id")); respond(w, v, e) })
+	mux.HandleFunc("GET /api/v1/cook-history", func(w http.ResponseWriter, r *http.Request) { v, e := s.History(); respond(w, v, e) })
 	mux.HandleFunc("PUT /api/v1/cook-history/{id}", func(w http.ResponseWriter, r *http.Request) {
 		var in mealfeedback.CookRecord
 		if !decodeJSON(w, r, &in, 1<<20) {

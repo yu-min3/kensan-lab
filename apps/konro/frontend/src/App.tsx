@@ -35,7 +35,7 @@ export function App() {
   const startPlan=async(plan:MealPlan)=>{
     if(session){routing.navigate({page:'cooking'});return}
     if(startLock.current)return;startLock.current=true;setStarting(true);setStartError('');
-    try{primeAudio();const recipes=await planRequest<Recipe[]>('/'+plan.id+'/cooking','POST',{revision:plan.revision});const s=newSession(recipes.map(r=>r.file),Object.fromEntries(recipes.map(r=>[r.file,r])));s.mealPlan={id:plan.id,revision:plan.revision};if(replace(s))routing.navigate({page:'cooking'})}catch(e){setStartError(e instanceof Error?e.message:String(e))}finally{startLock.current=false;setStarting(false)}
+    try{primeAudio();const recipes=await planRequest<Recipe[]>('/'+plan.id+'/cooking','POST',{revision:plan.revision});const s=newSession(recipes.map(r=>r.file),Object.fromEntries(recipes.map(r=>[r.file,r])));s.mealPlan={id:plan.id,revision:plan.revision,proposalId:plan.proposalId,scales:Object.fromEntries(plan.items.map(i=>[i.recipe.file,i.scale]))};if(replace(s))routing.navigate({page:'cooking'})}catch(e){setStartError(e instanceof Error?e.message:String(e))}finally{startLock.current=false;setStarting(false)}
   };
 
   return session&&routing.route.page==='cooking' ? (

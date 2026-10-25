@@ -98,7 +98,7 @@ export async function saveRecipePhoto(file:string,version:string,photo:Blob):Pro
 
 export type PlanItem={id:string;recipe:Recipe;scale:string;overrides?:Record<string,string>};
 export type ShoppingItem={id:string;line:{raw:string;name:string;kind:string;min?:string;max?:string;unit?:string};text:string;needed:string;status:'buy'|'home'|'bought'|'review';have?:string;note?:string;manual:boolean;sources:{itemId:string;file:string;version:string;title:string;row:number;raw:string;scaled:string}[]};
-export type MealPlan={id:string;revision:number;name:string;items:PlanItem[];shopping:ShoppingItem[]};
+export type MealPlan={id:string;revision:number;name:string;proposalId?:string;items:PlanItem[];shopping:ShoppingItem[]};
 export async function planRequest<T>(path='',method='GET',body?:unknown,operation:string=crypto.randomUUID()):Promise<T>{
  const r=await fetch('/api/v1/meal-plans'+path,{method,headers:{'Content-Type':'application/json','Idempotency-Key':operation},body:body===undefined?undefined:JSON.stringify(body)});
  if(!r.ok)throw new RecipeWriteError((await r.text()).trim()||'買い物リストを取得できません',r.status);return r.json();

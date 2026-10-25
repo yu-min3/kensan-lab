@@ -31,6 +31,7 @@ type Event struct {
 	RequestHash  string `json:"requestHash,omitempty"`
 }
 type CookedRecipe struct {
+	Title   string `json:"title,omitempty"`
 	File    string `json:"file"`
 	Version string `json:"version"`
 	Scale   string `json:"scale"`
@@ -237,6 +238,29 @@ func (s *Store) GetCook(id string) (CookRecord, error) {
 	var r CookRecord
 	e := s.read("cook-history", id, &r)
 	return r, e
+}
+func (s *Store) History() ([]CookRecord, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	entries, e := os.ReadDir(filepath.Join(s.root, "cook-history"))
+	if errors.Is(e, os.ErrNotExist) {
+		return []CookRecord{}, nil
+	}
+	if e != nil {
+		return nil, e
+	}
+	records := []CookRecord{}
+	for _, entry := range entries {
+		if filepath.Ext(entry.Name()) != ".json" {
+			continue
+		}
+		var r CookRecord
+		if e = s.read("cook-history", strings.TrimSuffix(entry.Name(), ".json"), &r); e != nil {
+			return nil, e
+		}
+		records = append(records, r)
+	}
+	return records, nil
 }
 func (s *Store) preferences() (Preferences, error) {
 	var p Preferences

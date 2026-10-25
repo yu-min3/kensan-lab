@@ -1,0 +1,3 @@
+export async function feedbackRequest<T>(path:string,method='GET',body?:unknown):Promise<T>{const r=await fetch('/api/v1/'+path,{method,headers:{'Content-Type':'application/json'},body:body===undefined?undefined:JSON.stringify(body)});if(!r.ok)throw new Error((await r.text()).trim());return r.json()}
+export type Preferences={revision:number;avoid:string[];use:string[];notes:string;suggested:string[]};
+export type CookRecord={id:string;revision:number;date:string;planId?:string;planRevision?:number;proposalId?:string;recipes:{title?:string;file:string;version:string;scale:string;made:boolean}[];satisfaction:number;amount:string;notes:string;cancelled:boolean};

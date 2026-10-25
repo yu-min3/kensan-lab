@@ -4,6 +4,7 @@ import { formatRemaining, isIngredientGroup, isPinnedSession, pinLegacySession, 
 import { holdWakeLock, releaseWakeLock } from "../wakelock";
 import {Bell, Clock, X, Undo2, Check, ChevronDown, ChevronRight, AlertTriangle} from 'lucide-react';
 import {Dialog} from '../components/Dialog';
+import {CookingFeedback} from '../components/CookingFeedback';
 
 // The cooking view: bottom burner tabs, one recipe panel, cross-tab timers.
 export function SessionPage({
@@ -22,6 +23,7 @@ export function SessionPage({
   const recipes = pinned ? session.recipes! : loaded;
   const [loadErrors, setLoadErrors] = useState<Record<string, string>>({});
   const [now, setNow] = useState(Date.now());
+  const [endingBusy,setEndingBusy]=useState(false);
   const [confirmEnd, setConfirmEnd] = useState(false);
   const [timerDetail, setTimerDetail] = useState<string | null>(null);
 
@@ -150,7 +152,7 @@ export function SessionPage({
           <div className="editor-actions"><button autoFocus className="recipe-action" onClick={()=>setTimerDetail(null)}><X aria-hidden="true"/>閉じる</button><button className="recipe-action" onClick={()=>dismissTimer(t.id)}>{fired?'確認済みにする':'停止'}</button></div>
         </Dialog>;
       })()}
-      {confirmEnd&&<Dialog title="調理を終了しますか？" onDismiss={()=>setConfirmEnd(false)}><p>終了すると、この調理のチェックとタイマーを削除します。</p><div className="editor-actions"><button autoFocus className="recipe-action" onClick={()=>setConfirmEnd(false)}>調理を続ける</button><button className="recipe-action" onClick={onEnd}>終了する（進捗・タイマーは消えます）</button></div></Dialog>}
+      {confirmEnd&&<Dialog title="調理を終了しますか？" onDismiss={()=>{if(!endingBusy)setConfirmEnd(false)}}><p>終了すると、この調理のチェックとタイマーを削除します。</p><CookingFeedback session={session} onEnd={onEnd} onBusy={setEndingBusy}/><div className="editor-actions"><button autoFocus className="recipe-action" disabled={endingBusy} onClick={()=>setConfirmEnd(false)}>調理を続ける</button><button className="recipe-action" disabled={endingBusy} onClick={onEnd}>終了する（進捗・タイマーは消えます）</button></div></Dialog>}
 
       <main className="recipe-panel">
         {!pinned ? <section className="editor-panel" aria-label="以前の調理セッションの確認">
