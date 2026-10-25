@@ -786,14 +786,15 @@ html:has(.recipe-detail) { scroll-padding-top: calc(var(--row-h) + var(--gap-inl
 .recipe-diff h4 { margin-block:var(--gap-inline); }
 .list-header > .header-row { flex-wrap:wrap; gap:var(--gap-inline); }
 .shopping-items, .saved-plans { list-style:none; padding:0; }
-.shopping-item { border-bottom:1px solid hsl(var(--border)); padding-block:var(--gap-stack); }
-.shopping-item > label { display:flex; align-items:center; gap:var(--gap-inline); }
-.shopping-item select { width:auto; }
+.shopping-item { display:grid; grid-template-columns:minmax(0,1fr) auto; align-items:center; gap:var(--gap-inline); border-bottom:1px solid hsl(var(--border)); padding-block:var(--gap-stack); }
+.shopping-item > label { display:flex; flex-direction:row; margin:0; align-items:center; gap:var(--gap-inline); }
+.editor-panel .shopping-item select { width:auto; }
+.shopping-item > details { grid-column:1 / -1; }
 .shopping-home > div, .shopping-bought > div { color:hsl(var(--muted-foreground)); }
 .shopping-review { border-left:var(--gap-inline) solid hsl(var(--warning)); padding-left:var(--gap-inline); }
 .plan-choice { border-bottom:1px solid hsl(var(--border)); padding-block:var(--gap-stack); display:grid; gap:var(--gap-inline); }
-.plan-choice > label { display:flex; flex-wrap:wrap; align-items:center; gap:var(--gap-inline); }
-.plan-choice > label input { width:calc(var(--row-h) * 2); }
+.plan-choice > label { display:flex; flex-direction:row; flex-wrap:wrap; align-items:center; gap:var(--gap-inline); }
+.editor-panel .plan-choice > label input { width:calc(var(--row-h) * 2); }
 .text-link { text-decoration:underline; color:hsl(var(--accent-foreground)); }
 .saved-plans { display:grid; gap:var(--gap-inline); }
 .proposal-basic { display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1fr); gap:var(--gap-stack); }
