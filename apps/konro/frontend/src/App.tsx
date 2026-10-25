@@ -1,50 +1,46 @@
 import { useEffect, useRef, useState } from "react";
 import { RecipesPage } from "./pages/RecipesPage";
 import { SessionPage } from "./pages/SessionPage";
-import { loadSession, newSession, saveSession, Session } from "./session";
-import { fetchRecipe } from "./api";
+import { newSession } from "./session";
+import {useCookingSession} from './hooks/useCookingSession';
+import { fetchRecipe, MealPlan, planRequest, Recipe } from "./api";
 import { primeAudio } from "./alerts";
+import {useRecipeRoute} from './hooks/useRecipeRoute';
+import {Flame} from 'lucide-react';
 
 export function App() {
-  const [session, setSession] = useState<Session | null>(() => loadSession());
+  const {session,update,replace,error} = useCookingSession();
+  const routing=useRecipeRoute();
+  useEffect(()=>{if(session&&!location.hash)routing.navigate({page:'cooking'},true);else if(!session&&routing.route.page==='cooking')routing.navigate({page:'list'},true);},[]);
+  useEffect(()=>{if(!session&&routing.route.page==='cooking')routing.navigate({page:'list'},true);},[session,routing.route.page]);
 
   const [startError, setStartError] = useState("");
   const [starting, setStarting] = useState(false);
   const startLock = useRef(false);
 
-  // Restored-session path never went through the "start" tap, so audio is
-  // still locked; prime on the first interaction or timer alarms stay silent.
-  useEffect(() => {
-    window.addEventListener("pointerdown", primeAudio, { once: true });
-    return () => window.removeEventListener("pointerdown", primeAudio);
-  }, []);
-
   const start = async (files: string[]) => {
+    if(session){routing.navigate({page:'cooking'});return;}
     if (startLock.current) return;
     startLock.current = true; setStarting(true); setStartError("");
     primeAudio();
     try {
       const recipes = await Promise.all(files.map(fetchRecipe));
       const s = newSession(files, Object.fromEntries(recipes.map((r) => [r.file, r])));
-      saveSession(s);
-      setSession(s);
+      if(replace(s))routing.navigate({page:'cooking'});
     } catch (e) { setStartError(`調理を開始できませんでした。${e instanceof Error ? e.message : String(e)}`); }
     finally { startLock.current = false; setStarting(false); }
   };
 
-  const update = (s: Session) => {
-    saveSession(s);
-    setSession(s);
+  const end = () => {if(replace(null))routing.navigate({page:'list'},true);};
+  const startPlan=async(plan:MealPlan)=>{
+    if(session){routing.navigate({page:'cooking'});return}
+    if(startLock.current)return;startLock.current=true;setStarting(true);setStartError('');
+    try{primeAudio();const recipes=await planRequest<Recipe[]>('/'+plan.id+'/cooking','POST',{revision:plan.revision});const s=newSession(recipes.map(r=>r.file),Object.fromEntries(recipes.map(r=>[r.file,r])));s.mealPlan={id:plan.id,revision:plan.revision,proposalId:plan.proposalId,scales:Object.fromEntries(plan.items.map(i=>[i.recipe.file,i.scale]))};if(replace(s))routing.navigate({page:'cooking'})}catch(e){setStartError(e instanceof Error?e.message:String(e))}finally{startLock.current=false;setStarting(false)}
   };
 
-  const end = () => {
-    saveSession(null);
-    setSession(null);
-  };
-
-  return session ? (
-    <SessionPage session={session} onUpdate={update} onEnd={end} />
+  return session&&routing.route.page==='cooking' ? (
+    <>{error&&<p className="notice" role="alert">{error}</p>}<SessionPage session={session} onUpdate={update} onEnd={end} onBrowse={()=>routing.navigate({page:'list'})} /></>
   ) : (
-    <><div aria-live="polite">{starting && <p className="notice" role="status">調理用のレシピを準備しています…</p>}{startError && <p className="notice" role="alert">{startError}</p>}</div><RecipesPage onStart={start} starting={starting} /></>
+    <>{session&&<aside className="session-banner"><span><Flame aria-hidden="true"/>調理中 {session.files.length}品 · タイマー{session.timers.length}件</span><button className="recipe-action" onClick={()=>void routing.navigateChecked({page:'cooking'})}>調理に戻る</button></aside>}<div aria-live="polite">{starting && <p className="notice" role="status">調理用のレシピを準備しています…</p>}{(startError||error) && <p className="notice" role="alert">{startError||error}</p>}</div><RecipesPage onStart={start} starting={starting} routing={routing} cooking={!!session} onStartPlan={startPlan} /></>
   );
 }

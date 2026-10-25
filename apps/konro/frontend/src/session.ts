@@ -11,9 +11,11 @@ export type Timer = {
   note?: string; // step context, e.g. "塩(少々)を…" (absent in old sessions)
   endsAt: number; // epoch ms
   acknowledged: boolean; // user dismissed the fired alarm
+  notifiedAt?: number; // persisted before the alarm to survive remount/reload
 };
 
 export type Session = {
+  id?: string;
   schemaVersion?: 2;
   recipes?: Record<string, Recipe>;
   startedAt: number;
@@ -22,6 +24,9 @@ export type Session = {
   steps: Record<string, boolean[]>;
   ingredients: Record<string, boolean[]>;
   timers: Timer[];
+  stoppedTimer?: Timer;
+  views?: Record<string, {scroll: number; ingredientsOpen: boolean}>;
+  mealPlan?: {id:string;revision:number;proposalId?:string;scales?:Record<string,string>};
 };
 
 const KEY = "konro-session-v1";
@@ -54,6 +59,7 @@ export function pinLegacySession(s: Session, recipes: Record<string, Recipe>): S
 }
 export function newSession(files: string[], recipes: Record<string, Recipe>): Session {
   return {
+    id:crypto.randomUUID(),
     schemaVersion: 2,
     recipes,
     startedAt: Date.now(),

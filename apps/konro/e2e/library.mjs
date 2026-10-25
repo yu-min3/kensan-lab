@@ -67,7 +67,7 @@ try {
   await page.getByLabel("タグ（1行に1つ）", { exact: true }).fill("和食\n週末,作り置き");
   await page.getByLabel("調理時間（分）", { exact: true }).fill("20");
   await page.getByLabel("出典（URL・書籍など）", { exact: true }).fill("料理の本");
-  await button("レシピを保存").click(); await page.getByRole("heading", { name: "魚 & 野菜", exact: true }).waitFor();
+  await button("レシピを保存").click(); await button("変更を確認して保存").click(); await page.getByRole("heading", { name: "魚 & 野菜", exact: true }).waitFor();
   const saved = await (await fetch(base + "/api/v1/recipes/" + encodeURIComponent("煮魚"))).json();
   assert.equal(saved.rkId, "keeper-original"); assert.deepEqual(saved.images, ["images/fish.svg"]); assert.equal(saved.cookTime, "PT20M");
   assert.equal(saved.notes, "翌日も食べる\n## 手順\nここもメモ"); assert.deepEqual(saved.tags, ["和食", "週末,作り置き"]);

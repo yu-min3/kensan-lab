@@ -16,6 +16,7 @@ import (
 	"github.com/yu-min3/kensan-lab/apps/konro/backend/internal/creatorprefs"
 	"github.com/yu-min3/kensan-lab/apps/konro/backend/internal/discovery"
 	"github.com/yu-min3/kensan-lab/apps/konro/backend/internal/importer"
+	"github.com/yu-min3/kensan-lab/apps/konro/backend/internal/planner"
 	"github.com/yu-min3/kensan-lab/apps/konro/backend/internal/recipe"
 	"github.com/yu-min3/kensan-lab/apps/konro/backend/internal/rkimport"
 )
@@ -37,6 +38,11 @@ func New(dataDir, staticDir string, opts ...Option) http.Handler {
 	registerDrafts(mux, importer.New(dataDir, config.agent))
 	registerRecipeWrites(mux, dataDir)
 	registerPhotos(mux, dataDir)
+	registerTaxonomy(mux, dataDir)
+	plans := registerMealplans(mux, dataDir)
+	planning := planner.New(dataDir, config.agent, plans)
+	registerPlanner(mux, planning)
+	registerMealFeedback(mux, planning.Feedback())
 	creatorStore := creatorprefs.New(dataDir)
 	searchService := discovery.New(config.searchFetch).WithPreferences(creatorStore)
 	registerDiscovery(mux, searchService)

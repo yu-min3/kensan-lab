@@ -1,27 +1,31 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { fetchRecipe, formatDuration, Recipe } from "../api";
 import { formatRemaining, isIngredientGroup, isPinnedSession, pinLegacySession, Session, tabName, timerCandidates } from "../session";
-import { alarm } from "../alerts";
 import { holdWakeLock, releaseWakeLock } from "../wakelock";
+import {Bell, Clock, X, Undo2, Check, ChevronDown, ChevronRight, AlertTriangle} from 'lucide-react';
+import {Dialog} from '../components/Dialog';
+import {CookingFeedback} from '../components/CookingFeedback';
 
 // The cooking view: bottom burner tabs, one recipe panel, cross-tab timers.
 export function SessionPage({
   session,
   onUpdate,
   onEnd,
+  onBrowse,
 }: {
   session: Session;
-  onUpdate: (s: Session) => void;
+  onUpdate: (s: Session | ((previous:Session)=>Session)) => void;
   onEnd: () => void;
+  onBrowse: () => void;
 }) {
   const [loaded, setRecipes] = useState<Record<string, Recipe>>({});
   const pinned = isPinnedSession(session);
   const recipes = pinned ? session.recipes! : loaded;
   const [loadErrors, setLoadErrors] = useState<Record<string, string>>({});
   const [now, setNow] = useState(Date.now());
+  const [endingBusy,setEndingBusy]=useState(false);
   const [confirmEnd, setConfirmEnd] = useState(false);
-  const [showIngredients, setShowIngredients] = useState(true);
-  const firedRef = useRef(new Set<string>());
+  const [timerDetail, setTimerDetail] = useState<string | null>(null);
 
   useEffect(() => {
     holdWakeLock();
@@ -45,18 +49,25 @@ export function SessionPage({
     const iv = setInterval(() => {
       const t = Date.now();
       setNow(t);
-      for (const timer of session.timers) {
-        if (!timer.acknowledged && timer.endsAt <= t && !firedRef.current.has(timer.id)) {
-          firedRef.current.add(timer.id);
-          alarm();
-        }
-      }
     }, 500);
     return () => clearInterval(iv);
   }, [session.timers]);
 
   const active = session.files[session.active];
   const recipe = recipes[active];
+  const latest=useRef(session);latest.current=session;
+  const showIngredients=session.views?.[active]?.ingredientsOpen??true;
+  useLayoutEffect(()=>{
+    if(!pinned)return;
+    const previous=history.scrollRestoration;history.scrollRestoration='manual';
+    let position=latest.current.views?.[active]?.scroll??0;
+    window.scrollTo({top:position,behavior:'instant'});
+    let timer=0;
+    const save=()=>onUpdate(s=>({...s,views:{...s.views,[active]:{scroll:position,ingredientsOpen:s.views?.[active]?.ingredientsOpen??true}}}));
+    const capture=()=>{position=window.scrollY;window.clearTimeout(timer);timer=window.setTimeout(save,150)};
+    window.addEventListener('scroll',capture,{passive:true});
+    return()=>{window.clearTimeout(timer);window.removeEventListener('scroll',capture);save();history.scrollRestoration=previous;};
+  },[active,pinned,onUpdate]);
 
   const checkedSteps = session.steps[active] ?? [];
   const currentStep = useMemo(() => {
@@ -94,23 +105,24 @@ export function SessionPage({
     });
   };
 
-  const dismissTimer = (id: string) =>
-    onUpdate({ ...session, timers: session.timers.filter((t) => t.id !== id) });
+  const dismissTimer = (id: string) => {
+    const timer = session.timers.find(t => t.id === id);
+    if (!timer) return;
+    onUpdate({...session, stoppedTimer:timer, timers:session.timers.filter(t => t.id !== id)});
+    setTimerDetail(null);
+  };
+  const restoreTimer = () => {
+    if (!session.stoppedTimer) return;
+    onUpdate({...session, timers:[...session.timers, session.stoppedTimer], stoppedTimer:undefined});
+  };
 
   const liveTimers = session.timers.filter((t) => !t.acknowledged);
 
   return (
     <div className="session-page">
       <header className="session-header">
-        {confirmEnd ? (
-          <button className="end-button end-confirm" onClick={onEnd}>
-            終了する（進捗・タイマーは消えます）
-          </button>
-        ) : (
-          <button className="end-button" onClick={() => { setConfirmEnd(true); setTimeout(() => setConfirmEnd(false), 3000); }}>
-            終了
-          </button>
-        )}
+        <button className="end-button" onClick={onBrowse}>一覧へ</button>
+        <button className="end-button" onClick={() => setConfirmEnd(true)}>終了</button>
         <div className="timer-bar">
           {liveTimers.map((t) => {
             const remaining = t.endsAt - now;
@@ -119,16 +131,28 @@ export function SessionPage({
               <button
                 key={t.id}
                 className={`timer-chip ${fired ? "timer-fired" : ""}`}
-                onClick={() => dismissTimer(t.id)}
+                onClick={() => setTimerDetail(t.id)}
+                aria-label={`${recipes[t.recipe]?.title??t.recipe} ${t.label}のタイマー詳細`}
                 title={recipes[t.recipe]?.title}
               >
-                {fired ? "🔔" : "⏱"} {t.label} {fired ? "完了!" : formatRemaining(remaining)}
+                {fired ? <Bell aria-hidden="true"/> : <Clock aria-hidden="true"/>} {t.label} {fired ? "完了!" : formatRemaining(remaining)}
                 {t.note && <span className="timer-note">{t.note}</span>}
               </button>
             );
           })}
         </div>
       </header>
+      {session.stoppedTimer&&<div className="timer-undo" role="status"><span>直前のタイマーを停止・確認しました。</span><button className="chip" onClick={restoreTimer}><Undo2 aria-hidden="true"/>取り消す</button></div>}
+      {timerDetail&&(()=>{
+        const t=session.timers.find(t=>t.id===timerDetail);
+        if(!t)return null;
+        const fired=t.endsAt<=now;
+        return <Dialog title="タイマー詳細" onDismiss={()=>setTimerDetail(null)}>
+          <h3>{recipes[t.recipe]?.title??t.recipe}</h3><p>{t.note}</p><p className="timer-detail-time tnum">{fired?'完了':formatRemaining(t.endsAt-now)}</p>
+          <div className="editor-actions"><button autoFocus className="recipe-action" onClick={()=>setTimerDetail(null)}><X aria-hidden="true"/>閉じる</button><button className="recipe-action" onClick={()=>dismissTimer(t.id)}>{fired?'確認済みにする':'停止'}</button></div>
+        </Dialog>;
+      })()}
+      {confirmEnd&&<Dialog title="調理を終了しますか？" onDismiss={()=>{if(!endingBusy)setConfirmEnd(false)}}><p>終了すると、この調理のチェックとタイマーを削除します。</p><CookingFeedback session={session} onEnd={onEnd} onBusy={setEndingBusy}/><div className="editor-actions"><button autoFocus className="recipe-action" disabled={endingBusy} onClick={()=>setConfirmEnd(false)}>調理を続ける</button><button className="recipe-action" disabled={endingBusy} onClick={onEnd}>終了する（進捗・タイマーは消えます）</button></div></Dialog>}
 
       <main className="recipe-panel">
         {!pinned ? <section className="editor-panel" aria-label="以前の調理セッションの確認">
@@ -151,7 +175,7 @@ export function SessionPage({
             <h2 className="recipe-title h-serif">{recipe.title}</h2>
             <div className="recipe-info">
               {recipe.servings && <span>{recipe.servings}</span>}
-              {formatDuration(recipe.cookTime) && <span>⏱ {formatDuration(recipe.cookTime)}</span>}
+              {formatDuration(recipe.cookTime) && <span><Clock aria-hidden="true"/> {formatDuration(recipe.cookTime)}</span>}
               {recipe.source && /^https?:\/\//i.test(recipe.source) && (
                 <a href={recipe.source} target="_blank" rel="noreferrer">
                   出典
@@ -160,8 +184,8 @@ export function SessionPage({
             </div>
 
             <section>
-              <button className="section-toggle" onClick={() => setShowIngredients(!showIngredients)}>
-                材料 {showIngredients ? "▾" : "▸"}
+              <button className="section-toggle" aria-expanded={showIngredients} onClick={() => onUpdate(s=>({...s,views:{...s.views,[active]:{scroll:window.scrollY,ingredientsOpen:!showIngredients}}}))}>
+                材料 {showIngredients ? <ChevronDown aria-hidden="true"/> : <ChevronRight aria-hidden="true"/>}
               </button>
               {showIngredients && (
                 <ul className="ingredients">
@@ -189,6 +213,7 @@ export function SessionPage({
 
             <section>
               <h3 className="section-label">手順</h3>
+              {currentStep<(recipe.steps?.length??0)&&<button className="chip next-step" onClick={()=>document.querySelector('.step-current')?.scrollIntoView({block:'center',behavior:'instant'})}>次の手順へ</button>}
               {(recipe.steps ?? []).length === 0 && (
                 <p className="no-steps">取り込み元 に手順が未登録のレシピです（材料のみ）。出典リンクから手順を確認してください。</p>
               )}
@@ -200,8 +225,8 @@ export function SessionPage({
                       checkedSteps[i] ? "step step-done" : i === currentStep ? "step step-current" : "step"
                     }
                   >
-                    <button className="step-body" onClick={() => toggleStep(i)}>
-                      <span className="step-num">{checkedSteps[i] ? "✓" : i + 1}</span>
+                    <button className="step-body" aria-pressed={checkedSteps[i]??false} onClick={() => toggleStep(i)}>
+                      <span className="step-num">{checkedSteps[i] ? <Check aria-hidden="true"/> : i + 1}</span>
                       <span className="step-text">{step}</span>
                     </button>
                     {i === currentStep && timerCandidates(step).length > 0 && (
@@ -212,7 +237,7 @@ export function SessionPage({
                             className="chip"
                             onClick={() => addTimer(c.label, c.seconds, step.slice(0, 8))}
                           >
-                            ⏱ {c.label}
+                            <Clock aria-hidden="true"/> {c.label}
                           </button>
                         ))}
                       </div>
@@ -231,7 +256,7 @@ export function SessionPage({
         )}
       </main>
 
-      <nav className="burner-tabs">
+      <nav className="burner-tabs" aria-label="調理する料理">
         {session.files.map((f, i) => {
           const r = recipes[f];
           const steps = r?.steps ?? [];
@@ -242,14 +267,16 @@ export function SessionPage({
             <button
               key={f}
               className={`burner-tab ${i === session.active ? "burner-active" : ""}`}
+              aria-pressed={i===session.active}
+              aria-label={`${r?.title??f} ${done}/${steps.length}手順完了`}
               onClick={() => onUpdate({ ...session, active: i })}
             >
               <span className="burner-name">{tabName(r?.title ?? f)}</span>
               <span className="burner-sub">
-                {loadErrors[f] && !r ? "⚠" : steps.length > 0 ? `${done}/${steps.length}` : r ? "材料のみ" : "–"}
+                {loadErrors[f] && !r ? <AlertTriangle aria-label="読み込み失敗"/> : steps.length > 0 ? `${done}/${steps.length}` : r ? "材料のみ" : "–"}
                 {nextFire !== null && (
                   <em className={nextFire <= 0 ? "burner-timer burner-timer-fired" : "burner-timer"}>
-                    {nextFire <= 0 ? "🔔" : ` ${formatRemaining(nextFire)}`}
+                    {nextFire <= 0 ? <Bell aria-label="タイマー完了"/> : ` ${formatRemaining(nextFire)}`}
                   </em>
                 )}
               </span>

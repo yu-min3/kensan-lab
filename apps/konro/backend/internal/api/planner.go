@@ -1,0 +1,89 @@
+package api
+
+import (
+	"errors"
+	"github.com/yu-min3/kensan-lab/apps/konro/backend/internal/planner"
+	"net/http"
+	"os"
+)
+
+func registerPlanner(mux *http.ServeMux, s *planner.Service) {
+	respond := func(w http.ResponseWriter, v any, e error) {
+		if e != nil {
+			status := 400
+			if errors.Is(e, os.ErrNotExist) {
+				status = 404
+			}
+			if errors.Is(e, planner.ErrConflict) {
+				status = 409
+			}
+			http.Error(w, e.Error(), status)
+			return
+		}
+		writeJSON(w, v)
+	}
+	mux.HandleFunc("GET /api/v1/planning-policies", func(w http.ResponseWriter, r *http.Request) { v, e := s.Policies(); respond(w, v, e) })
+	mux.HandleFunc("POST /api/v1/planning-policies", func(w http.ResponseWriter, r *http.Request) {
+		var in planner.Policy
+		if !decodeJSON(w, r, &in, 16384) {
+			return
+		}
+		v, e := s.SavePolicy(in)
+		respond(w, v, e)
+	})
+	mux.HandleFunc("POST /api/v1/planning-policies/compare", func(w http.ResponseWriter, r *http.Request) {
+		var in struct {
+			Version    string             `json:"version"`
+			Conditions planner.Conditions `json:"conditions"`
+		}
+		if !decodeJSON(w, r, &in, 32768) {
+			return
+		}
+		v, e := s.Compare(in.Version, in.Conditions)
+		respond(w, v, e)
+	})
+	mux.HandleFunc("POST /api/v1/planning-policies/activate", func(w http.ResponseWriter, r *http.Request) {
+		var in struct {
+			Version      string `json:"version"`
+			ComparisonID string `json:"comparisonId"`
+			Expected     string `json:"expected"`
+		}
+		if !decodeJSON(w, r, &in, 4096) {
+			return
+		}
+		v, e := s.Activate(in.Version, in.ComparisonID, in.Expected)
+		respond(w, v, e)
+	})
+	mux.HandleFunc("POST /api/v1/menu-proposals", func(w http.ResponseWriter, r *http.Request) {
+		var in struct {
+			Conditions planner.Conditions `json:"conditions"`
+			Mode       string             `json:"mode"`
+		}
+		if !decodeJSON(w, r, &in, 1<<20) {
+			return
+		}
+		v, e := s.Create(r.Context(), in.Conditions, in.Mode)
+		respond(w, v, e)
+	})
+	mux.HandleFunc("GET /api/v1/menu-proposals/active", func(w http.ResponseWriter, r *http.Request) { v, e := s.Active(r.Context()); respond(w, v, e) })
+	mux.HandleFunc("GET /api/v1/menu-proposals/{id}", func(w http.ResponseWriter, r *http.Request) {
+		v, e := s.Get(r.Context(), r.PathValue("id"))
+		respond(w, v, e)
+	})
+	mux.HandleFunc("POST /api/v1/menu-proposals/{id}/{action}", func(w http.ResponseWriter, r *http.Request) {
+		var in struct {
+			Revision int    `json:"revision"`
+			MenuID   string `json:"menuId"`
+		}
+		if !decodeJSON(w, r, &in, 4096) {
+			return
+		}
+		if r.PathValue("action") == "adopt" {
+			v, e := s.Adopt(r.PathValue("id"), in.Revision, in.MenuID, r.Header.Get("Idempotency-Key"))
+			respond(w, v, e)
+			return
+		}
+		v, e := s.Action(r.Context(), r.PathValue("id"), in.Revision, r.PathValue("action"))
+		respond(w, v, e)
+	})
+}

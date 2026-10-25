@@ -1,21 +1,25 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 
-export type Route = {page:'list'} | {page:'recipe';file:string} | {page:'search'} | {page:'creators'} | {page:'import';url:string;draft?:string;fromSearch:boolean};
+export type Route = {page:'list'} | {page:'cooking'} | {page:'shopping';id:string} | {page:'proposals';id:string} | {page:'recipe';file:string} | {page:'search'} | {page:'creators'} | {page:'import';url:string;draft?:string;fromSearch:boolean};
 export type LeaveGuard=()=>boolean|Promise<boolean>;
 const key='konroRouteIndex', previousKey='konroPreviousRoute';
 function readRoute():Route {
  const [path,query='']=location.hash.slice(1).split('?');
  if(path==='new')return {page:'recipe',file:''};
+ if(path==='shopping')return {page:'shopping',id:new URLSearchParams(query).get('id')??''};
+ if(path==='proposals')return {page:'proposals',id:new URLSearchParams(query).get('id')??''};
  if(path.startsWith('recipe/')){try{return {page:'recipe',file:decodeURIComponent(path.slice(7))}}catch{return {page:'list'}}}
- if(path==='search'||path==='creators')return {page:path};
+ if(path==='search'||path==='creators'||path==='cooking')return {page:path};
  if(path==='import'){const p=new URLSearchParams(query);return {page:'import',url:p.get('url')??'',draft:/^[a-f0-9]{32}$/.test(p.get('draft')??'')?p.get('draft')!:undefined,fromSearch:p.get('from')==='search'}};
  return {page:'list'};
 }
 const hashFor=(r:Route):string=>{
  switch(r.page){
-  case 'list':return '';
+  case 'list':return '#list';
+  case 'shopping':return '#shopping'+(r.id?'?id='+encodeURIComponent(r.id):'');
+  case 'proposals':return '#proposals'+(r.id?'?id='+encodeURIComponent(r.id):'');
   case 'recipe':return r.file?`#recipe/${encodeURIComponent(r.file)}`:'#new';
-  case 'search':case 'creators':return '#'+r.page;
+  case 'search':case 'creators':case 'cooking':return '#'+r.page;
   case 'import':{const p=new URLSearchParams();if(r.url)p.set('url',r.url);if(r.draft)p.set('draft',r.draft);if(r.fromSearch)p.set('from','search');return '#import'+(p.size?'?'+p:'')}
  }
 };
@@ -54,5 +58,6 @@ export function useRecipeRoute(){
  const back=useCallback((fallback:Route,alreadySaved=false)=>{
   if(current.current.index>0&&history.state?.[previousKey]===hashFor(fallback)){bypass.current=alreadySaved;history.back()}else navigate(fallback);
  },[navigate]);
- return {route,navigate,back,onGuard};
+ const navigateChecked=useCallback(async(next:Route)=>{if(await(guard.current?.()??true))navigate(next)},[navigate]);
+ return {route,navigate,navigateChecked,back,onGuard};
 }
