@@ -80,8 +80,12 @@ export function DailyJournal({ date, onDate }: { date: string; onDate: (date: st
   });
   const append = useMutation({
     mutationFn: async (text: string) => {
+      const time = new Intl.DateTimeFormat("ja-JP", {
+        timeZone: "Asia/Tokyo", hour: "2-digit", minute: "2-digit", hourCycle: "h23",
+      }).format(new Date());
+      const entry = `${time} ${text}`;
       if (file.notFound) {
-        await api.createFile(dailyPath(date), `${dailySkeleton(date).trimEnd()}\n\n${text}\n`);
+        await api.createFile(dailyPath(date), `${dailySkeleton(date).trimEnd()}\n\n${entry}\n`);
         await Promise.all([
           client.invalidateQueries({ queryKey: ["file", dailyPath(date)] }),
           client.invalidateQueries({ queryKey: ["dailyList"] }),
@@ -89,7 +93,7 @@ export function DailyJournal({ date, onDate }: { date: string; onDate: (date: st
         clearLine(text);
       } else {
         // Share the editor's save queue and conflict recovery. No second writer.
-        const saving = file.replace(`${file.draft.trimEnd()}\n\n${text}\n`);
+        const saving = file.replace(`${file.draft.trimEnd()}\n\n${entry}\n`);
         clearLine(text); // The line now belongs to the recoverable document draft.
         await saving;
       }

@@ -7,7 +7,7 @@ date: 2026-09-10
 
 The dashboard combines three levels of useful information: the map shows the relationship between direction and evidence, the original project cards show the work being pursued, and the diary captures daily intentions and observations. The technical radar and annual view retain their original role.
 
-The diary can be read, created, edited and appended to in place, with date navigation and a calendar. Its content stays free-form. A one-line input below the reading view appends a plain paragraph to the selected date, or creates the diary when missing. Enter and the save button both submit; the full editor remains available. Appends to existing diaries share the editor save queue and conflict recovery rather than using the legacy section-based diary API.
+The diary can be read, created, edited and appended to in place, with date navigation and a calendar. Its content stays free-form. A one-line input below the reading view prefixes the submission time in JST (`HH:mm`) and appends a plain paragraph to the selected date, or creates the diary when missing. Enter and the save button both submit; the full editor remains available. Appends to existing diaries share the editor save queue and conflict recovery rather than using the legacy section-based diary API.
 
 ## Removed management UI
 
@@ -68,3 +68,5 @@ Existing incomplete routine copies in `todo.md` are retained for explicit migrat
 ## Verification
 
 Run `npm test` and `npm run build` in `frontend`, and `npx playwright test` in `e2e`. Tests cover diary creation/edit/append, immediate editor close, delayed date changes, conflict recovery, read-only viewing, original project-card/radar/annual interactions, retired routes, no management-data requests, and desktop/mobile light/dark layout. All browser writes use isolated fixtures. Backend history contracts remain unchanged.
+
+Diary Markdown lists keep paragraph margins at zero inside each list item, so blank lines in Markdown do not double the item spacing. Nested lists use a small separation; ordinary paragraphs retain their reading margins.

@@ -32,7 +32,7 @@ export function MarkdownView({ content }: { content: string }) {
           p: ({ children }) => <p className="my-3 leading-7 [overflow-wrap:anywhere]">{children}</p>,
           ul: ({ children }) => <ul className="my-3 pl-5 list-disc space-y-1.5">{children}</ul>,
           ol: ({ children }) => <ol className="my-3 pl-5 list-decimal space-y-1.5">{children}</ol>,
-          li: ({ children }) => <li className="pl-1">{children}</li>,
+          li: ({ children }) => <li className="pl-1 [&>p]:my-0 [&>ul]:my-1 [&>ol]:my-1">{children}</li>,
           strong: ({ children }) => <strong className="font-semibold">{children}</strong>,
           blockquote: ({ children }) => (
             <blockquote className="my-4 border-l-2 border-brand pl-4 text-muted-foreground">{children}</blockquote>
