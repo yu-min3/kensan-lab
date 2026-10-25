@@ -68,8 +68,8 @@ export function RecipePage({ file, selected, onBack, onToggle, onSaved, onGuard 
         <SourceCredit info={recipe.sourceInfo}/>
         <p className="recipe-summary">{[recipe.servings, recipe.prepTime && `下準備 ${formatDuration(recipe.prepTime)}`, recipe.cookTime && `調理 ${formatDuration(recipe.cookTime)}`, recipe.rating ? "自分の評価 " + "★".repeat(recipe.rating) : ""].filter(Boolean).join(" · ")}</p>
         {!!recipe.tags?.length && <div className="detail-tags">{recipe.tags.map((tag, i) => <span className="recipe-tag" key={i}>{tag}</span>)}</div>}
-        <RecipePhoto image={recipe.images?.[0]} photo={photo}/>
         <button type="button" className={`recipe-action ${photo.dirty ? "" : "recipe-action-primary"} recipe-cook`} disabled={photo.busy||photo.preparing} aria-pressed={selected} onClick={() => onToggle(recipe.file)}>{selected ? <Check aria-hidden="true" /> : <Plus aria-hidden="true" />}{selected ? "追加済み・外す" : "調理に追加"}</button>
+        <RecipePhoto image={recipe.images?.[0]} photo={photo}/>
       </Panel>
       <Panel><h2 className="h-serif">材料</h2>{recipe.ingredients?.length ? <ul className="detail-ingredients">{recipe.ingredients.map((s, i) => <li key={i}>{s}</li>)}</ul> : <p className="recipe-summary">材料はまだ登録されていません</p>}</Panel>
       <Panel><h2 className="h-serif">手順</h2>{recipe.steps?.length ? <ol className="detail-steps">{recipe.steps.map((s, i) => <li key={i}>{s}</li>)}</ol> : <p className="recipe-summary">手順はまだ登録されていません</p>}</Panel>
