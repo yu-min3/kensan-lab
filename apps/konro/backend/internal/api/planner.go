@@ -22,6 +22,38 @@ func registerPlanner(mux *http.ServeMux, s *planner.Service) {
 		}
 		writeJSON(w, v)
 	}
+	mux.HandleFunc("GET /api/v1/planning-policies", func(w http.ResponseWriter, r *http.Request) { v, e := s.Policies(); respond(w, v, e) })
+	mux.HandleFunc("POST /api/v1/planning-policies", func(w http.ResponseWriter, r *http.Request) {
+		var in planner.Policy
+		if !decodeJSON(w, r, &in, 16384) {
+			return
+		}
+		v, e := s.SavePolicy(in)
+		respond(w, v, e)
+	})
+	mux.HandleFunc("POST /api/v1/planning-policies/compare", func(w http.ResponseWriter, r *http.Request) {
+		var in struct {
+			Version    string             `json:"version"`
+			Conditions planner.Conditions `json:"conditions"`
+		}
+		if !decodeJSON(w, r, &in, 32768) {
+			return
+		}
+		v, e := s.Compare(in.Version, in.Conditions)
+		respond(w, v, e)
+	})
+	mux.HandleFunc("POST /api/v1/planning-policies/activate", func(w http.ResponseWriter, r *http.Request) {
+		var in struct {
+			Version      string `json:"version"`
+			ComparisonID string `json:"comparisonId"`
+			Expected     string `json:"expected"`
+		}
+		if !decodeJSON(w, r, &in, 4096) {
+			return
+		}
+		v, e := s.Activate(in.Version, in.ComparisonID, in.Expected)
+		respond(w, v, e)
+	})
 	mux.HandleFunc("POST /api/v1/menu-proposals", func(w http.ResponseWriter, r *http.Request) {
 		var in struct {
 			Conditions planner.Conditions `json:"conditions"`

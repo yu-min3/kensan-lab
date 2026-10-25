@@ -69,7 +69,7 @@ func Valid(c Conditions) error {
 	if !ok || target.Sign() <= 0 || target.Cmp(big.NewRat(100, 1)) > 0 {
 		return ErrInvalid
 	}
-	if c.Count < 1 || c.Count > 12 || len(c.Idea) > 4000 || c.Main < 0 || c.Side < 0 || ((c.Main+c.Side) > 0 && c.Main+c.Side != c.Count) || len(c.Fixed) > c.Count || len(c.Avoid) > 30 || len(c.Use) > 30 {
+	if c.Count < 1 || c.Count > 12 || len(c.Idea) > 4000 || c.Main < 0 || c.Side < 0 || ((c.Main+c.Side) > 0 && c.Main+c.Side != c.Count) || len(c.Fixed) > c.Count || len(c.Avoid) > 30 || len(c.Use) > 30 || len(c.Omit) > 100 || len(c.Cuisine) > 200 {
 		return ErrInvalid
 	}
 	if _, e := ingredients.Multiply(c.Servings, "1"); e != nil || strings.HasPrefix(c.Servings, "-") || c.Servings == "0" {
@@ -175,6 +175,11 @@ func ValidateMenus(c Conditions, candidates []Candidate, menus []Menu) ([]Menu, 
 			}
 			seen[pick.File] = true
 			keys = append(keys, pick.File)
+			isMain := contains(candidate.Recipe.Tags, "メイン") || contains(candidate.Recipe.Tags, "主菜")
+			isSide := contains(candidate.Recipe.Tags, "副菜")
+			if c.Main+c.Side > 0 && isMain == isSide {
+				return nil, fmt.Errorf("%w: 主菜・副菜の分類が不明です", ErrInvalid)
+			}
 			if contains(candidate.Recipe.Tags, "メイン") || contains(candidate.Recipe.Tags, "主菜") {
 				main++
 			}

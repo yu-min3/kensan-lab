@@ -192,8 +192,8 @@ func (s *Service) Create(ctx context.Context, c Conditions, mode string) (*Propo
 	if json.Unmarshal(b, &explicit) != nil {
 		return nil, ErrInvalid
 	}
-	c.Avoid = append(c.Avoid, explicit.Avoid...)
-	c.Use = append(c.Use, explicit.Use...)
+	c.Avoid = Unique(append(c.Avoid, explicit.Avoid...))
+	c.Use = Unique(append(c.Use, explicit.Use...))
 	candidates, e := Candidates(s.root, c)
 	if e != nil {
 		return nil, e
@@ -201,7 +201,8 @@ func (s *Service) Create(ctx context.Context, c Conditions, mode string) (*Propo
 	if len(candidates) < c.Count {
 		return nil, fmt.Errorf("%w: 人数が確定した候補が%d品です。条件・好み・人数登録を確認してください", ErrInvalid, len(candidates))
 	}
-	policy, sv, e := OptionalJSON(filepath.Join(s.root, "planning-policy.json"))
+	policy, e := s.currentPolicy()
+	sv := policy.Version
 	if e != nil {
 		return nil, e
 	}
@@ -216,7 +217,7 @@ func (s *Service) Create(ctx context.Context, c Conditions, mode string) (*Propo
 	}
 	p := &Proposal{Schema: 1, ID: id, Revision: 1, Conditions: c, Candidates: candidates, Mode: mode, PreferenceVersion: pv, PolicyVersion: sv, Preferences: preferences, Policy: policy, Adopted: map[string]string{}}
 	if mode == "rules" {
-		p.Menus, e = RuleMenus(c, candidates)
+		p.Menus, e = RuleMenus(c, Rank(c, candidates, policy))
 		if e != nil {
 			return nil, e
 		}
@@ -370,6 +371,13 @@ func (s *Service) Adopt(id string, revision int, menuID, operation string) (meal
 		}
 		return s.plans.Get(parts[1])
 	}
+	_, currentPreferences, e := OptionalJSON(filepath.Join(s.root, ".settings", "meal-preferences.json"))
+	if e != nil {
+		return mealplan.Plan{}, e
+	}
+	if currentPreferences != p.PreferenceVersion {
+		return mealplan.Plan{}, ErrConflict
+	}
 	if p.Revision != revision || p.State != "succeeded" {
 		return mealplan.Plan{}, ErrConflict
 	}
@@ -465,4 +473,17 @@ func RuleMenus(c Conditions, candidates []Candidate) ([]Menu, error) {
 		return nil, fmt.Errorf("%w: 確認済みの分類だけでは献立を組めません。内訳や条件を確認してください", ErrInvalid)
 	}
 	return ValidateMenus(c, candidates, menus)
+}
+
+func Unique(values []string) []string {
+	result := []string{}
+	seen := map[string]bool{}
+	for _, v := range values {
+		key := normalized(v)
+		if !seen[key] {
+			seen[key] = true
+			result = append(result, v)
+		}
+	}
+	return result
 }
