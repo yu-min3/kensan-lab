@@ -26,6 +26,8 @@ export function RecipesPage({ onStart, starting = false, routing, cooking=false 
   const {capturePosition,q,setQ,tags,setTags,rating,setRating,sort,setSort,selected,setSelected,clearFilters}=useLibraryView(route.page==='list',loaded);
   const [taxonomy,setTaxonomy]=useState<Taxonomy>({revision:'',assignments:{},groups:[{id:'cuisine',category:'料理種類',label:'系統'},{id:'dish',category:'料理種類',label:'品目'},{id:'ingredient',category:'素材種類',label:'素材'},{id:'other',category:'その他',label:'自由タグ'}]});
   const [taxonomyError,setTaxonomyError]=useState('');
+  const [display,setDisplay]=useState<'photos'|'compact'>(()=>{try{return localStorage.getItem('konro.library-display')==='compact'?'compact':'photos'}catch{return 'photos'}});
+  useEffect(()=>{try{localStorage.setItem('konro.library-display',display)}catch{/* Viewing does not require storage. */}},[display]);
   useEffect(()=>{fetch('/api/v1/tag-taxonomy').then(async r=>{if(!r.ok)throw new Error('タグ分類を読み込めません。タグはその他に表示しています。');setTaxonomy(await r.json())}).catch(e=>setTaxonomyError(e.message));},[]);
   const navigate=(next:Route,replace=false)=>{capturePosition();routeNavigate(next,replace)};
   const [importing, setImporting] = useState(false);
@@ -68,7 +70,7 @@ export function RecipesPage({ onStart, starting = false, routing, cooking=false 
 
   if (route.page==='import') return <ImportPage key={route.url||route.draft||'manual'} initialURL={route.url} initialDraft={route.draft} returnToSearch={route.fromSearch} onGuard={onGuard} onDraft={(id)=>navigate({...route,draft:id},true)} onClose={()=>back({page:route.fromSearch?'search':'list'},true)} onSaved={(file, title) => {
     navigate({page:'list'},true); setImportMsg(`✓ ${title} を保存しました`);
-    setQ(""); setTag(""); setSelected((s) => s.includes(file) ? s : [...s, file]);
+    setQ(""); setTags([]); setSelected((s) => s.includes(file) ? s : [...s, file]);
     fetchRecipes().then(setRecipes).catch((e) => setError(String(e)));
   }} />;
 
@@ -89,7 +91,7 @@ export function RecipesPage({ onStart, starting = false, routing, cooking=false 
         )}
         <div className="library-search-tools">
           <label className="library-query" htmlFor="library-query"><span>レシピを探す</span><input id="library-query" type="search" aria-label="レシピを検索" placeholder="料理名・タグで検索" value={q} onChange={e=>setQ(e.target.value)}/></label>
-          <label htmlFor="library-sort"><span id="library-sort-label">並べ替え</span><select aria-labelledby="library-sort-label" id="library-sort" value={sort} onChange={e=>setSort(e.target.value as LibrarySort)}><option value="rating">評価が高い順</option><option value="name">名前順</option><option value="time">調理時間が短い順</option></select></label>
+          <label htmlFor="library-sort"><span id="library-sort-label">並べ替え</span><select aria-labelledby="library-sort-label" id="library-sort" value={sort} onChange={e=>setSort(e.target.value as LibrarySort)}><option value="rating">評価順</option><option value="name">名前順</option><option value="time">時間順</option></select></label>
         </div>
         <div className="library-rating-filters" role="group" aria-label="自分の評価で絞る">{([['all','すべて'],['high','★4以上'],['unrated','未評価']] as const).map(([value,label])=><button key={value} className={`chip ${rating===value?'chip-on':''}`} aria-pressed={rating===value} onClick={()=>setRating(value)}>{label}</button>)}</div>
         {taxonomyError&&<p className="notice" role="alert">{taxonomyError}</p>}
@@ -99,6 +101,7 @@ export function RecipesPage({ onStart, starting = false, routing, cooking=false 
       {error && <p className="error">{error}</p>}
 
       <div className="library-result-info"><p className="recipe-summary" aria-live="polite">{loaded?`${shown.length}品 / 全${recipes.length}品`:'レシピを読み込んでいます…'} · 星は自分の評価</p>{(q||tags.length>0||rating!=='all')&&<button className="chip" onClick={clearFilters}>絞り込みを解除</button>}</div>
+      <div className="display-options" role="group" aria-label="一覧の表示"><button className={`chip ${display==='photos'?'chip-on':''}`} aria-pressed={display==='photos'} onClick={()=>setDisplay('photos')}>写真</button><button className={`chip ${display==='compact'?'chip-on':''}`} aria-pressed={display==='compact'} onClick={()=>setDisplay('compact')}>コンパクト</button></div>
       <div className="library-layout"><div className="library-results">
       {!error && loaded && recipes.length > 0 && shown.length === 0 && (
         <div className="empty-state">
@@ -110,7 +113,7 @@ export function RecipesPage({ onStart, starting = false, routing, cooking=false 
       )}
 
       {!error && loaded && recipes.length === 0 && <div className="empty-state"><p>最初のレシピを追加しましょう</p><button className="chip" onClick={() => navigate({page:"import",url:"",fromSearch:false})}>URL・本文から取り込む</button></div>}
-      <ul className="recipe-grid">
+      <ul className="recipe-grid" data-view={display}>
         {shown.map((r) => {
           const idx = selected.indexOf(r.file);
           return (
@@ -132,7 +135,7 @@ export function RecipesPage({ onStart, starting = false, routing, cooking=false 
 
                 </div>
               </button>
-              <button disabled={starting} className={`recipe-select ${idx >= 0 ? "chip-on" : ""}`} aria-label={`${r.title}を調理に${idx >= 0 ? "選択済み" : "選ぶ"}`} aria-pressed={idx >= 0} onClick={() => toggle(r.file)}>{idx >= 0 ? "✓ 調理に選択済み" : "調理に選ぶ"}</button>
+              <button disabled={starting} className={`recipe-select ${idx >= 0 ? "chip-on" : ""}`} aria-label={`${r.title}を調理に${idx >= 0 ? "選択済み" : "選ぶ"}`} aria-pressed={idx >= 0} onClick={() => toggle(r.file)}>{display==='compact'?(idx>=0?'選択済み':'選ぶ'):idx >= 0 ? "✓ 調理に選択済み" : "調理に選ぶ"}</button>
               </article>
             </li>
           );

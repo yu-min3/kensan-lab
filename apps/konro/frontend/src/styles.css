@@ -760,6 +760,16 @@ html:has(.recipe-detail) { scroll-padding-top: calc(var(--row-h) + var(--gap-inl
 @media (min-width: 1200px) { .recipe-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
 
 /* Recipe photos share the detail panel and existing action controls. */
+.display-options { display:flex; gap:var(--gap-inline); }
+.recipe-grid[data-view="compact"] { grid-template-columns:minmax(0,1fr); }
+.recipe-grid[data-view="compact"] .recipe-card { display:grid; grid-template-columns:minmax(0,1fr) auto; }
+.recipe-grid[data-view="compact"] .recipe-open { flex-direction:row; align-items:center; min-width:0; }
+.recipe-grid[data-view="compact"] .recipe-open > img, .recipe-grid[data-view="compact"] .thumb-placeholder { width:calc(var(--row-h) * 2); height:calc(var(--row-h) * 2); flex-shrink:0; }
+.recipe-grid[data-view="compact"] .thumb-placeholder span { display:none; }
+.recipe-grid[data-view="compact"] .card-body { min-width:0; }
+.recipe-grid[data-view="compact"] .recipe-select { min-width:calc(var(--row-h) * 1.5); border-top:0; border-left:1px solid hsl(var(--border)); padding:var(--gap-inline); }
+.recipe-grid[data-view="compact"] .personal-rating-stars { display:none; }
+@media(max-width:639px){.library-search-tools{grid-template-columns:minmax(0,1fr) auto;align-items:end}.library-search-tools label:first-child{min-width:0}.library-search-tools select{max-width:calc(var(--row-h) * 2.7)}.selection-summary-names{-webkit-line-clamp:1}.cooking-selection{padding:var(--gap-inline) var(--gap-stack)}}
 .recipe-photo { display: grid; gap: var(--gap-stack); margin-block: var(--gap-stack); }
 .recipe-photo .recipe-cover { margin: 0; }
 .recipe-photo .editor-actions { flex-wrap: wrap; }
