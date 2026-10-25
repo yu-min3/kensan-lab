@@ -784,4 +784,16 @@ html:has(.recipe-detail) { scroll-padding-top: calc(var(--row-h) + var(--gap-inl
 .recipe-diff { display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1fr); gap:var(--gap-stack); }
 .recipe-diff pre { white-space:pre-wrap; overflow-wrap:anywhere; font-family:var(--font-sans); line-height:var(--text-lh); }
 .recipe-diff h4 { margin-block:var(--gap-inline); }
+.list-header > .header-row { flex-wrap:wrap; gap:var(--gap-inline); }
+.shopping-items, .saved-plans { list-style:none; padding:0; }
+.shopping-item { border-bottom:1px solid hsl(var(--border)); padding-block:var(--gap-stack); }
+.shopping-item > label { display:flex; align-items:center; gap:var(--gap-inline); }
+.shopping-item select { width:auto; }
+.shopping-home > div, .shopping-bought > div { color:hsl(var(--muted-foreground)); }
+.shopping-review { border-left:var(--gap-inline) solid hsl(var(--warning)); padding-left:var(--gap-inline); }
+.plan-choice { border-bottom:1px solid hsl(var(--border)); padding-block:var(--gap-stack); display:grid; gap:var(--gap-inline); }
+.plan-choice > label { display:flex; flex-wrap:wrap; align-items:center; gap:var(--gap-inline); }
+.plan-choice > label input { width:calc(var(--row-h) * 2); }
+.text-link { text-decoration:underline; color:hsl(var(--accent-foreground)); }
+.saved-plans { display:grid; gap:var(--gap-inline); }
 @media(max-width:639px){.recipe-diff{grid-template-columns:minmax(0,1fr)}}
