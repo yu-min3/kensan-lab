@@ -3,16 +3,19 @@ import { fetchRecipe, formatDuration, Recipe } from "../api";
 import { formatRemaining, isIngredientGroup, isPinnedSession, pinLegacySession, Session, tabName, timerCandidates } from "../session";
 import { holdWakeLock, releaseWakeLock } from "../wakelock";
 import {Bell, Clock, X, Undo2} from 'lucide-react';
+import {Dialog} from '../components/Dialog';
 
 // The cooking view: bottom burner tabs, one recipe panel, cross-tab timers.
 export function SessionPage({
   session,
   onUpdate,
   onEnd,
+  onBrowse,
 }: {
   session: Session;
   onUpdate: (s: Session) => void;
   onEnd: () => void;
+  onBrowse: () => void;
 }) {
   const [loaded, setRecipes] = useState<Record<string, Recipe>>({});
   const pinned = isPinnedSession(session);
@@ -104,15 +107,8 @@ export function SessionPage({
   return (
     <div className="session-page">
       <header className="session-header">
-        {confirmEnd ? (
-          <button className="end-button end-confirm" onClick={onEnd}>
-            終了する（進捗・タイマーは消えます）
-          </button>
-        ) : (
-          <button className="end-button" onClick={() => { setConfirmEnd(true); setTimeout(() => setConfirmEnd(false), 3000); }}>
-            終了
-          </button>
-        )}
+        <button className="end-button" onClick={onBrowse}>一覧へ</button>
+        <button className="end-button" onClick={() => setConfirmEnd(true)}>終了</button>
         <div className="timer-bar">
           {liveTimers.map((t) => {
             const remaining = t.endsAt - now;
@@ -137,11 +133,12 @@ export function SessionPage({
         const t=session.timers.find(t=>t.id===timerDetail);
         if(!t)return null;
         const fired=t.endsAt<=now;
-        return <div className="dialog-backdrop"><section className="editor-panel cooking-dialog" role="dialog" aria-modal="true" aria-label="タイマー詳細" onKeyDown={e=>{if(e.key==='Escape')setTimerDetail(null)}}>
-          <h2 className="h-serif">{recipes[t.recipe]?.title??t.recipe}</h2><p>{t.note}</p><p className="timer-detail-time tnum">{fired?'完了':formatRemaining(t.endsAt-now)}</p>
+        return <Dialog title="タイマー詳細" onDismiss={()=>setTimerDetail(null)}>
+          <h3>{recipes[t.recipe]?.title??t.recipe}</h3><p>{t.note}</p><p className="timer-detail-time tnum">{fired?'完了':formatRemaining(t.endsAt-now)}</p>
           <div className="editor-actions"><button autoFocus className="recipe-action" onClick={()=>setTimerDetail(null)}><X aria-hidden="true"/>閉じる</button><button className="recipe-action" onClick={()=>dismissTimer(t.id)}>{fired?'確認済みにする':'停止'}</button></div>
-        </section></div>;
+        </Dialog>;
       })()}
+      {confirmEnd&&<Dialog title="調理を終了しますか？" onDismiss={()=>setConfirmEnd(false)}><p>終了すると、この調理のチェックとタイマーを削除します。</p><div className="editor-actions"><button autoFocus className="recipe-action" onClick={()=>setConfirmEnd(false)}>調理を続ける</button><button className="recipe-action" onClick={onEnd}>終了する（進捗・タイマーは消えます）</button></div></Dialog>}
 
       <main className="recipe-panel">
         {!pinned ? <section className="editor-panel" aria-label="以前の調理セッションの確認">

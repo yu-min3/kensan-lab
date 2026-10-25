@@ -14,8 +14,8 @@ import {useLibraryView} from "../hooks/useLibraryView";
 
 // Recipe browser + session builder: tap cards to put recipes "on the stove",
 // then start the cooking session.
-export function RecipesPage({ onStart, starting = false }: { onStart: (files: string[]) => void; starting?: boolean }) {
-  const { route, navigate:routeNavigate, back, onGuard } = useRecipeRoute();
+export function RecipesPage({ onStart, starting = false, routing, cooking=false }: { onStart: (files: string[]) => void; starting?: boolean; routing:ReturnType<typeof useRecipeRoute>; cooking?:boolean }) {
+  const { route, navigate:routeNavigate, back, onGuard } = routing;
   const discovering=route.page==='search'||route.page==='creators';
   const search=useRecipeSearch(discovering);
   const setOpened=(file:string|null,replace=false)=>navigate(file===null?{page:'list'}:{page:'recipe',file},replace);
@@ -150,7 +150,7 @@ export function RecipesPage({ onStart, starting = false }: { onStart: (files: st
         })}
       </ul>
 
-      </div><CookingSelection selected={selected} recipes={recipes} starting={starting} onRemove={toggle} onClear={()=>setSelected([])} onStart={()=>onStart(selected)}/></div>
+      </div><CookingSelection selected={selected} recipes={recipes} starting={starting} cooking={cooking} onRemove={toggle} onClear={()=>setSelected([])} onStart={()=>onStart(selected)}/></div>
     </div>
   );
 }

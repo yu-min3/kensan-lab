@@ -1,7 +1,7 @@
 import {useEffect,useState} from 'react';
 import {Flame,ChevronDown,X} from 'lucide-react';
 import type {RecipeMeta} from '../api';
-export function CookingSelection({selected,recipes,starting,onRemove,onClear,onStart}:{selected:string[];recipes:RecipeMeta[];starting:boolean;onRemove:(file:string)=>void;onClear:()=>void;onStart:()=>void}){
+export function CookingSelection({selected,recipes,starting,cooking=false,onRemove,onClear,onStart}:{selected:string[];recipes:RecipeMeta[];starting:boolean;cooking?:boolean;onRemove:(file:string)=>void;onClear:()=>void;onStart:()=>void}){
  const [expanded,setExpanded]=useState(()=>matchMedia('(min-width: 1000px)').matches);
  useEffect(()=>{const media=matchMedia('(min-width: 1000px)');const update=()=>setExpanded(media.matches);media.addEventListener('change',update);return()=>media.removeEventListener('change',update)},[]);
  const title=(file:string)=>recipes.find(r=>r.file===file)?.title??file;
@@ -12,6 +12,6 @@ export function CookingSelection({selected,recipes,starting,onRemove,onClear,onS
    <div className="selection-tools"><button className="chip" disabled={starting} onClick={onClear}>すべて外す</button></div>
    <ol className="cooking-selection-list">{selected.map((file,i)=><li key={file}><span className="selection-order tnum">{i+1}</span><span>{title(file)}</span><button className="chip" disabled={starting} aria-label={`${title(file)}を今回の調理から外す`} onClick={()=>onRemove(file)}><X aria-hidden="true"/>外す</button></li>)}</ol>
   </details>
-  <button className="start-button" disabled={starting} onClick={onStart}><Flame aria-hidden="true"/>{starting?'準備中…':`${selected.length}品でコンロを開始`}</button>
+  <button className="start-button" disabled={starting} onClick={onStart}><Flame aria-hidden="true"/>{cooking?'調理に戻る':starting?'準備中…':`${selected.length}品でコンロを開始`}</button>
  </div></section>;
 }
