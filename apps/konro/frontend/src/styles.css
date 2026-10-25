@@ -77,6 +77,14 @@ button {
   padding: 10px 0 4px;
   scrollbar-width: none;
 }
+.taxonomy { margin-block:var(--gap-stack); }
+.taxonomy-category { display:flex; align-items:baseline; flex-wrap:wrap; gap:var(--gap-inline) var(--gap-stack); border-top:1px solid hsl(var(--border)); padding-block:var(--gap-inline); }
+.taxonomy-category h2 { margin:0; font-size:var(--text-size); min-width:calc(var(--row-h) * 2); }
+.taxonomy-group { display:flex; flex-wrap:wrap; align-items:baseline; gap:var(--gap-inline); }
+.taxonomy .tag-row { flex-wrap:wrap; overflow:visible; padding:0; }
+.taxonomy-label { font-size:var(--text-size); color:hsl(var(--muted-foreground)); }
+.tag-count { margin-left:var(--gap-inline); font-size:var(--text-size); }
+.active-tag-filters { display:flex; flex-wrap:wrap; gap:var(--gap-inline); margin-top:var(--gap-stack); }
 
 .chip {
   flex: none;

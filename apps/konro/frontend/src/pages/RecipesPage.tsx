@@ -11,6 +11,7 @@ import { ImportPage } from "./ImportPage";
 import { useRecipeRoute,Route } from "../hooks/useRecipeRoute";
 import {libraryRecipes,LibrarySort} from "../library";
 import {useLibraryView} from "../hooks/useLibraryView";
+import {TagFilters,Taxonomy} from '../components/TagFilters';
 
 // Recipe browser + session builder: tap cards to put recipes "on the stove",
 // then start the cooking session.
@@ -22,7 +23,10 @@ export function RecipesPage({ onStart, starting = false, routing, cooking=false 
   const [recipes, setRecipes] = useState<RecipeMeta[]>([]);
   const [error, setError] = useState("");
   const [loaded,setLoaded]=useState(false);
-  const {capturePosition,q,setQ,tag,setTag,rating,setRating,sort,setSort,selected,setSelected,clearFilters}=useLibraryView(route.page==='list',loaded);
+  const {capturePosition,q,setQ,tags,setTags,rating,setRating,sort,setSort,selected,setSelected,clearFilters}=useLibraryView(route.page==='list',loaded);
+  const [taxonomy,setTaxonomy]=useState<Taxonomy>({revision:'',assignments:{},groups:[{id:'cuisine',category:'料理種類',label:'系統'},{id:'dish',category:'料理種類',label:'品目'},{id:'ingredient',category:'素材種類',label:'素材'},{id:'other',category:'その他',label:'自由タグ'}]});
+  const [taxonomyError,setTaxonomyError]=useState('');
+  useEffect(()=>{fetch('/api/v1/tag-taxonomy').then(async r=>{if(!r.ok)throw new Error('タグ分類を読み込めません。タグはその他に表示しています。');setTaxonomy(await r.json())}).catch(e=>setTaxonomyError(e.message));},[]);
   const navigate=(next:Route,replace=false)=>{capturePosition();routeNavigate(next,replace)};
   const [importing, setImporting] = useState(false);
   const [importMsg, setImportMsg] = useState("");
@@ -49,13 +53,7 @@ export function RecipesPage({ onStart, starting = false, routing, cooking=false 
     }
   };
 
-  const topTags = useMemo(() => {
-    const count = new Map<string, number>();
-    for (const r of recipes) for (const t of r.tags ?? []) count.set(t, (count.get(t) ?? 0) + 1);
-    return [...count.entries()].sort((a, b) => b[1] - a[1]).slice(0, 12).map(([t]) => t);
-  }, [recipes]);
-
-  const shown=useMemo(()=>libraryRecipes(recipes,q,tag,rating,sort),[recipes,q,tag,rating,sort]);
+  const shown=useMemo(()=>libraryRecipes(recipes,q,tags,rating,sort,taxonomy.assignments),[recipes,q,tags,rating,sort,taxonomy]);
 
   const toggle = (file: string) =>
     setSelected((sel) => (sel.includes(file) ? sel.filter((f) => f !== file) : [...sel, file]));
@@ -94,22 +92,13 @@ export function RecipesPage({ onStart, starting = false, routing, cooking=false 
           <label htmlFor="library-sort"><span id="library-sort-label">並べ替え</span><select aria-labelledby="library-sort-label" id="library-sort" value={sort} onChange={e=>setSort(e.target.value as LibrarySort)}><option value="rating">評価が高い順</option><option value="name">名前順</option><option value="time">調理時間が短い順</option></select></label>
         </div>
         <div className="library-rating-filters" role="group" aria-label="自分の評価で絞る">{([['all','すべて'],['high','★4以上'],['unrated','未評価']] as const).map(([value,label])=><button key={value} className={`chip ${rating===value?'chip-on':''}`} aria-pressed={rating===value} onClick={()=>setRating(value)}>{label}</button>)}</div>
-        <div className="tag-row">
-          {topTags.map((t) => (
-            <button
-              key={t}
-              className={`chip ${tag === t ? "chip-on" : ""}`}
-              onClick={() => setTag(tag === t ? "" : t)}
-            >
-              {t}
-            </button>
-          ))}
-        </div>
+        {taxonomyError&&<p className="notice" role="alert">{taxonomyError}</p>}
+        <TagFilters recipes={recipes} q={q} rating={rating} sort={sort} selected={tags} onChange={setTags} taxonomy={taxonomy}/>
       </header>
 
       {error && <p className="error">{error}</p>}
 
-      <div className="library-result-info"><p className="recipe-summary" aria-live="polite">{loaded?`${shown.length}品 / 全${recipes.length}品`:'レシピを読み込んでいます…'} · 星は自分の評価</p>{(q||tag||rating!=='all')&&<button className="chip" onClick={clearFilters}>絞り込みを解除</button>}</div>
+      <div className="library-result-info"><p className="recipe-summary" aria-live="polite">{loaded?`${shown.length}品 / 全${recipes.length}品`:'レシピを読み込んでいます…'} · 星は自分の評価</p>{(q||tags.length>0||rating!=='all')&&<button className="chip" onClick={clearFilters}>絞り込みを解除</button>}</div>
       <div className="library-layout"><div className="library-results">
       {!error && loaded && recipes.length > 0 && shown.length === 0 && (
         <div className="empty-state">
