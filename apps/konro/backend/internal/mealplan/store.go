@@ -204,6 +204,9 @@ func (s *Store) items(selections []Selection, old []Item) ([]Item, error) {
 	seen := map[string]bool{}
 	seenFiles := map[string]bool{}
 	for i, v := range selections {
+		if v.Refresh && len(v.Overrides) > 0 {
+			return nil, fmt.Errorf("%w: レシピを更新するときは材料の補正をいったん解除してください", ErrInvalid)
+		}
 		if seenFiles[v.File] {
 			return nil, ErrInvalid
 		}

@@ -20,3 +20,11 @@ func TestHardConditions(t *testing.T) {
 		t.Fatal("ambiguous servings")
 	}
 }
+
+func TestAmbiguousRolesCannotSatisfySplit(t *testing.T) {
+	c := Conditions{Count: 2, Servings: "2", Main: 1, Side: 1}
+	candidates := []Candidate{{Recipe: recipe.Recipe{Meta: recipe.Meta{File: "both", Tags: []string{"メイン", "副菜"}}}}, {Recipe: recipe.Recipe{Meta: recipe.Meta{File: "neither"}}}}
+	if _, err := ValidateMenus(c, candidates, []Menu{{Picks: []Pick{{File: "both"}, {File: "neither"}}}}); err == nil {
+		t.Fatal("ambiguous classification accepted")
+	}
+}

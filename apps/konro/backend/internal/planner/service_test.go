@@ -3,6 +3,7 @@ package planner
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"github.com/yu-min3/kensan-lab/apps/konro/backend/internal/agentclient"
 	"github.com/yu-min3/kensan-lab/apps/konro/backend/internal/mealplan"
@@ -109,5 +110,53 @@ func TestRejectInvalidOutputAndOneRepair(t *testing.T) {
 	}
 	if _, e = s.Action(context.Background(), p.ID, p.Revision, "retry"); e == nil {
 		t.Fatal("unlimited repair")
+	}
+}
+
+func TestCancelAndStaleJob(t *testing.T) {
+	root := fixture(t)
+	agent := &fakeAgent{output: `{"menus":[{"picks":[{"file":"1"}]}]}`}
+	s := New(root, agent, mealplan.New(root))
+	p, err := s.Create(context.Background(), Conditions{Count: 1, Servings: "2"}, "ai")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err = s.Action(context.Background(), p.ID, p.Revision+1, "cancel"); !errors.Is(err, ErrConflict) {
+		t.Fatal(err)
+	}
+	p, err = s.Action(context.Background(), p.ID, p.Revision, "cancel")
+	if err != nil || p.State != "cancelled" {
+		t.Fatal(p, err)
+	}
+	p, err = s.Get(context.Background(), p.ID)
+	if err != nil || p.State != "cancelled" || len(p.Menus) != 0 {
+		t.Fatal(p, err)
+	}
+	if _, err = s.Adopt(p.ID, p.Revision, "menu-1", "cancelled"); !errors.Is(err, ErrConflict) {
+		t.Fatal(err)
+	}
+}
+
+func TestAdoptionRejectsChangedPreferenceAndPolicy(t *testing.T) {
+	for _, change := range []string{"preference", "policy"} {
+		t.Run(change, func(t *testing.T) {
+			root := fixture(t)
+			s := New(root, nil, mealplan.New(root))
+			p, err := s.Create(context.Background(), Conditions{Count: 1, Servings: "2"}, "rules")
+			if err != nil {
+				t.Fatal(err)
+			}
+			if change == "preference" {
+				err = AtomicJSON(filepath.Join(root, ".settings", "meal-preferences.json"), map[string]any{"revision": 1, "avoid": []string{"玉ねぎ"}})
+			} else {
+				err = AtomicJSON(filepath.Join(root, "planning-policy.json"), Policy{Version: "new", RatingWeight: 2})
+			}
+			if err != nil {
+				t.Fatal(err)
+			}
+			if _, err = s.Adopt(p.ID, p.Revision, p.Menus[0].ID, "stale"); !errors.Is(err, ErrConflict) {
+				t.Fatal(err)
+			}
+		})
 	}
 }

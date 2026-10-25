@@ -61,3 +61,14 @@ func TestSnapshotRecalculationAndReplay(t *testing.T) {
 		t.Fatal("restart", e)
 	}
 }
+
+func TestRefreshDoesNotReuseRowOverrides(t *testing.T) {
+	root := t.TempDir()
+	if err := os.WriteFile(filepath.Join(root, "one.md"), []byte("---\ntitle: 料理\n---\n\n## 材料\n- 玉ねぎ 1個\n\n## 手順\n1. 煮る\n"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	s := New(root)
+	if _, err := s.Create("unsafe-refresh", Change{Items: []Selection{{File: "one", Scale: "1", Refresh: true, Overrides: map[int]string{0: "塩 1g"}}}}); !errors.Is(err, ErrInvalid) {
+		t.Fatal(err)
+	}
+}

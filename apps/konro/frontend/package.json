@@ -14,7 +14,8 @@
     "test:discovery": "node ../e2e/discovery.mjs",
     "test:cooking": "node ../e2e/cooking.mjs",
     "test:improvements": "node ../e2e/improvements.mjs",
-    "test:shopping": "node ../e2e/shopping.mjs"
+    "test:shopping": "node ../e2e/shopping.mjs",
+    "test:proposals": "node ../e2e/proposals.mjs"
   },
   "dependencies": {
     "lucide-react": "^0.468.0",

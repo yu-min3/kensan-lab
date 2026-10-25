@@ -375,7 +375,11 @@ func (s *Service) Adopt(id string, revision int, menuID, operation string) (meal
 	if e != nil {
 		return mealplan.Plan{}, e
 	}
-	if currentPreferences != p.PreferenceVersion {
+	currentPolicy, e := s.currentPolicy()
+	if e != nil {
+		return mealplan.Plan{}, e
+	}
+	if currentPreferences != p.PreferenceVersion || currentPolicy.Version != p.PolicyVersion {
 		return mealplan.Plan{}, ErrConflict
 	}
 	if p.Revision != revision || p.State != "succeeded" {
