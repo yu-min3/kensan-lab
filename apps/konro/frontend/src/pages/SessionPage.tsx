@@ -2,7 +2,7 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { fetchRecipe, formatDuration, Recipe } from "../api";
 import { formatRemaining, isIngredientGroup, isPinnedSession, pinLegacySession, Session, tabName, timerCandidates } from "../session";
 import { holdWakeLock, releaseWakeLock } from "../wakelock";
-import {Bell, Clock, X, Undo2} from 'lucide-react';
+import {Bell, Clock, X, Undo2, Check, ChevronDown, ChevronRight, AlertTriangle} from 'lucide-react';
 import {Dialog} from '../components/Dialog';
 
 // The cooking view: bottom burner tabs, one recipe panel, cross-tab timers.
@@ -172,7 +172,7 @@ export function SessionPage({
             <h2 className="recipe-title h-serif">{recipe.title}</h2>
             <div className="recipe-info">
               {recipe.servings && <span>{recipe.servings}</span>}
-              {formatDuration(recipe.cookTime) && <span>⏱ {formatDuration(recipe.cookTime)}</span>}
+              {formatDuration(recipe.cookTime) && <span><Clock aria-hidden="true"/> {formatDuration(recipe.cookTime)}</span>}
               {recipe.source && /^https?:\/\//i.test(recipe.source) && (
                 <a href={recipe.source} target="_blank" rel="noreferrer">
                   出典
@@ -182,7 +182,7 @@ export function SessionPage({
 
             <section>
               <button className="section-toggle" aria-expanded={showIngredients} onClick={() => onUpdate(s=>({...s,views:{...s.views,[active]:{scroll:window.scrollY,ingredientsOpen:!showIngredients}}}))}>
-                材料 {showIngredients ? "▾" : "▸"}
+                材料 {showIngredients ? <ChevronDown aria-hidden="true"/> : <ChevronRight aria-hidden="true"/>}
               </button>
               {showIngredients && (
                 <ul className="ingredients">
@@ -222,8 +222,8 @@ export function SessionPage({
                       checkedSteps[i] ? "step step-done" : i === currentStep ? "step step-current" : "step"
                     }
                   >
-                    <button className="step-body" onClick={() => toggleStep(i)}>
-                      <span className="step-num">{checkedSteps[i] ? "✓" : i + 1}</span>
+                    <button className="step-body" aria-pressed={checkedSteps[i]??false} onClick={() => toggleStep(i)}>
+                      <span className="step-num">{checkedSteps[i] ? <Check aria-hidden="true"/> : i + 1}</span>
                       <span className="step-text">{step}</span>
                     </button>
                     {i === currentStep && timerCandidates(step).length > 0 && (
@@ -234,7 +234,7 @@ export function SessionPage({
                             className="chip"
                             onClick={() => addTimer(c.label, c.seconds, step.slice(0, 8))}
                           >
-                            ⏱ {c.label}
+                            <Clock aria-hidden="true"/> {c.label}
                           </button>
                         ))}
                       </div>
@@ -253,7 +253,7 @@ export function SessionPage({
         )}
       </main>
 
-      <nav className="burner-tabs">
+      <nav className="burner-tabs" aria-label="調理する料理">
         {session.files.map((f, i) => {
           const r = recipes[f];
           const steps = r?.steps ?? [];
@@ -264,14 +264,16 @@ export function SessionPage({
             <button
               key={f}
               className={`burner-tab ${i === session.active ? "burner-active" : ""}`}
+              aria-pressed={i===session.active}
+              aria-label={`${r?.title??f} ${done}/${steps.length}手順完了`}
               onClick={() => onUpdate({ ...session, active: i })}
             >
               <span className="burner-name">{tabName(r?.title ?? f)}</span>
               <span className="burner-sub">
-                {loadErrors[f] && !r ? "⚠" : steps.length > 0 ? `${done}/${steps.length}` : r ? "材料のみ" : "–"}
+                {loadErrors[f] && !r ? <AlertTriangle aria-label="読み込み失敗"/> : steps.length > 0 ? `${done}/${steps.length}` : r ? "材料のみ" : "–"}
                 {nextFire !== null && (
                   <em className={nextFire <= 0 ? "burner-timer burner-timer-fired" : "burner-timer"}>
-                    {nextFire <= 0 ? "🔔" : ` ${formatRemaining(nextFire)}`}
+                    {nextFire <= 0 ? <Bell aria-label="タイマー完了"/> : ` ${formatRemaining(nextFire)}`}
                   </em>
                 )}
               </span>

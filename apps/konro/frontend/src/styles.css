@@ -239,7 +239,7 @@ button {
 }
 .timer-chip svg, .timer-undo svg { width: 1em; height: 1em; vertical-align: middle; }
 .timer-undo { display:flex; align-items:center; justify-content:center; gap:var(--gap-stack); padding:var(--gap-stack); flex-wrap:wrap; }
-.cooking-dialog { width:min(calc(100% - var(--gap-stack) * 2), calc(var(--row-h) * 12)); max-height:90dvh; overflow:auto; color:hsl(var(--foreground)); margin:auto; }
+dialog.cooking-dialog { width:min(calc(100% - var(--gap-stack) * 2), calc(var(--row-h) * 12)); max-height:90dvh; overflow:auto; color:hsl(var(--foreground)); margin:auto; }
 .cooking-dialog::backdrop { background:hsl(var(--foreground) / .35); }
 .session-banner { display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:var(--gap-inline); padding:var(--gap-stack); background:hsl(var(--accent)); color:hsl(var(--accent-foreground)); border-bottom:1px solid hsl(var(--border)); }
 .session-banner svg { width:1em; height:1em; vertical-align:middle; }
@@ -324,7 +324,12 @@ button {
   font-size: 14px;
   line-height: 1.4;
   border-radius: 8px;
+  min-height:var(--row-h);
 }
+.section-toggle { min-height:var(--row-h); display:flex; align-items:center; gap:var(--gap-inline); }
+.recipe-info svg, .section-toggle svg, .step-timers svg, .burner-sub svg { width:1em; height:1em; vertical-align:middle; }
+.step-num svg { width:1em; height:1em; }
+.next-step { margin-bottom:var(--gap-stack); }
 
 .ingredients input {
   flex: none;
