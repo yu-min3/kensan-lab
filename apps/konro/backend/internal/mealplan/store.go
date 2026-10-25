@@ -22,6 +22,7 @@ var ErrInvalid = errors.New("献立や数量の入力を確認してください
 type Selection struct {
 	ID        string         `json:"id,omitempty"`
 	File      string         `json:"file"`
+	Version   string         `json:"version,omitempty"`
 	Scale     string         `json:"scale"`
 	Refresh   bool           `json:"refresh,omitempty"`
 	Overrides map[int]string `json:"overrides,omitempty"`
@@ -222,6 +223,9 @@ func (s *Store) items(selections []Selection, old []Item) ([]Item, error) {
 				return nil, e
 			}
 			snap = r
+		}
+		if v.Version != "" && snap.Version != v.Version {
+			return nil, ErrConflict
 		}
 		id := v.ID
 		if id == "" {

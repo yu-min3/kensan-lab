@@ -64,6 +64,10 @@ func contains(tags []string, tag string) bool {
 	return false
 }
 func Valid(c Conditions) error {
+	target, ok := new(big.Rat).SetString(c.Servings)
+	if !ok || target.Sign() <= 0 || target.Cmp(big.NewRat(100, 1)) > 0 {
+		return ErrInvalid
+	}
 	if c.Count < 1 || c.Count > 12 || len(c.Idea) > 4000 || c.Main < 0 || c.Side < 0 || ((c.Main+c.Side) > 0 && c.Main+c.Side != c.Count) || len(c.Fixed) > c.Count || len(c.Avoid) > 30 || len(c.Use) > 30 {
 		return ErrInvalid
 	}
