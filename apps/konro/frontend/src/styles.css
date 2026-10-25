@@ -796,4 +796,7 @@ html:has(.recipe-detail) { scroll-padding-top: calc(var(--row-h) + var(--gap-inl
 .plan-choice > label input { width:calc(var(--row-h) * 2); }
 .text-link { text-decoration:underline; color:hsl(var(--accent-foreground)); }
 .saved-plans { display:grid; gap:var(--gap-inline); }
+.proposal-basic { display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1fr); gap:var(--gap-stack); }
+.proposal-picks { list-style:none; padding:0; }
+.proposal-picks li { border-bottom:1px solid hsl(var(--border)); padding-block:var(--gap-stack); }
 @media(max-width:639px){.recipe-diff{grid-template-columns:minmax(0,1fr)}}

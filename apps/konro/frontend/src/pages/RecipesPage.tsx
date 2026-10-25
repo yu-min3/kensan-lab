@@ -13,6 +13,7 @@ import {libraryRecipes,LibrarySort} from "../library";
 import {useLibraryView} from "../hooks/useLibraryView";
 import {TagFilters,Taxonomy} from '../components/TagFilters';
 import {ShoppingPage} from './ShoppingPage';
+import {ProposalsPage} from './ProposalsPage';
 
 // Recipe browser + session builder: tap cards to put recipes "on the stove",
 // then start the cooking session.
@@ -61,6 +62,7 @@ export function RecipesPage({ onStart, starting = false, routing, cooking=false,
   const toggle = (file: string) =>
     setSelected((sel) => (sel.includes(file) ? sel.filter((f) => f !== file) : [...sel, file]));
   if(route.page==='shopping')return <ShoppingPage key={route.id} id={route.id} selected={selected} onBack={()=>back({page:'list'})} onOpen={id=>navigate({page:'shopping',id})} onRecipe={file=>navigate({page:'recipe',file})} onCook={onStartPlan} onGuard={onGuard}/>;
+  if(route.page==='proposals')return <ProposalsPage key={route.id} id={route.id} selected={selected} onBack={()=>back({page:'list'})} onOpen={id=>navigate({page:'proposals',id},true)} onAdopt={id=>navigate({page:'shopping',id})}/>;
 
   if (route.page === "recipe") { const opened=route.file; return <RecipePage onGuard={onGuard} key={opened} file={opened || null} selected={selected.includes(opened)} onBack={() => back({page:"list"})} onToggle={toggle} onSaved={(r) => {
     setOpened(r.file, true); setImportMsg(`✓ ${r.title} を保存しました`);
@@ -81,7 +83,7 @@ export function RecipesPage({ onStart, starting = false, routing, cooking=false,
       <header className="list-header">
         <div className="header-row">
           <h1 className="h-serif">konro</h1>
-          <div className="editor-actions"><button className="recipe-action" onClick={()=>navigate({page:'shopping',id:''})}>買い物</button><button className="recipe-action" onClick={()=>navigate({page:"search"})}>Webで探す</button><RecipeAddMenu importing={importing} onImport={()=>navigate({page:'import',url:'',fromSearch:false})} onNew={()=>setOpened('')} onZip={file=>void importZip(file)}/></div>
+          <div className="editor-actions"><button className="recipe-action" onClick={()=>navigate({page:'proposals',id:''})}>作り置き</button><button className="recipe-action" onClick={()=>navigate({page:'shopping',id:''})}>買い物</button><button className="recipe-action" onClick={()=>navigate({page:"search"})}>Webで探す</button><RecipeAddMenu importing={importing} onImport={()=>navigate({page:'import',url:'',fromSearch:false})} onNew={()=>setOpened('')} onZip={file=>void importZip(file)}/></div>
         </div>
         {importMsg && (
           <p

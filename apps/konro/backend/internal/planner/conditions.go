@@ -25,6 +25,7 @@ type Conditions struct {
 	Avoid    []string `json:"avoid"`
 	Use      []string `json:"use"`
 	Fixed    []string `json:"fixed"`
+	Omit     []string `json:"omit"`
 	Seed     int      `json:"seed"`
 }
 type Candidate struct {
@@ -91,6 +92,9 @@ func Candidates(root string, c Conditions) ([]Candidate, error) {
 	}
 	result := []Candidate{}
 	for _, meta := range metas {
+		if contains(c.Omit, meta.File) {
+			continue
+		}
 		r, e := recipe.Load(root, meta.File)
 		if e != nil {
 			return nil, e
