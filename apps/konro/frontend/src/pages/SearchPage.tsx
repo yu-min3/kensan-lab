@@ -39,15 +39,18 @@ export function SearchPage({search:s,onClose,onImport,managing,onManage,onCloseM
  if(managing)return <CreatorsPage favorites={favorites} onClose={onCloseManage} onSelect={select}/>;
  return <main className="editor-page search-page">
   <header className="header-row"><h1 className="h-serif">Webでレシピを探す</h1><button className="chip" onClick={onClose}>一覧へ</button></header>
-  <div className="creator-search-tools"><button className="recipe-action" onClick={onManage}><Heart aria-hidden="true"/>好きな作り手を管理</button></div>
   <CreatorNotice favorites={favorites}/>
-  <div className="creator-filters" role="group" aria-label="作り手を指定"><button className={`chip ${!s.creator?'chip-on':''}`} aria-pressed={!s.creator} onClick={()=>select('')}>すべて</button>{favorites.creators.map(c=><button key={c.id} className={`chip ${s.creator===c.id?'chip-on':''}`} aria-pressed={s.creator===c.id} onClick={()=>select(c.id)}>{c.name}</button>)}</div>
   <Panel>
    <form onSubmit={e=>{e.preventDefault();void s.search()}} aria-label="Webレシピ検索">
     <div className="web-search-query"><Field id="web-query" label="料理名・材料" value={s.q} onChange={s.setQ} maxLength={100}/>
     <button className="recipe-action recipe-action-primary" disabled={!s.q.trim()} type="submit">{s.loading?'検索し直す':'検索する'}</button></div>
-    <label htmlFor="web-site">検索するサイト<select id="web-site" value={s.creator?(s.creator.startsWith('youtube:')?'youtube':'kurashiru'):s.site} disabled={!!s.creator} onChange={e=>s.setSite(e.target.value)}><option value="all">主要サイトまとめて</option>{s.sites.map(site=><option key={site.id} value={site.id}>{site.name}</option>)}</select></label>
    </form>
+   <p className="recipe-summary" aria-live="polite">作り手：{favorites.creators.find(c=>c.id===s.creator)?.name??'すべて'} · サイト：{s.creator?(s.creator.startsWith('youtube:')?'YouTube':'クラシル'):s.sites.find(site=>site.id===s.site)?.name??'主要サイトまとめて'}</p>
+   <details className="search-options"><summary>検索条件</summary>
+    <label htmlFor="web-site">検索するサイト<select id="web-site" value={s.creator?(s.creator.startsWith('youtube:')?'youtube':'kurashiru'):s.site} disabled={!!s.creator} onChange={e=>s.setSite(e.target.value)}><option value="all">主要サイトまとめて</option>{s.sites.map(site=><option key={site.id} value={site.id}>{site.name}</option>)}</select></label>
+    <div className="creator-filters" role="group" aria-label="作り手を指定"><button className={`chip ${!s.creator?'chip-on':''}`} aria-pressed={!s.creator} onClick={()=>select('')}>すべて</button>{favorites.creators.map(c=><button key={c.id} className={`chip ${s.creator===c.id?'chip-on':''}`} aria-pressed={s.creator===c.id} onClick={()=>select(c.id)}>{c.name}</button>)}</div>
+    <button className="recipe-action" onClick={onManage}><Heart aria-hidden="true"/>好きな作り手を管理</button>
+   </details>
   </Panel>
   {s.loading&&<p role="status"><span className="import-spinner" aria-hidden="true"/>Webで候補を探しています…</p>}
   {s.error&&<p className="notice" role="alert">{s.error}</p>}
