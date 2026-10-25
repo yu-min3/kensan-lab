@@ -237,6 +237,7 @@ button {
   font-size: 15px;
   font-variant-numeric: tabular-nums;
 }
+.session-page { overflow-anchor:none; }
 .timer-chip svg, .timer-undo svg { width: 1em; height: 1em; vertical-align: middle; }
 .timer-undo { display:flex; align-items:center; justify-content:center; gap:var(--gap-stack); padding:var(--gap-stack); flex-wrap:wrap; }
 dialog.cooking-dialog { width:min(calc(100% - var(--gap-stack) * 2), calc(var(--row-h) * 12)); max-height:90dvh; overflow:auto; color:hsl(var(--foreground)); margin:auto; }

@@ -13,7 +13,7 @@ function readRoute():Route {
 }
 const hashFor=(r:Route):string=>{
  switch(r.page){
-  case 'list':return '';
+  case 'list':return '#list';
   case 'recipe':return r.file?`#recipe/${encodeURIComponent(r.file)}`:'#new';
   case 'search':case 'creators':case 'cooking':return '#'+r.page;
   case 'import':{const p=new URLSearchParams();if(r.url)p.set('url',r.url);if(r.draft)p.set('draft',r.draft);if(r.fromSearch)p.set('from','search');return '#import'+(p.size?'?'+p:'')}

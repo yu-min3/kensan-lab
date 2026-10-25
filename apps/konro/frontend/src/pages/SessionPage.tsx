@@ -58,10 +58,11 @@ export function SessionPage({
   useLayoutEffect(()=>{
     if(!pinned)return;
     const previous=history.scrollRestoration;history.scrollRestoration='manual';
-    window.scrollTo({top:latest.current.views?.[active]?.scroll??0,behavior:'instant'});
+    let position=latest.current.views?.[active]?.scroll??0;
+    window.scrollTo({top:position,behavior:'instant'});
     let timer=0;
-    const save=()=>onUpdate(s=>({...s,views:{...s.views,[active]:{scroll:window.scrollY,ingredientsOpen:s.views?.[active]?.ingredientsOpen??true}}}));
-    const capture=()=>{window.clearTimeout(timer);timer=window.setTimeout(save,150)};
+    const save=()=>onUpdate(s=>({...s,views:{...s.views,[active]:{scroll:position,ingredientsOpen:s.views?.[active]?.ingredientsOpen??true}}}));
+    const capture=()=>{position=window.scrollY;window.clearTimeout(timer);timer=window.setTimeout(save,150)};
     window.addEventListener('scroll',capture,{passive:true});
     return()=>{window.clearTimeout(timer);window.removeEventListener('scroll',capture);save();history.scrollRestoration=previous;};
   },[active,pinned,onUpdate]);

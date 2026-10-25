@@ -11,7 +11,8 @@
     "preview": "vite preview",
     "test:e2e": "node ../e2e/import.mjs",
     "test:library": "node ../e2e/library.mjs",
-    "test:discovery": "node ../e2e/discovery.mjs"
+    "test:discovery": "node ../e2e/discovery.mjs",
+    "test:cooking": "node ../e2e/cooking.mjs"
   },
   "dependencies": {
     "lucide-react": "^0.468.0",
