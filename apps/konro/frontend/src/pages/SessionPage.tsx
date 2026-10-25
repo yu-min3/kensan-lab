@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { fetchRecipe, formatDuration, Recipe } from "../api";
 import { formatRemaining, isIngredientGroup, isPinnedSession, pinLegacySession, Session, tabName, timerCandidates } from "../session";
-import { alarm } from "../alerts";
 import { holdWakeLock, releaseWakeLock } from "../wakelock";
 
 // The cooking view: bottom burner tabs, one recipe panel, cross-tab timers.
@@ -21,7 +20,6 @@ export function SessionPage({
   const [now, setNow] = useState(Date.now());
   const [confirmEnd, setConfirmEnd] = useState(false);
   const [showIngredients, setShowIngredients] = useState(true);
-  const firedRef = useRef(new Set<string>());
 
   useEffect(() => {
     holdWakeLock();
@@ -45,12 +43,6 @@ export function SessionPage({
     const iv = setInterval(() => {
       const t = Date.now();
       setNow(t);
-      for (const timer of session.timers) {
-        if (!timer.acknowledged && timer.endsAt <= t && !firedRef.current.has(timer.id)) {
-          firedRef.current.add(timer.id);
-          alarm();
-        }
-      }
     }, 500);
     return () => clearInterval(iv);
   }, [session.timers]);

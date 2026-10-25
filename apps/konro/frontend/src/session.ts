@@ -11,6 +11,7 @@ export type Timer = {
   note?: string; // step context, e.g. "塩(少々)を…" (absent in old sessions)
   endsAt: number; // epoch ms
   acknowledged: boolean; // user dismissed the fired alarm
+  notifiedAt?: number; // persisted before the alarm to survive remount/reload
 };
 
 export type Session = {
@@ -22,6 +23,8 @@ export type Session = {
   steps: Record<string, boolean[]>;
   ingredients: Record<string, boolean[]>;
   timers: Timer[];
+  stoppedTimer?: Timer;
+  views?: Record<string, {scroll: number; ingredientsOpen: boolean}>;
 };
 
 const KEY = "konro-session-v1";
