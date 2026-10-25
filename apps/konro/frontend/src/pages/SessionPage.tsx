@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { fetchRecipe, formatDuration, Recipe } from "../api";
 import { formatRemaining, isIngredientGroup, isPinnedSession, pinLegacySession, Session, tabName, timerCandidates } from "../session";
 import { holdWakeLock, releaseWakeLock } from "../wakelock";
+import {Bell, Clock, X, Undo2} from 'lucide-react';
 
 // The cooking view: bottom burner tabs, one recipe panel, cross-tab timers.
 export function SessionPage({
@@ -19,6 +20,7 @@ export function SessionPage({
   const [loadErrors, setLoadErrors] = useState<Record<string, string>>({});
   const [now, setNow] = useState(Date.now());
   const [confirmEnd, setConfirmEnd] = useState(false);
+  const [timerDetail, setTimerDetail] = useState<string | null>(null);
   const [showIngredients, setShowIngredients] = useState(true);
 
   useEffect(() => {
@@ -86,8 +88,16 @@ export function SessionPage({
     });
   };
 
-  const dismissTimer = (id: string) =>
-    onUpdate({ ...session, timers: session.timers.filter((t) => t.id !== id) });
+  const dismissTimer = (id: string) => {
+    const timer = session.timers.find(t => t.id === id);
+    if (!timer) return;
+    onUpdate({...session, stoppedTimer:timer, timers:session.timers.filter(t => t.id !== id)});
+    setTimerDetail(null);
+  };
+  const restoreTimer = () => {
+    if (!session.stoppedTimer) return;
+    onUpdate({...session, timers:[...session.timers, session.stoppedTimer], stoppedTimer:undefined});
+  };
 
   const liveTimers = session.timers.filter((t) => !t.acknowledged);
 
@@ -111,16 +121,27 @@ export function SessionPage({
               <button
                 key={t.id}
                 className={`timer-chip ${fired ? "timer-fired" : ""}`}
-                onClick={() => dismissTimer(t.id)}
+                onClick={() => setTimerDetail(t.id)}
+                aria-label={`${recipes[t.recipe]?.title??t.recipe} ${t.label}のタイマー詳細`}
                 title={recipes[t.recipe]?.title}
               >
-                {fired ? "🔔" : "⏱"} {t.label} {fired ? "完了!" : formatRemaining(remaining)}
+                {fired ? <Bell aria-hidden="true"/> : <Clock aria-hidden="true"/>} {t.label} {fired ? "完了!" : formatRemaining(remaining)}
                 {t.note && <span className="timer-note">{t.note}</span>}
               </button>
             );
           })}
         </div>
       </header>
+      {session.stoppedTimer&&<div className="timer-undo" role="status"><span>直前のタイマーを停止・確認しました。</span><button className="chip" onClick={restoreTimer}><Undo2 aria-hidden="true"/>取り消す</button></div>}
+      {timerDetail&&(()=>{
+        const t=session.timers.find(t=>t.id===timerDetail);
+        if(!t)return null;
+        const fired=t.endsAt<=now;
+        return <div className="dialog-backdrop"><section className="editor-panel cooking-dialog" role="dialog" aria-modal="true" aria-label="タイマー詳細" onKeyDown={e=>{if(e.key==='Escape')setTimerDetail(null)}}>
+          <h2 className="h-serif">{recipes[t.recipe]?.title??t.recipe}</h2><p>{t.note}</p><p className="timer-detail-time tnum">{fired?'完了':formatRemaining(t.endsAt-now)}</p>
+          <div className="editor-actions"><button autoFocus className="recipe-action" onClick={()=>setTimerDetail(null)}><X aria-hidden="true"/>閉じる</button><button className="recipe-action" onClick={()=>dismissTimer(t.id)}>{fired?'確認済みにする':'停止'}</button></div>
+        </section></div>;
+      })()}
 
       <main className="recipe-panel">
         {!pinned ? <section className="editor-panel" aria-label="以前の調理セッションの確認">

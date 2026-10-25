@@ -237,6 +237,11 @@ button {
   font-size: 15px;
   font-variant-numeric: tabular-nums;
 }
+.timer-chip svg, .timer-undo svg { width: 1em; height: 1em; vertical-align: middle; }
+.timer-undo { display:flex; align-items:center; justify-content:center; gap:var(--gap-stack); padding:var(--gap-stack); flex-wrap:wrap; }
+.dialog-backdrop { position:fixed; inset:0; background:hsl(var(--foreground) / .35); z-index:100; display:grid; place-items:center; padding:var(--gap-stack); }
+.cooking-dialog { width:min(100%, calc(var(--row-h) * 12)); max-height:90dvh; overflow:auto; }
+.timer-detail-time { font-size:calc(var(--text-size) * 2); }
 
 .timer-fired {
   background: hsl(var(--destructive));
