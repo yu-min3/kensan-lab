@@ -634,10 +634,10 @@ input::placeholder, textarea::placeholder { color: hsl(var(--muted-foreground));
 .recipe-cook { width: 100%; margin-top: var(--gap-stack); }
 html:has(.recipe-detail) { scroll-padding-top: calc(var(--row-h) + var(--gap-inline) * 2 + var(--gap-stack) + env(safe-area-inset-top, 0px)); }
 
-/* Search results are recipe previews; the whole photo/title area imports. */
+/* Photo/title links open the source; the separate button imports the recipe. */
 .web-recipe-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, calc(var(--row-h) * 6)), 1fr)); gap: var(--gap-stack); }
 .web-recipe-card { min-width: 0; overflow: hidden; border: 1px solid hsl(var(--border)); border-radius: var(--radius-xl); background: hsl(var(--card)); }
-.web-recipe-pick { display: flex; flex-direction: column; width: 100%; min-height: 100%; padding: 0; border: 0; border-radius: 0; background: transparent; color: hsl(var(--foreground)); text-align: left; }
+.web-recipe-pick { display: flex; flex-direction: column; width: 100%; min-height: 100%; padding: 0; border: 0; border-radius: 0; background: transparent; color: hsl(var(--foreground)); text-align: left; text-decoration: none; }
 .web-recipe-photo { width: 100%; aspect-ratio: 16 / 10; background: hsl(var(--muted)); overflow: hidden; }
 .web-recipe-photo img { width: 100%; height: 100%; object-fit: cover; display: block; }
 .web-recipe-no-photo { display: flex; height: 100%; align-items: center; justify-content: center; gap: var(--gap-inline); color: hsl(var(--secondary-foreground)); }
@@ -651,6 +651,7 @@ html:has(.recipe-detail) { scroll-padding-top: calc(var(--row-h) + var(--gap-inl
 .web-recipe-pick { flex: 1; min-height: 0; }
 .web-recipe-pick:hover { background: hsl(var(--muted)); }
 .web-recipe-pick:focus-visible { outline-offset: -4px; }
+.web-recipe-meta > .recipe-action { background: hsl(var(--accent)); border-color: hsl(var(--accent-foreground)); color: hsl(var(--accent-foreground)); }
 
 .web-search-query { display: flex; align-items: flex-end; gap: var(--gap-inline); }
 .web-search-query label { flex: 1; min-width: 0; margin: 0; }

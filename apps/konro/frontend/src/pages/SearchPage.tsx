@@ -20,14 +20,14 @@ function SearchCard({result,onImport,favorites:f}:{result:WebRecipe;onImport:(ur
  const chef=person?.id?.startsWith('kurashiru:chef:')||person?.id?.startsWith('nhk:');
  const toggle=()=>{if(!person?.id)return;const creator:FavoriteCreator={id:person.id,name:person.name,url:creatorURL(person.id),additional:false};void(favorite?f.remove(favorite):f.add(creator));};
  return <li ref={ref} className="web-recipe-card">
-  <button className="web-recipe-pick" onClick={()=>onImport(result.url)} aria-label={`${result.title}を取り込む`}>
+  <a className="web-recipe-pick" href={result.url} target="_blank" rel="noopener noreferrer" aria-label={`${result.title}の元のページを見る（新しいタブ）`}>
    <div className="web-recipe-photo">{result.image&&!failed?<img src={result.image} alt="" loading="lazy" referrerPolicy="no-referrer" onError={()=>setFailed(true)}/>:<span className="web-recipe-no-photo"><ImageOff aria-hidden="true"/>写真なし</span>}</div>
    <div className="web-recipe-body">{favorite&&<span className="recipe-tag">好きな作り手</span>}<h3 className="h-serif">{result.title}</h3>{result.description&&<p className="web-recipe-description">{result.description}</p>}</div>
-  </button>
+  </a>
   <div className="web-recipe-meta">
    {person&&<div className="creator-follow-row"><p className="source-creator">{chef?'料理人':'投稿者'}：{person.name}</p>{canFollow(person.id)&&<button className="creator-follow-button" aria-pressed={!!favorite} aria-label={`${person.name}を好きな作り手${favorite?'から外す':'に追加'}`} disabled={f.busy||f.loading||!f.settings} onClick={toggle}><Heart aria-hidden="true" fill={favorite?'currentColor':'none'}/><span>{favorite?'追加済み':'追加'}</span></button>}</div>}
    <SourceCredit info={info} showCreator={false} showPublisher={false}/><p className="recipe-summary">配信元：{info?.publisher?.name||result.siteName}{result.site==='youtube'?' · 動画':''}</p>
-   <button className="recipe-action" onClick={()=>onImport(result.url)}><Download aria-hidden="true"/>取り込む</button>
+   <button className="recipe-action" onClick={()=>onImport(result.url)} aria-label={`${result.title}を取り込む`}><Download aria-hidden="true"/>取り込む</button>
   </div>
   <a className="web-recipe-source" href={result.url} target="_blank" rel="noreferrer">元のページを見る<ExternalLink aria-hidden="true"/></a>
  </li>;
