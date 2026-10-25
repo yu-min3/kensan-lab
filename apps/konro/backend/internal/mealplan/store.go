@@ -57,6 +57,7 @@ type Plan struct {
 	ID         string            `json:"id"`
 	Revision   int               `json:"revision"`
 	Name       string            `json:"name"`
+	ProposalID string            `json:"proposalId,omitempty"`
 	Items      []Item            `json:"items"`
 	Shopping   []Shopping        `json:"shopping"`
 	Operations map[string]string `json:"operations"`
@@ -67,15 +68,16 @@ type Manual struct {
 	Text string `json:"text"`
 }
 type Change struct {
-	Revision int         `json:"revision"`
-	Name     string      `json:"name"`
-	Items    []Selection `json:"items,omitempty"`
-	Manual   []Manual    `json:"manual,omitempty"`
-	ItemID   string      `json:"itemId,omitempty"`
-	Status   string      `json:"status,omitempty"`
-	Have     string      `json:"have,omitempty"`
-	Note     string      `json:"note,omitempty"`
-	Preview  bool        `json:"preview,omitempty"`
+	Revision   int         `json:"revision"`
+	Name       string      `json:"name"`
+	ProposalID string      `json:"proposalId,omitempty"`
+	Items      []Selection `json:"items,omitempty"`
+	Manual     []Manual    `json:"manual,omitempty"`
+	ItemID     string      `json:"itemId,omitempty"`
+	Status     string      `json:"status,omitempty"`
+	Have       string      `json:"have,omitempty"`
+	Note       string      `json:"note,omitempty"`
+	Preview    bool        `json:"preview,omitempty"`
 }
 type Store struct {
 	mu        sync.Mutex
@@ -369,7 +371,7 @@ func (s *Store) Create(op string, in Change) (Plan, error) {
 	if len(name) > 300 {
 		return Plan{}, ErrInvalid
 	}
-	p := Plan{Schema: 1, ID: id, Revision: 1, Name: name, Items: items, Operations: map[string]string{}, CreateHash: digest}
+	p := Plan{Schema: 1, ID: id, Revision: 1, Name: name, ProposalID: in.ProposalID, Items: items, Operations: map[string]string{}, CreateHash: digest}
 	p.Shopping = aggregate(items, nil)
 	if e = s.manual(&p, in.Manual, op); e != nil {
 		return Plan{}, e

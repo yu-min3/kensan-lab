@@ -9,6 +9,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/yu-min3/kensan-lab/apps/konro/backend/internal/agentclient"
+	"github.com/yu-min3/kensan-lab/apps/konro/backend/internal/mealfeedback"
 	"github.com/yu-min3/kensan-lab/apps/konro/backend/internal/mealplan"
 	"io"
 	"os"
@@ -44,10 +45,11 @@ type Service struct {
 	root, dir string
 	agent     agentclient.Gateway
 	plans     *mealplan.Store
+	feedback  *mealfeedback.Store
 }
 
 func New(root string, agent agentclient.Gateway, plans *mealplan.Store) *Service {
-	return &Service{root: root, dir: filepath.Join(root, "menu-proposals"), agent: agent, plans: plans}
+	return &Service{root: root, dir: filepath.Join(root, "menu-proposals"), agent: agent, plans: plans, feedback: mealfeedback.New(root)}
 }
 
 var idPattern = regexp.MustCompile(`^[a-f0-9]{32}$`)
@@ -136,6 +138,7 @@ func OptionalJSON(path string) (any, string, error) {
 	}
 	return value, Digest(value), nil
 }
+func (s *Service) Feedback() *mealfeedback.Store { return s.feedback }
 func (s *Service) read(id string) (*Proposal, error) {
 	if !idPattern.MatchString(id) {
 		return nil, ErrInvalid
@@ -180,16 +183,23 @@ func (s *Service) Create(ctx context.Context, c Conditions, mode string) (*Propo
 	if mode != "ai" && mode != "rules" {
 		return nil, ErrInvalid
 	}
+	preferences, pv, e := OptionalJSON(filepath.Join(s.root, ".settings", "meal-preferences.json"))
+	if e != nil {
+		return nil, e
+	}
+	b, _ := json.Marshal(preferences)
+	var explicit mealfeedback.Preferences
+	if json.Unmarshal(b, &explicit) != nil {
+		return nil, ErrInvalid
+	}
+	c.Avoid = append(c.Avoid, explicit.Avoid...)
+	c.Use = append(c.Use, explicit.Use...)
 	candidates, e := Candidates(s.root, c)
 	if e != nil {
 		return nil, e
 	}
 	if len(candidates) < c.Count {
-		return nil, fmt.Errorf("%w: 人数が確定した候補が%d品です。条件か人数登録を確認してください", ErrInvalid, len(candidates))
-	}
-	preferences, pv, e := OptionalJSON(filepath.Join(s.root, "meal-preferences.json"))
-	if e != nil {
-		return nil, e
+		return nil, fmt.Errorf("%w: 人数が確定した候補が%d品です。条件・好み・人数登録を確認してください", ErrInvalid, len(candidates))
 	}
 	policy, sv, e := OptionalJSON(filepath.Join(s.root, "planning-policy.json"))
 	if e != nil {
@@ -380,8 +390,11 @@ func (s *Service) Adopt(id string, revision int, menuID, operation string) (meal
 			}
 		}
 	}
-	plan, e := s.plans.Create(operation, mealplan.Change{Name: "作り置きの献立", Items: selected})
+	plan, e := s.plans.Create(operation, mealplan.Change{Name: "作り置きの献立", ProposalID: p.ID, Items: selected})
 	if e != nil {
+		return plan, e
+	}
+	if _, e = s.feedback.Record(mealfeedback.Event{ID: "adopt-" + Digest(operation)[:32], Type: "adopt", ProposalID: p.ID, PlanID: plan.ID, PlanRevision: 1}); e != nil {
 		return plan, e
 	}
 	p.Adopted[operation] = menuID + ":" + plan.ID
