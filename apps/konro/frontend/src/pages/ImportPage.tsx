@@ -25,8 +25,11 @@ export function ImportPage({ onClose, onSaved, initialURL="",initialDraft="",ret
   const titles: Record<string, string> = { sending: "材料と手順を読み取っています", queued: "取り込みの順番を待っています", running: "材料と手順を読み取っています", waiting: "取り込みは待機中です", succeeded: complete ? "取り込めました" : "一部を取り込めませんでした", failed: "取り込みに失敗しました", cancelled: "取り込みを中止しました", manual: "内容を入力・編集できます", draft: complete ? "取り込めました" : "一部を取り込めませんでした" };
   const descriptions: Record<string, string> = { sending: "ページから読み取れなかった部分を、別の方法で抽出しています。", queued: "受付済みです。順番が来ると自動で読み取ります。", running: "この画面を閉じても処理は続きます。", waiting: "現在は処理していません。時間をおいて再開するか、手入力できます。", succeeded: complete ? "材料と手順を確認して保存してください。" : "元のページを確認し、足りない材料・手順を入力してください。", failed: "処理は停止しています。再試行するか、読み取れた内容を編集できます。", cancelled: "処理は停止しました。読み取れた内容は残しています。", manual: "後から届く抽出結果で上書きされることはありません。", draft: complete ? "材料と手順を確認して保存してください。" : "読み取れた内容は残しています。元のページを確認して入力できます。" };
   const processing = ["sending", "queued", "running"].includes(state) && !pollError;
+  const canSave=!busy&&!active&&confirmed&&complete;
+  const commit=()=>perform(async()=>{const d=await persist();const saved=await draftRequest(`/${d.id}/save`,"POST",{revision:d.revision});clearImportDraft(d.id);onSaved(saved.saved_file!,saved.content.title)});
   return <main className="editor-page">
-    <header className="header-row"><h1 className="h-serif">レシピを取り込む</h1><button className="chip" disabled={busy || loading} onClick={() => { if (draft && !active) perform(async () => { await persist(); onClose(); }); else onClose(); }}>{returnToSearch ? "検索結果へ" : "一覧へ"}</button></header>
+    <header className="recipe-toolbar"><button className="recipe-action recipe-action-ghost" disabled={busy || loading} onClick={() => { if (draft && !active) perform(async () => { await persist(); onClose(); }); else onClose(); }}>{returnToSearch ? "検索結果へ" : "一覧へ"}</button><h1 className="recipe-toolbar-title h-serif">レシピを取り込む</h1>{draft&&!active&&<button className="recipe-action recipe-action-primary" aria-label="レシピとして保存" disabled={!canSave} onClick={commit}>保存</button>}</header>
+    {(draft?.source.url||initialURL)&&<p className="import-source-link"><a href={draft?.source.url||initialURL} target="_blank" rel="noopener noreferrer">元ページを確認（新しいタブ）</a></p>}
     {loading && <Panel><p role="status"><span className="import-spinner" aria-hidden="true"/>{initialURL ? "レシピを取り込んでいます…" : "前の下書きを読み込んでいます…"}</p><p>材料と手順を読み取っています。完了すると確認画面へ進みます。</p></Panel>}
     {error && <p className="notice" role="alert">{error}</p>}
     {!draft && !loading && <Panel>
@@ -76,12 +79,9 @@ export function ImportPage({ onClose, onSaved, initialURL="",initialDraft="",ret
           <Field id="import-ingredients" label="材料（1行に1項目）" rows={6} value={ingredients} onChange={(value)=>{setIngredients(value);setConfirmed(false);}} />
           <Field id="import-steps" label="手順（1行に1つの手順）" rows={8} value={steps} onChange={(value)=>{setSteps(value);setConfirmed(false);}} />
           <label className="confirm-field"><input type="checkbox" checked={confirmed} onChange={(e) => setConfirmed(e.target.checked)} />分量・時間・温度と手順を確認しました</label>
+          <p className="recipe-summary" role="status">{!complete?'タイトル・材料・手順を入力してください。':!confirmed?'内容を確認してチェックすると、上部の保存ボタンが使えます。':'確認済みです。上部の保存ボタンでレシピに追加できます。'}</p>
           <div className="editor-actions">
             <button className="chip" onClick={() => perform(async () => { await persist(); onClose(); })}>下書きを保存して戻る</button>
-            <button className="start-button" disabled={!confirmed || !content.title.trim() || !ingredients.trim() || !steps.trim()} onClick={() => perform(async () => {
-              const d = await persist(); const saved = await draftRequest(`/${d.id}/save`, "POST", { revision: d.revision });
-              clearImportDraft(d.id); onSaved(saved.saved_file!, saved.content.title);
-            })}>レシピとして保存</button>
           </div>
         </fieldset>
       </Panel>}
