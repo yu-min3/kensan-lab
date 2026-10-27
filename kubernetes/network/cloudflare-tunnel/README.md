@@ -6,7 +6,7 @@ Outbound-only public ingress. `cloudflared` dials **out** to Cloudflare's edge â
 
 | file | role |
 |---|---|
-| `deployment.yaml` | `cloudflared` Deployment (token-managed tunnel, image `cloudflare/cloudflared:2025.2.1`, metrics on `:2000`) |
+| `deployment.yaml` | `cloudflared` Deployment (token-managed tunnel, image `cloudflare/cloudflared:2026.10.4`, metrics on `:2000`) |
 | `external-secret.yaml` | ESO pulls the tunnel token from Vault (`secret/cloudflare-tunnel/token`) into the `cloudflare-tunnel-token` Secret |
 | `namespace.yaml` | the `cloudflare-tunnel` namespace |
 
@@ -70,10 +70,11 @@ Access is an **edge gate**, not the only auth: unauthenticated requests die at C
 | external domain | `*.yu-mins.com` (Cloudflare Tunnel) |
 | namespace / Secret | `cloudflare-tunnel` / `cloudflare-tunnel-token` |
 | token Vault path | `secret/cloudflare-tunnel/token` |
-| connector image | `cloudflare/cloudflared:2025.2.1` |
+| connector image | `cloudflare/cloudflared:2026.10.4` |
 
 ## Related
 
 - Network overview and the two ingress paths: [network README](https://github.com/yu-min3/kensan-lab/blob/main/kubernetes/network/README.md)
 - External-gate model (Access vs Keycloak-only vs pass-through): [ADR-016](https://github.com/yu-min3/kensan-lab/blob/main/docs/adr/016-lan-frictionless-cf-access-external-gate.md)
 - Cloudflare-side edge, LB IPs, known issues: [`.claude/rules/network-ingress.md`](https://github.com/yu-min3/kensan-lab/blob/main/.claude/rules/network-ingress.md)
+- Cloudflare security advisory: [eMudhra certificate compromise](https://blog.cloudflare.com/emudhra-certificate-compromise/)
