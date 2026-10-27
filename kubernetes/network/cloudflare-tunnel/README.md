@@ -6,7 +6,7 @@ Outbound-only public ingress. `cloudflared` dials **out** to Cloudflare's edge â
 
 | file | role |
 |---|---|
-| `deployment.yaml` | `cloudflared` Deployment (token-managed tunnel, image `cloudflare/cloudflared:2026.10.4`, 1 replica, metrics on `:2000`) |
+| `deployment.yaml` | `cloudflared` Deployment (token-managed tunnel, image `cloudflare/cloudflared:2026.10.4`, metrics on `:2000`) |
 | `external-secret.yaml` | ESO pulls the tunnel token from Vault (`secret/cloudflare-tunnel/token`) into the `cloudflare-tunnel-token` Secret |
 | `namespace.yaml` | the `cloudflare-tunnel` namespace |
 
@@ -72,24 +72,9 @@ Access is an **edge gate**, not the only auth: unauthenticated requests die at C
 | token Vault path | `secret/cloudflare-tunnel/token` |
 | connector image | `cloudflare/cloudflared:2026.10.4` |
 
-## Connector updates
-
-Version `2026.10.4` includes the eMudhra certificate distrust mitigation required in
-`2026.10.2` or later ([Cloudflare advisory](https://blog.cloudflare.com/emudhra-certificate-compromise/)).
-Update the pinned image here and deploy through Git and Argo CD.
-
-One replica is retained to keep connector operations simple. The Deployment's
-existing rolling update strategy and probes are unchanged. An update can
-transiently run a replacement alongside the old pod; existing long-lived
-connections can still be interrupted when the old connector exits.
-After sync, check rollout completion, the running pod's `cloudflared --version`,
-registered tunnel connections, and origin reachability. For HTTPS origins, verify the actual
-certificate chain before updating; do not disable TLS verification to bypass
-certificate errors. Routing is dashboard-managed, so Git alone cannot prove which
-origin services are currently configured.
-
 ## Related
 
 - Network overview and the two ingress paths: [network README](https://github.com/yu-min3/kensan-lab/blob/main/kubernetes/network/README.md)
 - External-gate model (Access vs Keycloak-only vs pass-through): [ADR-016](https://github.com/yu-min3/kensan-lab/blob/main/docs/adr/016-lan-frictionless-cf-access-external-gate.md)
 - Cloudflare-side edge, LB IPs, known issues: [`.claude/rules/network-ingress.md`](https://github.com/yu-min3/kensan-lab/blob/main/.claude/rules/network-ingress.md)
+- Cloudflare security advisory: [eMudhra certificate compromise](https://blog.cloudflare.com/emudhra-certificate-compromise/)
