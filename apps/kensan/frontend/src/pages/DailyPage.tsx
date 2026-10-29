@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { useSearchParams } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { api, todayISO, dailyPath, dailySkeleton } from "../lib/api";
 import { Card, CardBody, CardHead } from "../components/ui/card";
@@ -40,7 +40,7 @@ export function DailyPage() {
       return result;
     });
   };
-  return <DailyJournal key={date} date={date} onDate={changeDate} />;
+  return <div className="ds-stack"><Link to="/" className="text-sm text-brand underline underline-offset-2">ダッシュボードへ戻る</Link><DailyJournal key={date} date={date} onDate={changeDate} /></div>;
 }
 
 // The same free-form document is read and edited here. No separate intention/task schema.

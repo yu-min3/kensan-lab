@@ -11,7 +11,7 @@ test("/ に地図と羅針盤が出て、マスの判定が @public から決ま
   await expect(page.getByRole("button", { name: "事業に効かせる × インフラ: 空き" })).toBeVisible();
   await page.getByRole("button", { name: "投資を決める × インフラ: 外から見える" }).click();
   await expect(page.getByText("E2E の公開済み証拠")).toHaveCount(2); // マスの見出しと詳細
-  await expect(page.getByRole("heading", { name: "羅針盤 · 時間がどこへ向いているか" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "羅針盤 · 活動がどこへ向いているか" })).toBeVisible();
   await expect(page.getByRole("img", { name: /today-demo 実際 \d+% 狙い 60%/ })).toBeVisible();
 });
 

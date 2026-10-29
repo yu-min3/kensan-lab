@@ -79,10 +79,11 @@ type Alloc struct {
 }
 
 type Compass struct {
-	From   string  `json:"from"`
-	To     string  `json:"to"`
-	Total  int     `json:"total"`
-	Allocs []Alloc `json:"allocs"`
+	From    string  `json:"from"`
+	To      string  `json:"to"`
+	Total   int     `json:"total"`
+	Allocs  []Alloc `json:"allocs"`
+	Support []Alloc `json:"support"`
 }
 
 type Milestone struct {
@@ -330,6 +331,7 @@ func parseTech(ring, quadrant, rest string) Tech {
 
 type projectInfo struct {
 	name, file, status string
+	support            bool
 	headline           string
 	aims, stack        []string
 	msDone, msTotal    int
@@ -349,6 +351,7 @@ func readProject(root, rel, name string) (projectInfo, bool) {
 	pi := projectInfo{name: name, file: rel}
 	fm := frontmatter(content)
 	pi.status = fm["status"]
+	pi.support = fm["compass"] == "support"
 	pi.headline = fm["headline"]
 	for _, x := range listField(fm["aims"]) {
 		pi.aims = append(pi.aims, strings.ReplaceAll(x, " ", ""))
@@ -557,9 +560,13 @@ func Load(root string, now time.Time) (View, error) {
 		}
 		counts[pi.name] = weeks
 	}
+	support := map[string]bool{}
+	for _, pi := range projs {
+		support[pi.name] = pi.support
+	}
 	names := append([]string{}, order...)
 	for n, w := range counts {
-		if _, ok := tgt[n]; !ok && sum(w) > 0 {
+		if _, ok := tgt[n]; !ok && (sum(w) > 0 || support[n]) {
 			names = append(names, n)
 		}
 	}
@@ -574,6 +581,7 @@ func Load(root string, now time.Time) (View, error) {
 			}
 		}
 	}
+	v.Compass.Support = []Alloc{}
 	gapCount := 0
 	for _, n := range names {
 		w := counts[n]
@@ -583,6 +591,11 @@ func Load(root string, now time.Time) (View, error) {
 		a := Alloc{Project: n, Target: tgt[n], Count: sum(w), Weeks: w, Aims: aimsOf[n]}
 		if a.Aims == nil {
 			a.Aims = []string{}
+		}
+		if support[n] {
+			a.Target = 0
+			v.Compass.Support = append(v.Compass.Support, a)
+			continue
 		}
 		v.Compass.Total += a.Count
 		if gap[n] {

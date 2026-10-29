@@ -101,7 +101,7 @@ function Hero({ v }: { v: PortfolioView }) {
       <dl className="grid grid-cols-3 gap-3">
         <Stat value={`${v.publicCells}`} sub=" / 9" label="外から見えるマス" />
         <Stat value={`${v.annual.total}`} label="今年積んだ節目" note={v.annual.month ? `今月 +${v.annual.month}` : undefined} />
-        <Stat value={`${v.gapShare}`} sub="%" label="空きを埋める時間（4 週）" warn={v.gapShare === 0 && v.compass.total > 0} />
+        <Stat value={`${v.gapShare}`} sub="%" label="空きを埋める活動（4 週）" warn={v.gapShare === 0 && v.compass.total > 0} />
       </dl>
       {stale && <p className="lg:col-span-2 text-xs pf-muted">{stale}</p>}
     </section>
@@ -245,7 +245,7 @@ function CompassPanel({ v }: { v: PortfolioView }) {
   return (
     <section aria-labelledby="cmp-h" className="bg-card border border-border rounded-xl p-4 sm:p-5 flex flex-col gap-3 min-w-0">
       <div className="flex justify-between items-baseline gap-3 flex-wrap">
-        <h2 id="cmp-h" className="h-serif text-lg font-semibold">羅針盤 · 時間がどこへ向いているか</h2>
+        <h2 id="cmp-h" className="h-serif text-lg font-semibold">羅針盤 · 活動がどこへ向いているか</h2>
         <span className="text-xs text-muted-foreground">{c.from.slice(5)}〜{c.to.slice(5)}</span>
       </div>
       {c.allocs.length === 0 ? (
@@ -276,12 +276,17 @@ function CompassPanel({ v }: { v: PortfolioView }) {
       {behind && behind.target - behind.actual >= 10 && (
         <div className="border-l-[3px] border-[hsl(var(--pf-gap))] pl-3 py-1 text-sm flex flex-col gap-1">
           <span>
-            {ahead && ahead.actual > ahead.target && <>時間の <b className="pf-gap">{ahead.actual}%</b> が {ahead.project} へ。</>}
+            {ahead && ahead.actual > ahead.target && <>活動の <b className="pf-gap">{ahead.actual}%</b> が {ahead.project} へ。</>}
             狙い {behind.target}% の <b className="pf-gap">{behind.project} は {behind.actual}%</b>。
           </span>
           {nextFor(behind.project) && <span>今週のリバランス案: {behind.project} に 1 コマ — <b className="pf-gap">{nextFor(behind.project)}</b></span>}
         </div>
       )}
+      {(c.support?.length ?? 0) > 0 && <div className="border-t border-border pt-3 text-sm ds-stack">
+        <h3 className="font-semibold">活動を支える整備</h3>
+        {c.support!.map(a => <p key={a.project} className="flex justify-between gap-3"><span>{a.project}</span><span className="font-mono tnum">{a.count} 件</span></p>)}
+        <p className="text-xs text-muted-foreground">上の配分には含めません。整備に向けた活動もここで確認できます。</p>
+      </div>}
       <p className="text-[11px] text-muted-foreground">
         青 = 直近 4 週の完了（@done）とログの数の割合（量の目安で、価値ではない）。橙の目盛り = goals.md の ## 配分。仕事の時間は含まない。
       </p>

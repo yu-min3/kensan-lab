@@ -11,6 +11,7 @@ import { MarkportRedirect } from "./pages/MarkportRedirect";
 import { HomePage } from "./pages/HomePage";
 import { HomeRedirect } from "./pages/HomeRedirect";
 import { NotFoundPage } from "./pages/NotFoundPage";
+import { DailyPage } from "./pages/DailyPage";
 import { FeedPage } from "./pages/FeedPage";
 import "./index.css";
 
@@ -32,7 +33,7 @@ createRoot(document.getElementById("root")!).render(
               <Route path="/tasks" element={<HomeRedirect panel="tasks" />} />
               <Route path="/projects" element={<HomeRedirect panel="projects" />} />
               <Route path="/feed" element={<FeedPage />} />
-              <Route path="/daily" element={<HomeRedirect panel="diary" />} />
+              <Route path="/daily" element={<DailyPage />} />
               <Route path="/memos" element={<MemoPage />} />
               <Route path="/life" element={<LifeGoalsPage />} />
               <Route path="/reviews" element={<ReviewsPage />} />
