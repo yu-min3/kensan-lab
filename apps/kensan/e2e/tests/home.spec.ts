@@ -330,7 +330,7 @@ test("ホームの欄はJSTの日付またぎで今日へ移る", async ({ page 
 for (const mode of ["light", "dark"] as const) {
   test(`${mode}: 今日の欄と整備枠をPCとスマホで表示する`, async ({ page }) => {
     await page.route("**/api/v1/files/daily/**", route => route.fulfill({ json: {
-      doc: { path: "daily/test.md", mtime: "initial" }, content: "## 今日やりたいこと\n\n- なぎちゃんと公園へ行く\n- 作り置きをする\n\n## 日記\n個人的な考えごと",
+      doc: { path: "daily/test.md", mtime: "initial" }, content: "## 今日やりたいこと\n\n- 公園へ行く\n- 作り置きをする\n\n## 日記\n個人的な考えごと",
     } }));
     await page.route("**/api/v1/portfolio", async route => {
       const view = await (await route.fetch()).json();
