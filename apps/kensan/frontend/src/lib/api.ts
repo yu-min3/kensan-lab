@@ -254,7 +254,7 @@ export interface PortfolioView {
   cells: PortfolioCell[]; publicCells: number;
   projects: PortfolioProject[];
   radar: { rings: string[]; quadrants: string[]; items: PortfolioTech[] };
-  compass: { from: string; to: string; total: number; allocs: PortfolioAlloc[] };
+  compass: { from: string; to: string; total: number; allocs: PortfolioAlloc[]; support?: PortfolioAlloc[] };
   gapShare: number;
   annual: { year: number; total: number; month: number; chapters: { quarter: string; name: string; items: PortfolioMilestone[] }[] };
   proposals: PortfolioProposal[];

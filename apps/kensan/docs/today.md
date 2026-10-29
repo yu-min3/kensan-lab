@@ -7,7 +7,9 @@ date: 2026-09-10
 
 The dashboard combines three levels of useful information: the map shows the relationship between direction and evidence, the original project cards show the work being pursued, and the diary captures daily intentions and observations. The technical radar and annual view retain their original role.
 
-The diary can be read, created, edited and appended to in place, with date navigation and a calendar. Its content stays free-form. A one-line input below the reading view prefixes the submission time in JST (`HH:mm`) and appends a plain paragraph to the selected date, or creates the diary when missing. Enter and the save button both submit; the full editor remains available. Appends to existing diaries share the editor save queue and conflict recovery rather than using the legacy section-based diary API.
+The always-visible dashboard reads only the explicit `## 今日やりたいこと` section of today’s daily file. Missing sections display an empty state; the rest of the diary is never used as a fallback. Section edits preserve frontmatter and the surrounding diary, using the file mtime to detect conflicts. Only the public input and its original mtime are cached per date for recovery. Headings are parsed as Markdown so code examples do not become display sections. The home follows the current JST date. This is a display boundary, not an access-control boundary.
+
+The full diary opens explicitly at `/daily`, where it can be read, created, edited and appended to, with date navigation and a calendar. Its content stays free-form. A one-line input below the reading view prefixes the submission time in JST (`HH:mm`) and appends a plain paragraph to the selected date, or creates the diary when missing. Enter and the save button both submit; the full editor remains available. Appends to existing diaries share the editor save queue and conflict recovery rather than using the legacy section-based diary API.
 
 ## Removed management UI
 
@@ -15,7 +17,7 @@ The separate Today, task board and full project management interfaces are retire
 
 The original project cards are restored from the pre-integration implementation: headline, progress, next milestone, technologies and achievements. Selecting a technology still highlights the radar. Project references on the map/compass point to the corresponding card, not to a separate management interface.
 
-Legacy `/today` and `/tasks` URLs redirect to the dashboard. `/projects?name=...` points to the corresponding summary card; `/daily?date=...` opens that diary on the dashboard. Old management query parameters do not revive removed features. Existing Markdown and backend compatibility APIs are preserved.
+Legacy `/today` and `/tasks` URLs redirect to the dashboard. `/projects?name=...` points to the corresponding summary card; `/daily?date=...` opens the separate diary page. Old management query parameters do not revive removed features. Existing Markdown and backend compatibility APIs are preserved.
 
 ## Diary saves
 
@@ -70,3 +72,8 @@ Existing incomplete routine copies in `todo.md` are retained for explicit migrat
 Run `npm test` and `npm run build` in `frontend`, and `npx playwright test` in `e2e`. Tests cover diary creation/edit/append, immediate editor close, delayed date changes, conflict recovery, read-only viewing, original project-card/radar/annual interactions, retired routes, no management-data requests, and desktop/mobile light/dark layout. All browser writes use isolated fixtures. Backend history contracts remain unchanged.
 
 Diary Markdown lists keep paragraph margins at zero inside each list item, so blank lines in Markdown do not double the item spacing. Nested lists use a small separation; ordinary paragraphs retain their reading margins.
+
+
+## Compass support work
+
+README frontmatter `compass: support` marks operational support work. It appears under a separate support heading, with raw completion/log counts, and is excluded from the main allocation denominator and gap share. It keeps its project card, map aims and annual entries. Missing `compass` retains the current project behavior. Targets on a support project are ignored. Main allocations still count records rather than elapsed time; the UI calls them activities.

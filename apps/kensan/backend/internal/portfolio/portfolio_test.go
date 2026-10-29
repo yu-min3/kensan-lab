@@ -285,3 +285,36 @@ func TestProjectCards(t *testing.T) {
 		t.Fatalf("outbound meter (マイルストーン数): %+v", o.Meter)
 	}
 }
+
+func TestSupportIsSeparateFromAllocation(t *testing.T) {
+	root := fixture(t)
+	write(t, root, "projects/tooling/README.md", "---\ntype: project\nstatus: active\ncompass: support\naims: [技術を選ぶ×AI]\n---\n## ログ\n- 2026-10-09: 整備した\n- 2026-10-10: 整えた\n")
+	// Old targets must not accidentally bring support back into the denominator.
+	f, _ := os.OpenFile(filepath.Join(root, "goals.md"), os.O_APPEND|os.O_WRONLY, 0)
+	_, _ = f.WriteString("- tooling 10\n")
+	_ = f.Close()
+	v, err := Load(root, time.Date(2026, 10, 10, 12, 0, 0, 0, jst))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if v.Compass.Total != 3 || len(v.Compass.Support) != 1 || v.Compass.Support[0].Project != "tooling" || v.Compass.Support[0].Count != 2 || v.Compass.Support[0].Target != 0 {
+		t.Fatalf("compass: %+v", v.Compass)
+	}
+	for _, a := range v.Compass.Allocs {
+		if a.Project == "tooling" {
+			t.Fatal("support in main allocations")
+		}
+	}
+	found := false
+	for _, p := range v.Projects {
+		if p.Name == "tooling" {
+			found = true
+		}
+	}
+	if !found {
+		t.Fatal("support project card disappeared")
+	}
+	if v.GapShare != 100 {
+		t.Fatalf("gap: %d", v.GapShare)
+	}
+}

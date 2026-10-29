@@ -42,7 +42,7 @@ function ProjectCard({ p, alloc, byName, tech, onPick }: {
           ))}
           {alloc && alloc.target > 0 && (
             <span className={`ml-auto font-mono tnum text-[11px] ${alloc.actual < alloc.target * 0.6 ? "pf-gap font-semibold" : "text-muted-foreground"}`}>
-              時間 {alloc.actual}% / 狙い {alloc.target}%
+              活動 {alloc.actual}% / 狙い {alloc.target}%
             </span>
           )}
         </div>
