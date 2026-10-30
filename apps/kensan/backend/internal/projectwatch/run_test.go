@@ -14,6 +14,7 @@ import (
 )
 
 type fake struct {
+	payloads   [][]byte
 	creates    int
 	keys       []string
 	failCreate bool
@@ -24,6 +25,8 @@ type fake struct {
 func (f *fake) Create(_ context.Context, r agentclient.Request) (agentclient.Job, error) {
 	f.creates++
 	f.keys = append(f.keys, r.IdempotencyKey)
+	payload, _ := json.Marshal(r)
+	f.payloads = append(f.payloads, payload)
 	if f.failCreate {
 		f.failCreate = false
 		return agentclient.Job{}, os.ErrDeadlineExceeded
@@ -84,7 +87,7 @@ func TestResumeAndNoChange(t *testing.T) {
 			t.Fatalf("%+v", s)
 		}
 	}
-	if f.creates != 2 || f.keys[0] != f.keys[1] {
+	if f.creates != 2 || f.keys[0] != f.keys[1] || string(f.payloads[0]) != string(f.payloads[1]) {
 		t.Fatalf("lost response must reuse request: %+v", f)
 	}
 	s, e := Step(ctx, root, f, now)
