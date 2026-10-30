@@ -736,7 +736,7 @@ data:
         },
         {
           "id": 8,
-          "title": "継続しているPodアラート",
+          "title": "継続しているPod / Jobアラート",
           "type": "table",
           "gridPos": {
             "x": 0,
@@ -748,14 +748,14 @@ data:
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "description": "既存の確定アラートだけ表示。時間はpendingを含むアラート開始からの経過で、即時の待機理由の継続時間ではない。Job失敗もここで確認。ALERTSは通知済み／抑制状態とは異なる。",
+          "description": "既存の確定アラートだけ表示。時間はpendingを含むアラート開始からの経過で、即時の待機理由の継続時間ではない。Job失敗はjob_nameから対象を表示し、収集用Podとは区別する。ALERTSは通知済み／抑制状態とは異なる。",
           "targets": [
             {
               "datasource": {
                 "type": "prometheus",
                 "uid": "prometheus"
               },
-              "expr": "max by(namespace,pod,alertname) ((time() - ALERTS_FOR_STATE{alertname=~\"KubePodNotReady|KubePodCrashLooping|KubeJobFailed\"}) and on(namespace,pod,alertname) ALERTS{alertname=~\"KubePodNotReady|KubePodCrashLooping|KubeJobFailed\",alertstate=\"firing\"})",
+              "expr": "max by(namespace,target,alertname) (label_replace((time() - ALERTS_FOR_STATE{alertname=~\"KubePodNotReady|KubePodCrashLooping\"}) and on(namespace,pod,alertname) ALERTS{alertname=~\"KubePodNotReady|KubePodCrashLooping\",alertstate=\"firing\"}, \"target\", \"Pod/$1\", \"pod\", \"(.+)\") or label_replace((time() - ALERTS_FOR_STATE{alertname=\"KubeJobFailed\"}) and on(namespace,job_name,alertname) ALERTS{alertname=\"KubeJobFailed\",alertstate=\"firing\"}, \"target\", \"Job/$1\", \"job_name\", \"(.+)\"))",
               "refId": "A",
               "instant": true,
               "format": "table"
@@ -800,7 +800,7 @@ data:
                 },
                 "renameByName": {
                   "namespace": "Namespace",
-                  "pod": "Pod",
+                  "target": "Pod / Job",
                   "alertname": "アラート",
                   "Value": "開始から"
                 }
