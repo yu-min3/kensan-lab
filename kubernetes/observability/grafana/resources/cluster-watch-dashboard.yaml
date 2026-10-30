@@ -362,7 +362,7 @@ data:
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "description": "待機理由は即時検出。Pending / Unknown は既存 KubePodNotReady の firing、Running の NotReady は1分ごとの記録で5分以上継続した対象。正常な完了Jobは対象外。監視状態が正常かつ0件なら一覧は空。同じ対象の理由をまとめて表示。",
+          "description": "空欄（—）は表示データなし。監視の取得可否は上段の取得状態で確認。待機理由は即時検出。Pending / Unknown は既存 KubePodNotReady の firing、Running の NotReady は1分ごとの記録で5分以上継続した対象。正常な完了Jobは対象外。監視状態が正常かつ0件なら一覧は空。同じ対象の理由をまとめて表示。",
           "targets": [
             {
               "datasource": {
@@ -377,7 +377,7 @@ data:
           ],
           "fieldConfig": {
             "defaults": {
-              "noValue": "確認不能",
+              "noValue": "—",
               "color": {
                 "mode": "thresholds"
               },
@@ -675,7 +675,7 @@ data:
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "description": "復旧しても直近の不安定さを残す。累積回数ではなく1時間の増分。通常・init双方を含む。小数はrate補間による。",
+          "description": "空欄（—）は表示データなし。監視の取得可否は上段の取得状態で確認。復旧しても直近の不安定さを残す。累積回数ではなく1時間の増分。通常・init双方を含む。小数はrate補間による。",
           "targets": [
             {
               "datasource": {
@@ -690,7 +690,7 @@ data:
           ],
           "fieldConfig": {
             "defaults": {
-              "noValue": "確認不能",
+              "noValue": "—",
               "color": {
                 "mode": "thresholds"
               },
@@ -748,7 +748,7 @@ data:
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "description": "既存の確定アラートだけ表示。時間はpendingを含むアラート開始からの経過で、即時の待機理由の継続時間ではない。Job失敗はjob_nameから対象を表示し、収集用Podとは区別する。ALERTSは通知済み／抑制状態とは異なる。",
+          "description": "空欄（—）は表示データなし。監視の取得可否は上段の取得状態で確認。既存の確定アラートだけ表示。時間はpendingを含むアラート開始からの経過で、即時の待機理由の継続時間ではない。Job失敗はjob_nameから対象を表示し、収集用Podとは区別する。ALERTSは通知済み／抑制状態とは異なる。",
           "targets": [
             {
               "datasource": {
@@ -763,7 +763,7 @@ data:
           ],
           "fieldConfig": {
             "defaults": {
-              "noValue": "確認不能",
+              "noValue": "—",
               "color": {
                 "mode": "thresholds"
               },
@@ -885,7 +885,9 @@ data:
               "options": {
                 "excludeByName": {
                   "Time": true,
-                  "job": true
+                  "job": true,
+                  "__name__": true,
+                  "namespace": true
                 },
                 "renameByName": {
                   "instance": "Endpoint",
