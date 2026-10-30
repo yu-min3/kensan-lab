@@ -11,7 +11,7 @@ data:
     {
       "uid": "cluster-watch",
       "title": "Cluster Watch",
-      "description": "常設用。上段で取得状態と対処対象、下段で最近の不安定さを確認。履歴調査はCluster Healthへ。",
+      "description": "常設用。Podの状態をJobも含めて表示し、ノードReady・CPU/メモリ・永続ストレージ・HTTPS・重要アラートでクラスタの状態を確認。",
       "schemaVersion": 39,
       "version": 2,
       "editable": true,
@@ -49,7 +49,7 @@ data:
       "panels": [
         {
           "id": 1,
-          "title": "監視の取得状態",
+          "title": "監視取得",
           "type": "stat",
           "gridPos": {
             "x": 0,
@@ -68,7 +68,7 @@ data:
                 "type": "prometheus",
                 "uid": "prometheus"
               },
-              "expr": "((cluster_watch:ksm_healthy:bool * cluster_watch:https_healthy:bool\n* ((min(up{job=\"node-exporter\"}) == bool 1) or vector(0))\n* ((count(up{job=\"node-exporter\"}) >= bool count(kube_node_info)) or vector(0))) and on() (time() - timestamp(cluster_watch:ksm_healthy:bool) < 120)) or vector(-1)",
+              "expr": "(vector(1) and on() ((((cluster_watch:ksm_healthy:bool == 1) and on() (time() - timestamp(cluster_watch:ksm_healthy:bool) < 120)) and on() (count(max by(namespace,pod,uid)(kube_pod_status_ready{condition=\"true\"})) == count(max by(namespace,pod,uid)(kube_pod_info))) and on() (count(max by(namespace,pod,uid,phase)(kube_pod_status_phase == 1)) == count(max by(namespace,pod,uid)(kube_pod_info))) and on() (time() - min(timestamp(kube_pod_status_ready{condition=\"true\"})) < 120) and on() (time() - min(timestamp(kube_pod_status_phase)) < 120)) and on() ((((cluster_watch:ksm_healthy:bool == 1) and on() (time() - timestamp(cluster_watch:ksm_healthy:bool) < 120)) and on() (min(up{job=\"node-exporter\"}) == 1) and on() (count(up{job=\"node-exporter\"}) == count(max by(node)(kube_node_info)))) and on() (count(count by(instance)(rate(node_cpu_seconds_total{mode=\"idle\"}[5m]))) == count(max by(node)(kube_node_info))) and on() (time()-min(timestamp(node_cpu_seconds_total{mode=\"idle\"})) < 120)) and on() ((((cluster_watch:ksm_healthy:bool == 1) and on() (time() - timestamp(cluster_watch:ksm_healthy:bool) < 120)) and on() (min(up{job=\"node-exporter\"}) == 1) and on() (count(up{job=\"node-exporter\"}) == count(max by(node)(kube_node_info)))) and on() (count(node_memory_MemAvailable_bytes) == count(max by(node)(kube_node_info))) and on() (count(node_memory_MemTotal_bytes) == count(max by(node)(kube_node_info))) and on() (min(node_memory_MemTotal_bytes)>0) and on() (time()-min(timestamp(node_memory_MemAvailable_bytes)) < 120) and on() (time()-min(timestamp(node_memory_MemTotal_bytes)) < 120)) and on() (((cluster_watch:ksm_healthy:bool == 1) and on() (time() - timestamp(cluster_watch:ksm_healthy:bool) < 120)) and on() (count(max by(namespace,persistentvolumeclaim)(kubelet_volume_stats_used_bytes / (kubelet_volume_stats_capacity_bytes > 0))) > 0) and on() (time()-min(timestamp(kubelet_volume_stats_used_bytes)) < 120) and on() (time()-min(timestamp(kubelet_volume_stats_capacity_bytes)) < 120) and on() (min(up{job=\"kubelet\",metrics_path=\"/metrics\"}) == 1) and on() (count(up{job=\"kubelet\",metrics_path=\"/metrics\"}) == count(max by(node)(kube_node_info))) unless on() (max by(namespace,persistentvolumeclaim)(kube_pod_spec_volumes_persistentvolumeclaims_info and on(namespace,pod,uid)(kube_pod_status_phase{phase=\"Running\"}==1)) unless on(namespace,persistentvolumeclaim) max by(namespace,persistentvolumeclaim)(kubelet_volume_stats_used_bytes / (kubelet_volume_stats_capacity_bytes > 0)))) and on() (((cluster_watch:ksm_healthy:bool == 1) and on() (time() - timestamp(cluster_watch:ksm_healthy:bool) < 120)) and on() (max((time()-prometheus_rule_group_last_evaluation_timestamp_seconds)/(2*prometheus_rule_group_interval_seconds+60))<1 and on() (count(prometheus_rule_group_last_evaluation_timestamp_seconds)==count(prometheus_rule_group_interval_seconds)) and on() (time()-min(timestamp(prometheus_rule_group_last_evaluation_timestamp_seconds))<120))) and on() ((cluster_watch:https_healthy:bool == 1) and on() (time()-timestamp(cluster_watch:https_healthy:bool)<120)))) or vector(0)",
               "refId": "A",
               "instant": true,
               "format": "time_series"
@@ -129,8 +129,8 @@ data:
           }
         },
         {
-          "id": 2,
-          "title": "要確認Pod（対象単位）",
+          "id": 3,
+          "title": "ノード",
           "type": "stat",
           "gridPos": {
             "x": 6,
@@ -149,83 +149,22 @@ data:
                 "type": "prometheus",
                 "uid": "prometheus"
               },
-              "expr": "(cluster_watch:pod_count:current and on() (time() - timestamp(cluster_watch:pod_count:current) < 120)) or vector(-1)",
+              "expr": "(((sum(kube_node_status_condition{condition=\"Ready\",status=\"true\"}))) and on() ((cluster_watch:ksm_healthy:bool == 1) and on() (time() - timestamp(cluster_watch:ksm_healthy:bool) < 120))) or vector(-1)",
               "refId": "A",
               "instant": true,
-              "format": "time_series"
-            }
-          ],
-          "fieldConfig": {
-            "defaults": {
-              "noValue": "確認不能",
-              "color": {
-                "mode": "thresholds"
-              },
-              "thresholds": {
-                "mode": "absolute",
-                "steps": [
-                  {
-                    "color": "green",
-                    "value": null
-                  },
-                  {
-                    "color": "orange",
-                    "value": 1
-                  }
-                ]
-              },
-              "mappings": [
-                {
-                  "type": "value",
-                  "options": {
-                    "-1": {
-                      "text": "確認不能",
-                      "color": "gray"
-                    }
-                  }
-                }
-              ]
+              "format": "time_series",
+              "legendFormat": "Ready"
             },
-            "overrides": []
-          },
-          "options": {
-            "colorMode": "value",
-            "graphMode": "none",
-            "textMode": "value",
-            "reduceOptions": {
-              "calcs": [
-                "lastNotNull"
-              ],
-              "fields": "",
-              "values": false
-            }
-          }
-        },
-        {
-          "id": 3,
-          "title": "Readyノード",
-          "type": "stat",
-          "gridPos": {
-            "x": 12,
-            "y": 0,
-            "w": 6,
-            "h": 3
-          },
-          "datasource": {
-            "type": "prometheus",
-            "uid": "prometheus"
-          },
-          "description": "",
-          "targets": [
             {
               "datasource": {
                 "type": "prometheus",
                 "uid": "prometheus"
               },
-              "expr": "(sum(kube_node_status_condition{condition=\"Ready\",status=\"true\"}) and on() (cluster_watch:ksm_healthy:bool == 1)) or vector(-1)",
-              "refId": "A",
+              "expr": "(((count(max by(node)(kube_node_info)))) and on() ((cluster_watch:ksm_healthy:bool == 1) and on() (time() - timestamp(cluster_watch:ksm_healthy:bool) < 120))) or vector(-1)",
+              "refId": "B",
               "instant": true,
-              "format": "time_series"
+              "format": "time_series",
+              "legendFormat": "全体"
             }
           ],
           "fieldConfig": {
@@ -265,13 +204,18 @@ data:
           "options": {
             "colorMode": "value",
             "graphMode": "none",
-            "textMode": "value",
+            "textMode": "value_and_name",
             "reduceOptions": {
               "calcs": [
                 "lastNotNull"
               ],
               "fields": "",
               "values": false
+            },
+            "orientation": "horizontal",
+            "text": {
+              "valueSize": 30,
+              "titleSize": 12
             }
           }
         },
@@ -280,7 +224,7 @@ data:
           "title": "HTTPS異常",
           "type": "stat",
           "gridPos": {
-            "x": 18,
+            "x": 12,
             "y": 0,
             "w": 6,
             "h": 3
@@ -349,35 +293,35 @@ data:
           }
         },
         {
-          "id": 5,
-          "title": "いま確認するPod",
-          "type": "table",
+          "id": 20,
+          "title": "重要アラート",
+          "type": "stat",
           "gridPos": {
-            "x": 0,
-            "y": 3,
-            "w": 24,
-            "h": 4
+            "x": 18,
+            "y": 0,
+            "w": 6,
+            "h": 3
           },
           "datasource": {
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "description": "待機理由は即時検出。Pending / Unknown は既存 KubePodNotReady の firing、Running の NotReady は1分ごとの記録で5分以上継続した対象。正常な完了Jobは対象外。同じ対象の理由をまとめて表示。 監視正常で対象がない場合は「対象なし」、必要な監視データが取得できない場合は「取得不能」を表示。",
+          "description": "warning/criticalの発火系列数。通知の未対応件数ではない。Watchdogなどseverity=noneは除外。",
           "targets": [
             {
               "datasource": {
                 "type": "prometheus",
                 "uid": "prometheus"
               },
-              "expr": "((cluster_watch:pod_issue:present and on() (cluster_watch:ksm_healthy:bool == 1)) and on() ((cluster_watch:ksm_healthy:bool == 1) and on() (time() - timestamp(cluster_watch:ksm_healthy:bool) < 120)))\nor label_replace((label_replace((label_replace(((vector(0) and on() ((cluster_watch:ksm_healthy:bool == 1) and on() (time() - timestamp(cluster_watch:ksm_healthy:bool) < 120))) unless on() ((cluster_watch:pod_issue:present and on() (cluster_watch:ksm_healthy:bool == 1)) and on() ((cluster_watch:ksm_healthy:bool == 1) and on() (time() - timestamp(cluster_watch:ksm_healthy:bool) < 120)))), \"namespace\", \"—\", \"\", \"\")), \"pod\", \"対象なし\", \"\", \"\")), \"reason\", \"対象なし\", \"\", \"\")\nor label_replace((label_replace((label_replace((vector(-1) unless on() ((cluster_watch:ksm_healthy:bool == 1) and on() (time() - timestamp(cluster_watch:ksm_healthy:bool) < 120))), \"namespace\", \"—\", \"\", \"\")), \"pod\", \"取得不能\", \"\", \"\")), \"reason\", \"取得不能\", \"\", \"\")",
+              "expr": "(((count(ALERTS{alertstate=\"firing\",severity=~\"warning|critical\"})) or vector(0)) and on() (((cluster_watch:ksm_healthy:bool == 1) and on() (time() - timestamp(cluster_watch:ksm_healthy:bool) < 120)) and on() (max((time()-prometheus_rule_group_last_evaluation_timestamp_seconds)/(2*prometheus_rule_group_interval_seconds+60))<1 and on() (count(prometheus_rule_group_last_evaluation_timestamp_seconds)==count(prometheus_rule_group_interval_seconds)) and on() (time()-min(timestamp(prometheus_rule_group_last_evaluation_timestamp_seconds))<120)))) or vector(-1)",
               "refId": "A",
               "instant": true,
-              "format": "table"
+              "format": "time_series"
             }
           ],
           "fieldConfig": {
             "defaults": {
-              "noValue": "—",
+              "noValue": "確認不能",
               "color": {
                 "mode": "thresholds"
               },
@@ -385,61 +329,789 @@ data:
                 "mode": "absolute",
                 "steps": [
                   {
-                    "color": "green",
+                    "color": "gray",
                     "value": null
                   },
                   {
-                    "color": "orange",
+                    "color": "green",
+                    "value": 0
+                  },
+                  {
+                    "color": "red",
                     "value": 1
                   }
                 ]
-              }
+              },
+              "mappings": [
+                {
+                  "type": "value",
+                  "options": {
+                    "-1": {
+                      "text": "確認不能",
+                      "color": "gray"
+                    }
+                  }
+                }
+              ]
             },
             "overrides": []
           },
           "options": {
-            "showHeader": true,
-            "cellHeight": "sm",
-            "footer": {
-              "show": false
-            }
+            "colorMode": "value",
+            "graphMode": "none",
+            "textMode": "value",
+            "reduceOptions": {
+              "calcs": [
+                "lastNotNull"
+              ],
+              "fields": "",
+              "values": false
+            },
+            "orientation": "horizontal"
+          }
+        },
+        {
+          "id": 11,
+          "title": "稼働",
+          "type": "stat",
+          "gridPos": {
+            "x": 0,
+            "y": 3,
+            "w": 4,
+            "h": 3
           },
-          "transformations": [
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "description": "RunningかつReadyの稼働Pod数と、全phaseのPod総数。Jobも含む。",
+          "targets": [
             {
-              "id": "groupBy",
-              "options": {
-                "fields": {
-                  "namespace": {
-                    "operation": "groupby"
-                  },
-                  "pod": {
-                    "operation": "groupby"
-                  },
-                  "reason": {
-                    "operation": "aggregate",
-                    "aggregations": [
-                      "uniqueValues"
-                    ]
-                  }
-                }
-              }
+              "datasource": {
+                "type": "prometheus",
+                "uid": "prometheus"
+              },
+              "expr": "(((count((max by(namespace,pod,uid)(kube_pod_status_phase{phase=\"Running\"} == 1)) and on(namespace,pod,uid) (max by(namespace,pod,uid)(kube_pod_status_ready{condition=\"true\"} == 1)))) or vector(0)) and on() (((cluster_watch:ksm_healthy:bool == 1) and on() (time() - timestamp(cluster_watch:ksm_healthy:bool) < 120)) and on() (count(max by(namespace,pod,uid)(kube_pod_status_ready{condition=\"true\"})) == count(max by(namespace,pod,uid)(kube_pod_info))) and on() (count(max by(namespace,pod,uid,phase)(kube_pod_status_phase == 1)) == count(max by(namespace,pod,uid)(kube_pod_info))) and on() (time() - min(timestamp(kube_pod_status_ready{condition=\"true\"})) < 120) and on() (time() - min(timestamp(kube_pod_status_phase)) < 120))) or vector(-1)",
+              "refId": "A",
+              "instant": true,
+              "format": "time_series",
+              "legendFormat": "Ready"
             },
             {
-              "id": "organize",
-              "options": {
-                "indexByName": {
-                  "namespace": 0,
-                  "pod": 1,
-                  "reason (uniqueValues)": 2
-                },
-                "renameByName": {
-                  "namespace": "Namespace",
-                  "pod": "Pod",
-                  "reason (uniqueValues)": "理由"
-                }
-              }
+              "datasource": {
+                "type": "prometheus",
+                "uid": "prometheus"
+              },
+              "expr": "(((count(max by(namespace,pod,uid)(kube_pod_info))) or vector(0)) and on() (((cluster_watch:ksm_healthy:bool == 1) and on() (time() - timestamp(cluster_watch:ksm_healthy:bool) < 120)) and on() (count(max by(namespace,pod,uid)(kube_pod_status_ready{condition=\"true\"})) == count(max by(namespace,pod,uid)(kube_pod_info))) and on() (count(max by(namespace,pod,uid,phase)(kube_pod_status_phase == 1)) == count(max by(namespace,pod,uid)(kube_pod_info))) and on() (time() - min(timestamp(kube_pod_status_ready{condition=\"true\"})) < 120) and on() (time() - min(timestamp(kube_pod_status_phase)) < 120))) or vector(-1)",
+              "refId": "B",
+              "instant": true,
+              "format": "time_series",
+              "legendFormat": "全Pod"
             }
-          ]
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "noValue": "確認不能",
+              "color": {
+                "mode": "thresholds"
+              },
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "gray",
+                    "value": null
+                  },
+                  {
+                    "color": "green",
+                    "value": 0
+                  }
+                ]
+              },
+              "mappings": [
+                {
+                  "type": "value",
+                  "options": {
+                    "-1": {
+                      "text": "確認不能",
+                      "color": "gray"
+                    }
+                  }
+                }
+              ]
+            },
+            "overrides": []
+          },
+          "options": {
+            "colorMode": "value",
+            "graphMode": "none",
+            "textMode": "value_and_name",
+            "reduceOptions": {
+              "calcs": [
+                "lastNotNull"
+              ],
+              "fields": "",
+              "values": false
+            },
+            "orientation": "horizontal",
+            "text": {
+              "valueSize": 30,
+              "titleSize": 12
+            }
+          }
+        },
+        {
+          "id": 12,
+          "title": "未Ready",
+          "type": "stat",
+          "gridPos": {
+            "x": 4,
+            "y": 3,
+            "w": 4,
+            "h": 3
+          },
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "description": "RunningかつReady=falseのPod。正常稼働とは別に表示。Jobも含む。",
+          "targets": [
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "prometheus"
+              },
+              "expr": "(((count((max by(namespace,pod,uid)(kube_pod_status_phase{phase=\"Running\"} == 1)) and on(namespace,pod,uid) (max by(namespace,pod,uid)(kube_pod_status_ready{condition=\"true\"} == 0)))) or vector(0)) and on() (((cluster_watch:ksm_healthy:bool == 1) and on() (time() - timestamp(cluster_watch:ksm_healthy:bool) < 120)) and on() (count(max by(namespace,pod,uid)(kube_pod_status_ready{condition=\"true\"})) == count(max by(namespace,pod,uid)(kube_pod_info))) and on() (count(max by(namespace,pod,uid,phase)(kube_pod_status_phase == 1)) == count(max by(namespace,pod,uid)(kube_pod_info))) and on() (time() - min(timestamp(kube_pod_status_ready{condition=\"true\"})) < 120) and on() (time() - min(timestamp(kube_pod_status_phase)) < 120))) or vector(-1)",
+              "refId": "A",
+              "instant": true,
+              "format": "time_series"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "noValue": "確認不能",
+              "color": {
+                "mode": "thresholds"
+              },
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "gray",
+                    "value": null
+                  },
+                  {
+                    "color": "green",
+                    "value": 0
+                  },
+                  {
+                    "color": "red",
+                    "value": 1
+                  }
+                ]
+              },
+              "mappings": [
+                {
+                  "type": "value",
+                  "options": {
+                    "-1": {
+                      "text": "確認不能",
+                      "color": "gray"
+                    }
+                  }
+                }
+              ]
+            },
+            "overrides": []
+          },
+          "options": {
+            "colorMode": "value",
+            "graphMode": "none",
+            "textMode": "value",
+            "reduceOptions": {
+              "calcs": [
+                "lastNotNull"
+              ],
+              "fields": "",
+              "values": false
+            },
+            "orientation": "horizontal"
+          }
+        },
+        {
+          "id": 13,
+          "title": "待機",
+          "type": "stat",
+          "gridPos": {
+            "x": 8,
+            "y": 3,
+            "w": 4,
+            "h": 3
+          },
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "description": "Pending状態のPod。コンテナの待機理由とは別分類。",
+          "targets": [
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "prometheus"
+              },
+              "expr": "(((count(max by(namespace,pod,uid)(kube_pod_status_phase{phase=\"Pending\"}==1))) or vector(0)) and on() (((cluster_watch:ksm_healthy:bool == 1) and on() (time() - timestamp(cluster_watch:ksm_healthy:bool) < 120)) and on() (count(max by(namespace,pod,uid)(kube_pod_status_ready{condition=\"true\"})) == count(max by(namespace,pod,uid)(kube_pod_info))) and on() (count(max by(namespace,pod,uid,phase)(kube_pod_status_phase == 1)) == count(max by(namespace,pod,uid)(kube_pod_info))) and on() (time() - min(timestamp(kube_pod_status_ready{condition=\"true\"})) < 120) and on() (time() - min(timestamp(kube_pod_status_phase)) < 120))) or vector(-1)",
+              "refId": "A",
+              "instant": true,
+              "format": "time_series"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "noValue": "確認不能",
+              "color": {
+                "mode": "thresholds"
+              },
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "gray",
+                    "value": null
+                  },
+                  {
+                    "color": "green",
+                    "value": 0
+                  },
+                  {
+                    "color": "red",
+                    "value": 1
+                  }
+                ]
+              },
+              "mappings": [
+                {
+                  "type": "value",
+                  "options": {
+                    "-1": {
+                      "text": "確認不能",
+                      "color": "gray"
+                    }
+                  }
+                }
+              ]
+            },
+            "overrides": []
+          },
+          "options": {
+            "colorMode": "value",
+            "graphMode": "none",
+            "textMode": "value",
+            "reduceOptions": {
+              "calcs": [
+                "lastNotNull"
+              ],
+              "fields": "",
+              "values": false
+            },
+            "orientation": "horizontal"
+          }
+        },
+        {
+          "id": 14,
+          "title": "不明",
+          "type": "stat",
+          "gridPos": {
+            "x": 12,
+            "y": 3,
+            "w": 4,
+            "h": 3
+          },
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "description": "Unknown状態のPod。",
+          "targets": [
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "prometheus"
+              },
+              "expr": "(((count(max by(namespace,pod,uid)(kube_pod_status_phase{phase=\"Unknown\"}==1))) or vector(0)) and on() (((cluster_watch:ksm_healthy:bool == 1) and on() (time() - timestamp(cluster_watch:ksm_healthy:bool) < 120)) and on() (count(max by(namespace,pod,uid)(kube_pod_status_ready{condition=\"true\"})) == count(max by(namespace,pod,uid)(kube_pod_info))) and on() (count(max by(namespace,pod,uid,phase)(kube_pod_status_phase == 1)) == count(max by(namespace,pod,uid)(kube_pod_info))) and on() (time() - min(timestamp(kube_pod_status_ready{condition=\"true\"})) < 120) and on() (time() - min(timestamp(kube_pod_status_phase)) < 120))) or vector(-1)",
+              "refId": "A",
+              "instant": true,
+              "format": "time_series"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "noValue": "確認不能",
+              "color": {
+                "mode": "thresholds"
+              },
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "gray",
+                    "value": null
+                  },
+                  {
+                    "color": "green",
+                    "value": 0
+                  },
+                  {
+                    "color": "red",
+                    "value": 1
+                  }
+                ]
+              },
+              "mappings": [
+                {
+                  "type": "value",
+                  "options": {
+                    "-1": {
+                      "text": "確認不能",
+                      "color": "gray"
+                    }
+                  }
+                }
+              ]
+            },
+            "overrides": []
+          },
+          "options": {
+            "colorMode": "value",
+            "graphMode": "none",
+            "textMode": "value",
+            "reduceOptions": {
+              "calcs": [
+                "lastNotNull"
+              ],
+              "fields": "",
+              "values": false
+            },
+            "orientation": "horizontal"
+          }
+        },
+        {
+          "id": 15,
+          "title": "失敗",
+          "type": "stat",
+          "gridPos": {
+            "x": 16,
+            "y": 3,
+            "w": 4,
+            "h": 3
+          },
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "description": "Failed状態のPod。Jobの失敗も含む。",
+          "targets": [
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "prometheus"
+              },
+              "expr": "(((count(max by(namespace,pod,uid)(kube_pod_status_phase{phase=\"Failed\"}==1))) or vector(0)) and on() (((cluster_watch:ksm_healthy:bool == 1) and on() (time() - timestamp(cluster_watch:ksm_healthy:bool) < 120)) and on() (count(max by(namespace,pod,uid)(kube_pod_status_ready{condition=\"true\"})) == count(max by(namespace,pod,uid)(kube_pod_info))) and on() (count(max by(namespace,pod,uid,phase)(kube_pod_status_phase == 1)) == count(max by(namespace,pod,uid)(kube_pod_info))) and on() (time() - min(timestamp(kube_pod_status_ready{condition=\"true\"})) < 120) and on() (time() - min(timestamp(kube_pod_status_phase)) < 120))) or vector(-1)",
+              "refId": "A",
+              "instant": true,
+              "format": "time_series"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "noValue": "確認不能",
+              "color": {
+                "mode": "thresholds"
+              },
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "gray",
+                    "value": null
+                  },
+                  {
+                    "color": "green",
+                    "value": 0
+                  },
+                  {
+                    "color": "red",
+                    "value": 1
+                  }
+                ]
+              },
+              "mappings": [
+                {
+                  "type": "value",
+                  "options": {
+                    "-1": {
+                      "text": "確認不能",
+                      "color": "gray"
+                    }
+                  }
+                }
+              ]
+            },
+            "overrides": []
+          },
+          "options": {
+            "colorMode": "value",
+            "graphMode": "none",
+            "textMode": "value",
+            "reduceOptions": {
+              "calcs": [
+                "lastNotNull"
+              ],
+              "fields": "",
+              "values": false
+            },
+            "orientation": "horizontal"
+          }
+        },
+        {
+          "id": 16,
+          "title": "完了",
+          "type": "stat",
+          "gridPos": {
+            "x": 20,
+            "y": 3,
+            "w": 4,
+            "h": 3
+          },
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "description": "Succeeded状態の正常に完了したPod。異常ではないため中立色。Jobも含む。",
+          "targets": [
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "prometheus"
+              },
+              "expr": "(((count(max by(namespace,pod,uid)(kube_pod_status_phase{phase=\"Succeeded\"}==1))) or vector(0)) and on() (((cluster_watch:ksm_healthy:bool == 1) and on() (time() - timestamp(cluster_watch:ksm_healthy:bool) < 120)) and on() (count(max by(namespace,pod,uid)(kube_pod_status_ready{condition=\"true\"})) == count(max by(namespace,pod,uid)(kube_pod_info))) and on() (count(max by(namespace,pod,uid,phase)(kube_pod_status_phase == 1)) == count(max by(namespace,pod,uid)(kube_pod_info))) and on() (time() - min(timestamp(kube_pod_status_ready{condition=\"true\"})) < 120) and on() (time() - min(timestamp(kube_pod_status_phase)) < 120))) or vector(-1)",
+              "refId": "A",
+              "instant": true,
+              "format": "time_series"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "noValue": "確認不能",
+              "color": {
+                "mode": "thresholds"
+              },
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "gray",
+                    "value": null
+                  },
+                  {
+                    "color": "text",
+                    "value": 0
+                  }
+                ]
+              },
+              "mappings": [
+                {
+                  "type": "value",
+                  "options": {
+                    "-1": {
+                      "text": "確認不能",
+                      "color": "gray"
+                    }
+                  }
+                }
+              ]
+            },
+            "overrides": []
+          },
+          "options": {
+            "colorMode": "value",
+            "graphMode": "none",
+            "textMode": "value",
+            "reduceOptions": {
+              "calcs": [
+                "lastNotNull"
+              ],
+              "fields": "",
+              "values": false
+            },
+            "orientation": "horizontal"
+          }
+        },
+        {
+          "id": 17,
+          "title": "CPU使用",
+          "type": "stat",
+          "gridPos": {
+            "x": 0,
+            "y": 6,
+            "w": 8,
+            "h": 3
+          },
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "description": "CPUはコア数、メモリは容量で加重。PVCは最も使用率が高い永続ボリューム。必要な観測の欠測・古さは取得不能。",
+          "targets": [
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "prometheus"
+              },
+              "expr": "(((1-avg(rate(node_cpu_seconds_total{mode=\"idle\"}[5m])))) and on() ((((cluster_watch:ksm_healthy:bool == 1) and on() (time() - timestamp(cluster_watch:ksm_healthy:bool) < 120)) and on() (min(up{job=\"node-exporter\"}) == 1) and on() (count(up{job=\"node-exporter\"}) == count(max by(node)(kube_node_info)))) and on() (count(count by(instance)(rate(node_cpu_seconds_total{mode=\"idle\"}[5m]))) == count(max by(node)(kube_node_info))) and on() (time()-min(timestamp(node_cpu_seconds_total{mode=\"idle\"})) < 120))) or vector(-1)",
+              "refId": "A",
+              "instant": true,
+              "format": "time_series"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "noValue": "確認不能",
+              "color": {
+                "mode": "thresholds"
+              },
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "gray",
+                    "value": null
+                  },
+                  {
+                    "color": "green",
+                    "value": 0
+                  },
+                  {
+                    "color": "orange",
+                    "value": 0.75
+                  },
+                  {
+                    "color": "red",
+                    "value": 0.9
+                  }
+                ]
+              },
+              "mappings": [
+                {
+                  "type": "value",
+                  "options": {
+                    "-1": {
+                      "text": "確認不能",
+                      "color": "gray"
+                    }
+                  }
+                }
+              ],
+              "unit": "percentunit",
+              "min": 0,
+              "max": 1,
+              "decimals": 1
+            },
+            "overrides": []
+          },
+          "options": {
+            "colorMode": "value",
+            "graphMode": "none",
+            "textMode": "value",
+            "reduceOptions": {
+              "calcs": [
+                "lastNotNull"
+              ],
+              "fields": "",
+              "values": false
+            },
+            "text": {
+              "valueSize": 40
+            },
+            "orientation": "horizontal"
+          }
+        },
+        {
+          "id": 18,
+          "title": "メモリ使用",
+          "type": "stat",
+          "gridPos": {
+            "x": 8,
+            "y": 6,
+            "w": 8,
+            "h": 3
+          },
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "description": "CPUはコア数、メモリは容量で加重。PVCは最も使用率が高い永続ボリューム。必要な観測の欠測・古さは取得不能。",
+          "targets": [
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "prometheus"
+              },
+              "expr": "(((1-sum(node_memory_MemAvailable_bytes)/sum(node_memory_MemTotal_bytes))) and on() ((((cluster_watch:ksm_healthy:bool == 1) and on() (time() - timestamp(cluster_watch:ksm_healthy:bool) < 120)) and on() (min(up{job=\"node-exporter\"}) == 1) and on() (count(up{job=\"node-exporter\"}) == count(max by(node)(kube_node_info)))) and on() (count(node_memory_MemAvailable_bytes) == count(max by(node)(kube_node_info))) and on() (count(node_memory_MemTotal_bytes) == count(max by(node)(kube_node_info))) and on() (min(node_memory_MemTotal_bytes)>0) and on() (time()-min(timestamp(node_memory_MemAvailable_bytes)) < 120) and on() (time()-min(timestamp(node_memory_MemTotal_bytes)) < 120))) or vector(-1)",
+              "refId": "A",
+              "instant": true,
+              "format": "time_series"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "noValue": "確認不能",
+              "color": {
+                "mode": "thresholds"
+              },
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "gray",
+                    "value": null
+                  },
+                  {
+                    "color": "green",
+                    "value": 0
+                  },
+                  {
+                    "color": "orange",
+                    "value": 0.75
+                  },
+                  {
+                    "color": "red",
+                    "value": 0.9
+                  }
+                ]
+              },
+              "mappings": [
+                {
+                  "type": "value",
+                  "options": {
+                    "-1": {
+                      "text": "確認不能",
+                      "color": "gray"
+                    }
+                  }
+                }
+              ],
+              "unit": "percentunit",
+              "min": 0,
+              "max": 1,
+              "decimals": 1
+            },
+            "overrides": []
+          },
+          "options": {
+            "colorMode": "value",
+            "graphMode": "none",
+            "textMode": "value",
+            "reduceOptions": {
+              "calcs": [
+                "lastNotNull"
+              ],
+              "fields": "",
+              "values": false
+            },
+            "text": {
+              "valueSize": 40
+            },
+            "orientation": "horizontal"
+          }
+        },
+        {
+          "id": 19,
+          "title": "PVC最大使用",
+          "type": "stat",
+          "gridPos": {
+            "x": 16,
+            "y": 6,
+            "w": 8,
+            "h": 3
+          },
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "description": "CPUはコア数、メモリは容量で加重。PVCは最も使用率が高い永続ボリューム。必要な観測の欠測・古さは取得不能。",
+          "targets": [
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "prometheus"
+              },
+              "expr": "(((max(max by(namespace,persistentvolumeclaim)(kubelet_volume_stats_used_bytes / (kubelet_volume_stats_capacity_bytes > 0)) and on(namespace,persistentvolumeclaim) kube_persistentvolumeclaim_info))) and on() (((cluster_watch:ksm_healthy:bool == 1) and on() (time() - timestamp(cluster_watch:ksm_healthy:bool) < 120)) and on() (count(max by(namespace,persistentvolumeclaim)(kubelet_volume_stats_used_bytes / (kubelet_volume_stats_capacity_bytes > 0))) > 0) and on() (time()-min(timestamp(kubelet_volume_stats_used_bytes)) < 120) and on() (time()-min(timestamp(kubelet_volume_stats_capacity_bytes)) < 120) and on() (min(up{job=\"kubelet\",metrics_path=\"/metrics\"}) == 1) and on() (count(up{job=\"kubelet\",metrics_path=\"/metrics\"}) == count(max by(node)(kube_node_info))) unless on() (max by(namespace,persistentvolumeclaim)(kube_pod_spec_volumes_persistentvolumeclaims_info and on(namespace,pod,uid)(kube_pod_status_phase{phase=\"Running\"}==1)) unless on(namespace,persistentvolumeclaim) max by(namespace,persistentvolumeclaim)(kubelet_volume_stats_used_bytes / (kubelet_volume_stats_capacity_bytes > 0))))) or vector(-1)",
+              "refId": "A",
+              "instant": true,
+              "format": "time_series"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "noValue": "確認不能",
+              "color": {
+                "mode": "thresholds"
+              },
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "gray",
+                    "value": null
+                  },
+                  {
+                    "color": "green",
+                    "value": 0
+                  },
+                  {
+                    "color": "orange",
+                    "value": 0.75
+                  },
+                  {
+                    "color": "red",
+                    "value": 0.9
+                  }
+                ]
+              },
+              "mappings": [
+                {
+                  "type": "value",
+                  "options": {
+                    "-1": {
+                      "text": "確認不能",
+                      "color": "gray"
+                    }
+                  }
+                }
+              ],
+              "unit": "percentunit",
+              "min": 0,
+              "max": 1,
+              "decimals": 1
+            },
+            "overrides": []
+          },
+          "options": {
+            "colorMode": "value",
+            "graphMode": "none",
+            "textMode": "value",
+            "reduceOptions": {
+              "calcs": [
+                "lastNotNull"
+              ],
+              "fields": "",
+              "values": false
+            },
+            "text": {
+              "valueSize": 40
+            },
+            "orientation": "horizontal"
+          }
         },
         {
           "id": 6,
@@ -447,7 +1119,7 @@ data:
           "type": "table",
           "gridPos": {
             "x": 0,
-            "y": 7,
+            "y": 9,
             "w": 24,
             "h": 7
           },
@@ -743,12 +1415,105 @@ data:
           ]
         },
         {
+          "id": 5,
+          "title": "Pod状態の理由",
+          "type": "table",
+          "gridPos": {
+            "x": 0,
+            "y": 16,
+            "w": 24,
+            "h": 5
+          },
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "description": "現在のPending/Unknown/Running未Ready/Failedを即時表示し、コンテナ待機理由と継続異常も併記。Jobを含む。遷移中の状態を含み、新規通知は追加しない。Succeededは正常な完了。",
+          "targets": [
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "prometheus"
+              },
+              "expr": "((cluster_watch:pod_issue:present or label_replace(max by(namespace,pod,uid)(kube_pod_status_phase{phase=\"Failed\"} == 1),\"reason\",\"Failed\",\"\",\"\") or label_replace(max by(namespace,pod,uid)(kube_pod_status_phase{phase=\"Pending\"} == 1),\"reason\",\"Pending\",\"\",\"\") or label_replace(max by(namespace,pod,uid)(kube_pod_status_phase{phase=\"Unknown\"} == 1),\"reason\",\"Unknown\",\"\",\"\") or label_replace((max by(namespace,pod,uid)(kube_pod_status_phase{phase=\"Running\"} == 1) and on(namespace,pod,uid) max by(namespace,pod,uid)(kube_pod_status_ready{condition=\"true\"} == 0)),\"reason\",\"NotReady\",\"\",\"\")) and on() (((cluster_watch:ksm_healthy:bool == 1) and on() (time() - timestamp(cluster_watch:ksm_healthy:bool) < 120)) and on() (count(max by(namespace,pod,uid)(kube_pod_status_ready{condition=\"true\"})) == count(max by(namespace,pod,uid)(kube_pod_info))) and on() (count(max by(namespace,pod,uid,phase)(kube_pod_status_phase == 1)) == count(max by(namespace,pod,uid)(kube_pod_info))) and on() (time() - min(timestamp(kube_pod_status_ready{condition=\"true\"})) < 120) and on() (time() - min(timestamp(kube_pod_status_phase)) < 120))) or label_replace((label_replace((label_replace(((vector(0) and on() (((cluster_watch:ksm_healthy:bool == 1) and on() (time() - timestamp(cluster_watch:ksm_healthy:bool) < 120)) and on() (count(max by(namespace,pod,uid)(kube_pod_status_ready{condition=\"true\"})) == count(max by(namespace,pod,uid)(kube_pod_info))) and on() (count(max by(namespace,pod,uid,phase)(kube_pod_status_phase == 1)) == count(max by(namespace,pod,uid)(kube_pod_info))) and on() (time() - min(timestamp(kube_pod_status_ready{condition=\"true\"})) < 120) and on() (time() - min(timestamp(kube_pod_status_phase)) < 120))) unless on() ((cluster_watch:pod_issue:present or label_replace(max by(namespace,pod,uid)(kube_pod_status_phase{phase=\"Failed\"} == 1),\"reason\",\"Failed\",\"\",\"\") or label_replace(max by(namespace,pod,uid)(kube_pod_status_phase{phase=\"Pending\"} == 1),\"reason\",\"Pending\",\"\",\"\") or label_replace(max by(namespace,pod,uid)(kube_pod_status_phase{phase=\"Unknown\"} == 1),\"reason\",\"Unknown\",\"\",\"\") or label_replace((max by(namespace,pod,uid)(kube_pod_status_phase{phase=\"Running\"} == 1) and on(namespace,pod,uid) max by(namespace,pod,uid)(kube_pod_status_ready{condition=\"true\"} == 0)),\"reason\",\"NotReady\",\"\",\"\")) and on() (((cluster_watch:ksm_healthy:bool == 1) and on() (time() - timestamp(cluster_watch:ksm_healthy:bool) < 120)) and on() (count(max by(namespace,pod,uid)(kube_pod_status_ready{condition=\"true\"})) == count(max by(namespace,pod,uid)(kube_pod_info))) and on() (count(max by(namespace,pod,uid,phase)(kube_pod_status_phase == 1)) == count(max by(namespace,pod,uid)(kube_pod_info))) and on() (time() - min(timestamp(kube_pod_status_ready{condition=\"true\"})) < 120) and on() (time() - min(timestamp(kube_pod_status_phase)) < 120)))),\"namespace\",\"—\",\"\",\"\")),\"pod\",\"異常なし\",\"\",\"\")),\"reason\",\"正常稼働\",\"\",\"\") or label_replace((label_replace((label_replace((vector(-1) unless on() (((cluster_watch:ksm_healthy:bool == 1) and on() (time() - timestamp(cluster_watch:ksm_healthy:bool) < 120)) and on() (count(max by(namespace,pod,uid)(kube_pod_status_ready{condition=\"true\"})) == count(max by(namespace,pod,uid)(kube_pod_info))) and on() (count(max by(namespace,pod,uid,phase)(kube_pod_status_phase == 1)) == count(max by(namespace,pod,uid)(kube_pod_info))) and on() (time() - min(timestamp(kube_pod_status_ready{condition=\"true\"})) < 120) and on() (time() - min(timestamp(kube_pod_status_phase)) < 120))),\"namespace\",\"—\",\"\",\"\")),\"pod\",\"取得不能\",\"\",\"\")),\"reason\",\"取得不能\",\"\",\"\")",
+              "refId": "A",
+              "instant": true,
+              "format": "table"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "noValue": "—",
+              "color": {
+                "mode": "thresholds"
+              },
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "green",
+                    "value": null
+                  },
+                  {
+                    "color": "orange",
+                    "value": 1
+                  }
+                ]
+              }
+            },
+            "overrides": []
+          },
+          "options": {
+            "showHeader": true,
+            "cellHeight": "sm",
+            "footer": {
+              "show": false
+            }
+          },
+          "transformations": [
+            {
+              "id": "groupBy",
+              "options": {
+                "fields": {
+                  "namespace": {
+                    "operation": "groupby"
+                  },
+                  "pod": {
+                    "operation": "groupby"
+                  },
+                  "reason": {
+                    "operation": "aggregate",
+                    "aggregations": [
+                      "uniqueValues"
+                    ]
+                  }
+                }
+              }
+            },
+            {
+              "id": "organize",
+              "options": {
+                "indexByName": {
+                  "namespace": 0,
+                  "pod": 1,
+                  "reason (uniqueValues)": 2
+                },
+                "renameByName": {
+                  "namespace": "Namespace",
+                  "pod": "Pod",
+                  "reason (uniqueValues)": "理由"
+                }
+              }
+            }
+          ]
+        },
+        {
           "id": 7,
           "title": "直近1時間の再起動",
           "type": "table",
           "gridPos": {
             "x": 0,
-            "y": 14,
+            "y": 21,
             "w": 24,
             "h": 5
           },
@@ -836,12 +1601,101 @@ data:
           ]
         },
         {
+          "id": 22,
+          "title": "重要アラートの内訳",
+          "type": "table",
+          "gridPos": {
+            "x": 0,
+            "y": 26,
+            "w": 24,
+            "h": 6
+          },
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "description": "全クラスタのwarning/criticalを名前とseverity別に表示。Pod以外のTargetDown・API遅延も含む。",
+          "targets": [
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "prometheus"
+              },
+              "expr": "(count by(alertname,severity)(ALERTS{alertstate=\"firing\",severity=~\"warning|critical\"}) and on() (((cluster_watch:ksm_healthy:bool == 1) and on() (time() - timestamp(cluster_watch:ksm_healthy:bool) < 120)) and on() (max((time()-prometheus_rule_group_last_evaluation_timestamp_seconds)/(2*prometheus_rule_group_interval_seconds+60))<1 and on() (count(prometheus_rule_group_last_evaluation_timestamp_seconds)==count(prometheus_rule_group_interval_seconds)) and on() (time()-min(timestamp(prometheus_rule_group_last_evaluation_timestamp_seconds))<120)))) or label_replace((label_replace(((vector(0) and on() (((cluster_watch:ksm_healthy:bool == 1) and on() (time() - timestamp(cluster_watch:ksm_healthy:bool) < 120)) and on() (max((time()-prometheus_rule_group_last_evaluation_timestamp_seconds)/(2*prometheus_rule_group_interval_seconds+60))<1 and on() (count(prometheus_rule_group_last_evaluation_timestamp_seconds)==count(prometheus_rule_group_interval_seconds)) and on() (time()-min(timestamp(prometheus_rule_group_last_evaluation_timestamp_seconds))<120)))) unless on() (count by(alertname,severity)(ALERTS{alertstate=\"firing\",severity=~\"warning|critical\"}) and on() (((cluster_watch:ksm_healthy:bool == 1) and on() (time() - timestamp(cluster_watch:ksm_healthy:bool) < 120)) and on() (max((time()-prometheus_rule_group_last_evaluation_timestamp_seconds)/(2*prometheus_rule_group_interval_seconds+60))<1 and on() (count(prometheus_rule_group_last_evaluation_timestamp_seconds)==count(prometheus_rule_group_interval_seconds)) and on() (time()-min(timestamp(prometheus_rule_group_last_evaluation_timestamp_seconds))<120))))),\"alertname\",\"発火なし\",\"\",\"\")),\"severity\",\"—\",\"\",\"\") or label_replace((label_replace((vector(-1) unless on() (((cluster_watch:ksm_healthy:bool == 1) and on() (time() - timestamp(cluster_watch:ksm_healthy:bool) < 120)) and on() (max((time()-prometheus_rule_group_last_evaluation_timestamp_seconds)/(2*prometheus_rule_group_interval_seconds+60))<1 and on() (count(prometheus_rule_group_last_evaluation_timestamp_seconds)==count(prometheus_rule_group_interval_seconds)) and on() (time()-min(timestamp(prometheus_rule_group_last_evaluation_timestamp_seconds))<120)))),\"alertname\",\"取得不能\",\"\",\"\")),\"severity\",\"—\",\"\",\"\")",
+              "refId": "A",
+              "instant": true,
+              "format": "table"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "noValue": "—",
+              "color": {
+                "mode": "thresholds"
+              },
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "green",
+                    "value": null
+                  },
+                  {
+                    "color": "orange",
+                    "value": 1
+                  }
+                ]
+              },
+              "mappings": [
+                {
+                  "type": "value",
+                  "options": {
+                    "0": {
+                      "text": "—",
+                      "color": "text"
+                    },
+                    "-1": {
+                      "text": "取得不能",
+                      "color": "gray"
+                    }
+                  }
+                }
+              ]
+            },
+            "overrides": []
+          },
+          "options": {
+            "showHeader": true,
+            "cellHeight": "sm",
+            "footer": {
+              "show": false
+            }
+          },
+          "transformations": [
+            {
+              "id": "organize",
+              "options": {
+                "includeByName": {
+                  "alertname": true,
+                  "severity": true,
+                  "Value": true
+                },
+                "renameByName": {
+                  "alertname": "アラート",
+                  "severity": "重要度",
+                  "Value": "発火系列"
+                }
+              }
+            }
+          ]
+        },
+        {
           "id": 8,
           "title": "継続しているPod / Jobアラート",
           "type": "table",
           "gridPos": {
             "x": 0,
-            "y": 19,
+            "y": 32,
             "w": 24,
             "h": 8
           },
@@ -936,7 +1790,7 @@ data:
           "type": "table",
           "gridPos": {
             "x": 0,
-            "y": 27,
+            "y": 40,
             "w": 24,
             "h": 11
           },
@@ -1042,7 +1896,7 @@ data:
           "type": "stat",
           "gridPos": {
             "x": 0,
-            "y": 38,
+            "y": 51,
             "w": 24,
             "h": 2
           },

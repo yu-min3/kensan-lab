@@ -23,3 +23,9 @@ export function watchExcerpt(markdown: string, limit = 130): string {
   const chars = Array.from(value);
   return chars.length > limit ? chars.slice(0, limit).join("") + "…" : value;
 }
+
+export function watchHeadline(markdown: string): string {
+  const strong = markdown.match(/\*\*([^*\n]+)\*\*/)?.[1];
+  const first = (strong || watchExcerpt(markdown, 500)).split(/[。\n]/)[0].replace(/\s*[（(](?:kensan-lab|PR|commit|#[0-9]).*$/, "").trim();
+  return Array.from(first).length > 44 ? Array.from(first).slice(0,44).join("") + "…" : first;
+}

@@ -70,7 +70,7 @@ status: active
 
 var now = time.Date(2026, 10, 30, 10, 0, 0, 0, time.FixedZone("JST", 9*3600))
 
-const goodOutput = `{"items":[{"project":"sample","change":"テストした","meaning":"実装を確認できた","decision":"","sourceIds":["project:sample"]}]}`
+const goodOutput = `{"items":[{"project":"sample","headline":"動作の確認を完了","change":"テストした","meaning":"実装を確認できた","decision":"","sourceIds":["project:sample"]}]}`
 
 func TestResumeAndNoChange(t *testing.T) {
 	root := t.TempDir()
@@ -114,7 +114,7 @@ func TestRejectInventedEvidencePreservePrevious(t *testing.T) {
 	root := t.TempDir()
 	put(t, root, "projects/sample/README.md", project)
 	put(t, root, ResultPath, `{"version":1,"hash":"old","generatedAt":"2026-10-29T10:00:00+09:00","items":[],"sources":[]}`)
-	f := &fake{output: `{"items":[{"project":"sample","change":"完了","meaning":"","decision":"","sourceIds":["invented"]}]}`}
+	f := &fake{output: `{"items":[{"project":"sample","headline":"動作の確認を完了","change":"完了","meaning":"","decision":"","sourceIds":["invented"]}]}`}
 	for i := 0; i < 3; i++ {
 		if _, e := Step(context.Background(), root, f, now); e != nil {
 			t.Fatal(e)
@@ -259,5 +259,47 @@ func TestLostResponseCanRecoverAfter24Hours(t *testing.T) {
 	}
 	if len(f.keys) != 2 || f.keys[0] != f.keys[1] || string(f.payloads[0]) != string(f.payloads[1]) {
 		t.Fatal("overdue recovery created a different request")
+	}
+}
+
+func TestHeadlineUpgradeKeepsLegacyPendingJobs(t *testing.T) {
+	for _, tc := range []struct {
+		name   string
+		legacy bool
+		output string
+		want   string
+	}{
+		{"old schema resumes without headline", true, strings.Replace(goodOutput, `"headline":"動作の確認を完了",`, "", 1), "succeeded"},
+		{"new schema requires headline", false, strings.Replace(goodOutput, `"headline":"動作の確認を完了",`, "", 1), "failed"},
+		{"new schema rejects blank headline", false, strings.Replace(goodOutput, `"headline":"動作の確認を完了"`, `"headline":"   "`, 1), "failed"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			root := t.TempDir()
+			put(t, root, "projects/sample/README.md", project)
+			f := &fake{output: tc.output}
+			ctx := context.Background()
+			for i := 0; i < 2; i++ {
+				if _, e := Step(ctx, root, f, now); e != nil {
+					t.Fatal(e)
+				}
+			}
+			if tc.legacy {
+				b, e := os.ReadFile(filepath.Join(root, StatePath))
+				if e != nil {
+					t.Fatal(e)
+				}
+				var state State
+				if e = json.Unmarshal(b, &state); e != nil {
+					t.Fatal(e)
+				}
+				state.Pending.Schema = json.RawMessage(`{"type":"object"}`)
+				b, _ = json.Marshal(state)
+				put(t, root, StatePath, string(b))
+			}
+			state, e := Step(ctx, root, f, now)
+			if e != nil || state.Status != tc.want {
+				t.Fatalf("%+v %v", state, e)
+			}
+		})
 	}
 }

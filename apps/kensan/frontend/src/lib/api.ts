@@ -305,6 +305,7 @@ export const api = {
   today: () => request<TodayView>("/today"),
   portfolio: () => request<PortfolioView>("/portfolio"),
   watch: () => request<WatchView>("/watch"),
+  watchMetrics: () => request<WatchMetrics>("/watch/metrics"),
   decideProposal: (p: PortfolioProposal, accept: boolean) =>
     request<{ proposal: PortfolioProposal }>(`/portfolio/proposals/${accept ? "accept" : "reject"}`, {
       method: "POST", body: JSON.stringify({ file: p.file, line: p.line, text: p.text }),
@@ -508,10 +509,17 @@ updated: ${date}
 }
 
 export interface WatchSource { id: string; project: string; path: string; date: string; text: string; hash: string }
-export interface WatchItem { project: string; change: string; meaning: string; decision: string; sourceIds: string[] }
+export interface WatchItem { headline?: string; project: string; change: string; meaning: string; decision: string; sourceIds: string[] }
 export interface WatchView {
   snapshot: { hash: string; warnings?: string[]; projects: { name: string; path: string; date: string; text: string; next: string }[] };
   state: { status: string; reason?: string; checkedAt?: string; lastSuccessAt?: string };
   result: { hash: string; generatedAt: string; items: WatchItem[]; sources: WatchSource[] } | null;
   stale: boolean; stateError?: string;
+}
+
+export interface WatchMetricSection<T> { data: T | null; updatedAt: string; checkedAt: string; error?: string; stale: boolean; currentPeriod: boolean }
+export interface WatchMetrics {
+ version: number; repo: string; zenn: string;
+ publications: WatchMetricSection<{month:string; items:{title:string;url:string;at:string}[]}>;
+ development: WatchMetricSection<{week:string;items:{title:string;url:string;createdAt:string;mergedAt:string}[];days:number[];medianHours:number|null}>;
 }

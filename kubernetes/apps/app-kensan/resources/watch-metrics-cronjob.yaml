@@ -1,0 +1,64 @@
+# Public read-only providers; enable after releasing the new CLI image.
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: kensan-watch-metrics
+  namespace: app-kensan
+spec:
+  suspend: true
+  schedule: "15 * * * *"
+  timeZone: Asia/Tokyo
+  concurrencyPolicy: Forbid
+  startingDeadlineSeconds: 600
+  successfulJobsHistoryLimit: 2
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      backoffLimit: 0
+      activeDeadlineSeconds: 180
+      template:
+        metadata:
+          labels:
+            app.kubernetes.io/name: kensan-watch-metrics
+            app.kubernetes.io/part-of: kensan
+        spec:
+          restartPolicy: Never
+          automountServiceAccountToken: false
+          imagePullSecrets:
+            - name: ghcr-pull-secret
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 65532
+            runAsGroup: 65532
+            fsGroup: 65532
+            seccompProfile:
+              type: RuntimeDefault
+          containers:
+            - name: watch-metrics
+              # Release an image containing watch-metrics before removing suspend.
+              image: ghcr.io/yu-min3/kensan:v0.3.18
+              command: ["/usr/local/bin/watch-metrics"]
+              args: ["-repo", "yu-min3/kensan-lab", "-zenn", "yuu7751"]
+              env:
+                - name: KENSAN_DATA_DIR
+                  value: /data
+                - name: TZ
+                  value: Asia/Tokyo
+              resources:
+                requests:
+                  cpu: 25m
+                  memory: 64Mi
+                limits:
+                  memory: 256Mi
+              securityContext:
+                allowPrivilegeEscalation: false
+                capabilities:
+                  drop: ["ALL"]
+                readOnlyRootFilesystem: true
+              volumeMounts:
+                - name: workspace
+                  mountPath: /data
+          volumes:
+            - name: workspace
+              persistentVolumeClaim:
+                claimName: kensan-workspace
