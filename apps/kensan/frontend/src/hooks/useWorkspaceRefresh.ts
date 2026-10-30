@@ -11,6 +11,7 @@ export function useWorkspaceRefresh() {
         [
           "today",
           "portfolio",
+          "watch",
           "board",
           "projects",
           "project",

@@ -1,5 +1,5 @@
 import { useEffect, useState, type ReactNode } from "react";
-import { NavLink } from "react-router-dom";
+import { NavLink, Link, useLocation } from "react-router-dom";
 import {
   LayoutDashboard,
   Sun,
@@ -25,6 +25,7 @@ const nav = [
     group: "今日",
     items: [
       { to: "/", label: "ダッシュボード", icon: LayoutDashboard },
+      { to: "/watch", label: "常設表示", icon: Monitor },
       { to: "/feed", label: "フィード", icon: Newspaper },
     ],
   },
@@ -43,6 +44,18 @@ const nav = [
 export function AppShell({ children }: { children: ReactNode }) {
   const [navOpen, setNavOpen] = useState(false);
   const close = () => setNavOpen(false);
+  const location = useLocation();
+  if (location.pathname === "/watch") return (
+    <div data-density="compact" className="min-h-screen">
+      <header className="flex items-center gap-3 border-b border-border bg-background ds-card">
+        <Link to="/" className="h-serif font-semibold text-brand">研鑽</Link>
+        <span className="text-sm text-muted-foreground">常設表示</span>
+        <Link to="/" className="ml-auto text-sm text-brand">地図と羅針盤</Link>
+        <ThemeSwitch />
+      </header>
+      <main className="ds-page min-w-0 max-w-6xl mx-auto">{children}</main>
+    </div>
+  );
 
   return (
     <div className="min-h-screen md:grid md:grid-cols-[200px_1fr]">
