@@ -1,5 +1,6 @@
 # Cluster Watch uses existing KubePodNotReady firing state for sustained
-# Pending/Unknown/NotReady; it does not add duplicate notification rules.
+# Pending/Unknown. Running readiness failures use five minutes of local history.
+# It does not add duplicate notification rules.
 # Immediate waiting reasons are diagnostic signals, not new firing alerts.
 # Negative counts mean monitoring is unavailable, never a healthy zero.
 apiVersion: monitoring.coreos.com/v1
@@ -38,6 +39,16 @@ spec:
         )
         unless on(namespace, pod, uid)
         (kube_pod_status_phase{phase=~"Succeeded|Failed"} == 1)
+    - record: cluster_watch:pod_unready:bool
+      expr: |-
+        (
+          max by(namespace, pod, uid) (
+            (kube_pod_status_phase{phase="Running"} == 1)
+            * on(namespace, pod, uid)
+            (kube_pod_status_ready{condition="true"} == bool 0)
+          )
+          unless on(namespace, pod, uid) kube_pod_owner{owner_kind="Job"}
+        ) and on() (cluster_watch:ksm_healthy:bool == 1)
     - record: cluster_watch:pod_notready:present
       expr: |-
         (label_replace(
@@ -49,12 +60,10 @@ spec:
         )
         or
         label_replace(
-          max by(namespace, pod, uid) (
-            (kube_pod_status_phase{phase="Running"} == 1)
-            and on(namespace,pod,uid) (kube_pod_status_ready{condition="true"} == 0)
-            and on(namespace, pod)
-            (ALERTS{alertname="KubePodNotReady",alertstate="firing"} == 1)
-          ), "reason", "NotReady", "pod", ".+"
+          (min_over_time(cluster_watch:pod_unready:bool[6m]) == 1)
+          and (count_over_time(cluster_watch:pod_unready:bool[6m]) >= 6)
+          and (cluster_watch:pod_unready:bool == 1),
+          "reason", "NotReady", "pod", ".+"
         ))
         unless on(namespace,pod,uid) kube_pod_owner{owner_kind="Job"}
     - record: cluster_watch:pod_failed:present

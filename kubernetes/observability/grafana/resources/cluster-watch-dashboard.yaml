@@ -362,7 +362,7 @@ data:
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "description": "待機理由は即時検出。Pending / Unknown / NotReady は既存 KubePodNotReady が firing の対象のみ。正常な完了Jobは対象外。監視状態が正常かつ0件なら一覧は空。同じ対象の理由をまとめて表示。",
+          "description": "待機理由は即時検出。Pending / Unknown は既存 KubePodNotReady の firing、Running の NotReady は1分ごとの記録で5分以上継続した対象。正常な完了Jobは対象外。監視状態が正常かつ0件なら一覧は空。同じ対象の理由をまとめて表示。",
           "targets": [
             {
               "datasource": {
