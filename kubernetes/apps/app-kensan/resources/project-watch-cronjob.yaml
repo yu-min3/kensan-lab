@@ -1,12 +1,11 @@
-# Enable only after releasing the image, configuring the dedicated client/CA,
-# and verifying shared runtime capacity and file locking on the workspace PVC.
+# Dedicated runtime auth, initial generation and cross-node PVC locking verified.
 apiVersion: batch/v1
 kind: CronJob
 metadata:
   name: kensan-project-watch
   namespace: app-kensan
 spec:
-  suspend: true
+  suspend: false
   schedule: "0 8-22/2 * * *"
   timeZone: Asia/Tokyo
   concurrencyPolicy: Forbid

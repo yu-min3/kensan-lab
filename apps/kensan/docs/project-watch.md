@@ -42,14 +42,14 @@ Konroと同じバージョン付きHTTP契約を小さな専用clientで使う�
 
 出力はJSON schemaだけでなく、文字数・既知の出典ID・プロジェクトとの対応も検証する。未知の出典・任意HTMLを採用しない。意味の正しさを完全に保証するものではないため、元の根拠へ進むリンクを残す。失敗しても前回成功要約と現在の元ログを表示できる。
 
-## 本番有効化前の手順
+## 本番運用
 
-現在のCronJobは **suspend: true**。資格やCAのリソースは存在するとは仮定しない。
+2026-10-30、v0.3.18を配備。専用clientのTLS/認証、初回生成と出典検証、UID65532の別Pod間flockとatomic renameを確認して定期実行を有効化した。以下は再配備・環境移行時の受入手順。
 
-1. multi-arch imageを公開し、CronJobとappのimageを配備する同一releaseへ合わせる。定義のv0.3.18は次release用で、公開済みとは限らない。
+1. multi-arch imageを公開し、CronJobとappのimageを配備する同一releaseへ合わせる。現在のv0.3.18はamd64/arm64とも公開済み。
 2. Keycloakに専用confidential clientを作り、audience `agent-runtime` を設定する。Konro資格は流用しない。
 3. senseのruntime許可clientへ追加する。配備用unitの共有30件/UTC日・FIFO1件・実行5分と、購読枠を再確認する。
-4. app-kensanへ`kensan-agent-runtime` Secret（key `client-secret`）と`kensan-agent-runtime-ca` ConfigMap（key `ca.crt`）を既存Vault/ExternalSecret等の運用で用意する。raw secretはGitへ入れない。
+4. app-kensanへ`kensan-agent-runtime` Secret（key `client-secret`）と`kensan-agent-runtime-ca` ConfigMap（key `ca.crt`）をSealedSecret/ConfigMapで用意する。raw secretはGitへ入れない。
 5. workspace PVC上でflockが別Pod間でも排他できること、UID65532の書込みとatomic renameを確認する。
 6. 許可された本番操作で1回実行し、TLS・認証・schema・根拠・再開・既存Konro動作を確認する。
 7. 成功後GitOpsでsuspendを外す。JST08〜22時2時間毎、concurrencyPolicy Forbid、batch retryなし。
