@@ -13,7 +13,7 @@ data:
       "title": "Cluster Watch",
       "description": "常設用。上段で取得状態と対処対象、下段で最近の不安定さを確認。履歴調査はCluster Healthへ。",
       "schemaVersion": 39,
-      "version": 1,
+      "version": 2,
       "editable": true,
       "id": null,
       "tags": [
@@ -356,20 +356,20 @@ data:
             "x": 0,
             "y": 3,
             "w": 24,
-            "h": 7
+            "h": 4
           },
           "datasource": {
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "description": "空欄（—）は表示データなし。監視の取得可否は上段の取得状態で確認。待機理由は即時検出。Pending / Unknown は既存 KubePodNotReady の firing、Running の NotReady は1分ごとの記録で5分以上継続した対象。正常な完了Jobは対象外。監視状態が正常かつ0件なら一覧は空。同じ対象の理由をまとめて表示。",
+          "description": "待機理由は即時検出。Pending / Unknown は既存 KubePodNotReady の firing、Running の NotReady は1分ごとの記録で5分以上継続した対象。正常な完了Jobは対象外。同じ対象の理由をまとめて表示。 監視正常で対象がない場合は「対象なし」、必要な監視データが取得できない場合は「取得不能」を表示。",
           "targets": [
             {
               "datasource": {
                 "type": "prometheus",
                 "uid": "prometheus"
               },
-              "expr": "cluster_watch:pod_issue:present and on() (cluster_watch:ksm_healthy:bool == 1)",
+              "expr": "((cluster_watch:pod_issue:present and on() (cluster_watch:ksm_healthy:bool == 1)) and on() ((cluster_watch:ksm_healthy:bool == 1) and on() (time() - timestamp(cluster_watch:ksm_healthy:bool) < 120)))\nor label_replace((label_replace((label_replace(((vector(0) and on() ((cluster_watch:ksm_healthy:bool == 1) and on() (time() - timestamp(cluster_watch:ksm_healthy:bool) < 120))) unless on() ((cluster_watch:pod_issue:present and on() (cluster_watch:ksm_healthy:bool == 1)) and on() ((cluster_watch:ksm_healthy:bool == 1) and on() (time() - timestamp(cluster_watch:ksm_healthy:bool) < 120)))), \"namespace\", \"—\", \"\", \"\")), \"pod\", \"対象なし\", \"\", \"\")), \"reason\", \"対象なし\", \"\", \"\")\nor label_replace((label_replace((label_replace((vector(-1) unless on() ((cluster_watch:ksm_healthy:bool == 1) and on() (time() - timestamp(cluster_watch:ksm_healthy:bool) < 120))), \"namespace\", \"—\", \"\", \"\")), \"pod\", \"取得不能\", \"\", \"\")), \"reason\", \"取得不能\", \"\", \"\")",
               "refId": "A",
               "instant": true,
               "format": "table"
@@ -447,9 +447,9 @@ data:
           "type": "table",
           "gridPos": {
             "x": 0,
-            "y": 10,
-            "w": 14,
-            "h": 6
+            "y": 7,
+            "w": 24,
+            "h": 7
           },
           "datasource": {
             "type": "prometheus",
@@ -526,7 +526,8 @@ data:
                     "value": 1
                   }
                 ]
-              }
+              },
+              "decimals": 1
             },
             "overrides": [
               {
@@ -616,6 +617,78 @@ data:
                     ]
                   }
                 ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Node"
+                },
+                "properties": [
+                  {
+                    "id": "custom.width",
+                    "value": 140
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Ready"
+                },
+                "properties": [
+                  {
+                    "id": "custom.width",
+                    "value": 110
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "CPU使用"
+                },
+                "properties": [
+                  {
+                    "id": "custom.width",
+                    "value": 120
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "メモリ使用"
+                },
+                "properties": [
+                  {
+                    "id": "custom.width",
+                    "value": 130
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "root空き"
+                },
+                "properties": [
+                  {
+                    "id": "custom.width",
+                    "value": 120
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Pressure"
+                },
+                "properties": [
+                  {
+                    "id": "custom.width",
+                    "value": 110
+                  }
+                ]
               }
             ]
           },
@@ -656,6 +729,14 @@ data:
                   "Value #C": "メモリ使用",
                   "Value #D": "root空き",
                   "Value #E": "Pressure"
+                },
+                "includeByName": {
+                  "node": true,
+                  "Value #A": true,
+                  "Value #B": true,
+                  "Value #C": true,
+                  "Value #D": true,
+                  "Value #E": true
                 }
               }
             }
@@ -666,23 +747,23 @@ data:
           "title": "直近1時間の再起動",
           "type": "table",
           "gridPos": {
-            "x": 14,
-            "y": 10,
-            "w": 10,
-            "h": 6
+            "x": 0,
+            "y": 14,
+            "w": 24,
+            "h": 5
           },
           "datasource": {
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "description": "空欄（—）は表示データなし。監視の取得可否は上段の取得状態で確認。復旧しても直近の不安定さを残す。累積回数ではなく1時間の増分。通常・init双方を含む。小数はrate補間による。",
+          "description": "空欄（—）は表示データなし。監視の取得可否は上段の取得状態で確認。復旧しても直近の不安定さを残す。累積回数ではなく1時間の増分。通常・init双方を含む。小数はrate補間による。 監視正常で対象がない場合は「対象なし」、必要な監視データが取得できない場合は「取得不能」を表示。",
           "targets": [
             {
               "datasource": {
                 "type": "prometheus",
                 "uid": "prometheus"
               },
-              "expr": "sum by(namespace,pod) (max by(namespace,pod,uid,container) (increase(kube_pod_container_status_restarts_total[1h])) or max by(namespace,pod,uid,container) (increase(kube_pod_init_container_status_restarts_total[1h]))) > 0",
+              "expr": "((sum by(namespace,pod) (max by(namespace,pod,uid,container) (increase(kube_pod_container_status_restarts_total[1h])) or max by(namespace,pod,uid,container) (increase(kube_pod_init_container_status_restarts_total[1h]))) > 0) and on() (((cluster_watch:ksm_healthy:bool == 1) and on() (time() - timestamp(cluster_watch:ksm_healthy:bool) < 120)) and on() (count(kube_pod_container_status_restarts_total) > 0)))\nor label_replace((label_replace(((vector(0) and on() (((cluster_watch:ksm_healthy:bool == 1) and on() (time() - timestamp(cluster_watch:ksm_healthy:bool) < 120)) and on() (count(kube_pod_container_status_restarts_total) > 0))) unless on() ((sum by(namespace,pod) (max by(namespace,pod,uid,container) (increase(kube_pod_container_status_restarts_total[1h])) or max by(namespace,pod,uid,container) (increase(kube_pod_init_container_status_restarts_total[1h]))) > 0) and on() (((cluster_watch:ksm_healthy:bool == 1) and on() (time() - timestamp(cluster_watch:ksm_healthy:bool) < 120)) and on() (count(kube_pod_container_status_restarts_total) > 0)))), \"namespace\", \"—\", \"\", \"\")), \"pod\", \"対象なし\", \"\", \"\")\nor label_replace((label_replace((vector(-1) unless on() (((cluster_watch:ksm_healthy:bool == 1) and on() (time() - timestamp(cluster_watch:ksm_healthy:bool) < 120)) and on() (count(kube_pod_container_status_restarts_total) > 0))), \"namespace\", \"—\", \"\", \"\")), \"pod\", \"取得不能\", \"\", \"\")",
               "refId": "A",
               "instant": true,
               "format": "table"
@@ -707,7 +788,22 @@ data:
                   }
                 ]
               },
-              "decimals": 1
+              "decimals": 1,
+              "mappings": [
+                {
+                  "type": "value",
+                  "options": {
+                    "0": {
+                      "text": "—",
+                      "color": "text"
+                    },
+                    "-1": {
+                      "text": "取得不能",
+                      "color": "gray"
+                    }
+                  }
+                }
+              ]
             },
             "overrides": []
           },
@@ -729,6 +825,11 @@ data:
                   "namespace": "Namespace",
                   "pod": "Pod",
                   "Value": "再起動 / 1h"
+                },
+                "includeByName": {
+                  "namespace": true,
+                  "pod": true,
+                  "Value": true
                 }
               }
             }
@@ -740,22 +841,22 @@ data:
           "type": "table",
           "gridPos": {
             "x": 0,
-            "y": 16,
-            "w": 14,
-            "h": 5
+            "y": 19,
+            "w": 24,
+            "h": 8
           },
           "datasource": {
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "description": "空欄（—）は表示データなし。監視の取得可否は上段の取得状態で確認。既存の確定アラートだけ表示。時間はpendingを含むアラート開始からの経過で、即時の待機理由の継続時間ではない。Job失敗はjob_nameから対象を表示し、収集用Podとは区別する。ALERTSは通知済み／抑制状態とは異なる。",
+          "description": "空欄（—）は表示データなし。監視の取得可否は上段の取得状態で確認。既存の確定アラートだけ表示。時間はpendingを含むアラート開始からの経過で、即時の待機理由の継続時間ではない。Job失敗はjob_nameから対象を表示し、収集用Podとは区別する。ALERTSは通知済み／抑制状態とは異なる。 監視正常で対象がない場合は「対象なし」、必要な監視データが取得できない場合は「取得不能」を表示。",
           "targets": [
             {
               "datasource": {
                 "type": "prometheus",
                 "uid": "prometheus"
               },
-              "expr": "max by(namespace,target,alertname) (label_replace((time() - ALERTS_FOR_STATE{alertname=~\"KubePodNotReady|KubePodCrashLooping\"}) and on(namespace,pod,alertname) ALERTS{alertname=~\"KubePodNotReady|KubePodCrashLooping\",alertstate=\"firing\"}, \"target\", \"Pod/$1\", \"pod\", \"(.+)\") or label_replace((time() - ALERTS_FOR_STATE{alertname=\"KubeJobFailed\"}) and on(namespace,job_name,alertname) ALERTS{alertname=\"KubeJobFailed\",alertstate=\"firing\"}, \"target\", \"Job/$1\", \"job_name\", \"(.+)\"))",
+              "expr": "((max by(namespace,target,alertname) (label_replace((time() - ALERTS_FOR_STATE{alertname=~\"KubePodNotReady|KubePodCrashLooping\"}) and on(namespace,pod,alertname) ALERTS{alertname=~\"KubePodNotReady|KubePodCrashLooping\",alertstate=\"firing\"}, \"target\", \"Pod/$1\", \"pod\", \"(.+)\") or label_replace((time() - ALERTS_FOR_STATE{alertname=\"KubeJobFailed\"}) and on(namespace,job_name,alertname) ALERTS{alertname=\"KubeJobFailed\",alertstate=\"firing\"}, \"target\", \"Job/$1\", \"job_name\", \"(.+)\"))) and on() (((cluster_watch:ksm_healthy:bool == 1) and on() (time() - timestamp(cluster_watch:ksm_healthy:bool) < 120)) and on() (max(time() - prometheus_rule_group_last_evaluation_timestamp_seconds{rule_group=~\".*kubernetes-apps.*\"}) < 120)))\nor label_replace((label_replace((label_replace(((vector(0) and on() (((cluster_watch:ksm_healthy:bool == 1) and on() (time() - timestamp(cluster_watch:ksm_healthy:bool) < 120)) and on() (max(time() - prometheus_rule_group_last_evaluation_timestamp_seconds{rule_group=~\".*kubernetes-apps.*\"}) < 120))) unless on() ((max by(namespace,target,alertname) (label_replace((time() - ALERTS_FOR_STATE{alertname=~\"KubePodNotReady|KubePodCrashLooping\"}) and on(namespace,pod,alertname) ALERTS{alertname=~\"KubePodNotReady|KubePodCrashLooping\",alertstate=\"firing\"}, \"target\", \"Pod/$1\", \"pod\", \"(.+)\") or label_replace((time() - ALERTS_FOR_STATE{alertname=\"KubeJobFailed\"}) and on(namespace,job_name,alertname) ALERTS{alertname=\"KubeJobFailed\",alertstate=\"firing\"}, \"target\", \"Job/$1\", \"job_name\", \"(.+)\"))) and on() (((cluster_watch:ksm_healthy:bool == 1) and on() (time() - timestamp(cluster_watch:ksm_healthy:bool) < 120)) and on() (max(time() - prometheus_rule_group_last_evaluation_timestamp_seconds{rule_group=~\".*kubernetes-apps.*\"}) < 120)))), \"namespace\", \"—\", \"\", \"\")), \"target\", \"対象なし\", \"\", \"\")), \"alertname\", \"発火なし\", \"\", \"\")\nor label_replace((label_replace((label_replace((vector(-1) unless on() (((cluster_watch:ksm_healthy:bool == 1) and on() (time() - timestamp(cluster_watch:ksm_healthy:bool) < 120)) and on() (max(time() - prometheus_rule_group_last_evaluation_timestamp_seconds{rule_group=~\".*kubernetes-apps.*\"}) < 120))), \"namespace\", \"—\", \"\", \"\")), \"target\", \"取得不能\", \"\", \"\")), \"alertname\", \"取得不能\", \"\", \"\")",
               "refId": "A",
               "instant": true,
               "format": "table"
@@ -780,7 +881,22 @@ data:
                   }
                 ]
               },
-              "unit": "dtdurations"
+              "unit": "dtdurations",
+              "mappings": [
+                {
+                  "type": "value",
+                  "options": {
+                    "0": {
+                      "text": "—",
+                      "color": "text"
+                    },
+                    "-1": {
+                      "text": "取得不能",
+                      "color": "gray"
+                    }
+                  }
+                }
+              ]
             },
             "overrides": []
           },
@@ -803,6 +919,12 @@ data:
                   "target": "Pod / Job",
                   "alertname": "アラート",
                   "Value": "開始から"
+                },
+                "includeByName": {
+                  "namespace": true,
+                  "target": true,
+                  "alertname": true,
+                  "Value": true
                 }
               }
             }
@@ -813,10 +935,10 @@ data:
           "title": "公開HTTPSの状態",
           "type": "table",
           "gridPos": {
-            "x": 14,
-            "y": 16,
-            "w": 10,
-            "h": 5
+            "x": 0,
+            "y": 27,
+            "w": 24,
+            "h": 11
           },
           "datasource": {
             "type": "prometheus",
@@ -870,7 +992,20 @@ data:
                 }
               ]
             },
-            "overrides": []
+            "overrides": [
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "HTTPS"
+                },
+                "properties": [
+                  {
+                    "id": "custom.width",
+                    "value": 100
+                  }
+                ]
+              }
+            ]
           },
           "options": {
             "showHeader": true,
@@ -892,6 +1027,10 @@ data:
                 "renameByName": {
                   "instance": "Endpoint",
                   "Value": "HTTPS"
+                },
+                "includeByName": {
+                  "instance": true,
+                  "Value": true
                 }
               }
             }
@@ -903,7 +1042,7 @@ data:
           "type": "stat",
           "gridPos": {
             "x": 0,
-            "y": 21,
+            "y": 38,
             "w": 24,
             "h": 2
           },
