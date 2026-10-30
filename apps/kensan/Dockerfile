@@ -15,11 +15,13 @@ FROM --platform=$BUILDPLATFORM golang:1.25 AS backend
 ARG TARGETARCH
 WORKDIR /build
 COPY apps/kensan/backend /build
-RUN CGO_ENABLED=0 GOOS=linux GOARCH=$TARGETARCH go build -trimpath -ldflags="-s -w" -o /kensan ./cmd/kensan
+RUN CGO_ENABLED=0 GOOS=linux GOARCH=$TARGETARCH go build -trimpath -ldflags="-s -w" -o /kensan ./cmd/kensan \
+ && CGO_ENABLED=0 GOOS=linux GOARCH=$TARGETARCH go build -trimpath -ldflags="-s -w" -o /project-watch ./cmd/project-watch
 
 # ---- runtime ----
 FROM gcr.io/distroless/static-debian12:nonroot
 COPY --from=backend /kensan /usr/local/bin/kensan
+COPY --from=backend /project-watch /usr/local/bin/project-watch
 COPY --from=frontend /build/apps/kensan/frontend/dist /srv/dist
 ENV KENSAN_STATIC_DIR=/srv/dist
 ENV KENSAN_ADDR=:8080

@@ -38,6 +38,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /api/v1/tasks", s.handleTasks)
 	mux.HandleFunc("GET /api/v1/today", s.handleToday)
 	mux.HandleFunc("GET /api/v1/portfolio", s.handlePortfolio)
+	mux.HandleFunc("GET /api/v1/watch", s.handleWatch)
 	mux.HandleFunc("POST /api/v1/portfolio/proposals/accept", s.handleProposalAccept)
 	mux.HandleFunc("POST /api/v1/portfolio/proposals/reject", s.handleProposalReject)
 	mux.HandleFunc("PUT /api/v1/routines/state", s.handleRoutineState)

@@ -1,0 +1,345 @@
+# promtool test rules; extract PrometheusRule.spec to cluster-watch.rules first.
+rule_files:
+- cluster-watch.rules
+evaluation_interval: 1m
+tests:
+- name: Running CrashLoop and init reasons count as one Pod
+  interval: 1m
+  input_series:
+  - &id001
+    series: up{job="kube-state-metrics",instance="ksm:8080"}
+    values: 1+0x30
+  - &id002
+    series: kube_node_info{node="node-a"}
+    values: 1+0x30
+  - &id003
+    series: kube_pod_info{namespace="example",pod="app-a",uid="uid-a"}
+    values: 1+0x30
+  - &id004
+    series: kube_pod_status_phase{namespace="monitoring",pod="inventory",uid="inventory",phase="Running"}
+    values: 1+0x30
+  - &id005
+    series: kube_pod_status_ready{namespace="monitoring",pod="inventory",uid="inventory",condition="true"}
+    values: 1+0x30
+  - series: kube_pod_status_phase{namespace="example",pod="app-a",uid="uid-a",phase="Running"}
+    values: 1+0x30
+  - series: kube_pod_status_ready{namespace="example",pod="app-a",uid="uid-a",condition="true"}
+    values: 0+0x30
+  - series: kube_pod_container_status_waiting_reason{namespace="example",pod="app-a",uid="uid-a",container="main",reason="CrashLoopBackOff"}
+    values: 1+0x30
+  - series: kube_pod_init_container_status_waiting_reason{namespace="example",pod="app-a",uid="uid-a",container="init",reason="ImagePullBackOff"}
+    values: 1+0x30
+  - series: ALERTS{namespace="example",pod="app-a",alertname="KubePodNotReady",alertstate="firing"}
+    values: 1+0x30
+  promql_expr_test:
+  - expr: cluster_watch:pod_count:current
+    eval_time: 10m
+    exp_samples:
+    - labels: '{__name__="cluster_watch:pod_count:current"}'
+      value: 1
+  - expr: count(cluster_watch:pod_issue:present)
+    eval_time: 10m
+    exp_samples:
+    - labels: '{}'
+      value: 3
+- name: Succeeded Jobs and transient Pending are not incidents
+  interval: 1m
+  input_series:
+  - *id001
+  - *id002
+  - *id003
+  - *id004
+  - *id005
+  - series: kube_pod_status_phase{namespace="example",pod="done-job",uid="uid-job",phase="Succeeded"}
+    values: 1+0x30
+  - series: kube_pod_owner{namespace="example",pod="done-job",uid="uid-job",owner_kind="Job"}
+    values: 1+0x30
+  - series: kube_pod_status_phase{namespace="example",pod="pending-a",uid="uid-pending",phase="Pending"}
+    values: 1+0x30
+  - series: kube_pod_init_container_status_waiting_reason{namespace="example",pod="done-job",uid="uid-job",container="init",reason="ImagePullBackOff"}
+    values: 1+0x30
+  promql_expr_test:
+  - expr: cluster_watch:pod_count:current
+    eval_time: 10m
+    exp_samples:
+    - labels: '{__name__="cluster_watch:pod_count:current"}'
+      value: 0
+- name: Confirmed Pending is visible while Job NotReady is excluded
+  interval: 1m
+  input_series:
+  - *id001
+  - *id002
+  - *id003
+  - *id004
+  - *id005
+  - series: kube_pod_status_phase{namespace="example",pod="pending-a",uid="uid-pending",phase="Pending"}
+    values: 1+0x30
+  - series: ALERTS{namespace="example",pod="pending-a",alertname="KubePodNotReady",alertstate="firing"}
+    values: 1+0x30
+  - series: kube_pod_status_phase{namespace="example",pod="job-a",uid="uid-job",phase="Pending"}
+    values: 1+0x30
+  - series: kube_pod_owner{namespace="example",pod="job-a",uid="uid-job",owner_kind="Job"}
+    values: 1+0x30
+  - series: ALERTS{namespace="example",pod="job-a",alertname="KubePodNotReady",alertstate="firing"}
+    values: 1+0x30
+  promql_expr_test:
+  - expr: cluster_watch:pod_count:current
+    eval_time: 10m
+    exp_samples:
+    - labels: '{__name__="cluster_watch:pod_count:current"}'
+      value: 1
+  - expr: count(cluster_watch:pod_issue:present{reason="Pending"})
+    eval_time: 10m
+    exp_samples:
+    - labels: '{}'
+      value: 1
+- name: Failed non-Job is visible and historic Failed Job is excluded
+  interval: 1m
+  input_series:
+  - *id001
+  - *id002
+  - *id003
+  - *id004
+  - *id005
+  - series: kube_pod_status_phase{namespace="example",pod="failed-a",uid="uid-failed",phase="Failed"}
+    values: 1+0x30
+  - series: kube_pod_status_phase{namespace="example",pod="job-a",uid="uid-job",phase="Failed"}
+    values: 1+0x30
+  - series: kube_pod_owner{namespace="example",pod="job-a",uid="uid-job",owner_kind="Job"}
+    values: 1+0x30
+  promql_expr_test:
+  - expr: cluster_watch:pod_count:current
+    eval_time: 10m
+    exp_samples:
+    - labels: '{__name__="cluster_watch:pod_count:current"}'
+      value: 1
+- name: Missing KSM is unknown rather than zero
+  interval: 1m
+  input_series: []
+  promql_expr_test:
+  - expr: cluster_watch:pod_count:current
+    eval_time: 10m
+    exp_samples:
+    - labels: '{__name__="cluster_watch:pod_count:current"}'
+      value: -1
+- name: KSM scrape down is unknown despite cached metrics
+  interval: 1m
+  input_series:
+  - series: up{job="kube-state-metrics",instance="ksm:8080"}
+    values: 0+0x30
+  - *id002
+  - *id003
+  - *id004
+  - *id005
+  promql_expr_test:
+  - expr: cluster_watch:pod_count:current
+    eval_time: 10m
+    exp_samples:
+    - labels: '{__name__="cluster_watch:pod_count:current"}'
+      value: -1
+- name: Missing Pod inventory is unknown despite KSM up
+  interval: 1m
+  input_series:
+  - *id001
+  - *id002
+  promql_expr_test:
+  - expr: cluster_watch:pod_count:current
+    eval_time: 10m
+    exp_samples:
+    - labels: '{__name__="cluster_watch:pod_count:current"}'
+      value: -1
+- name: Scrape freshness is required
+  interval: 1m
+  input_series:
+  - *id001
+  - *id002
+  - series: kube_pod_info{namespace="example",pod="app-a",uid="uid-a"}
+    values: 1+0x5
+  promql_expr_test:
+  - expr: cluster_watch:pod_count:current
+    eval_time: 10m
+    exp_samples:
+    - labels: '{__name__="cluster_watch:pod_count:current"}'
+      value: -1
+- name: HTTPS scrape failure is unknown rather than zero
+  interval: 1m
+  input_series:
+  - *id001
+  - *id002
+  - *id003
+  - *id004
+  - *id005
+  - series: up{job="https-platform",instance="https://service.example"}
+    values: 0+0x30
+  - series: probe_success{job="https-platform",instance="https://service.example"}
+    values: 1+0x30
+  promql_expr_test:
+  - expr: cluster_watch:pod_count:current
+    eval_time: 10m
+    exp_samples:
+    - labels: '{__name__="cluster_watch:pod_count:current"}'
+      value: 0
+  - expr: cluster_watch:https_count:current
+    eval_time: 10m
+    exp_samples:
+    - labels: '{__name__="cluster_watch:https_count:current"}'
+      value: -1
+- name: HTTPS failure with healthy monitoring is an incident
+  interval: 1m
+  input_series:
+  - *id001
+  - *id002
+  - *id003
+  - *id004
+  - *id005
+  - series: up{job="https-platform",instance="https://service.example"}
+    values: 1+0x30
+  - series: probe_success{job="https-platform",instance="https://service.example"}
+    values: 0+0x30
+  promql_expr_test:
+  - expr: cluster_watch:pod_count:current
+    eval_time: 10m
+    exp_samples:
+    - labels: '{__name__="cluster_watch:pod_count:current"}'
+      value: 0
+  - expr: cluster_watch:https_count:current
+    eval_time: 10m
+    exp_samples:
+    - labels: '{__name__="cluster_watch:https_count:current"}'
+      value: 1
+- name: HTTPS missing a configured target is unknown
+  interval: 1m
+  input_series:
+  - *id001
+  - *id002
+  - *id003
+  - *id004
+  - *id005
+  - series: up{job="https-platform",instance="https://one.example"}
+    values: 1+0x30
+  - series: up{job="https-platform",instance="https://two.example"}
+    values: 1+0x30
+  - series: probe_success{job="https-platform",instance="https://one.example"}
+    values: 1+0x30
+  promql_expr_test:
+  - expr: cluster_watch:pod_count:current
+    eval_time: 10m
+    exp_samples:
+    - labels: '{__name__="cluster_watch:pod_count:current"}'
+      value: 0
+  - expr: cluster_watch:https_count:current
+    eval_time: 10m
+    exp_samples:
+    - labels: '{__name__="cluster_watch:https_count:current"}'
+      value: -1
+- name: Running readiness failure is visible without an alert
+  interval: 1m
+  input_series:
+  - *id001
+  - *id002
+  - *id003
+  - *id004
+  - *id005
+  - series: kube_pod_status_phase{namespace="example",pod="ready-check",uid="uid-ready",phase="Running"}
+    values: 1+0x30
+  - series: kube_pod_status_ready{namespace="example",pod="ready-check",uid="uid-ready",condition="true"}
+    values: 0+0x30
+  promql_expr_test:
+  - expr: cluster_watch:pod_count:current
+    eval_time: 5m
+    exp_samples:
+    - labels: '{__name__="cluster_watch:pod_count:current"}'
+      value: 1
+- name: Transient Running readiness failure stays below threshold
+  interval: 1m
+  input_series:
+  - *id001
+  - *id002
+  - *id003
+  - *id004
+  - *id005
+  - series: kube_pod_status_phase{namespace="example",pod="ready-check",uid="uid-ready",phase="Running"}
+    values: 1+0x30
+  - series: kube_pod_status_ready{namespace="example",pod="ready-check",uid="uid-ready",condition="true"}
+    values: 1 0 0 0 1+0x26
+  promql_expr_test:
+  - expr: cluster_watch:pod_count:current
+    eval_time: 3m
+    exp_samples:
+    - labels: '{__name__="cluster_watch:pod_count:current"}'
+      value: 0
+- name: Readiness requires a complete five minute history
+  interval: 1m
+  input_series:
+  - *id001
+  - *id002
+  - *id003
+  - *id004
+  - *id005
+  - series: kube_pod_status_phase{namespace="example",pod="ready-check",uid="uid-ready",phase="Running"}
+    values: 1+0x30
+  - series: kube_pod_status_ready{namespace="example",pod="ready-check",uid="uid-ready",condition="true"}
+    values: 0+0x30
+  promql_expr_test:
+  - expr: cluster_watch:pod_count:current
+    eval_time: 4m
+    exp_samples:
+    - labels: '{__name__="cluster_watch:pod_count:current"}'
+      value: 0
+- name: Recovered Running readiness failure clears immediately
+  interval: 1m
+  input_series:
+  - *id001
+  - *id002
+  - *id003
+  - *id004
+  - *id005
+  - series: kube_pod_status_phase{namespace="example",pod="ready-check",uid="uid-ready",phase="Running"}
+    values: 1+0x30
+  - series: kube_pod_status_ready{namespace="example",pod="ready-check",uid="uid-ready",condition="true"}
+    values: 0+0x5 1+0x24
+  promql_expr_test:
+  - expr: cluster_watch:pod_count:current
+    eval_time: 6m
+    exp_samples:
+    - labels: '{__name__="cluster_watch:pod_count:current"}'
+      value: 0
+- name: Readiness does not bridge a monitoring gap
+  interval: 1m
+  input_series:
+  - series: up{job="kube-state-metrics",instance="ksm:8080"}
+    values: 1+0x3 0 1+0x25
+  - *id002
+  - *id003
+  - *id004
+  - *id005
+  - series: kube_pod_status_phase{namespace="example",pod="ready-check",uid="uid-ready",phase="Running"}
+    values: 1+0x30
+  - series: kube_pod_status_ready{namespace="example",pod="ready-check",uid="uid-ready",condition="true"}
+    values: 0+0x30
+  promql_expr_test:
+  - expr: cluster_watch:pod_count:current
+    eval_time: 9m
+    exp_samples:
+    - labels: '{__name__="cluster_watch:pod_count:current"}'
+      value: 0
+- name: Running Job readiness failure is excluded
+  interval: 1m
+  input_series:
+  - *id001
+  - *id002
+  - *id003
+  - *id004
+  - *id005
+  - series: kube_pod_status_phase{namespace="example",pod="ready-check",uid="uid-ready",phase="Running"}
+    values: 1+0x30
+  - series: kube_pod_status_ready{namespace="example",pod="ready-check",uid="uid-ready",condition="true"}
+    values: 0+0x30
+  - series: kube_pod_owner{namespace="example",pod="ready-check",uid="uid-ready",owner_kind="Job"}
+    values: 1+0x30
+  promql_expr_test:
+  - expr: cluster_watch:pod_count:current
+    eval_time: 10m
+    exp_samples:
+    - labels: '{__name__="cluster_watch:pod_count:current"}'
+      value: 0

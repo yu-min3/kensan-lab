@@ -1,0 +1,14 @@
+---
+apiVersion: bitnami.com/v1alpha1
+kind: SealedSecret
+metadata:
+  name: kensan-agent-runtime
+  namespace: app-kensan
+spec:
+  encryptedData:
+    client-secret: AgAMyXSGLPgyZ/H8CDnU7yTLqZhpDsDeFnoMV+qv7HqHXMkbaS4R8e60CvOYPZUKZMLD05cwAhvDIHTO5qwNRPQNqMTJp8xyi6IEzx76iwM5SvDsgw5OVU+D8E/HibKYoWBIqY8HvUlpEO7LJpSfvQTKcQ44t+Ii60OOvr08h6ppsfWqombNNAt6EeRUd0cCegxNg5T/rOOg83xfiU8EoWnBFkT4KWpZrKRvxj6TPgzi+nP9vndAqHKN8xqUNChAjnXVE3f4Ji/3ZqWlIjZnGtMCnI2yw3U5uBeldoThXmTtkU9bxRVNx40pt7B4qHqjlVFh6KErVwpmDYTdjV7wqKmnXVGxh1lY7acPwQzqr4ZneiniqVHApvKEFxJYKv3rcFJ8sL68eAkfHUiXOUvM10icDUkazYZl9oStFkqOXtaRAjm2LVmHLBeyrT/Niriksnai1mbKpNuVrvkRLMRGigxcUMyzTKv14Vji/9ZMMFUmQJuUZqhY4OT/0J/UXh7L50VNtuvwfh1MxD5olHoORX0PIYuUmLNT5jmpjTqN6q0uAm4z+S4izjiZwz8CJhxJ3wSML7RS5DErfL2F5/JPDbhw5h36n7PsOEhZZYwb2ZKPam0FteChZZC3UbDyreEE0k7beGUXagaRtArhJ9Y78tJ7Nv5nYP7KG6F/29cQJJISbr6Me9R2Bfnx/bDBy5c0Xmqb5Xzw0mI14MlU0TPc5rv4oTP5L9glJHOCraBEkrYkOQ==
+  template:
+    metadata:
+      name: kensan-agent-runtime
+      namespace: app-kensan
+    type: Opaque

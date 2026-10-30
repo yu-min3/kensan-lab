@@ -1,0 +1,969 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: grafana-cluster-watch-dashboard
+  namespace: monitoring
+  labels:
+    grafana_dashboard: "1"
+    grafana_folder: "Platform"
+data:
+  cluster-watch.json: |
+    {
+      "uid": "cluster-watch",
+      "title": "Cluster Watch",
+      "description": "常設用。上段で取得状態と対処対象、下段で最近の不安定さを確認。履歴調査はCluster Healthへ。",
+      "schemaVersion": 39,
+      "version": 1,
+      "editable": true,
+      "id": null,
+      "tags": [
+        "platform",
+        "watch"
+      ],
+      "refresh": "1m",
+      "time": {
+        "from": "now-1h",
+        "to": "now"
+      },
+      "timezone": "browser",
+      "links": [
+        {
+          "title": "Cluster Health",
+          "url": "/d/cluster-health",
+          "type": "link",
+          "targetBlank": false
+        },
+        {
+          "title": "Control Plane Health",
+          "url": "/d/controlplane-health",
+          "type": "link",
+          "targetBlank": false
+        },
+        {
+          "title": "Longhorn",
+          "url": "/dashboards?query=Longhorn",
+          "type": "link",
+          "targetBlank": false
+        }
+      ],
+      "panels": [
+        {
+          "id": 1,
+          "title": "監視の取得状態",
+          "type": "stat",
+          "gridPos": {
+            "x": 0,
+            "y": 0,
+            "w": 6,
+            "h": 3
+          },
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "description": "",
+          "targets": [
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "prometheus"
+              },
+              "expr": "((cluster_watch:ksm_healthy:bool * cluster_watch:https_healthy:bool\n* ((min(up{job=\"node-exporter\"}) == bool 1) or vector(0))\n* ((count(up{job=\"node-exporter\"}) >= bool count(kube_node_info)) or vector(0))) and on() (time() - timestamp(cluster_watch:ksm_healthy:bool) < 120)) or vector(-1)",
+              "refId": "A",
+              "instant": true,
+              "format": "time_series"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "noValue": "確認不能",
+              "color": {
+                "mode": "thresholds"
+              },
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "green",
+                    "value": null
+                  },
+                  {
+                    "color": "orange",
+                    "value": 1
+                  }
+                ]
+              },
+              "mappings": [
+                {
+                  "type": "value",
+                  "options": {
+                    "1": {
+                      "text": "取得正常",
+                      "color": "green"
+                    },
+                    "0": {
+                      "text": "一部確認不能",
+                      "color": "orange"
+                    },
+                    "-1": {
+                      "text": "確認不能",
+                      "color": "gray"
+                    }
+                  }
+                }
+              ]
+            },
+            "overrides": []
+          },
+          "options": {
+            "colorMode": "value",
+            "graphMode": "none",
+            "textMode": "value",
+            "reduceOptions": {
+              "calcs": [
+                "lastNotNull"
+              ],
+              "fields": "",
+              "values": false
+            }
+          }
+        },
+        {
+          "id": 2,
+          "title": "要確認Pod（対象単位）",
+          "type": "stat",
+          "gridPos": {
+            "x": 6,
+            "y": 0,
+            "w": 6,
+            "h": 3
+          },
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "description": "",
+          "targets": [
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "prometheus"
+              },
+              "expr": "(cluster_watch:pod_count:current and on() (time() - timestamp(cluster_watch:pod_count:current) < 120)) or vector(-1)",
+              "refId": "A",
+              "instant": true,
+              "format": "time_series"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "noValue": "確認不能",
+              "color": {
+                "mode": "thresholds"
+              },
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "green",
+                    "value": null
+                  },
+                  {
+                    "color": "orange",
+                    "value": 1
+                  }
+                ]
+              },
+              "mappings": [
+                {
+                  "type": "value",
+                  "options": {
+                    "-1": {
+                      "text": "確認不能",
+                      "color": "gray"
+                    }
+                  }
+                }
+              ]
+            },
+            "overrides": []
+          },
+          "options": {
+            "colorMode": "value",
+            "graphMode": "none",
+            "textMode": "value",
+            "reduceOptions": {
+              "calcs": [
+                "lastNotNull"
+              ],
+              "fields": "",
+              "values": false
+            }
+          }
+        },
+        {
+          "id": 3,
+          "title": "Readyノード",
+          "type": "stat",
+          "gridPos": {
+            "x": 12,
+            "y": 0,
+            "w": 6,
+            "h": 3
+          },
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "description": "",
+          "targets": [
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "prometheus"
+              },
+              "expr": "(sum(kube_node_status_condition{condition=\"Ready\",status=\"true\"}) and on() (cluster_watch:ksm_healthy:bool == 1)) or vector(-1)",
+              "refId": "A",
+              "instant": true,
+              "format": "time_series"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "noValue": "確認不能",
+              "color": {
+                "mode": "fixed",
+                "fixedColor": "text"
+              },
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "green",
+                    "value": null
+                  },
+                  {
+                    "color": "orange",
+                    "value": 1
+                  }
+                ]
+              },
+              "mappings": [
+                {
+                  "type": "value",
+                  "options": {
+                    "-1": {
+                      "text": "確認不能",
+                      "color": "gray"
+                    }
+                  }
+                }
+              ]
+            },
+            "overrides": []
+          },
+          "options": {
+            "colorMode": "value",
+            "graphMode": "none",
+            "textMode": "value",
+            "reduceOptions": {
+              "calcs": [
+                "lastNotNull"
+              ],
+              "fields": "",
+              "values": false
+            }
+          }
+        },
+        {
+          "id": 4,
+          "title": "HTTPS異常",
+          "type": "stat",
+          "gridPos": {
+            "x": 18,
+            "y": 0,
+            "w": 6,
+            "h": 3
+          },
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "description": "",
+          "targets": [
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "prometheus"
+              },
+              "expr": "(cluster_watch:https_count:current and on() (time() - timestamp(cluster_watch:https_count:current) < 120)) or vector(-1)",
+              "refId": "A",
+              "instant": true,
+              "format": "time_series"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "noValue": "確認不能",
+              "color": {
+                "mode": "thresholds"
+              },
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "green",
+                    "value": null
+                  },
+                  {
+                    "color": "orange",
+                    "value": 1
+                  }
+                ]
+              },
+              "mappings": [
+                {
+                  "type": "value",
+                  "options": {
+                    "-1": {
+                      "text": "確認不能",
+                      "color": "gray"
+                    }
+                  }
+                }
+              ]
+            },
+            "overrides": []
+          },
+          "options": {
+            "colorMode": "value",
+            "graphMode": "none",
+            "textMode": "value",
+            "reduceOptions": {
+              "calcs": [
+                "lastNotNull"
+              ],
+              "fields": "",
+              "values": false
+            }
+          }
+        },
+        {
+          "id": 5,
+          "title": "いま確認するPod",
+          "type": "table",
+          "gridPos": {
+            "x": 0,
+            "y": 3,
+            "w": 24,
+            "h": 7
+          },
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "description": "待機理由は即時検出。Pending / Unknown は既存 KubePodNotReady の firing、Running の NotReady は1分ごとの記録で5分以上継続した対象。正常な完了Jobは対象外。監視状態が正常かつ0件なら一覧は空。同じ対象の理由をまとめて表示。",
+          "targets": [
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "prometheus"
+              },
+              "expr": "cluster_watch:pod_issue:present and on() (cluster_watch:ksm_healthy:bool == 1)",
+              "refId": "A",
+              "instant": true,
+              "format": "table"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "noValue": "確認不能",
+              "color": {
+                "mode": "thresholds"
+              },
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "green",
+                    "value": null
+                  },
+                  {
+                    "color": "orange",
+                    "value": 1
+                  }
+                ]
+              }
+            },
+            "overrides": []
+          },
+          "options": {
+            "showHeader": true,
+            "cellHeight": "sm",
+            "footer": {
+              "show": false
+            }
+          },
+          "transformations": [
+            {
+              "id": "groupBy",
+              "options": {
+                "fields": {
+                  "namespace": {
+                    "operation": "groupby"
+                  },
+                  "pod": {
+                    "operation": "groupby"
+                  },
+                  "reason": {
+                    "operation": "aggregate",
+                    "aggregations": [
+                      "uniqueValues"
+                    ]
+                  }
+                }
+              }
+            },
+            {
+              "id": "organize",
+              "options": {
+                "indexByName": {
+                  "namespace": 0,
+                  "pod": 1,
+                  "reason (uniqueValues)": 2
+                },
+                "renameByName": {
+                  "namespace": "Namespace",
+                  "pod": "Pod",
+                  "reason (uniqueValues)": "理由"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "id": 6,
+          "title": "ノードの余裕",
+          "type": "table",
+          "gridPos": {
+            "x": 0,
+            "y": 10,
+            "w": 14,
+            "h": 6
+          },
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "description": "期待ノードは kube_node_status_condition から表示。exporter不通時はCPU等を確認不能として残す。ノード一覧そのものが取得できない場合は上の監視状態を確認。rootは空き割合。",
+          "targets": [
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "prometheus"
+              },
+              "expr": "max by(node) (kube_node_status_condition{condition=\"Ready\",status=\"true\"}) and on() (cluster_watch:ksm_healthy:bool == 1)",
+              "refId": "A",
+              "instant": true,
+              "format": "table"
+            },
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "prometheus"
+              },
+              "expr": "label_replace(max by(nodename) ((1 - avg by(instance) (rate(node_cpu_seconds_total{mode=\"idle\"}[5m]))) * on(instance) group_left(nodename) node_uname_info), \"node\", \"$1\", \"nodename\", \"(.+)\")",
+              "refId": "B",
+              "instant": true,
+              "format": "table"
+            },
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "prometheus"
+              },
+              "expr": "label_replace(max by(nodename) ((1 - node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes) * on(instance) group_left(nodename) node_uname_info), \"node\", \"$1\", \"nodename\", \"(.+)\")",
+              "refId": "C",
+              "instant": true,
+              "format": "table"
+            },
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "prometheus"
+              },
+              "expr": "label_replace(min by(nodename) ((node_filesystem_avail_bytes{mountpoint=\"/\",fstype!~\"tmpfs|overlay\"} / node_filesystem_size_bytes{mountpoint=\"/\",fstype!~\"tmpfs|overlay\"}) * on(instance) group_left(nodename) node_uname_info), \"node\", \"$1\", \"nodename\", \"(.+)\")",
+              "refId": "D",
+              "instant": true,
+              "format": "table"
+            },
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "prometheus"
+              },
+              "expr": "max by(node) (kube_node_status_condition{condition=~\"MemoryPressure|DiskPressure|PIDPressure\",status=\"true\"}) and on() (cluster_watch:ksm_healthy:bool == 1)",
+              "refId": "E",
+              "instant": true,
+              "format": "table"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "noValue": "確認不能",
+              "color": {
+                "mode": "thresholds"
+              },
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "green",
+                    "value": null
+                  },
+                  {
+                    "color": "orange",
+                    "value": 1
+                  }
+                ]
+              }
+            },
+            "overrides": [
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "CPU使用"
+                },
+                "properties": [
+                  {
+                    "id": "unit",
+                    "value": "percentunit"
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "メモリ使用"
+                },
+                "properties": [
+                  {
+                    "id": "unit",
+                    "value": "percentunit"
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "root空き"
+                },
+                "properties": [
+                  {
+                    "id": "unit",
+                    "value": "percentunit"
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Ready"
+                },
+                "properties": [
+                  {
+                    "id": "mappings",
+                    "value": [
+                      {
+                        "type": "value",
+                        "options": {
+                          "0": {
+                            "text": "NotReady",
+                            "color": "red"
+                          },
+                          "1": {
+                            "text": "Ready",
+                            "color": "green"
+                          }
+                        }
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Pressure"
+                },
+                "properties": [
+                  {
+                    "id": "mappings",
+                    "value": [
+                      {
+                        "type": "value",
+                        "options": {
+                          "0": {
+                            "text": "なし",
+                            "color": "green"
+                          },
+                          "1": {
+                            "text": "要確認",
+                            "color": "orange"
+                          }
+                        }
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          "options": {
+            "showHeader": true,
+            "cellHeight": "sm",
+            "footer": {
+              "show": false
+            }
+          },
+          "transformations": [
+            {
+              "id": "joinByField",
+              "options": {
+                "byField": "node",
+                "mode": "outerTabular"
+              }
+            },
+            {
+              "id": "organize",
+              "options": {
+                "excludeByName": {
+                  "Time": true,
+                  "Time 1": true,
+                  "Time 2": true,
+                  "Time 3": true,
+                  "Time 4": true,
+                  "Time 5": true,
+                  "nodename": true,
+                  "nodename 1": true,
+                  "nodename 2": true,
+                  "nodename 3": true
+                },
+                "renameByName": {
+                  "node": "Node",
+                  "Value #A": "Ready",
+                  "Value #B": "CPU使用",
+                  "Value #C": "メモリ使用",
+                  "Value #D": "root空き",
+                  "Value #E": "Pressure"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "id": 7,
+          "title": "直近1時間の再起動",
+          "type": "table",
+          "gridPos": {
+            "x": 14,
+            "y": 10,
+            "w": 10,
+            "h": 6
+          },
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "description": "復旧しても直近の不安定さを残す。累積回数ではなく1時間の増分。通常・init双方を含む。小数はrate補間による。",
+          "targets": [
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "prometheus"
+              },
+              "expr": "sum by(namespace,pod) (max by(namespace,pod,uid,container) (increase(kube_pod_container_status_restarts_total[1h])) or max by(namespace,pod,uid,container) (increase(kube_pod_init_container_status_restarts_total[1h]))) > 0",
+              "refId": "A",
+              "instant": true,
+              "format": "table"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "noValue": "確認不能",
+              "color": {
+                "mode": "thresholds"
+              },
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "green",
+                    "value": null
+                  },
+                  {
+                    "color": "orange",
+                    "value": 1
+                  }
+                ]
+              },
+              "decimals": 1
+            },
+            "overrides": []
+          },
+          "options": {
+            "showHeader": true,
+            "cellHeight": "sm",
+            "footer": {
+              "show": false
+            }
+          },
+          "transformations": [
+            {
+              "id": "organize",
+              "options": {
+                "excludeByName": {
+                  "Time": true
+                },
+                "renameByName": {
+                  "namespace": "Namespace",
+                  "pod": "Pod",
+                  "Value": "再起動 / 1h"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "id": 8,
+          "title": "継続しているPodアラート",
+          "type": "table",
+          "gridPos": {
+            "x": 0,
+            "y": 16,
+            "w": 14,
+            "h": 5
+          },
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "description": "既存の確定アラートだけ表示。時間はpendingを含むアラート開始からの経過で、即時の待機理由の継続時間ではない。Job失敗もここで確認。ALERTSは通知済み／抑制状態とは異なる。",
+          "targets": [
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "prometheus"
+              },
+              "expr": "max by(namespace,pod,alertname) ((time() - ALERTS_FOR_STATE{alertname=~\"KubePodNotReady|KubePodCrashLooping|KubeJobFailed\"}) and on(namespace,pod,alertname) ALERTS{alertname=~\"KubePodNotReady|KubePodCrashLooping|KubeJobFailed\",alertstate=\"firing\"})",
+              "refId": "A",
+              "instant": true,
+              "format": "table"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "noValue": "確認不能",
+              "color": {
+                "mode": "thresholds"
+              },
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "green",
+                    "value": null
+                  },
+                  {
+                    "color": "orange",
+                    "value": 1
+                  }
+                ]
+              },
+              "unit": "dtdurations"
+            },
+            "overrides": []
+          },
+          "options": {
+            "showHeader": true,
+            "cellHeight": "sm",
+            "footer": {
+              "show": false
+            }
+          },
+          "transformations": [
+            {
+              "id": "organize",
+              "options": {
+                "excludeByName": {
+                  "Time": true
+                },
+                "renameByName": {
+                  "namespace": "Namespace",
+                  "pod": "Pod",
+                  "alertname": "アラート",
+                  "Value": "開始から"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "id": 9,
+          "title": "公開HTTPSの状態",
+          "type": "table",
+          "gridPos": {
+            "x": 14,
+            "y": 16,
+            "w": 10,
+            "h": 5
+          },
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "description": "PodがRunningでもHTTPS到達性は別に確認。0=疎通失敗。上段が確認不能なら空の一覧を正常と解釈しない。",
+          "targets": [
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "prometheus"
+              },
+              "expr": "probe_success{job=\"https-platform\"} and on() (cluster_watch:https_healthy:bool == 1)",
+              "refId": "A",
+              "instant": true,
+              "format": "table"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "noValue": "確認不能",
+              "color": {
+                "mode": "thresholds"
+              },
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "green",
+                    "value": null
+                  },
+                  {
+                    "color": "orange",
+                    "value": 1
+                  }
+                ]
+              },
+              "mappings": [
+                {
+                  "type": "value",
+                  "options": {
+                    "0": {
+                      "text": "不通",
+                      "color": "red"
+                    },
+                    "1": {
+                      "text": "到達",
+                      "color": "green"
+                    }
+                  }
+                }
+              ]
+            },
+            "overrides": []
+          },
+          "options": {
+            "showHeader": true,
+            "cellHeight": "sm",
+            "footer": {
+              "show": false
+            }
+          },
+          "transformations": [
+            {
+              "id": "organize",
+              "options": {
+                "excludeByName": {
+                  "Time": true,
+                  "job": true
+                },
+                "renameByName": {
+                  "instance": "Endpoint",
+                  "Value": "HTTPS"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "id": 10,
+          "title": "データ時刻・読み方",
+          "type": "stat",
+          "gridPos": {
+            "x": 0,
+            "y": 21,
+            "w": 24,
+            "h": 2
+          },
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "description": "表示値はPodデータのサンプル時刻。画面の更新時刻ではない。取得失敗時は前の表示が残ることがあるため監視状態と併せて確認。",
+          "targets": [
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "prometheus"
+              },
+              "expr": "max(timestamp(kube_pod_info)) * 1000",
+              "refId": "A",
+              "instant": true,
+              "format": "time_series"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "noValue": "確認不能",
+              "color": {
+                "mode": "fixed",
+                "fixedColor": "text"
+              },
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "green",
+                    "value": null
+                  },
+                  {
+                    "color": "orange",
+                    "value": 1
+                  }
+                ]
+              },
+              "unit": "dateTimeAsIso"
+            },
+            "overrides": []
+          },
+          "options": {
+            "colorMode": "none",
+            "graphMode": "none",
+            "reduceOptions": {
+              "calcs": [
+                "lastNotNull"
+              ],
+              "fields": "",
+              "values": false
+            },
+            "textMode": "value"
+          }
+        }
+      ],
+      "templating": {
+        "list": []
+      },
+      "annotations": {
+        "list": []
+      }
+    }
