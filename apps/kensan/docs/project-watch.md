@@ -10,7 +10,7 @@
 - 最新の `feeds/YYYY/MM/DD.md` を文脈として含める。URLやメールの収集は現行Feed取り込みを継続する。
 - 内容のhashが前回成功入力と同じなら推論を省く。日次最大8件（JST）。同じ内容の再生成は通常実行ではしない。
 - 初回は現存記録の要約を作るため、その内容を「前回から進んだ」と解釈しない。画面では参照記録の日付とAI生成日時を分ける。
-- 資料は1README最大1MiB、抽出後1プロジェクト16KB、Feed32KB、全資料のJSON120KB。超過を隠して切り捨てずエラーを出す。
+- 資料は1README最大1MiB、抽出後1プロジェクト16KB、Feed32KB、全資料のJSON120KB。超過を隠して切り捨てずAI処理のエラーを出す。常設APIでは元ログと前回要約を保持し、入力上限の警告を表示する。
 
 ## 保存契約
 
@@ -36,7 +36,7 @@ Konroと同じバージョン付きHTTP契約を小さな専用clientで使う�
 
 ローカル模擬runtimeだけはloopback HTTPと`KENSAN_AGENT_TOKEN_FILE`を利用できる。外部平文HTTP・redirectは許可しない。
 
-送信前にkeyを保存する。同key・同payloadの再送は同じjobとなる。通信断は状態を保持し10分まで同じjobを確認する。waitingは自動retryしない。24時間を超える未完了jobは要確認として止め、新規依頼を重ねない。failed/cancelledを自動再試行しない。
+送信前にkeyを保存する。同key・同payloadの再送は同じjobとなる。通信断は状態を保持し10分まで同じjobを確認する。waitingは自動retryしない。24時間を超えるjobも同じkey/IDで結果を確認する。未完了なら待機としてCLIを終え、新しい依頼は作らない。failed/cancelledを自動再試行しない。
 
 `--reset-failed` は、runtime上で元jobが終端（failed/cancelled/succeeded）と確認できた場合だけ新しいkeyで再生成を準備する。応答喪失でID不明の依頼を捨てることはできない。元の同keyで受付結果を回収する。日次上限は再生成も含む。
 

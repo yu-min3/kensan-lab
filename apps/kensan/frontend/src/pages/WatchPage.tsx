@@ -67,6 +67,7 @@ function ProjectChanges({ data }: { data: WatchView }) {
    <div className="text-xs text-muted-foreground ds-stack" role="status">
      <p className={unhealthy ? "text-warning" : undefined}>{unhealthy ? "要確認 · " : ""}{labels[state.status] ?? "AI更新状態を確認してください"}</p>
      <p>最終確認 {stamp(state.checkedAt)} ／ AI生成 {stamp(result?.generatedAt)}</p>
+     {data.snapshot.warnings?.map(message => <p key={message} className="text-warning">{message}</p>)}
      {(state.reason || data.stateError) && <p>{data.stateError ?? state.reason}</p>}
      {data.stale && <p className="text-warning">AI要約のあとに記録が変わっています。下の元の記録が最新です。</p>}
    </div>

@@ -225,3 +225,39 @@ func TestResetCannotForgetRunningJob(t *testing.T) {
 		t.Fatal("running job discarded")
 	}
 }
+
+func TestDisplaySurvivesAIInputLimit(t *testing.T) {
+	root := t.TempDir()
+	put(t, root, "projects/sample/README.md", project)
+	put(t, root, "feeds/2026/10/30.md", strings.Repeat("x", 32001))
+	put(t, root, ResultPath, `{"version":1,"hash":"old","generatedAt":"2026-10-29T10:00:00+09:00","items":[],"sources":[]}`)
+	if _, e := Collect(root); e == nil {
+		t.Fatal("AI accepted oversized input")
+	}
+	v, e := Read(root)
+	if e != nil || len(v.Snapshot.Projects) != 1 || v.Result == nil || len(v.Snapshot.Warnings) == 0 {
+		t.Fatalf("display lost records: %+v %v", v, e)
+	}
+}
+func TestLostResponseCanRecoverAfter24Hours(t *testing.T) {
+	root := t.TempDir()
+	put(t, root, "projects/sample/README.md", project)
+	f := &fake{failCreate: true, output: goodOutput}
+	for i := 0; i < 2; i++ {
+		if _, e := Step(context.Background(), root, f, now); e != nil {
+			t.Fatal(e)
+		}
+	}
+	late := now.Add(25 * time.Hour)
+	s, e := Step(context.Background(), root, f, late)
+	if e != nil || s.Status != "waiting" {
+		t.Fatalf("overdue recovery: %+v %v", s, e)
+	}
+	s, e = Step(context.Background(), root, f, late)
+	if e != nil || s.Status != "succeeded" {
+		t.Fatalf("result was abandoned: %+v %v", s, e)
+	}
+	if len(f.keys) != 2 || f.keys[0] != f.keys[1] || string(f.payloads[0]) != string(f.payloads[1]) {
+		t.Fatal("overdue recovery created a different request")
+	}
+}

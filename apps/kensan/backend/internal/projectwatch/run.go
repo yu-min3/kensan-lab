@@ -102,7 +102,7 @@ func save(r *os.Root, path string, v any) error {
 	return r.Rename(tmp, path)
 }
 func Read(root string) (View, error) {
-	snap, e := Collect(root)
+	snap, e := collect(root, false)
 	if e != nil {
 		return View{}, e
 	}
@@ -128,6 +128,7 @@ func Read(root string) (View, error) {
 		v.StateError = "AI要約を読み取れません"
 	}
 	// Pending contains input snapshots; do not expose these as runtime status.
+	v.Snapshot.Sources = nil
 	v.State.Pending = nil
 	v.State.Baseline = nil
 	return v, nil
@@ -194,9 +195,10 @@ func Step(ctx context.Context, root string, g agentclient.Gateway, now time.Time
 	if state.Pending != nil {
 		p := state.Pending
 		t, err := time.Parse(time.RFC3339, p.CreatedAt)
-		if err != nil || now.Sub(t) > 24*time.Hour {
-			return fail("未完了ジョブが24時間を超えました。実行状態を確認してください")
+		if err != nil {
+			return fail("ジョブの受付日時を確認してください")
 		}
+		overdue := now.Sub(t) > 24*time.Hour
 		if g == nil {
 			state.Status = "not_configured"
 			state.Reason = "runtime接続を設定してください"
@@ -221,6 +223,10 @@ func Step(ctx context.Context, root string, g agentclient.Gateway, now time.Time
 		state.Reason = ""
 		switch job.State {
 		case "queued", "running":
+			if overdue {
+				state.Status = "waiting"
+				state.Reason = "24時間を超えるジョブを確認中です。新しい依頼は作成しません"
+			}
 		case "waiting":
 			state.Reason = "runtimeで待機中です。利用枠・認証・実行条件を確認してください"
 		case "failed", "cancelled":

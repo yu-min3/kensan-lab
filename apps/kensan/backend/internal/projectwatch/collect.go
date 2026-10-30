@@ -33,6 +33,7 @@ type Project struct {
 	Next string `json:"next"`
 }
 type Snapshot struct {
+	Warnings []string  `json:"warnings,omitempty"`
 	Hash     string    `json:"hash"`
 	Sources  []Source  `json:"sources"`
 	Projects []Project `json:"projects"`
@@ -95,7 +96,9 @@ func readLimited(r *os.Root, path string, max int64) ([]byte, error) {
 
 // Collect reads only direct project READMEs and the latest imported feed.
 // Source text is bounded explicitly; excessive input is an error, never silently dropped.
-func Collect(root string) (Snapshot, error) {
+func Collect(root string) (Snapshot, error) { return collect(root, true) }
+
+func collect(root string, forAI bool) (Snapshot, error) {
 	r, e := os.OpenRoot(root)
 	if e != nil {
 		return Snapshot{}, e
@@ -120,7 +123,14 @@ func Collect(root string) (Snapshot, error) {
 		path := "projects/" + name + "/README.md"
 		b, e := readLimited(r, path, 1024*1024)
 		if e != nil {
-			return Snapshot{}, e
+			if os.IsNotExist(e) {
+				continue
+			}
+			if forAI {
+				return Snapshot{}, e
+			}
+			snap.Warnings = append(snap.Warnings, "記録を読み取れません: "+name)
+			continue
 		}
 		text := strings.ReplaceAll(string(b), "\r\n", "\n")
 		var meta struct {
@@ -129,7 +139,11 @@ func Collect(root string) (Snapshot, error) {
 		if strings.HasPrefix(text, "---\n") {
 			if end := strings.Index(text[4:], "\n---"); end >= 0 {
 				if e = yaml.Unmarshal([]byte(text[4:4+end]), &meta); e != nil {
-					return Snapshot{}, fmt.Errorf("invalid frontmatter: %s", path)
+					if forAI {
+						return Snapshot{}, fmt.Errorf("invalid frontmatter: %s", path)
+					}
+					snap.Warnings = append(snap.Warnings, "frontmatterを読み取れません: "+name)
+					continue
 				}
 			}
 		}
@@ -170,7 +184,10 @@ func Collect(root string) (Snapshot, error) {
 			evidence += l.date + ": " + l.text + "\n"
 		}
 		if len(evidence) > 16000 {
-			return Snapshot{}, fmt.Errorf("project context exceeds 16000 bytes: %s", name)
+			if forAI {
+				return Snapshot{}, fmt.Errorf("project context exceeds 16000 bytes: %s", name)
+			}
+			snap.Warnings = append(snap.Warnings, "AI入力上限を超えています: "+name)
 		}
 		snap.Sources = append(snap.Sources, Source{ID: "project:" + name, Project: name, Path: path, Date: p.Date, Text: evidence, Hash: digest([]byte(evidence))})
 	}
@@ -222,18 +239,32 @@ func Collect(root string) (Snapshot, error) {
 			}
 		}
 		if latest != "" {
-			b, e := readLimited(r, latest, 32000)
-			if e != nil {
-				return Snapshot{}, e
+			limit := int64(32000)
+			if !forAI {
+				limit = 1024 * 1024
 			}
-			snap.Sources = append(snap.Sources, Source{ID: "feed:latest", Path: latest, Text: string(b), Hash: digest(b)})
+			b, e := readLimited(r, latest, limit)
+			if e != nil {
+				if forAI {
+					return Snapshot{}, e
+				}
+				snap.Warnings = append(snap.Warnings, "AI参照用フィードを読み取れません")
+			} else {
+				if !forAI && len(b) > 32000 {
+					snap.Warnings = append(snap.Warnings, "フィードがAI入力上限を超えています")
+				}
+				snap.Sources = append(snap.Sources, Source{ID: "feed:latest", Path: latest, Text: string(b), Hash: digest(b)})
+			}
 		}
 	} else if !os.IsNotExist(e) {
 		return Snapshot{}, e
 	}
 	b, _ := json.Marshal(snap.Sources)
 	if len(b) > 120000 {
-		return Snapshot{}, fmt.Errorf("combined context exceeds 120000 bytes")
+		if forAI {
+			return Snapshot{}, fmt.Errorf("combined context exceeds 120000 bytes")
+		}
+		snap.Warnings = append(snap.Warnings, "資料全体がAI入力上限を超えています")
 	}
 	snap.Hash = digest(b)
 	sort.SliceStable(snap.Projects, func(i, j int) bool { return snap.Projects[i].Date > snap.Projects[j].Date })

@@ -510,7 +510,7 @@ updated: ${date}
 export interface WatchSource { id: string; project: string; path: string; date: string; text: string; hash: string }
 export interface WatchItem { project: string; change: string; meaning: string; decision: string; sourceIds: string[] }
 export interface WatchView {
-  snapshot: { hash: string; projects: { name: string; path: string; date: string; text: string; next: string }[] };
+  snapshot: { hash: string; warnings?: string[]; projects: { name: string; path: string; date: string; text: string; next: string }[] };
   state: { status: string; reason?: string; checkedAt?: string; lastSuccessAt?: string };
   result: { hash: string; generatedAt: string; items: WatchItem[]; sources: WatchSource[] } | null;
   stale: boolean; stateError?: string;
