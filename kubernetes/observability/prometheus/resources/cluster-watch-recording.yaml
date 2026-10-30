@@ -1,0 +1,81 @@
+# Cluster Watch uses existing KubePodNotReady firing state for sustained
+# Pending/Unknown/NotReady; it does not add duplicate notification rules.
+# Immediate waiting reasons are diagnostic signals, not new firing alerts.
+# Negative counts mean monitoring is unavailable, never a healthy zero.
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: cluster-watch-recording
+  namespace: monitoring
+  labels:
+    release: prometheus
+    app: kube-prometheus-stack
+spec:
+  groups:
+  - name: cluster-watch
+    interval: 1m
+    rules:
+    - record: cluster_watch:ksm_healthy:bool
+      expr: |-
+        ((min(up{job="kube-state-metrics"}) == bool 1) or vector(0))
+        * ((count(kube_node_info) > bool 0) or vector(0))
+        * ((count(kube_pod_info) > bool 0) or vector(0))
+        * ((count(kube_pod_status_phase) > bool 0) or vector(0))
+        * ((count(kube_pod_status_ready) > bool 0) or vector(0))
+        * ((time() - min(timestamp(kube_pod_info)) < bool 120) or vector(0))
+    - record: cluster_watch:https_healthy:bool
+      expr: |-
+        ((min(up{job="https-platform"}) == bool 1) or vector(0))
+        * ((count(probe_success{job="https-platform"}) > bool 0) or vector(0))
+        * ((count(probe_success{job="https-platform"}) == bool count(up{job="https-platform"})) or vector(0))
+        * ((time() - min(timestamp(probe_success{job="https-platform"})) < bool 120) or vector(0))
+    - record: cluster_watch:pod_waiting:present
+      expr: |-
+        max by(namespace, pod, uid, reason) (
+          (kube_pod_container_status_waiting_reason{reason=~"CrashLoopBackOff|ImagePullBackOff|ErrImagePull|CreateContainerConfigError|CreateContainerError"} == 1)
+          or
+          (kube_pod_init_container_status_waiting_reason{reason=~"CrashLoopBackOff|ImagePullBackOff|ErrImagePull|CreateContainerConfigError|CreateContainerError"} == 1)
+        )
+        unless on(namespace, pod, uid)
+        (kube_pod_status_phase{phase=~"Succeeded|Failed"} == 1)
+    - record: cluster_watch:pod_notready:present
+      expr: |-
+        (label_replace(
+          max by(namespace, pod, uid, phase) (
+            (kube_pod_status_phase{phase=~"Pending|Unknown"} == 1)
+            and on(namespace, pod)
+            (ALERTS{alertname="KubePodNotReady",alertstate="firing"} == 1)
+          ), "reason", "$1", "phase", "(.+)"
+        )
+        or
+        label_replace(
+          max by(namespace, pod, uid) (
+            (kube_pod_status_phase{phase="Running"} == 1)
+            and on(namespace,pod,uid) (kube_pod_status_ready{condition="true"} == 0)
+            and on(namespace, pod)
+            (ALERTS{alertname="KubePodNotReady",alertstate="firing"} == 1)
+          ), "reason", "NotReady", "pod", ".+"
+        ))
+        unless on(namespace,pod,uid) kube_pod_owner{owner_kind="Job"}
+    - record: cluster_watch:pod_failed:present
+      expr: |-
+        label_replace(
+          max by(namespace,pod,uid) (kube_pod_status_phase{phase="Failed"} == 1)
+          unless on(namespace,pod,uid) kube_pod_owner{owner_kind="Job"},
+          "reason", "Failed", "pod", ".+"
+        )
+    - record: cluster_watch:pod_issue:present
+      expr: |-
+        max by(namespace,pod,uid,reason) (
+          cluster_watch:pod_waiting:present
+          or cluster_watch:pod_notready:present
+          or cluster_watch:pod_failed:present
+        )
+    - record: cluster_watch:pod_count:current
+      expr: |-
+        ((count(max by(namespace,pod,uid) (cluster_watch:pod_issue:present)) or vector(0))
+          and on() (cluster_watch:ksm_healthy:bool == 1)) or vector(-1)
+    - record: cluster_watch:https_count:current
+      expr: |-
+        ((count(probe_success{job="https-platform"} == 0) or vector(0))
+          and on() (cluster_watch:https_healthy:bool == 1)) or vector(-1)
