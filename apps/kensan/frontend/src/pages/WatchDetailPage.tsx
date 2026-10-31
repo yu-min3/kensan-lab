@@ -2,6 +2,7 @@ import { useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Link, useLocation, useParams } from "react-router-dom";
 import { api } from "../lib/api";
+import { DailyMergeChart } from "../components/DailyMergeChart";
 import { MarkdownView } from "../components/MarkdownView";
 import { Card, CardBody, CardHead } from "../components/ui/card";
 import { Badge } from "../components/ui/badge";
@@ -30,7 +31,7 @@ export function WatchActivityPage(){
  {q.isPending?<SkeletonRows rows={5}/>:q.isError?<ErrorState error={q.error} onRetry={()=>q.refetch()}/>:<>
  <section id="publications" className="scroll-mt-6"><Card><CardHead title="今月公開した記事" sub={`Zenn · ${pub?.month??"今月分は未取得"}`}/><CardBody className="ds-stack"><p className="font-mono text-4xl">{pub?.items.length??"—"}<span className="text-base"> 本</span></p><p className="text-sm text-muted-foreground">公開日時をJSTの暦月で集計。下書き・既存記事の更新は含みません。対象はZennです。</p>{pub?.items.length?<ul className="ds-stack">{pub.items.map(a=><li key={a.url}><a href={a.url} className="text-brand">{a.title} ↗</a><p className="text-xs text-muted-foreground">公開 {watchStamp(a.at)}</p></li>)}</ul>:<p className="text-sm">{pub?"今月の公開記事はありません。":"今月分の観測値を取得できていません。"}</p>}<p className="text-xs text-muted-foreground">{metricNote(q.data?.publications)}</p>{q.data?.publications.error&&<p className="text-warning text-sm">{q.data.publications.error}。前回値を保持しています。</p>}</CardBody></Card></section>
  <section id="development" className="scroll-mt-6"><Card><CardHead title="今週の開発" sub={`${q.data?.repo||"リポジトリ未設定"} · ${dev?.week??"今週分は未取得"}〜（JST・月曜始まり）`}/><CardBody className="ds-stack"><div className="grid grid-cols-2 gap-4"><div><p className="text-sm text-muted-foreground">マージPR</p><p className="font-mono text-4xl">{dev?.items.length??"—"}<span className="text-base"> 件</span></p></div><div><p className="text-sm text-muted-foreground">作成→マージの中央値</p><p className="font-mono text-4xl">{dev?.medianHours?.toFixed(1)??"—"}<span className="text-base"> 時間</span></p></div></div>
- {dev&&<div className="grid grid-cols-7 gap-2" aria-label="曜日別のマージPR数">{dev.days.map((n,i)=><div key={i} className="ds-stack items-center"><div className="h-20 w-full bg-muted flex items-end rounded-sm overflow-hidden"><div className="w-full bg-brand" style={{height:`${n/Math.max(1,...dev.days)*100}%`}}/></div><span className="text-xs">{"月火水木金土日"[i]}</span><span className="font-mono text-sm">{n}</span></div>)}</div>}
+ {dev&&<DailyMergeChart days={dev.days} week={dev.week} updatedAt={q.data?.development.updatedAt}/>}
  <p className="text-sm text-muted-foreground">マージ日時が今週のPRを集計。却下・未マージは除外。時間はPR作成からマージまでで、作業時間や本番配備時間ではありません。</p>
  <ul className="divide-y divide-border">{dev?.items.map(p=><li key={p.url} className="py-3"><a href={p.url} className="text-brand">{p.title} ↗</a><p className="text-xs text-muted-foreground">マージ {watchStamp(p.mergedAt)}</p></li>)}</ul><p className="text-xs text-muted-foreground">{metricNote(q.data?.development)}</p>{q.data?.development.error&&<p className="text-warning text-sm">{q.data.development.error}。前回値を保持しています。</p>}
  </CardBody></Card></section>

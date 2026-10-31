@@ -53,6 +53,8 @@ test("公開数・Stars・週次PRから集計の詳細へ遷移する",async({p
  const pub=page.getByRole("link",{name:/今月公開した記事/});await expect(pub).toContainText("1 本");
  await expect(page.getByRole("link",{name:/kensan-lab Stars/})).toContainText("19");
  await expect(page.getByRole("link",{name:/今週のマージPR/})).toContainText("1 件");
+ await expect(page.getByRole("group",{name:"曜日別のマージPR数"})).toBeVisible();
+ await expect(page.getByRole("img",{name:"10/28（水）: 1件"})).toBeVisible();
  await pub.click();await expect(page).toHaveURL(/\/watch\/activity#publications$/);
  await expect(page.getByRole("link",{name:"公開した記事 ↗"})).toHaveAttribute("href","https://zenn.dev/writer/articles/one");
  await expect(page.getByRole("link",{name:"実装を改善する ↗"})).toHaveAttribute("href","https://github.com/sample/repo/pull/1");
