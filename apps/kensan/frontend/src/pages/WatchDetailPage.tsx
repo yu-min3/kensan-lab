@@ -2,19 +2,21 @@ import { useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Link, useLocation, useParams } from "react-router-dom";
 import { api } from "../lib/api";
+import { WatchUpdateStatus } from "../components/WatchUpdateStatus";
 import { DailyMergeChart } from "../components/DailyMergeChart";
 import { MarkdownView } from "../components/MarkdownView";
 import { Card, CardBody, CardHead } from "../components/ui/card";
 import { Badge } from "../components/ui/badge";
 import { ErrorState, SkeletonRows } from "../components/ui/states";
 import { watchHeadline } from "../lib/watchExcerpt";
-import { metricNote, metricValue, watchPoll, watchStamp } from "./WatchPage";
+import { metricNote, metricValue, watchPoll, watchStamp, WatchWarnings } from "./WatchPage";
 export function WatchChangePage(){
  const {project}=useParams();const q=useQuery({queryKey:["watch"],queryFn:api.watch,...watchPoll});
  useEffect(()=>{window.scrollTo(0,0);},[project]);
  const p=q.data?.snapshot.projects.find(p=>p.name===project);const summaries=q.data?.result?.items.filter(i=>i.project===project)??[];
- return <div className="ds-section min-w-0"><Link to="/watch" className="text-brand text-sm">← 常設表示へ</Link>
+ return <div className="ds-section min-w-0"><Link to="/watch" className="text-brand text-sm">← 常設表示へ</Link><WatchWarnings warnings={q.data?.snapshot.warnings}/>
  {q.isPending?<SkeletonRows rows={5}/>:q.isError&&!q.data?<ErrorState error={q.error} onRetry={()=>q.refetch()}/>:!p?<p>このプロジェクトの記録はありません。</p>:<>
+ {q.data&&<WatchUpdateStatus data={q.data} readError={q.isError}/>}
  <header><p className="text-sm text-muted-foreground">{p.name} · 記録 {p.date||"日付なし"}</p><h1 className="h-serif text-2xl font-semibold">{!q.data?.stale&&summaries[0]?.headline||watchHeadline(p.text)||p.name}</h1></header>
  {q.isError&&<p className="text-warning" role="status">更新を取得できません。前回の表示を残しています。</p>}
  <Card><CardHead title="最新の元の記録"/><CardBody><MarkdownView content={p.text||"新しい記録はありません。"}/>{p.next&&<p className="text-sm text-muted-foreground">次の節目：{p.next}</p>}<Link to={`/#project-${encodeURIComponent(p.name)}`} className="text-brand text-sm">プロジェクト全体を開く →</Link></CardBody></Card>

@@ -211,7 +211,7 @@ test("1行追加で日記を作成し、本文編集後にも自由な本文へ�
   expect(daily.content).toContain("09:05 朝は散歩に出たい");
   expect(daily.content).toContain("本文からも書ける");
   expect(daily.content).toContain("09:05 夕方は読書した");
-  expect(daily.content).not.toContain("## 日記");
+  expect(daily.content.match(/^## 日記$/gm)).toHaveLength(1);
 });
 
 test("1行追加の保存失敗では本文ドラフトに入力が残る", async ({ page }) => {

@@ -53,6 +53,7 @@ type State struct {
 	Version       int      `json:"version"`
 	Status        string   `json:"status"`
 	Reason        string   `json:"reason,omitempty"`
+	ReasonCode    string   `json:"reasonCode,omitempty"`
 	CheckedAt     string   `json:"checkedAt"`
 	LastSuccessAt string   `json:"lastSuccessAt,omitempty"`
 	LastHash      string   `json:"lastHash,omitempty"`
@@ -194,6 +195,9 @@ func Step(ctx context.Context, root string, g agentclient.Gateway, now time.Time
 	if state.Version != 1 {
 		return state, errors.New("unsupported state version")
 	}
+	// Checking an existing job is a fresh observation too, including failures.
+	state.CheckedAt = now.Format(time.RFC3339)
+	state.ReasonCode = ""
 	persist := func() (State, error) { return state, save(r, StatePath, state) }
 	fail := func(reason string) (State, error) { state.Status = "failed"; state.Reason = reason; return persist() }
 	if state.Pending != nil {
@@ -232,7 +236,19 @@ func Step(ctx context.Context, root string, g agentclient.Gateway, now time.Time
 				state.Reason = "24時間を超えるジョブを確認中です。新しい依頼は作成しません"
 			}
 		case "waiting":
-			state.Reason = "runtimeで待機中です。利用枠・認証・実行条件を確認してください"
+			switch job.Reason {
+			case "auth_required":
+				state.ReasonCode = job.Reason
+				state.Reason = "AIの再認証が必要です。認証後に待機中の依頼を再開してください"
+			case "billing_blocked":
+				state.ReasonCode = job.Reason
+				state.Reason = "AIの認証または利用条件を確認してください。確認後に待機中の依頼の再開が必要です"
+			case "quota_wait":
+				state.ReasonCode = job.Reason
+				state.Reason = "AIの利用枠を待っています。枠の回復後に待機中の依頼を再開してください"
+			default:
+				state.Reason = "AI更新は待機中です。実行条件を確認して依頼を再開してください"
+			}
 		case "failed", "cancelled":
 			state.Reason = "runtimeの実行が終了しました。状態を確認して明示的に再生成してください"
 		case "succeeded":
@@ -287,7 +303,6 @@ func Step(ctx context.Context, root string, g agentclient.Gateway, now time.Time
 		}
 		return persist()
 	}
-	state.CheckedAt = now.Format(time.RFC3339)
 	snap, err := Collect(root)
 	if err != nil {
 		return fail("入力記録を収集できません: " + err.Error())

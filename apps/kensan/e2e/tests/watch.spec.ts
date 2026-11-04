@@ -126,3 +126,15 @@ test("日記画面から追記した本文を常設に出さず予定編集後�
  const saved=(await (await page.request.get("/api/v1/files/daily/2032/05/01.md")).json()).content;expect(saved).toContain("## 日記");expect(saved).toContain("PRIVATE JOURNAL ENTRY");
  await page.getByRole("textbox",{name:"一行日記",exact:true}).fill("PRIVATE SECOND ENTRY");await page.getByRole("button",{name:"日記に残す"}).click();await expect(page.getByRole("textbox",{name:"一行日記",exact:true})).toHaveValue("");await expect(page.getByLabel("今日やりたいことの本文")).toHaveText("本を読む");await expect(page.getByText("PRIVATE SECOND ENTRY",{exact:false})).toHaveCount(0);
 });
+
+test("定期再取得で待機から成功へ変わっても日記入力を失わずAIを起動しない",async({page})=>{
+ await page.clock.install({time:new Date("2033-06-01T01:01:00Z")});await diary(page);await feed(page);await metrics(page);
+ let ready=false;const writes:string[]=[];
+ await page.route("**/api/v1/watch",r=>r.fulfill({json:{snapshot:{hash:"x",projects:[]},state:{status:ready?"succeeded":"waiting",reasonCode:ready?undefined:"billing_blocked",checkedAt:"2033-06-01T10:00:00+09:00"},result:{hash:"x",generatedAt:ready?"2033-06-01T10:00:00+09:00":"2033-05-30T10:00:00+09:00",items:[],sources:[]},stale:!ready}}));
+ page.on("request",r=>{if(r.method()!=="GET")writes.push(r.method()+" "+r.url())});
+ await page.goto("/watch");const status=page.getByLabel("AI更新の状態");await expect(status).toContainText("AI更新は要再開");await expect(status).toContainText("次回確認予定 6/1 12:00 JST");
+ await status.getByText("必要な対応を見る").click();await expect(status).toContainText("認証・利用条件を確認");
+ await page.getByRole("textbox",{name:"一行日記",exact:true}).fill("まだ保存しない個人の入力");ready=true;await page.clock.fastForward(61_000);
+ await expect(status).toContainText("確認済み");await expect(status).toContainText("AI生成 6/1 10:00");await expect(page.getByRole("textbox",{name:"一行日記",exact:true})).toHaveValue("まだ保存しない個人の入力");
+ await expect(page.getByText("PRIVATE DIARY MUST STAY HIDDEN")).toHaveCount(0);expect(writes).toEqual([]);
+});

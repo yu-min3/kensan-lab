@@ -20,6 +20,7 @@ type fake struct {
 	failCreate bool
 	output     string
 	state      string
+	reason     string
 }
 
 func (f *fake) Create(_ context.Context, r agentclient.Request) (agentclient.Job, error) {
@@ -38,7 +39,7 @@ func (f *fake) Get(_ context.Context, id string) (agentclient.Job, error) {
 	if s == "" {
 		s = "succeeded"
 	}
-	return agentclient.Job{ID: id, State: s, Output: json.RawMessage(f.output)}, nil
+	return agentclient.Job{ID: id, State: s, Reason: f.reason, Output: json.RawMessage(f.output)}, nil
 }
 func (f *fake) Action(context.Context, string, string) (agentclient.Job, error) {
 	panic("no automatic retry")
@@ -108,6 +109,41 @@ func TestResumeAndNoChange(t *testing.T) {
 	actual, _ := os.ReadFile(filepath.Join(root, "projects/sample/README.md"))
 	if string(actual) != project {
 		t.Fatal("human record modified")
+	}
+}
+
+func TestWaitingChecksAdvanceAndPreserveEvidence(t *testing.T) {
+	for _, reason := range []string{"auth_required", "billing_blocked", "quota_wait", "UNTRUSTED SECRET DETAIL"} {
+		t.Run(reason, func(t *testing.T) {
+			root := t.TempDir()
+			put(t, root, "projects/sample/README.md", project)
+			put(t, root, ResultPath, `{"version":1,"hash":"old","generatedAt":"2026-10-29T10:00:00+09:00","items":[],"sources":[]}`)
+			f := &fake{state: "waiting", reason: reason}
+			for i := 0; i < 2; i++ {
+				if _, err := Step(context.Background(), root, f, now); err != nil {
+					t.Fatal(err)
+				}
+			}
+			late := now.Add(4 * 24 * time.Hour)
+			state, err := Step(context.Background(), root, f, late)
+			if err != nil || state.Status != "waiting" || state.CheckedAt != late.Format(time.RFC3339) {
+				t.Fatalf("state %v, error %v", state.Status, err)
+			}
+			if state.Pending == nil || state.Pending.CreatedAt != now.Format(time.RFC3339) || f.creates != 1 {
+				t.Fatal("waiting job replaced or resubmitted")
+			}
+			v, err := Read(root)
+			if err != nil || v.Result == nil || v.Result.Hash != "old" || v.State.CheckedAt != late.Format(time.RFC3339) {
+				t.Fatal("observation or previous result lost")
+			}
+			if reason == "UNTRUSTED SECRET DETAIL" {
+				if state.ReasonCode != "" || strings.Contains(state.Reason, reason) {
+					t.Fatal("provider details leaked")
+				}
+			} else if state.ReasonCode != reason {
+				t.Fatal("actionable reason lost")
+			}
+		})
 	}
 }
 func TestRejectInventedEvidencePreservePrevious(t *testing.T) {
