@@ -3,6 +3,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Link, useSearchParams } from "react-router-dom";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { api, todayISO, dailyPath, dailySkeleton } from "../lib/api";
+import { prepareQuickLine } from "../lib/quickDiary";
 import { Card, CardBody, CardHead } from "../components/ui/card";
 import { Button } from "../components/ui/button";
 import { MilkdownEditor } from "../components/editors/MilkdownEditor";
@@ -83,9 +84,9 @@ export function DailyJournal({ date, onDate }: { date: string; onDate: (date: st
       const time = new Intl.DateTimeFormat("ja-JP", {
         timeZone: "Asia/Tokyo", hour: "2-digit", minute: "2-digit", hourCycle: "h23",
       }).format(new Date());
-      const entry = `${time} ${text}`;
+      const content = prepareQuickLine(file.notFound ? dailySkeleton(date) : file.draft, text, time).content;
       if (file.notFound) {
-        await api.createFile(dailyPath(date), `${dailySkeleton(date).trimEnd()}\n\n${entry}\n`);
+        await api.createFile(dailyPath(date), content);
         await Promise.all([
           client.invalidateQueries({ queryKey: ["file", dailyPath(date)] }),
           client.invalidateQueries({ queryKey: ["dailyList"] }),
@@ -93,7 +94,7 @@ export function DailyJournal({ date, onDate }: { date: string; onDate: (date: st
         clearLine(text);
       } else {
         // Share the editor's save queue and conflict recovery. No second writer.
-        const saving = file.replace(`${file.draft.trimEnd()}\n\n${entry}\n`);
+        const saving = file.replace(content);
         clearLine(text); // The line now belongs to the recoverable document draft.
         await saving;
       }
@@ -149,7 +150,7 @@ export function DailyJournal({ date, onDate }: { date: string; onDate: (date: st
           event.preventDefault();
           if (line.trim() && !busy && !file.saveError) append.mutate(line.trim());
         }} className="ds-stack">
-          <label htmlFor="diary-line" className="text-sm">今日やりたいこと・いま思っていること</label>
+          <label htmlFor="diary-line" className="text-sm">いま思っていることを日記に残す</label>
           <div className="flex flex-col sm:flex-row gap-2">
             <input id="diary-line" aria-label="日記（1 行）" value={line}
               onChange={event => setLine(event.target.value)} disabled={busy}

@@ -61,10 +61,10 @@ it("retains public input on a conflict without exposing the rest of the diary", 
   vi.spyOn(api, "putFile").mockRejectedValue(new ApiError(409, "conflict"));
   mount(true);
   fireEvent.click(await screen.findByRole("button", { name: "今日やりたいことを書く" }));
-  fireEvent.change(screen.getByRole("textbox"), { target: { value: "買い物に行く" } });
+  fireEvent.change(screen.getByRole("textbox", { name: /やりたいこと（ダッシュボードに表示）/ }), { target: { value: "買い物に行く" } });
   fireEvent.click(screen.getByRole("button", { name: "保存する" }));
   await screen.findByRole("alert");
-  expect((screen.getByRole("textbox") as HTMLTextAreaElement).value).toBe("買い物に行く");
+  expect((screen.getByRole("textbox", { name: /やりたいこと（ダッシュボードに表示）/ }) as HTMLTextAreaElement).value).toBe("買い物に行く");
   expect(screen.queryByText("朝のメモ")).toBeNull();
 });
 
@@ -75,7 +75,7 @@ it("keeps the original revision for recovered input and rebases explicitly after
   const put = vi.spyOn(api, "putFile").mockRejectedValue(new ApiError(409, "conflict"));
   mount(true);
   fireEvent.click(await screen.findByRole("button", { name: "今日やりたいことを編集" }));
-  expect((screen.getByRole("textbox") as HTMLTextAreaElement).value).toBe("回収した予定");
+  expect((screen.getByRole("textbox", { name: /やりたいこと（ダッシュボードに表示）/ }) as HTMLTextAreaElement).value).toBe("回収した予定");
   fireEvent.click(screen.getByRole("button", { name: "保存する" }));
   await screen.findByRole("alert");
   expect(put.mock.calls[0][2]).toBe("old");
@@ -86,4 +86,40 @@ it("keeps the original revision for recovered input and rebases explicitly after
   expect(put.mock.calls[1][2]).toBe("new");
   expect(put.mock.calls[1][1]).toContain("新しい個人の記録");
   expect(screen.queryByText("新しい個人の記録")).toBeNull();
+});
+
+it("明日の予定を別の日付へ保存し、タブ切替でも入力を保持する",async()=>{
+ const date=new Intl.DateTimeFormat("sv-SE",{timeZone:"Asia/Tokyo"}).format(new Date());
+ const next=new Date(`${date}T12:00:00Z`);next.setUTCDate(next.getUTCDate()+1);const tomorrow=next.toISOString().slice(0,10);
+ vi.spyOn(api,"file").mockImplementation(async path=>({content:`## 今日やりたいこと\n\n${path.includes(tomorrow.replaceAll("-","/"))?"明日の予定A":"今日の予定A"}\n\n## 日記\n\nPRIVATE BODY`,doc:{path,mtime:"base",size:1,meta:{}}}));
+ const put=vi.spyOn(api,"putFile").mockResolvedValue({doc:{path:"daily/test.md",mtime:"saved",size:1,meta:{}}});
+ mount(true);fireEvent.click(screen.getByRole("tab",{name:"明日やりたいことを書く"}));
+ fireEvent.click(await screen.findByRole("button",{name:"明日やりたいことを編集"}));
+ fireEvent.change(screen.getByRole("textbox", { name: /やりたいこと（ダッシュボードに表示）/ }),{target:{value:"明日は読書"}});
+ fireEvent.click(screen.getByRole("tab",{name:"今日やりたいこと"}));
+ await screen.findByText("今日の予定A");fireEvent.click(screen.getByRole("tab",{name:"明日やりたいことを書く"}));
+ fireEvent.click(await screen.findByRole("button",{name:"明日やりたいことを編集"}));expect((screen.getByRole("textbox", { name: /やりたいこと（ダッシュボードに表示）/ }) as HTMLTextAreaElement).value).toBe("明日は読書");
+ fireEvent.click(screen.getByRole("button",{name:"保存する"}));await waitFor(()=>expect(put).toHaveBeenCalledTimes(1));
+ expect(put.mock.calls[0][0]).toBe(`daily/${tomorrow.replaceAll("-","/")}.md`);expect(put.mock.calls[0][1]).toContain("PRIVATE BODY");expect(screen.queryByText("PRIVATE BODY")).toBeNull();
+});
+it("一行日記を予定から分離して保存し、その場で編集する",async()=>{
+ let content="## 今日やりたいこと\n\n散歩する\n\n## 日記\n\nPRIVATE BODY\n";let revision="base";
+ vi.spyOn(api,"file").mockImplementation(async path=>({content,doc:{path,mtime:revision,size:1,meta:{}}}));
+ vi.spyOn(api,"putFile").mockImplementation(async(path,next,mtime)=>{expect(mtime).toBe(revision);content=next;revision+="1";return {doc:{path,mtime:revision,size:1,meta:{}}};});
+ mount(true);await screen.findByText("散歩する");
+ fireEvent.change(screen.getByRole("textbox",{name:"一行日記"}),{target:{value:"いい一日だった"}});fireEvent.click(screen.getByRole("button",{name:"日記に残す"}));
+ fireEvent.click(await screen.findByRole("button",{name:"今の一行を編集"}));fireEvent.change(screen.getByRole("textbox",{name:"一行日記"}),{target:{value:"読書できてよかった"}});fireEvent.click(screen.getByRole("button",{name:"変更を保存"}));
+ await waitFor(()=>expect((screen.getByRole("textbox",{name:"一行日記"}) as HTMLTextAreaElement).value).toBe(""));expect(content).toContain("読書できてよかった");expect(screen.queryByText("読書できてよかった")).toBeNull();expect(screen.getByText("散歩する")).toBeTruthy();expect(content).not.toContain("いい一日だった");expect(content).toContain("散歩する");expect(screen.queryByText("PRIVATE BODY")).toBeNull();
+});
+
+it("日記画面の一行追加も予定節へ混入させない", async () => {
+ const before="---\ntype: daily\n---\n# 日付\n\n## 今日やりたいこと\n\n散歩する\n";
+ vi.spyOn(api,"file").mockResolvedValue({content:before,doc:{path:"daily/test.md",mtime:"base",size:1,meta:{}}});
+ const put=vi.spyOn(api,"putFile").mockResolvedValue({doc:{path:"daily/test.md",mtime:"saved",size:1,meta:{}}});
+ mount();
+ await screen.findByText("散歩する");
+ fireEvent.change(screen.getByRole("textbox",{name:"日記（1 行）"}),{target:{value:"個人の日記を追記"}});
+ fireEvent.click(screen.getByRole("button",{name:"残す"}));
+ await waitFor(()=>expect(put).toHaveBeenCalledTimes(1));
+ expect(put.mock.calls[0][1]).toMatch(/散歩する\s+## 日記\s+- \d{2}:\d{2} 個人の日記を追記/);
 });
