@@ -817,3 +817,19 @@ html:has(.recipe-detail) { scroll-padding-top: calc(var(--row-h) + var(--gap-inl
 .proposal-picks { list-style:none; padding:0; }
 .proposal-picks li { border-bottom:1px solid hsl(var(--border)); padding-block:var(--gap-stack); }
 @media(max-width:639px){.recipe-diff{grid-template-columns:minmax(0,1fr)}}
+
+.proposal-fields { border:0; margin:0; padding:0; min-width:0; }
+.proposal-progress { border-color:hsl(var(--brand)); }
+.proposal-progress-heading { display:flex; align-items:center; gap:var(--gap-inline); }
+.proposal-progress-heading svg { width:var(--card-pad-y); height:var(--card-pad-y); flex-shrink:0; color:hsl(var(--accent-foreground)); }
+.proposal-progress-heading h2 { margin:0; font-size:calc(var(--text-size) * 1.25); }
+.proposal-progress progress { display:block; appearance:none; width:100%; height:var(--gap-inline); border:0; border-radius:var(--radius-sm); overflow:hidden; background:hsl(var(--secondary)); accent-color:hsl(var(--brand)); }
+.proposal-progress progress::-webkit-progress-bar { background:hsl(var(--secondary)); }
+.proposal-progress progress::-webkit-progress-value { background:hsl(var(--brand)); }
+.proposal-progress progress::-moz-progress-bar { background:hsl(var(--brand)); }
+.proposal-progress progress:indeterminate { background:linear-gradient(90deg, transparent, hsl(var(--brand)), transparent) left / 40% 100% no-repeat hsl(var(--secondary)); animation:proposal-progress 1.6s ease-in-out infinite alternate; }
+.proposal-progress progress:indeterminate::-webkit-progress-bar { background:transparent; }
+.proposal-progress-paused { height:var(--gap-inline); border-radius:var(--radius-sm); background:hsl(var(--muted)); border:1px solid hsl(var(--border-strong)); }
+.proposal-progress-times { display:flex; flex-wrap:wrap; gap:var(--gap-inline) var(--gap-stack); margin-block:var(--gap-stack); font-size:var(--text-label); color:hsl(var(--muted-foreground)); font-variant-numeric:tabular-nums; }
+@keyframes proposal-progress { to { background-position:right; } }
+@media(prefers-reduced-motion:reduce) { .proposal-progress progress:indeterminate { animation:none; background-position:center; } }

@@ -4,6 +4,7 @@ import (
 	"github.com/yu-min3/kensan-lab/apps/konro/backend/internal/recipe"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -44,5 +45,57 @@ func TestAvoidMaterialAliasesInBothDirections(t *testing.T) {
 				t.Fatal("excluded alias remained", candidates, err)
 			}
 		})
+	}
+}
+
+func TestCountOnlyPreservesRecipeAmounts(t *testing.T) {
+	root := t.TempDir()
+	for name, servings := range map[string]string{"two": "2人分", "six": "6人分", "unknown": "", "range": "3〜4人分"} {
+		raw := "---\ntitle: " + name + "\nservings: " + servings + "\n---\n\n## 材料\n- にんじん 1本\n\n## 手順\n1. 炒める\n"
+		if err := os.WriteFile(filepath.Join(root, name+".md"), []byte(raw), 0600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	c := Conditions{Count: 4, Fixed: []string{"unknown"}}
+	candidates, err := Candidates(root, c)
+	if err != nil || len(candidates) != 4 {
+		t.Fatalf("count-only candidates: %+v %v", candidates, err)
+	}
+	picks := []Pick{}
+	for _, candidate := range candidates {
+		if candidate.Scale != "1" {
+			t.Fatalf("unexpected shared amount: %+v", candidate)
+		}
+		picks = append(picks, Pick{File: candidate.Recipe.File})
+	}
+	menus, err := ValidateMenus(c, candidates, []Menu{{Picks: picks}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, pick := range menus[0].Picks {
+		if !strings.Contains(pick.Reason, "レシピの元の分量") {
+			t.Fatal(pick.Reason)
+		}
+	}
+	legacy, err := Candidates(root, Conditions{Count: 2, Servings: "4"})
+	if err != nil || len(legacy) != 2 {
+		t.Fatal(legacy, err)
+	}
+	for _, candidate := range legacy {
+		want := map[string]string{"two": "2", "six": "2/3"}[candidate.Recipe.File]
+		if candidate.Scale != want {
+			t.Fatalf("legacy scale changed: %+v", candidate)
+		}
+	}
+}
+
+func TestOptionalServingsStillValidatesExplicitValues(t *testing.T) {
+	for _, value := range []string{"0", "-1", "101", "no", "1/0"} {
+		if Valid(Conditions{Count: 4, Servings: value}) == nil {
+			t.Fatal("invalid servings accepted", value)
+		}
+	}
+	if err := Valid(Conditions{Count: 4}); err != nil {
+		t.Fatal(err)
 	}
 }

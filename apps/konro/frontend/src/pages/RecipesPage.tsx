@@ -88,7 +88,7 @@ export function RecipesPage({ onStart, starting = false, routing, cooking=false,
         <section className="proposal-entry" aria-labelledby="proposal-entry-title">
           <div className="proposal-entry-copy">
             <h2 id="proposal-entry-title" className="h-serif">作り置き、何にする？</h2>
-            <p id="proposal-entry-description">保存したレシピから、好み・品数・人数に合わせて提案します。</p>
+            <p id="proposal-entry-description">保存したレシピから、好みと品数に合わせて提案します。</p>
           </div>
           <button
             className={`recipe-action ${selected.length || cooking ? '' : 'recipe-action-primary'}`}
