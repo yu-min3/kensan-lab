@@ -26,7 +26,7 @@ export function ProposalsPage({id,selected,onBack,onOpen,onAdopt}:{id:string;sel
  const comparable=(c:Conditions)=>JSON.stringify([c.idea??'',c.count,c.servings,c.main,c.side,c.cuisine??'',c.avoid??[],c.use??[],c.fixed??[],c.omit??[]]);
  const conditionChanged=!!proposal&&comparable(conditions)!==comparable(proposal.conditions);
  const action=(name:string)=>perform(async()=>{if(!proposal)return;const p=await request<Proposal>('/'+proposal.id+'/'+name,'POST',{revision:proposal.revision});if(mounted.current)setProposal(p)});
- return <main className="editor-page proposals-page"><header className="recipe-toolbar"><button className="recipe-action recipe-action-ghost" disabled={busy} onClick={onBack}>一覧へ</button><h1 className="recipe-toolbar-title h-serif">作り置きを考える</h1></header>
+ return <main className="editor-page proposals-page"><header className="recipe-toolbar"><button className="recipe-action recipe-action-ghost" disabled={busy} onClick={onBack}>一覧へ</button><h1 className="recipe-toolbar-title h-serif">AIで作り置きの献立を提案</h1></header>
  {error&&<p className="notice" role="alert">{error}</p>}
  {active.filter(p=>p.id!==id).length>0&&<Panel><h2 className="h-serif">進行中の提案</h2><p>この端末以外で始めた提案も、ここから続けられます。</p>{active.filter(p=>p.id!==id).map(p=><button key={p.id} className="recipe-action" disabled={busy} onClick={()=>onOpen(p.id)}>進行中の{p.conditions.count}品の提案を開く</button>)}</Panel>}
  <MealPreferences/><CookHistory/>
