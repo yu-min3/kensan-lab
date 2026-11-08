@@ -18,7 +18,7 @@ var ErrConflict = errors.New("提案が更新されています。最新の内�
 type Conditions struct {
 	Idea     string   `json:"idea"`
 	Count    int      `json:"count"`
-	Servings string   `json:"servings"`
+	Servings string   `json:"servings,omitempty"` // Legacy proposals may still specify a shared serving count.
 	Main     int      `json:"main"`
 	Side     int      `json:"side"`
 	Cuisine  string   `json:"cuisine,omitempty"`
@@ -72,14 +72,16 @@ func contains(tags []string, tag string) bool {
 	return false
 }
 func Valid(c Conditions) error {
-	target, ok := new(big.Rat).SetString(c.Servings)
-	if !ok || target.Sign() <= 0 || target.Cmp(big.NewRat(100, 1)) > 0 {
-		return ErrInvalid
+	if c.Servings != "" {
+		target, ok := new(big.Rat).SetString(c.Servings)
+		if !ok || target.Sign() <= 0 || target.Cmp(big.NewRat(100, 1)) > 0 {
+			return ErrInvalid
+		}
+		if _, e := ingredients.Multiply(c.Servings, "1"); e != nil || strings.HasPrefix(c.Servings, "-") {
+			return ErrInvalid
+		}
 	}
 	if c.Count < 1 || c.Count > 12 || len(c.Idea) > 4000 || c.Main < 0 || c.Side < 0 || ((c.Main+c.Side) > 0 && c.Main+c.Side != c.Count) || len(c.Fixed) > c.Count || len(c.Avoid) > 30 || len(c.Use) > 30 || len(c.Omit) > 100 || len(c.Cuisine) > 200 {
-		return ErrInvalid
-	}
-	if _, e := ingredients.Multiply(c.Servings, "1"); e != nil || strings.HasPrefix(c.Servings, "-") || c.Servings == "0" {
 		return ErrInvalid
 	}
 	for _, v := range append(append([]string{}, c.Avoid...), c.Use...) {
@@ -110,7 +112,7 @@ func Candidates(root string, c Conditions) ([]Candidate, error) {
 			continue
 		}
 		base := BaseServings(r.Servings)
-		if base == "" {
+		if c.Servings != "" && base == "" {
 			continue
 		}
 		if c.Cuisine != "" && !contains(r.Tags, c.Cuisine) {
@@ -131,9 +133,12 @@ func Candidates(root string, c Conditions) ([]Candidate, error) {
 		if excluded {
 			continue
 		}
-		a, _ := new(big.Rat).SetString(c.Servings)
-		b, _ := new(big.Rat).SetString(base)
-		scale := new(big.Rat).Quo(a, b).RatString()
+		scale := "1"
+		if c.Servings != "" {
+			a, _ := new(big.Rat).SetString(c.Servings)
+			b, _ := new(big.Rat).SetString(base)
+			scale = new(big.Rat).Quo(a, b).RatString()
+		}
 		if _, e := ingredients.Multiply("1", scale); e != nil {
 			continue
 		}
@@ -152,7 +157,7 @@ func Candidates(root string, c Conditions) ([]Candidate, error) {
 	seen := map[string]bool{}
 	for _, file := range c.Fixed {
 		if seen[file] || !existing[file] {
-			return nil, fmt.Errorf("%w: 固定した料理が条件に合わないか人数未登録です", ErrInvalid)
+			return nil, fmt.Errorf("%w: 固定した料理が重複しているか、条件・材料・手順を確認できません", ErrInvalid)
 		}
 		seen[file] = true
 	}
@@ -193,9 +198,15 @@ func ValidateMenus(c Conditions, candidates []Candidate, menus []Menu) ([]Menu, 
 			if contains(candidate.Recipe.Tags, "副菜") {
 				side++
 			}
-			menu.Picks[i].Reason = fmt.Sprintf("%s人分に換算 · 自分の評価 %d/5", ingredients.Display(c.Servings), candidate.Recipe.Rating)
+			amount := "レシピの元の分量"
+			if c.Servings != "" {
+				amount = ingredients.Display(c.Servings) + "人分に換算"
+			} else if candidate.Recipe.Servings != "" {
+				amount += "（" + candidate.Recipe.Servings + "）"
+			}
+			menu.Picks[i].Reason = fmt.Sprintf("%s · 自分の評価 %d/5", amount, candidate.Recipe.Rating)
 			if candidate.Recipe.Rating == 0 {
-				menu.Picks[i].Reason = ingredients.Display(c.Servings) + "人分に換算 · 未評価"
+				menu.Picks[i].Reason = amount + " · 未評価"
 			}
 		}
 		for _, file := range c.Fixed {

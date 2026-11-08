@@ -15,7 +15,8 @@
     "test:cooking": "node ../e2e/cooking.mjs",
     "test:improvements": "node ../e2e/improvements.mjs",
     "test:shopping": "node ../e2e/shopping.mjs",
-    "test:proposals": "node ../e2e/proposals.mjs"
+    "test:proposals": "node ../e2e/proposals.mjs",
+    "test:proposal-status": "node ../e2e/proposal-status.mjs"
   },
   "dependencies": {
     "lucide-react": "^0.468.0",

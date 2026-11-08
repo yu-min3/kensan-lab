@@ -18,6 +18,7 @@ import (
 	"sort"
 	"strings"
 	"sync"
+	"time"
 )
 
 type Proposal struct {
@@ -33,6 +34,7 @@ type Proposal struct {
 	Interpretation    string            `json:"interpretation"`
 	Error             string            `json:"error,omitempty"`
 	State             string            `json:"state"`
+	CreatedAt         string            `json:"createdAt,omitempty"`
 	Repairs           int               `json:"repairs"`
 	PreferenceVersion string            `json:"preferenceVersion"`
 	PolicyVersion     string            `json:"policyVersion"`
@@ -222,7 +224,7 @@ func (s *Service) Create(ctx context.Context, c Conditions, mode string) (*Propo
 		return nil, e
 	}
 	if len(candidates) < c.Count {
-		return nil, fmt.Errorf("%w: 人数が確定した候補が%d品です。条件・好み・人数登録を確認してください", ErrInvalid, len(candidates))
+		return nil, fmt.Errorf("%w: 条件に合う候補が%d品です。品数・好み・レシピの材料と手順を確認してください", ErrInvalid, len(candidates))
 	}
 	policy, e := s.currentPolicy()
 	sv := policy.Version
@@ -244,13 +246,13 @@ func (s *Service) Create(ctx context.Context, c Conditions, mode string) (*Propo
 			return nil, fmt.Errorf("%w: 進行中の提案を開いて完了または中止してください", ErrConflict)
 		}
 	}
-	p := &Proposal{Schema: 1, ID: id, Revision: 1, Conditions: c, Candidates: candidates, Mode: mode, PreferenceVersion: pv, PolicyVersion: sv, Preferences: preferences, Policy: policy, Adopted: map[string]string{}}
+	p := &Proposal{Schema: 1, ID: id, Revision: 1, CreatedAt: time.Now().UTC().Format(time.RFC3339), Conditions: c, Candidates: candidates, Mode: mode, PreferenceVersion: pv, PolicyVersion: sv, Preferences: preferences, Policy: policy, Adopted: map[string]string{}}
 	if mode == "rules" {
 		p.Menus, e = RuleMenus(c, Rank(c, candidates, policy))
 		if e != nil {
 			return nil, e
 		}
-		p.Interpretation = "入力した品数・人数・内訳・固定品・除外条件だけで組みました。自由文のイメージは解釈していません。"
+		p.Interpretation = "入力した品数・内訳・固定品・除外条件だけで組みました。自由文のイメージは解釈していません。"
 	} else if s.agent == nil {
 		p.Error = "AI接続が未設定です。条件だけの簡易提案か、一覧から手動で選べます。"
 	} else {
@@ -326,6 +328,7 @@ func (s *Service) getLocked(ctx context.Context, id string) (*Proposal, error) {
 			p.Error = "状態を取得できません。時間をおいて再確認してください。"
 		} else {
 			p.Job = &j
+			p.Error = ""
 			s.apply(p)
 		}
 	}
