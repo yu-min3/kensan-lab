@@ -18,6 +18,7 @@ type fakeAgent struct {
 	job     agentclient.Job
 	output  string
 	request agentclient.Request
+	getErr  error
 }
 
 func (a *fakeAgent) Create(_ context.Context, r agentclient.Request) (agentclient.Job, error) {
@@ -27,6 +28,9 @@ func (a *fakeAgent) Create(_ context.Context, r agentclient.Request) (agentclien
 	return a.job, nil
 }
 func (a *fakeAgent) Get(_ context.Context, id string) (agentclient.Job, error) {
+	if a.getErr != nil {
+		return agentclient.Job{}, a.getErr
+	}
 	state := a.state
 	if state == "" {
 		state = "succeeded"
@@ -192,5 +196,58 @@ func TestAbandonedJobReconciliationAndRecovery(t *testing.T) {
 	old, err := s.read(first.ID)
 	if err != nil || old.State != "succeeded" || len(old.Menus) != 1 {
 		t.Fatal(old, err)
+	}
+}
+
+func TestCountOnlyProposalAdoptsOriginalAmounts(t *testing.T) {
+	root := fixture(t)
+	raw := "---\ntitle: 人数未登録の副菜\ntags: [副菜]\n---\n\n## 材料\n- にんじん 1本\n\n## 手順\n1. 炒める\n"
+	if err := os.WriteFile(filepath.Join(root, "unknown.md"), []byte(raw), 0600); err != nil {
+		t.Fatal(err)
+	}
+	for _, mode := range []string{"ai", "rules"} {
+		t.Run(mode, func(t *testing.T) {
+			agent := &fakeAgent{output: `{"interpretation":"主菜と副菜の組み合わせ","menus":[{"picks":[{"file":"1"},{"file":"unknown"}]}]}`}
+			s := New(root, agent, mealplan.New(root))
+			p, err := s.Create(context.Background(), Conditions{Count: 2, Fixed: []string{"unknown"}}, mode)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if p.CreatedAt == "" {
+				t.Fatal("missing creation time")
+			}
+			p, err = s.Get(context.Background(), p.ID)
+			if err != nil || p.State != "succeeded" {
+				t.Fatal(p, err)
+			}
+			plan, err := s.Adopt(p.ID, p.Revision, p.Menus[0].ID, "count-only-"+mode)
+			if err != nil || len(plan.Items) != 2 {
+				t.Fatal(plan, err)
+			}
+			for _, item := range plan.Items {
+				if item.Scale != "1" {
+					t.Fatalf("scaled original recipe: %+v", item)
+				}
+			}
+		})
+	}
+}
+
+func TestRuntimeStatusErrorClearsOnRecovery(t *testing.T) {
+	root := fixture(t)
+	agent := &fakeAgent{state: "running", getErr: errors.New("temporary disconnect")}
+	s := New(root, agent, mealplan.New(root))
+	p, err := s.Create(context.Background(), Conditions{Count: 1}, "ai")
+	if err != nil {
+		t.Fatal(err)
+	}
+	p, err = s.Get(context.Background(), p.ID)
+	if err != nil || p.Error == "" {
+		t.Fatal(p, err)
+	}
+	agent.getErr = nil
+	p, err = s.Get(context.Background(), p.ID)
+	if err != nil || p.Error != "" || p.State != "running" {
+		t.Fatal(p, err)
 	}
 }

@@ -1,4 +1,4 @@
-import {Clock,ChefHat} from 'lucide-react';
+import {Clock,ChefHat,Sparkles} from 'lucide-react';
 import {RecipeAddMenu} from '../components/RecipeAddMenu';
 import {PersonalRating} from '../components/PersonalRating';
 import {CookingSelection} from '../components/CookingSelection';
@@ -83,8 +83,19 @@ export function RecipesPage({ onStart, starting = false, routing, cooking=false,
       <header className="list-header">
         <div className="header-row">
           <h1 className="h-serif">konro</h1>
-          <div className="editor-actions"><button className="recipe-action" onClick={()=>navigate({page:'proposals',id:''})}>作り置き</button><button className="recipe-action" onClick={()=>navigate({page:'shopping',id:''})}>買い物</button><button className="recipe-action" onClick={()=>navigate({page:"search"})}>Webで探す</button><RecipeAddMenu importing={importing} onImport={()=>navigate({page:'import',url:'',fromSearch:false})} onNew={()=>setOpened('')} onZip={file=>void importZip(file)}/></div>
+          <div className="editor-actions"><button className="recipe-action" onClick={()=>navigate({page:'shopping',id:''})}>買い物</button><button className="recipe-action" onClick={()=>navigate({page:"search"})}>Webで探す</button><RecipeAddMenu importing={importing} onImport={()=>navigate({page:'import',url:'',fromSearch:false})} onNew={()=>setOpened('')} onZip={file=>void importZip(file)}/></div>
         </div>
+        <section className="proposal-entry" aria-labelledby="proposal-entry-title">
+          <div className="proposal-entry-copy">
+            <h2 id="proposal-entry-title" className="h-serif">作り置き、何にする？</h2>
+            <p id="proposal-entry-description">保存したレシピから、好みと品数に合わせて提案します。</p>
+          </div>
+          <button
+            className={`recipe-action ${selected.length || cooking ? '' : 'recipe-action-primary'}`}
+            aria-describedby="proposal-entry-description"
+            onClick={()=>navigate({page:'proposals',id:''})}
+          ><Sparkles aria-hidden="true"/>AIで献立を提案</button>
+        </section>
         {importMsg && (
           <p
             className={`import-msg ${importMsg.startsWith("✓") ? "" : "error"}`}

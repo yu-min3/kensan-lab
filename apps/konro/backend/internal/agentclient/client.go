@@ -24,10 +24,12 @@ import (
 )
 
 type Job struct {
-	ID     string          `json:"id"`
-	State  string          `json:"state"`
-	Reason string          `json:"reason,omitempty"`
-	Output json.RawMessage `json:"output,omitempty"`
+	ID        string          `json:"id"`
+	State     string          `json:"state"`
+	Reason    string          `json:"reason,omitempty"`
+	CreatedAt string          `json:"created_at,omitempty"`
+	UpdatedAt string          `json:"updated_at,omitempty"`
+	Output    json.RawMessage `json:"output,omitempty"`
 }
 type Request struct {
 	Profile        string          `json:"profile"`
