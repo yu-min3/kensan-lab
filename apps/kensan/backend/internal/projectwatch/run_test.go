@@ -20,6 +20,7 @@ type fake struct {
 	failCreate bool
 	output     string
 	state      string
+	reason     string
 }
 
 func (f *fake) Create(_ context.Context, r agentclient.Request) (agentclient.Job, error) {
@@ -38,7 +39,7 @@ func (f *fake) Get(_ context.Context, id string) (agentclient.Job, error) {
 	if s == "" {
 		s = "succeeded"
 	}
-	return agentclient.Job{ID: id, State: s, Output: json.RawMessage(f.output)}, nil
+	return agentclient.Job{ID: id, State: s, Reason: f.reason, Output: json.RawMessage(f.output)}, nil
 }
 func (f *fake) Action(context.Context, string, string) (agentclient.Job, error) {
 	panic("no automatic retry")
@@ -70,7 +71,7 @@ status: active
 
 var now = time.Date(2026, 10, 30, 10, 0, 0, 0, time.FixedZone("JST", 9*3600))
 
-const goodOutput = `{"items":[{"project":"sample","change":"テストした","meaning":"実装を確認できた","decision":"","sourceIds":["project:sample"]}]}`
+const goodOutput = `{"items":[{"project":"sample","headline":"動作の確認を完了","change":"テストした","meaning":"実装を確認できた","decision":"","sourceIds":["project:sample"]}]}`
 
 func TestResumeAndNoChange(t *testing.T) {
 	root := t.TempDir()
@@ -110,11 +111,46 @@ func TestResumeAndNoChange(t *testing.T) {
 		t.Fatal("human record modified")
 	}
 }
+
+func TestWaitingChecksAdvanceAndPreserveEvidence(t *testing.T) {
+	for _, reason := range []string{"auth_required", "billing_blocked", "quota_wait", "UNTRUSTED SECRET DETAIL"} {
+		t.Run(reason, func(t *testing.T) {
+			root := t.TempDir()
+			put(t, root, "projects/sample/README.md", project)
+			put(t, root, ResultPath, `{"version":1,"hash":"old","generatedAt":"2026-10-29T10:00:00+09:00","items":[],"sources":[]}`)
+			f := &fake{state: "waiting", reason: reason}
+			for i := 0; i < 2; i++ {
+				if _, err := Step(context.Background(), root, f, now); err != nil {
+					t.Fatal(err)
+				}
+			}
+			late := now.Add(4 * 24 * time.Hour)
+			state, err := Step(context.Background(), root, f, late)
+			if err != nil || state.Status != "waiting" || state.CheckedAt != late.Format(time.RFC3339) {
+				t.Fatalf("state %v, error %v", state.Status, err)
+			}
+			if state.Pending == nil || state.Pending.CreatedAt != now.Format(time.RFC3339) || f.creates != 1 {
+				t.Fatal("waiting job replaced or resubmitted")
+			}
+			v, err := Read(root)
+			if err != nil || v.Result == nil || v.Result.Hash != "old" || v.State.CheckedAt != late.Format(time.RFC3339) {
+				t.Fatal("observation or previous result lost")
+			}
+			if reason == "UNTRUSTED SECRET DETAIL" {
+				if state.ReasonCode != "" || strings.Contains(state.Reason, reason) {
+					t.Fatal("provider details leaked")
+				}
+			} else if state.ReasonCode != reason {
+				t.Fatal("actionable reason lost")
+			}
+		})
+	}
+}
 func TestRejectInventedEvidencePreservePrevious(t *testing.T) {
 	root := t.TempDir()
 	put(t, root, "projects/sample/README.md", project)
 	put(t, root, ResultPath, `{"version":1,"hash":"old","generatedAt":"2026-10-29T10:00:00+09:00","items":[],"sources":[]}`)
-	f := &fake{output: `{"items":[{"project":"sample","change":"完了","meaning":"","decision":"","sourceIds":["invented"]}]}`}
+	f := &fake{output: `{"items":[{"project":"sample","headline":"動作の確認を完了","change":"完了","meaning":"","decision":"","sourceIds":["invented"]}]}`}
 	for i := 0; i < 3; i++ {
 		if _, e := Step(context.Background(), root, f, now); e != nil {
 			t.Fatal(e)
@@ -250,7 +286,7 @@ func TestLostResponseCanRecoverAfter24Hours(t *testing.T) {
 	}
 	late := now.Add(25 * time.Hour)
 	s, e := Step(context.Background(), root, f, late)
-	if e != nil || s.Status != "waiting" {
+	if e != nil || s.Status != "waiting" || s.ReasonCode != "long_running" {
 		t.Fatalf("overdue recovery: %+v %v", s, e)
 	}
 	s, e = Step(context.Background(), root, f, late)
@@ -259,5 +295,47 @@ func TestLostResponseCanRecoverAfter24Hours(t *testing.T) {
 	}
 	if len(f.keys) != 2 || f.keys[0] != f.keys[1] || string(f.payloads[0]) != string(f.payloads[1]) {
 		t.Fatal("overdue recovery created a different request")
+	}
+}
+
+func TestHeadlineUpgradeKeepsLegacyPendingJobs(t *testing.T) {
+	for _, tc := range []struct {
+		name   string
+		legacy bool
+		output string
+		want   string
+	}{
+		{"old schema resumes without headline", true, strings.Replace(goodOutput, `"headline":"動作の確認を完了",`, "", 1), "succeeded"},
+		{"new schema requires headline", false, strings.Replace(goodOutput, `"headline":"動作の確認を完了",`, "", 1), "failed"},
+		{"new schema rejects blank headline", false, strings.Replace(goodOutput, `"headline":"動作の確認を完了"`, `"headline":"   "`, 1), "failed"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			root := t.TempDir()
+			put(t, root, "projects/sample/README.md", project)
+			f := &fake{output: tc.output}
+			ctx := context.Background()
+			for i := 0; i < 2; i++ {
+				if _, e := Step(ctx, root, f, now); e != nil {
+					t.Fatal(e)
+				}
+			}
+			if tc.legacy {
+				b, e := os.ReadFile(filepath.Join(root, StatePath))
+				if e != nil {
+					t.Fatal(e)
+				}
+				var state State
+				if e = json.Unmarshal(b, &state); e != nil {
+					t.Fatal(e)
+				}
+				state.Pending.Schema = json.RawMessage(`{"type":"object"}`)
+				b, _ = json.Marshal(state)
+				put(t, root, StatePath, string(b))
+			}
+			state, e := Step(ctx, root, f, now)
+			if e != nil || state.Status != tc.want {
+				t.Fatalf("%+v %v", state, e)
+			}
+		})
 	}
 }

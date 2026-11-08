@@ -8,6 +8,7 @@ import { MemoPage } from "./pages/MemoPage";
 import { ReviewsPage } from "./pages/ReviewsPage";
 import { LifeGoalsPage } from "./pages/LifeGoalsPage";
 import { MarkportRedirect } from "./pages/MarkportRedirect";
+import { WatchActivityPage, WatchChangePage } from "./pages/WatchDetailPage";
 import { WatchPage } from "./pages/WatchPage";
 import { HomePage } from "./pages/HomePage";
 import { HomeRedirect } from "./pages/HomeRedirect";
@@ -31,6 +32,8 @@ createRoot(document.getElementById("root")!).render(
             <Routes>
               <Route path="/" element={<HomePage />} />
               <Route path="/watch" element={<WatchPage />} />
+              <Route path="/watch/activity" element={<WatchActivityPage />} />
+              <Route path="/watch/changes/:project" element={<WatchChangePage />} />
               <Route path="/today" element={<HomeRedirect panel="activity" />} />
               <Route path="/tasks" element={<HomeRedirect panel="tasks" />} />
               <Route path="/projects" element={<HomeRedirect panel="projects" />} />
