@@ -19,7 +19,7 @@
 
 ## 配備
 
-Dockerfileは新CLIを同梱し、`watch-metrics-cronjob.yaml`は毎時15分の定義を持つ。既存v0.3.18にはCLIが無いため`suspend: true`。CLIを含む新imageを両archでreleaseした後にimageを揃え、有効化する。project-watchの推論定期実行とは独立し、推論枠を消費しない。
+v0.3.19はCLIを同梱し、`watch-metrics-cronjob.yaml`を毎時15分に有効化する。app・project-watch・watch-metricsは同じreleaseを使う。配備前に両archのimageを公開し、ロールバック時はCLIを持たないv0.3.18へ戻す前にwatch-metricsを停止する。project-watchの推論定期実行とは独立し、推論枠を消費しない。
 
 ## 日別表示
 

@@ -36,7 +36,7 @@ spec:
           containers:
             - name: project-watch
               # Release this version before removing suspend. Keep aligned with app values.
-              image: ghcr.io/yu-min3/kensan:v0.3.18
+              image: ghcr.io/yu-min3/kensan:v0.3.19
               command: ["/usr/local/bin/project-watch"]
               env:
                 - name: KENSAN_DATA_DIR

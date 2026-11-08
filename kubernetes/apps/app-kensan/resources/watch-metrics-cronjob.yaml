@@ -1,11 +1,11 @@
-# Public read-only providers; enable after releasing the new CLI image.
+# Collect public observations independently of AI generation.
 apiVersion: batch/v1
 kind: CronJob
 metadata:
   name: kensan-watch-metrics
   namespace: app-kensan
 spec:
-  suspend: true
+  suspend: false
   schedule: "15 * * * *"
   timeZone: Asia/Tokyo
   concurrencyPolicy: Forbid
@@ -35,8 +35,7 @@ spec:
               type: RuntimeDefault
           containers:
             - name: watch-metrics
-              # Release an image containing watch-metrics before removing suspend.
-              image: ghcr.io/yu-min3/kensan:v0.3.18
+              image: ghcr.io/yu-min3/kensan:v0.3.19
               command: ["/usr/local/bin/watch-metrics"]
               args: ["-repo", "yu-min3/kensan-lab", "-zenn", "yuu7751"]
               env:

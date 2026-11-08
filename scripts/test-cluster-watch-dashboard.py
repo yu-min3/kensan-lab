@@ -86,6 +86,12 @@ pvc = [*node,
 case('worst PVC usage is numeric',19,pvc,'{}',0.7)
 case('zero PVC capacity is not a valid percentage',19,[{**x,'values':'0+0x10'} if 'capacity_bytes' in x['series'] else x for x in pvc],'{}',-1)
 
+pending_without_ready = [health,*inventory,
+ {'series':'kube_pod_info{namespace="example",pod="pending",uid="p"}','values':'1+0x10'},
+ {'series':'kube_pod_status_phase{namespace="example",pod="pending",uid="p",phase="Pending"}','values':'1+0x10'}]
+case('Pending without a Ready condition stays visible',13,pending_without_ready,'{}',1)
+case('Ready count is scoped to Running Pods',11,pending_without_ready,'{}',1)
+case('Pending without Ready still has diagnostic details',5,pending_without_ready,'{namespace="example",pod="pending",uid="p",reason="Pending"}',1)
 (repo / 'temp').mkdir(exist_ok=True)
 with tempfile.TemporaryDirectory(prefix='cluster-watch-', dir=repo / 'temp') as folder:
     target = Path(folder)
