@@ -286,7 +286,7 @@ func TestLostResponseCanRecoverAfter24Hours(t *testing.T) {
 	}
 	late := now.Add(25 * time.Hour)
 	s, e := Step(context.Background(), root, f, late)
-	if e != nil || s.Status != "waiting" {
+	if e != nil || s.Status != "waiting" || s.ReasonCode != "long_running" {
 		t.Fatalf("overdue recovery: %+v %v", s, e)
 	}
 	s, e = Step(context.Background(), root, f, late)

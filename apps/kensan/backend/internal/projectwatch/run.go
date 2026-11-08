@@ -233,6 +233,7 @@ func Step(ctx context.Context, root string, g agentclient.Gateway, now time.Time
 		case "queued", "running":
 			if overdue {
 				state.Status = "waiting"
+				state.ReasonCode = "long_running"
 				state.Reason = "24時間を超えるジョブを確認中です。新しい依頼は作成しません"
 			}
 		case "waiting":

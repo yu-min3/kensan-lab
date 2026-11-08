@@ -15,6 +15,13 @@ it("夜間は翌朝まで遅延と扱わず、予定から15分を過ぎた未�
 it("年末年始もJSTの8時を次回予定とする", () => {
  expect(watchSchedule(at("2026-12-31T23:59:59")).next).toBe(at("2027-01-01T08:00:00"));
 });
+it("長時間の受付・実行中を認証待ちや再開対象として案内しない", () => {
+ const v = view("waiting", "2026-11-05T10:00:00+09:00");
+ v.state.reasonCode = "long_running";
+ const s = watchStatus(v, at("2026-11-05T10:01:00"));
+ expect(s.warning).toBe(true);expect(s.label).toBe("AIの実行が長引いています");
+ expect(s.help).not.toMatch(/認証|再開/);expect(s.help).toContain("同じ依頼の確認を続け");
+});
 it("確認が成功していてもwaitingを正常にせず、認証と利用枠の対応を区別する", () => {
  const v = view("waiting", "2026-11-05T10:00:00+09:00");
  v.state.reasonCode = "billing_blocked";

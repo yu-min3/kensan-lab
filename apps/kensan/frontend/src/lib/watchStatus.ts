@@ -25,11 +25,16 @@ export function watchStatus(data: WatchView, now: number, readError = false) {
   help = "AIの定期実行を設定すると、記録の変化を要約できます。現在は元の記録を表示しています。";
  } else if (state === "waiting") {
   warning = true;
-  label = data.state.reasonCode === "quota_wait" ? "利用枠の回復待ち" : "AI更新は要再開";
-  help = data.state.reasonCode === "auth_required" ? "AIの再認証後、待機中の依頼を再開してください。"
-   : data.state.reasonCode === "quota_wait" ? "利用枠の回復後、待機中の依頼を再開してください。"
-   : "AIの認証・利用条件を確認し、待機中の依頼を再開してください。";
-  help += "画面を再読み込みするだけでは再開しません。";
+  if (data.state.reasonCode === "long_running") {
+   label = "AIの実行が長引いています";
+   help = "依頼の受付から24時間を超えています。実行状態を確認してください。同じ依頼の確認を続け、新しい依頼は作成しません。";
+  } else {
+   label = data.state.reasonCode === "quota_wait" ? "利用枠の回復待ち" : "AI更新は要再開";
+   help = data.state.reasonCode === "auth_required" ? "AIの再認証後、待機中の依頼を再開してください。"
+    : data.state.reasonCode === "quota_wait" ? "利用枠の回復後、待機中の依頼を再開してください。"
+    : "AIの認証・利用条件を確認し、待機中の依頼を再開してください。";
+   help += "画面を再読み込みするだけでは再開しません。";
+  }
  } else if (["failed", "cancelled", "invalid_state", "reset"].includes(state)) {
   label = state === "reset" ? "再生成を準備中" : "AI更新の確認が必要"; warning = state !== "reset";
   help = "前回の結果を保持しています。実行状態を確認し、明示的に再生成してください。";
