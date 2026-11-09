@@ -4,19 +4,20 @@
 
 ## この差分の実装範囲
 
-現在は**共通部品と実サービスprobeを実装した段階**。HTTP APIサーバー・加工評価worker・Konro通常経路の接続は後続。以下の部品単体の成功と、基盤全体の一周の成功は区別する。
+現在は**共通サービスとローカルデータ基盤を実装し、各境界を検証した段階**。V0全体は未完了。固定datasetの公開、評価runnerと実runの比較、outbox、backup復元と横断統合試験は後続となる。
 
-| 境界 | 実装・検証済み | 後続 |
+| 境界 | 実装・検証済み | 残る接続・検証 |
 |---|---|---|
-| HTTP・record | OpenAPI、17 schema、正負fixture | APIサービス |
-| identity | JWT署名・claims・固定client mapping・JWKS更新 | 各操作のpolicy、実Keycloakとの統合 |
-| job台帳 | owner別冪等性、quota予約、単一writer、送信前永続化、応答喪失後照合 | HTTP受付とdispatch |
-| runtime client | owner/target固定、OAuth更新、Create/Get/Action、サイズ・TLS検査 | 実agentd OIDC統合 |
-| adapter | Konro prepare/grade、既存抽出・検証を再利用 | 共通workerとの接続 |
-| catalog・S3 | 実サービスでsnapshot/readonly/別app拒否、OAuth再取得、再起動保持 | Keycloak、通常app用資格、長時間session更新 |
-| 推論・評価 | run/attemptと固定releaseの契約 | worker、評価器、比較HTML |
+| API | schema、capture/feedback、job/artifact HTTP API、起動CLI | 実サービスを通す全経路の統合 |
+| identity/policy | JWT、鍵更新、固定mapping、app/role/owner認可、scope cursor | 横断分離試験 |
+| job/runtime | 永続受付・quota・再照合・状態理由、OAuth client、実agentd OIDC契約試験 | 実モデルsmoke（未実施） |
+| adapter/worker | Konro prepare/grade、登録binary hash、app/role固定worker | dataset/evalコマンドの一周 |
+| catalog/S3 | TLS環境、限定資格、app別catalog、実snapshotと認可試験 | 長時間S3 session更新、backup復元 |
+| grading/report | 未確認を分けるgrader、回帰比較HTMLとescape/狭幅検証 | 実runを読み込む評価runner |
 
-検証の再実行は[互換性probe](../dev/probes/README.md)と各internal packageのREADMEを参照する。
+各タスクの個別検証と基盤全体の完了を区別する。native adapterは信頼した登録binaryの実行境界であり、同UIDのファイル・ネットワークまで制限するOS sandboxではない。
+
+再実行は[開発環境](../dev/README.md)、[権限bootstrap](../dev/bootstrap/README.md)、[互換性probe](../dev/probes/README.md)、[job API](../internal/api/JOBS.md)を参照する。
 
 ## サービスの境界
 
@@ -79,7 +80,7 @@ flowchart TB
 
 Rawは元のbytes、metadata・release・runはJSON、table実体はParquetを使う。原文HTMLと閲覧HTMLは別の意味を持つ。Icebergは表の履歴、Polarisはcatalog、S3は実体、DuckDBは計算を担当する。
 
-初版はkonro.curated.recipesとkonro.datasets.import_casesの2表。料理schemaはKonro adapterが所有し、共通recordはobject参照・source group・domain schema／transform版だけを共通化する。
+初版の構成はapp別catalog `konro`と`sample`、その中の`curated`／`datasets` namespace。共有Polarisサービスの中でもcatalog grantsとstorage prefixを分ける。Konroの対象は`konro.curated.recipes`と`konro.datasets.import_cases`の2表。料理schemaはKonro adapterが所有し、共通recordはobject参照・source group・domain schema／transform版だけを共通化する。
 
 releaseは参照する全tableのsnapshot ID、Raw object／hash、case一覧hash、code／adapter版を固定する。複数tableの原子commitを仮定せず、参照検査とpin後に最後のimmutable manifestを公開する。未公開・改変・欠損releaseを拒否し、latestやglobで入力を選ばない。
 
