@@ -6,8 +6,8 @@ import subprocess
 import tempfile
 
 repo = Path(__file__).resolve().parents[1]
-manifest = (repo / 'kubernetes/observability/grafana/resources/cluster-watch-dashboard.yaml').read_text()
-dashboard = json.loads(manifest.split('  cluster-watch.json: |\n', 1)[1])
+manifest = (repo / 'kubernetes/observability/grafana/resources/cluster-watch-classic-dashboard.yaml').read_text()
+dashboard = json.loads(manifest.split('  cluster-watch-classic.json: |\n', 1)[1])
 panels = {p['id']: p for p in dashboard['panels']}
 health = {'series': 'cluster_watch:ksm_healthy:bool', 'values': '1+0x10'}
 counter = {'series': 'kube_pod_container_status_restarts_total{namespace="example",pod="app",container="main"}', 'values': '0+0x10'}
