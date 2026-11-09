@@ -4,15 +4,19 @@
 
 ## この差分の実装範囲
 
-現在は**契約とKonro adapterの実装段階**。Go module、OpenAPI、保存record／adapterのJSON Schema、client mapping例、正負fixture検証を追加した。Konro adapterは既存の純粋な抽出・検証を再利用し、ネットワーク・保存・推論なしでprepare／gradeを実行できる。以下のサービス・認可・保存・評価は後続を含む全体像であり、基盤全体の一周はまだ動作確認済みではない。
+現在は**共通部品と実サービスprobeを実装した段階**。HTTP APIサーバー・加工評価worker・Konro通常経路の接続は後続。以下の部品単体の成功と、基盤全体の一周の成功は区別する。
 
-| 境界 | 今回 | 後続 |
+| 境界 | 実装・検証済み | 後続 |
 |---|---|---|
-| HTTP・record | OpenAPI＋JSON Schema | APIサービス実装 |
-| identity・app role | mapping例と拒否契約 | JWT・policy・否定試験 |
-| adapter | versioned envelope、Konro prepare／grade binary | 共通workerとの接続 |
-| catalog・S3 | namespace・prefix・限定資格の設計 | 製品互換性、bootstrap、grants |
-| 推論・評価 | run／attempt・固定release契約 | runtime接続、評価器、比較HTML |
+| HTTP・record | OpenAPI、17 schema、正負fixture | APIサービス |
+| identity | JWT署名・claims・固定client mapping・JWKS更新 | 各操作のpolicy、実Keycloakとの統合 |
+| job台帳 | owner別冪等性、quota予約、単一writer、送信前永続化、応答喪失後照合 | HTTP受付とdispatch |
+| runtime client | owner/target固定、OAuth更新、Create/Get/Action、サイズ・TLS検査 | 実agentd OIDC統合 |
+| adapter | Konro prepare/grade、既存抽出・検証を再利用 | 共通workerとの接続 |
+| catalog・S3 | 実サービスでsnapshot/readonly/別app拒否、OAuth再取得、再起動保持 | Keycloak、通常app用資格、長時間session更新 |
+| 推論・評価 | run/attemptと固定releaseの契約 | worker、評価器、比較HTML |
+
+検証の再実行は[互換性probe](../dev/probes/README.md)と各internal packageのREADMEを参照する。
 
 ## サービスの境界
 
