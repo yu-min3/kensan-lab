@@ -42,10 +42,12 @@ type Backend interface {
 	Get(context.Context, string, int64) (Blob, error)
 }
 type CaptureInput struct {
-	Key       string
-	MIME      string
-	SourceURI string
-	SHA256    string
+	OwnerSubject string
+	OwnerRole    string
+	Key          string
+	MIME         string
+	SourceURI    string
+	SHA256       string
 }
 type Reference struct {
 	ObjectID string `json:"object_id"`
@@ -64,9 +66,11 @@ type Capture struct {
 	Object        Reference `json:"object"`
 }
 type publication struct {
-	Version     int     `json:"version"`
-	RequestHash string  `json:"request_hash"`
-	Capture     Capture `json:"capture"`
+	OwnerSubject string  `json:"owner_subject"`
+	OwnerRole    string  `json:"owner_role"`
+	Version      int     `json:"version"`
+	RequestHash  string  `json:"request_hash"`
+	Capture      Capture `json:"capture"`
 }
 type Store struct {
 	app     string
@@ -113,11 +117,12 @@ func sum(b []byte) string              { s := sha256.Sum256(b); return hex.Encod
 func (s *Store) base(id string) string { return "apps/" + s.app + "/raw/" + id + "/" }
 func requestDigest(in CaptureInput, size int64) string {
 	b, _ := json.Marshal(struct {
-		Key, MIME, SourceURI, SHA256 string
-		Size                         int64
-	}{in.Key, in.MIME, in.SourceURI, in.SHA256, size})
+		Key, MIME, SourceURI, SHA256, OwnerSubject, OwnerRole string
+		Size                                                  int64
+	}{in.Key, in.MIME, in.SourceURI, in.SHA256, in.OwnerSubject, in.OwnerRole, size})
 	return sum(b)
 }
+
 func validateInput(in CaptureInput, b []byte) error {
 	if !keyID(in.Key) || len(in.SourceURI) > 2048 || len(in.SHA256) != 64 || in.SHA256 != sum(b) {
 		return ErrInvalid
@@ -196,7 +201,7 @@ func (s *Store) Capture(ctx context.Context, in CaptureInput, body io.Reader) (C
 		return Capture{}, false, ErrConflict
 	}
 	c := Capture{SchemaVersion: "1", AppID: s.app, CaptureID: id, CaptureKey: in.Key, MIME: in.MIME, SourceURI: in.SourceURI, CapturedAt: s.now().UTC(), Object: Reference{ObjectID: "raw_" + id, SHA256: in.SHA256, Size: int64(len(b)), AppID: s.app}}
-	manifest, _ := json.Marshal(publication{Version: 1, RequestHash: digest, Capture: c})
+	manifest, _ := json.Marshal(publication{OwnerSubject: in.OwnerSubject, OwnerRole: in.OwnerRole, Version: 2, RequestHash: digest, Capture: c})
 	e = s.backend.PutIfAbsent(ctx, s.base(id)+"manifest.json", manifest, "application/json")
 	if e != nil && !errors.Is(e, ErrExists) {
 		return Capture{}, false, e
@@ -232,10 +237,10 @@ func (s *Store) publication(ctx context.Context, id string) (publication, error)
 		return publication{}, ErrCorrupt
 	}
 	c := p.Capture
-	if p.Version != 1 || c.SchemaVersion != "1" || c.AppID != s.app || c.CaptureID != id || c.Object.AppID != s.app || c.Object.ObjectID != "raw_"+id || c.Object.Size < 0 || c.Object.Size > MaxRawBytes || c.CapturedAt.IsZero() || !keyID(c.CaptureKey) || len(c.Object.SHA256) != 64 {
+	if p.Version != 2 || c.SchemaVersion != "1" || c.AppID != s.app || c.CaptureID != id || c.Object.AppID != s.app || c.Object.ObjectID != "raw_"+id || c.Object.Size < 0 || c.Object.Size > MaxRawBytes || c.CapturedAt.IsZero() || !keyID(c.CaptureKey) || len(c.Object.SHA256) != 64 {
 		return publication{}, ErrCorrupt
 	}
-	in := CaptureInput{Key: c.CaptureKey, MIME: c.MIME, SourceURI: c.SourceURI, SHA256: c.Object.SHA256}
+	in := CaptureInput{Key: c.CaptureKey, MIME: c.MIME, SourceURI: c.SourceURI, SHA256: c.Object.SHA256, OwnerSubject: p.OwnerSubject, OwnerRole: p.OwnerRole}
 	if sum([]byte(s.app + "\x00" + c.CaptureKey))[:32] != id || p.RequestHash != requestDigest(in, c.Object.Size) {
 		return publication{}, ErrCorrupt
 	}
@@ -275,3 +280,15 @@ func (s *Store) GetArtifact(ctx context.Context, objectID string) (Blob, error) 
 	}
 	return s.verifiedSource(ctx, p.Capture)
 }
+
+// CaptureOwnership exposes only trusted publication ownership for policy lookup.
+func (s *Store) CaptureOwnership(ctx context.Context, id string) (string, string, error) {
+	p, e := s.publication(ctx, id)
+	if e != nil {
+		return "", "", e
+	}
+	return p.OwnerSubject, p.OwnerRole, nil
+}
+
+// AppID is the fixed trusted application boundary.
+func (s *Store) AppID() string { return s.app }

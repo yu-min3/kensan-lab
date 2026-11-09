@@ -37,3 +37,7 @@ sourceは8 MiB、manifestは16 KiBを上限にGETする。schema／byte hash／�
 unit試験は原文bytesの保持、再送、別内容／metadataの拒否、同keyに30writerが競合する場合、公開前のartifact拒否、保存途中失敗、corruption、入力／サイズ／MIME検査を確認する。
 
 SDKを通したHTTP試験はSigV4署名、固定bucket／prefix、If-None-Match、412／404、過大GET、他app key拒否、応答bodyのerror漏洩防止を確認する。これは実RustFSのpolicy検証ではない。実資格によるS3分離はintegration taskで確認する。
+
+## Immutable JSON records
+
+PublishRecordはapp別の`records/<collection>/<id>.json`へ条件付き公開する。canonical request hashとdata hashを保持し、同要求の再送では最初のserver metadataを返す。request／dataのwrapper全体はMaxRecordBytes以下。raw captureのownerはprivate publication v2へ保存し、CaptureOwnershipからpolicy resolverへ返す。public Capture schemaへowner fieldsを追加しない。
