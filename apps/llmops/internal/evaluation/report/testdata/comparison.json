@@ -1,0 +1,258 @@
+{
+  "schema_version": "1",
+  "comparison_id": "comparison-demo",
+  "mode": "prepared",
+  "dataset": {
+    "app_id": "example",
+    "task_id": "recipe-import",
+    "release_id": "release-demo",
+    "snapshots": [
+      {
+        "table": "example.curated.recipes",
+        "snapshot_id": "12345"
+      },
+      {
+        "table": "example.datasets.cases",
+        "snapshot_id": "67890"
+      }
+    ]
+  },
+  "current": {
+    "run_id": "run-current",
+    "dataset_release_id": "release-demo",
+    "prompt_version": "prompt-current",
+    "code_version": "code-demo",
+    "evaluator_version": "grader-demo",
+    "execution_source": "fixture"
+  },
+  "candidate": {
+    "run_id": "run-candidate",
+    "dataset_release_id": "release-demo",
+    "prompt_version": "prompt-candidate",
+    "code_version": "code-demo",
+    "evaluator_version": "grader-demo",
+    "execution_source": "fixture"
+  },
+  "cases": [
+    {
+      "case_id": "case-regression",
+      "source": {
+        "object_id": "raw_case-regression",
+        "sha256": "3af6e7109b42bdead07555429ae56690e692df2f64881ba91e56030de742c16c",
+        "uri": "https://example.test/synthetic-recipe",
+        "annotation_status": "synthetic",
+        "input": "玉ねぎ1/2個\n<script>window.__rawRan=true</script><img src=\"https://untrusted.example/tracker\">"
+      },
+      "current": {
+        "case_id": "case-regression",
+        "run_id": "run-current",
+        "attempt_id": "attempt-1",
+        "state": "succeeded",
+        "reason": "",
+        "output": "玉ねぎ1/2個",
+        "model": null,
+        "usage": null,
+        "evaluation": {
+          "case_id": "case-regression",
+          "attempt_id": "attempt-1",
+          "mode": "prepared",
+          "evaluator_version": "grader-demo",
+          "annotation_status": "synthetic",
+          "execution_state": "succeeded",
+          "execution_reason": "",
+          "status": "passed",
+          "evaluated": true,
+          "checks": {
+            "schema": true
+          },
+          "reasons": []
+        }
+      },
+      "candidate": {
+        "case_id": "case-regression",
+        "run_id": "run-candidate",
+        "attempt_id": "attempt-2",
+        "state": "succeeded",
+        "reason": "",
+        "output": "玉ねぎ2個 <script>window.__modelRan=true</script>",
+        "model": null,
+        "usage": null,
+        "evaluation": {
+          "case_id": "case-regression",
+          "attempt_id": "attempt-2",
+          "mode": "prepared",
+          "evaluator_version": "grader-demo",
+          "annotation_status": "synthetic",
+          "execution_state": "succeeded",
+          "execution_reason": "",
+          "status": "failed",
+          "evaluated": true,
+          "checks": {
+            "schema": true
+          },
+          "reasons": [
+            "quantity_mismatch"
+          ]
+        }
+      }
+    },
+    {
+      "case_id": "case-improvement",
+      "source": {
+        "object_id": "raw_case-improvement",
+        "sha256": "3af6e7109b42bdead07555429ae56690e692df2f64881ba91e56030de742c16c",
+        "uri": "https://example.test/synthetic-recipe",
+        "annotation_status": "synthetic",
+        "input": "玉ねぎ1/2個\n<script>window.__rawRan=true</script><img src=\"https://untrusted.example/tracker\">"
+      },
+      "current": {
+        "case_id": "case-improvement",
+        "run_id": "run-current",
+        "attempt_id": "attempt-3",
+        "state": "succeeded",
+        "reason": "",
+        "output": "材料が欠落",
+        "model": null,
+        "usage": null,
+        "evaluation": {
+          "case_id": "case-improvement",
+          "attempt_id": "attempt-3",
+          "mode": "prepared",
+          "evaluator_version": "grader-demo",
+          "annotation_status": "synthetic",
+          "execution_state": "succeeded",
+          "execution_reason": "",
+          "status": "failed",
+          "evaluated": true,
+          "checks": {
+            "schema": true
+          },
+          "reasons": [
+            "quantity_mismatch"
+          ]
+        }
+      },
+      "candidate": {
+        "case_id": "case-improvement",
+        "run_id": "run-candidate",
+        "attempt_id": "attempt-4",
+        "state": "succeeded",
+        "reason": "",
+        "output": "玉ねぎ1/2個",
+        "model": null,
+        "usage": null,
+        "evaluation": {
+          "case_id": "case-improvement",
+          "attempt_id": "attempt-4",
+          "mode": "prepared",
+          "evaluator_version": "grader-demo",
+          "annotation_status": "synthetic",
+          "execution_state": "succeeded",
+          "execution_reason": "",
+          "status": "passed",
+          "evaluated": true,
+          "checks": {
+            "schema": true
+          },
+          "reasons": []
+        }
+      }
+    },
+    {
+      "case_id": "case-waiting",
+      "source": {
+        "object_id": "raw_case-waiting",
+        "sha256": "3af6e7109b42bdead07555429ae56690e692df2f64881ba91e56030de742c16c",
+        "uri": "https://example.test/synthetic-recipe",
+        "annotation_status": "synthetic",
+        "input": "玉ねぎ1/2個\n<script>window.__rawRan=true</script><img src=\"https://untrusted.example/tracker\">"
+      },
+      "current": {
+        "case_id": "case-waiting",
+        "run_id": "run-current",
+        "attempt_id": "attempt-5",
+        "state": "succeeded",
+        "reason": "",
+        "output": "玉ねぎ1/2個",
+        "model": null,
+        "usage": null,
+        "evaluation": {
+          "case_id": "case-waiting",
+          "attempt_id": "attempt-5",
+          "mode": "prepared",
+          "evaluator_version": "grader-demo",
+          "annotation_status": "synthetic",
+          "execution_state": "succeeded",
+          "execution_reason": "",
+          "status": "passed",
+          "evaluated": true,
+          "checks": {
+            "schema": true
+          },
+          "reasons": []
+        }
+      },
+      "candidate": {
+        "case_id": "case-waiting",
+        "run_id": "run-candidate",
+        "attempt_id": "attempt-6",
+        "state": "waiting",
+        "reason": "quota_wait",
+        "output": "",
+        "model": null,
+        "usage": null,
+        "evaluation": {
+          "case_id": "case-waiting",
+          "attempt_id": "attempt-6",
+          "mode": "prepared",
+          "evaluator_version": "grader-demo",
+          "annotation_status": "synthetic",
+          "execution_state": "waiting",
+          "execution_reason": "quota_wait",
+          "status": "not_evaluated",
+          "evaluated": false,
+          "checks": {},
+          "reasons": []
+        }
+      }
+    },
+    {
+      "case_id": "case-review",
+      "source": {
+        "object_id": "raw_case-review",
+        "sha256": "3af6e7109b42bdead07555429ae56690e692df2f64881ba91e56030de742c16c",
+        "uri": "https://example.test/synthetic-recipe",
+        "annotation_status": "unreviewed",
+        "input": "玉ねぎ1/2個\n<script>window.__rawRan=true</script><img src=\"https://untrusted.example/tracker\">"
+      },
+      "current": {
+        "case_id": "case-review",
+        "run_id": "run-current",
+        "attempt_id": "attempt-7",
+        "state": "succeeded",
+        "reason": "",
+        "output": "注釈の確認待ち",
+        "model": null,
+        "usage": null,
+        "evaluation": {
+          "case_id": "case-review",
+          "attempt_id": "attempt-7",
+          "mode": "prepared",
+          "evaluator_version": "grader-demo",
+          "annotation_status": "unreviewed",
+          "execution_state": "succeeded",
+          "execution_reason": "",
+          "status": "needs_review",
+          "evaluated": true,
+          "checks": {
+            "schema": true
+          },
+          "reasons": [
+            "annotation_not_reviewed"
+          ]
+        }
+      },
+      "candidate": null
+    }
+  ]
+}
