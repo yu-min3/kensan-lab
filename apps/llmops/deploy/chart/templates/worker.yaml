@@ -1,0 +1,52 @@
+{{- if .Values.worker.enabled -}}
+{{- $image := printf "%s:%s" (required "worker.image.repository required" .Values.worker.image.repository) (required "worker.image.tag required" .Values.worker.image.tag) -}}
+{{- if empty .Values.worker.args -}}{{- fail "worker.args required" -}}{{- end -}}
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ .Release.Name }}-manual-worker
+spec:
+  backoffLimit: 0
+  activeDeadlineSeconds: 600
+  template:
+    metadata:
+      labels: {app.kubernetes.io/name: llmops, app.kubernetes.io/instance: {{ .Release.Name }}, app.kubernetes.io/component: worker}
+    spec:
+      restartPolicy: Never
+      automountServiceAccountToken: false
+      securityContext: {runAsNonRoot: true, runAsUser: 65532, runAsGroup: 65532, fsGroup: 65532, seccompProfile: {type: RuntimeDefault}}
+      initContainers:
+        - name: private-credentials
+          image: {{ printf "%s:%s" .Values.initImage.repository .Values.initImage.tag | quote }}
+          command: [/bin/sh, -ec]
+          args: ['umask 077; for file in /projected/*; do if [ -f "$file" ]; then cp "$file" "/private/$(basename "$file")"; fi; done; chmod 600 /private/*']
+          securityContext: {allowPrivilegeEscalation: false, readOnlyRootFilesystem: true, capabilities: {drop: [ALL]}}
+          resources: {requests: {cpu: 10m, memory: 16Mi}, limits: {cpu: 100m, memory: 32Mi}}
+          volumeMounts:
+            - {name: projected, mountPath: /projected, readOnly: true}
+            - {name: private, mountPath: /private}
+      containers:
+        - name: worker
+          image: {{ $image | quote }}
+          command: [/bin/sh, -ec, 'exec /usr/local/bin/llmops-worker "$@" </etc/input/request.json', '--']
+          args: {{ toJson .Values.worker.args }}
+          securityContext: {allowPrivilegeEscalation: false, readOnlyRootFilesystem: true, capabilities: {drop: [ALL]}}
+          resources: {{ toJson .Values.worker.resources }}
+          env: [{name: TMPDIR, value: /tmp}]
+          volumeMounts:
+            - {name: config, mountPath: /etc/worker, readOnly: true}
+            - {name: input, mountPath: /etc/input, readOnly: true}
+            - {name: private, mountPath: /run/private, readOnly: true}
+            - {name: tmp, mountPath: /tmp}
+      volumes:
+        - name: config
+          configMap: {name: {{ required "worker.configMap required" .Values.worker.configMap }}}
+        - name: input
+          configMap: {name: {{ required "worker.inputConfigMap required" .Values.worker.inputConfigMap }}}
+        - name: projected
+          secret: {secretName: {{ required "worker.existingSecret required" .Values.worker.existingSecret }}, defaultMode: 0440}
+        - name: private
+          emptyDir: {medium: Memory, sizeLimit: 16Mi}
+        - name: tmp
+          emptyDir: {sizeLimit: 256Mi}
+{{- end }}

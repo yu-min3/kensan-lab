@@ -1,0 +1,62 @@
+{
+  "image": {
+    "repository": "example.invalid/llmops-api",
+    "tag": "review-only"
+  },
+  "initImage": {
+    "repository": "busybox",
+    "tag": "1.37.0"
+  },
+  "existingSecret": "llmops-api-private",
+  "apiConfig": {
+    "listen": "0.0.0.0:8443",
+    "issuer": "https://identity.example.invalid/realms/llmops",
+    "audience": "llmops-platform",
+    "jwks_url": "https://identity.example.invalid/realms/llmops/protocol/openid-connect/certs",
+    "ca_file": "/run/private/ca.pem",
+    "mapping_file": "/etc/llmops/client-mapping.json",
+    "state_directory": "/data/jobs",
+    "cursor_key_file": "/run/private/cursor-key",
+    "tls_cert_file": "/run/private/tls.crt",
+    "tls_key_file": "/run/private/tls.key",
+    "stores": [
+      {
+        "app": "example",
+        "bucket": "llmops",
+        "region": "us-east-1",
+        "endpoint": "https://storage.example.invalid",
+        "ca_file": "/run/private/ca.pem",
+        "credentials_file": "/run/private/api-example.json"
+      }
+    ],
+    "runtimes": [
+      {
+        "app": "example",
+        "role": "app",
+        "target_id": "runtime-v1",
+        "client_id": "runtime-example-online",
+        "base_url": "https://runtime.example.invalid",
+        "token_url": "https://identity.example.invalid/realms/llmops/protocol/openid-connect/token",
+        "client_secret_file": "/run/private/runtime-example.secret",
+        "ca_file": "/run/private/ca.pem"
+      }
+    ],
+    "daily_limits": {
+      "example": {
+        "online": 20,
+        "eval": 4
+      }
+    }
+  },
+  "clientMapping": {
+    "version": "v1",
+    "clients": {
+      "example-app": {
+        "app_id": "example",
+        "role": "app",
+        "audience": "llmops-platform",
+        "runtime_client": "runtime-example-online"
+      }
+    }
+  }
+}

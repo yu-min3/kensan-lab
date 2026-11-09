@@ -1,0 +1,55 @@
+# Deployment proposal only; image and existing credentials are operator inputs.
+image:
+  repository: ""
+  tag: ""
+initImage:
+  repository: ""
+  tag: ""
+existingSecret: ""
+# Bump after the external Secret changes; credentials are copied once at init.
+secretRevision: initial
+apiConfig:
+  listen: "0.0.0.0:8443"
+  issuer: ""
+  audience: llmops-platform
+  jwks_url: ""
+  ca_file: /run/private/ca.pem
+  mapping_file: /etc/llmops/client-mapping.json
+  state_directory: /data/jobs
+  cursor_key_file: /run/private/cursor-key
+  tls_cert_file: /run/private/tls.crt
+  tls_key_file: /run/private/tls.key
+  stores: []
+  runtimes: []
+  daily_limits: {}
+clientMapping:
+  version: v1
+  clients: {}
+persistence:
+  size: 1Gi
+resources:
+  requests: {cpu: 100m, memory: 128Mi}
+  limits: {cpu: "1", memory: 512Mi}
+networkPolicy:
+  enabled: true
+  ingress: []
+  egress: []
+worker:
+  enabled: false
+  image: {repository: "", tag: ""}
+  existingSecret: ""
+  configMap: ""
+  inputConfigMap: ""
+  args: []
+  resources:
+    requests: {cpu: 250m, memory: 256Mi}
+    limits: {cpu: "1", memory: 1Gi}
+route:
+  enabled: false
+  gatewayName: ""
+  gatewayNamespace: ""
+  hostname: ""
+  backendHostname: ""
+  backendCAConfigMap: ""
+  # Set to the API version installed in the target cluster after review.
+  backendTLSPolicyAPIVersion: ""

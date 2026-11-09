@@ -1,0 +1,6 @@
+apiVersion: v2
+name: llmops
+version: 0.1.0
+description: Unconnected LLMOps API and optional manual worker job
+appVersion: "0.1.0"
+type: application

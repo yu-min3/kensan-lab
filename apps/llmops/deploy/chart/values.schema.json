@@ -1,0 +1,216 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "required": [
+    "image",
+    "initImage",
+    "existingSecret",
+    "apiConfig",
+    "clientMapping"
+  ],
+  "properties": {
+    "image": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "repository",
+        "tag"
+      ],
+      "properties": {
+        "repository": {
+          "type": "string",
+          "minLength": 1
+        },
+        "tag": {
+          "type": "string",
+          "minLength": 1,
+          "not": {
+            "enum": [
+              "latest"
+            ]
+          }
+        }
+      }
+    },
+    "initImage": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "repository",
+        "tag"
+      ],
+      "properties": {
+        "repository": {
+          "type": "string",
+          "minLength": 1
+        },
+        "tag": {
+          "type": "string",
+          "minLength": 1,
+          "not": {
+            "enum": [
+              "latest"
+            ]
+          }
+        }
+      }
+    },
+    "existingSecret": {
+      "type": "string",
+      "minLength": 1
+    },
+    "apiConfig": {
+      "type": "object",
+      "required": [
+        "issuer",
+        "audience",
+        "jwks_url",
+        "stores",
+        "runtimes"
+      ],
+      "properties": {
+        "issuer": {
+          "type": "string",
+          "pattern": "^https://"
+        },
+        "jwks_url": {
+          "type": "string",
+          "pattern": "^https://"
+        },
+        "stores": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "app",
+              "bucket",
+              "region",
+              "endpoint",
+              "ca_file",
+              "credentials_file"
+            ],
+            "properties": {
+              "app": {
+                "type": "string"
+              },
+              "bucket": {
+                "type": "string"
+              },
+              "region": {
+                "type": "string"
+              },
+              "endpoint": {
+                "type": "string",
+                "pattern": "^https://"
+              },
+              "ca_file": {
+                "type": "string",
+                "pattern": "^/run/private/[a-zA-Z0-9_.-]+$"
+              },
+              "credentials_file": {
+                "type": "string",
+                "pattern": "^/run/private/[a-zA-Z0-9_.-]+$"
+              }
+            }
+          }
+        },
+        "runtimes": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "app",
+              "role",
+              "target_id",
+              "client_id",
+              "base_url",
+              "token_url",
+              "client_secret_file",
+              "ca_file"
+            ],
+            "properties": {
+              "app": {
+                "type": "string"
+              },
+              "role": {
+                "type": "string"
+              },
+              "target_id": {
+                "type": "string"
+              },
+              "client_id": {
+                "type": "string"
+              },
+              "base_url": {
+                "type": "string",
+                "pattern": "^https://"
+              },
+              "token_url": {
+                "type": "string",
+                "pattern": "^https://"
+              },
+              "client_secret_file": {
+                "type": "string",
+                "pattern": "^/run/private/[a-zA-Z0-9_.-]+$"
+              },
+              "ca_file": {
+                "type": "string",
+                "pattern": "^/run/private/[a-zA-Z0-9_.-]+$"
+              }
+            }
+          }
+        },
+        "listen": {
+          "type": "string"
+        },
+        "audience": {
+          "type": "string"
+        },
+        "mapping_file": {
+          "type": "string"
+        },
+        "state_directory": {
+          "type": "string"
+        },
+        "ca_file": {
+          "type": "string",
+          "pattern": "^/run/private/[a-zA-Z0-9_.-]+$"
+        },
+        "cursor_key_file": {
+          "type": "string",
+          "pattern": "^/run/private/[a-zA-Z0-9_.-]+$"
+        },
+        "tls_cert_file": {
+          "type": "string",
+          "pattern": "^/run/private/[a-zA-Z0-9_.-]+$"
+        },
+        "tls_key_file": {
+          "type": "string",
+          "pattern": "^/run/private/[a-zA-Z0-9_.-]+$"
+        },
+        "daily_limits": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "online": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "eval": {
+                "type": "integer",
+                "minimum": 0
+              }
+            }
+          }
+        }
+      },
+      "additionalProperties": false
+    }
+  }
+}
