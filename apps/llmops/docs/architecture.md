@@ -4,13 +4,13 @@
 
 ## この差分の実装範囲
 
-現在は**契約定義の段階**。Go module、OpenAPI、保存record／adapterのJSON Schema、client mapping例、正負fixture検証を追加した。以下のサービス・認可・保存・評価は実装対象の全体像であり、まだ動作確認済みの構成ではない。
+現在は**契約とKonro adapterの実装段階**。Go module、OpenAPI、保存record／adapterのJSON Schema、client mapping例、正負fixture検証を追加した。Konro adapterは既存の純粋な抽出・検証を再利用し、ネットワーク・保存・推論なしでprepare／gradeを実行できる。以下のサービス・認可・保存・評価は後続を含む全体像であり、基盤全体の一周はまだ動作確認済みではない。
 
 | 境界 | 今回 | 後続 |
 |---|---|---|
 | HTTP・record | OpenAPI＋JSON Schema | APIサービス実装 |
 | identity・app role | mapping例と拒否契約 | JWT・policy・否定試験 |
-| adapter | versioned envelope、domain非依存schema | Konro binaryとworker |
+| adapter | versioned envelope、Konro prepare／grade binary | 共通workerとの接続 |
 | catalog・S3 | namespace・prefix・限定資格の設計 | 製品互換性、bootstrap、grants |
 | 推論・評価 | run／attempt・固定release契約 | runtime接続、評価器、比較HTML |
 
@@ -126,3 +126,5 @@ contract試験に加え、実Keycloak／Polaris／S3で自app成功・別app拒�
 配備例はArgo監視対象外のapps/llmops/deployに置き、draft PRで本番Application・Secret・DNS・routeを有効化しない。
 
 外向き形式と上限は[contracts](../contracts/README.md)、[OpenAPI](../contracts/openapi.json)、[record schemas](../contracts/schemas/)を参照する。
+
+Konro固有のpayload・実行例・採点条件は[adapter契約](../../konro/docs/llmops-adapter.md)を参照。
