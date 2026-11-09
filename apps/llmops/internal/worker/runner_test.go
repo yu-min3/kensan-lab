@@ -163,3 +163,24 @@ func TestCallerCancellation(t *testing.T) {
 		t.Fatalf("got %v", e)
 	}
 }
+
+func TestSingleHostWriterLock(t *testing.T) {
+	r, e := New(config(t))
+	if e != nil {
+		t.Fatal(e)
+	}
+	executed := false
+	e = r.WithLock("dataset-publish", func() error {
+		inner := r.WithLock("dataset-publish", func() error { executed = true; return nil })
+		if inner == nil {
+			return errors.New("second writer entered")
+		}
+		return nil
+	})
+	if e != nil || executed {
+		t.Fatal("writer exclusion failed")
+	}
+	if e = r.WithLock("dataset-publish", func() error { return nil }); e != nil {
+		t.Fatal("lock retained after completion")
+	}
+}

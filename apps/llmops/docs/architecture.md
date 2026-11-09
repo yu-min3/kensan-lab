@@ -4,7 +4,7 @@
 
 ## この差分の実装範囲
 
-現在は**共通サービスとローカルデータ基盤を実装し、各境界を検証した段階**。V0全体は未完了。固定datasetの公開、評価runnerと実runの比較、outbox、backup復元と横断統合試験は後続となる。
+現在は**共通サービスとローカルデータ基盤を実装し、各境界を検証した段階**。V0全体は未完了。固定datasetの公開と再読込まで実装済み。評価runnerと実runの比較、outbox、backup復元と横断統合試験は後続となる。
 
 | 境界 | 実装・検証済み | 残る接続・検証 |
 |---|---|---|
@@ -13,6 +13,7 @@
 | job/runtime | 永続受付・quota・再照合・状態理由、OAuth client、実agentd OIDC契約試験 | 実モデルsmoke（未実施） |
 | adapter/worker | Konro prepare/grade、登録binary hash、app/role固定worker | dataset/evalコマンドの一周 |
 | catalog/S3 | TLS環境、限定資格、app別catalog、実snapshotと認可試験 | 長時間S3 session更新、backup復元 |
+| dataset | 2表目、group別split・合成注釈、immutable release、実tag/Raw保持参照、固定snapshot reader | 実runの評価runnerへ接続 |
 | grading/report | 未確認を分けるgrader、回帰比較HTMLとescape/狭幅検証 | 実runを読み込む評価runner |
 
 各タスクの個別検証と基盤全体の完了を区別する。native adapterは信頼した登録binaryの実行境界であり、同UIDのファイル・ネットワークまで制限するOS sandboxではない。
@@ -83,6 +84,12 @@ Rawは元のbytes、metadata・release・runはJSON、table実体はParquetを�
 初版の構成はapp別catalog `konro`と`sample`、その中の`curated`／`datasets` namespace。共有Polarisサービスの中でもcatalog grantsとstorage prefixを分ける。Konroの対象は`konro.curated.recipes`と`konro.datasets.import_cases`の2表。料理schemaはKonro adapterが所有し、共通recordはobject参照・source group・domain schema／transform版だけを共通化する。
 
 releaseは参照する全tableのsnapshot ID、Raw object／hash、case一覧hash、code／adapter版を固定する。複数tableの原子commitを仮定せず、参照検査とpin後に最後のimmutable manifestを公開する。未公開・改変・欠損releaseを拒否し、latestやglobで入力を選ばない。
+
+dataset公開は要求を条件付き予約し、Raw/hashの検査、2表目のcommit、source/datasetの実retention tag、Raw保持参照を揃えてからmanifestを最後に公開する。tagはRESTのUUID/ref要件で作り、max-ref-age-msをLongMaxへ固定する。同releaseの別要求を拒否し、失敗後の同要求は既存tagのsnapshotから再開する。publisherは同一host・共通TempRootのapp/role lockで単一writerに限定する。
+
+readerは予約要求・manifest・case一覧hash・tag・Raw bytes/hashを照合し、A→B更新後もAのprepared inputを取得する。source_groupがdevelopment/holdoutを跨ぐ注釈を拒否し、syntheticと実用の確認済み注釈を区別する。LLMへ渡すのはPreparedだけで、期待条件と注釈はgraderに閉じる。[dataset公開/reader契約](../internal/worker/dataset/README.md)を参照。
+
+Raw pinは保持参照であり物理削除を強制防止する機能ではない。V0には自作GC/削除/unpinを持たず、将来の維持管理は保持guardで参照中の削除を拒否する。
 
 snapshot IDだけではexpirationを防げない。tagと保持方針を併用し、一般runの保持期間と参照中artifactのpinを分ける。削除要求で原文を消す場合は派生releaseを無効化し、再現不能を記録する。
 

@@ -56,6 +56,11 @@ type CatalogConfig struct {
 	PythonBinary     string `json:"python_binary"`
 }
 
+type TableLocation struct {
+	Namespace string `json:"namespace"`
+	Table     string `json:"table"`
+}
+
 type Config struct {
 	App            string             `json:"app"`
 	Role           string             `json:"role"`
@@ -66,6 +71,7 @@ type Config struct {
 	Adapters       map[string]Adapter `json:"adapters"`
 	Storage        *Storage           `json:"storage,omitempty"`
 	Catalog        *CatalogConfig     `json:"catalog,omitempty"`
+	DatasetSource  *TableLocation     `json:"dataset_source,omitempty"`
 }
 type Request struct {
 	ProtocolVersion     string          `json:"protocol_version"`
@@ -287,4 +293,22 @@ func (r *Runner) Call(ctx context.Context, id string, request Request) (Response
 		return nil
 	})
 	return result, e
+}
+
+// WithLock enforces the V0 single-host writer boundary across CLI processes.
+// All writers for an app/role must share the operator-configured TempRoot.
+func (r *Runner) WithLock(id string, fn func() error) error {
+	if !name.MatchString(id) {
+		return ErrConfig
+	}
+	file, e := os.OpenFile(filepath.Join(r.cfg.TempRoot, r.cfg.App, r.cfg.Role, id+".lock"), os.O_CREATE|os.O_RDWR, 0600)
+	if e != nil {
+		return ErrExecution
+	}
+	defer file.Close()
+	if syscall.Flock(int(file.Fd()), syscall.LOCK_EX|syscall.LOCK_NB) != nil {
+		return errors.New("worker writer is busy; retry later")
+	}
+	defer syscall.Flock(int(file.Fd()), syscall.LOCK_UN)
+	return fn()
 }
