@@ -44,6 +44,18 @@ type Storage struct {
 	CredentialFile string `json:"credential_file"`
 	CAFile         string `json:"ca_file,omitempty"`
 }
+type CatalogConfig struct {
+	URI              string `json:"uri"`
+	Name             string `json:"name"`
+	Namespace        string `json:"namespace"`
+	Table            string `json:"table"`
+	TokenURL         string `json:"token_url"`
+	ClientID         string `json:"client_id"`
+	ClientSecretFile string `json:"client_secret_file"`
+	CAFile           string `json:"ca_file"`
+	PythonBinary     string `json:"python_binary"`
+}
+
 type Config struct {
 	App            string             `json:"app"`
 	Role           string             `json:"role"`
@@ -53,6 +65,7 @@ type Config struct {
 	MaxOutputBytes int                `json:"max_output_bytes"`
 	Adapters       map[string]Adapter `json:"adapters"`
 	Storage        *Storage           `json:"storage,omitempty"`
+	Catalog        *CatalogConfig     `json:"catalog,omitempty"`
 }
 type Request struct {
 	ProtocolVersion     string          `json:"protocol_version"`

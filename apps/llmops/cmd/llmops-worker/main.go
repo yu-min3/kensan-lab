@@ -14,6 +14,13 @@ import (
 )
 
 func main() {
+	if len(os.Args) > 1 && os.Args[1] == "curate" {
+		if e := runCurate(os.Args[2:]); e != nil {
+			fmt.Fprintln(os.Stderr, e)
+			os.Exit(1)
+		}
+		return
+	}
 	config := flag.String("config", "", "operator configuration file")
 	adapter := flag.String("adapter", "", "registered adapter identifier")
 	flag.Parse()
