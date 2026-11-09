@@ -102,4 +102,3 @@ def state_panel(title, expr, x, y, w=4, description=""):
                     "justifyMode": "center", "reduceOptions": {"calcs": ["last"], "values": False},
                     "text": {"valueSize": 21}}
     return p
-
