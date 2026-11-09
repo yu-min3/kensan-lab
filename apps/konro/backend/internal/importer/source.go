@@ -17,11 +17,12 @@ const MaxSource = webpage.MaxSource
 const MaxText = 128 << 10
 
 type Source struct {
-	URL  string           `json:"url,omitempty"`
-	Raw  string           `json:"raw"`
-	Text string           `json:"text"`
-	Kind string           `json:"kind,omitempty"`
-	Info *provenance.Info `json:"info,omitempty"`
+	URL           string           `json:"url,omitempty"`
+	Raw           string           `json:"raw"`
+	Text          string           `json:"text"`
+	Kind          string           `json:"kind,omitempty"`
+	TextTruncated bool             `json:"text_truncated,omitempty"`
+	Info          *provenance.Info `json:"info,omitempty"`
 }
 type Content = recipe.Content
 
@@ -56,12 +57,16 @@ func sourceFromPage(p webpage.Page) (Source, error) {
 			s.Text = ""
 			return s, nil
 		}
-		s.Text = limitText(title + "\n\n" + description)
+		text := title + "\n\n" + description
+		s.TextTruncated = len(text) > MaxText
+		s.Text = limitText(text)
 		return s, nil
 	}
 	selection := recipeSelection(doc, s.URL)
 	selection.Find("script,style,nav,header,footer,iframe,noscript").Remove()
-	s.Text = limitText(selection.Text())
+	text := selection.Text()
+	s.TextTruncated = len(text) > MaxText
+	s.Text = limitText(text)
 	return s, nil
 }
 func limitText(s string) string {

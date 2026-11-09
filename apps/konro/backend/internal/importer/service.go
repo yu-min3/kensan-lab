@@ -3,14 +3,12 @@
 package importer
 
 import (
-	"bytes"
 	"context"
 	"crypto/rand"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -317,28 +315,13 @@ func (s *Service) apply(d *Draft) error {
 		return nil
 	}
 	d.AppliedJob = d.Job.ID
-	var output struct {
-		Content
-		Assessment string `json:"assessment"`
-	}
-	dec := json.NewDecoder(bytes.NewReader(d.Job.Output))
-	dec.DisallowUnknownFields()
-	var fields map[string]json.RawMessage
-	_ = json.Unmarshal(d.Job.Output, &fields)
-	required := true
-	for _, name := range []string{"title", "servings", "ingredients", "steps"} {
-		v, ok := fields[name]
-		if !ok || string(bytes.TrimSpace(v)) == "null" {
-			required = false
-		}
-	}
-	if e := dec.Decode(&output); e != nil || dec.Decode(new(any)) != io.EOF || !required || validateContent(output.Content, false) != nil || utf8.RuneCountInString(output.Assessment) > 600 {
+	c, assessment, err := DecodeAgentOutput(d.Job.Output)
+	if err != nil {
 		d.Job.State = "failed"
 		d.Job.Reason = "invalid_recipe"
 		d.Warnings = append(d.Warnings, "AIの結果がレシピ形式に合わないため採用しませんでした")
 		return nil
 	}
-	c := output.Content
 	// Compare recipe text, never its JSON representation: encoding/json turns
 	// '&', '<', '>' and line separators into escapes containing unrelated digits.
 	if newNumbers(d.Source.Text+" "+contentText(d.Content), contentText(c)) {
@@ -360,7 +343,7 @@ func (s *Service) apply(d *Draft) error {
 		keptInput = true
 	}
 	d.Content = c
-	d.Assessment = strings.TrimSpace(output.Assessment)
+	d.Assessment = strings.TrimSpace(assessment)
 	d.Revision++
 	var retained []string
 	for _, w := range d.Warnings {
