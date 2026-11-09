@@ -1,0 +1,85 @@
+name: llmops-dev
+services:
+  rustfs:
+    image: rustfs/rustfs:1.0.0-beta.8@sha256:fa19210ac4697c79d7ccca1ec9b0eb91aebacc6691991ffb14014bb3c67e6cc3
+    ports: ["127.0.0.1:19300:9000"]
+    environment:
+      RUSTFS_ACCESS_KEY: ${DEV_S3_KEY:?generated credential required}
+      RUSTFS_SECRET_KEY: ${DEV_S3_SECRET:?generated credential required}
+      RUSTFS_VOLUMES: /data
+      RUSTFS_CONSOLE_ENABLE: "false"
+    volumes: ["rustfs-data:/data"]
+  postgres:
+    image: postgres:18.6@sha256:e3d24f6906d0760bf4da0dae872415391ededefad23fd471c47dc53b0ddf3c42
+    environment:
+      POSTGRES_USER: polaris
+      POSTGRES_DB: polaris
+      POSTGRES_PASSWORD: ${DEV_DB_SECRET:?}
+    volumes: ["postgres-data:/var/lib/postgresql", "${DEV_DATA:?}/init.sql:/docker-entrypoint-initdb.d/init.sql:ro"]
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "polaris"]
+      interval: 2s
+      timeout: 2s
+      retries: 30
+  bootstrap:
+    image: apache/polaris-admin-tool:1.8.0@sha256:34dde19bb321aef5925a14ba90b69e26e982a5dcbda76a9d0cfc1aac1534ba4e
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      POLARIS_PERSISTENCE_TYPE: relational-jdbc
+      POLARIS_PERSISTENCE_RELATIONAL_JDBC_DATABASE_TYPE: postgresql
+      QUARKUS_DATASOURCE_JDBC_URL: jdbc:postgresql://postgres:5432/polaris
+      QUARKUS_DATASOURCE_USERNAME: polaris
+      QUARKUS_DATASOURCE_PASSWORD: ${DEV_DB_SECRET:?}
+    command: ["bootstrap", "--realm=POLARIS", "--credential=POLARIS,root,${DEV_CATALOG_SECRET:?}"]
+  polaris:
+    depends_on:
+      bootstrap:
+        condition: service_completed_successfully
+      postgres:
+        condition: service_healthy
+    image: apache/polaris:1.8.0@sha256:347615e736cab2c9be0d8c464552ac930be4755302bb0aeb745216bbae99ba5b
+    ports: ["127.0.0.1:19381:8181", "127.0.0.1:19382:8182"]
+    environment:
+      POLARIS_PERSISTENCE_TYPE: relational-jdbc
+      POLARIS_PERSISTENCE_RELATIONAL_JDBC_DATABASE_TYPE: postgresql
+      QUARKUS_DATASOURCE_JDBC_URL: jdbc:postgresql://postgres:5432/polaris
+      QUARKUS_DATASOURCE_USERNAME: polaris
+      QUARKUS_DATASOURCE_PASSWORD: ${DEV_DB_SECRET:?}
+      AWS_REGION: us-east-1
+      AWS_ACCESS_KEY_ID: ${CATALOG_S3_KEY:-}
+      AWS_SECRET_ACCESS_KEY: ${CATALOG_S3_SECRET:-}
+      polaris.realm-context.realms: POLARIS
+      quarkus.otel.sdk.disabled: "true"
+  keycloak:
+    image: quay.io/keycloak/keycloak:26.8.2@sha256:3879c623248408de29a5303178b5816c77e8dfef3890c361f8c0bbeaa979ba3b
+    user: "${DEV_UID:?}:0"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    ports: ["127.0.0.1:19443:19443"]
+    environment:
+      KC_DB: postgres
+      KC_DB_URL: jdbc:postgresql://postgres:5432/keycloak
+      KC_DB_USERNAME: keycloak
+      KC_DB_PASSWORD: ${DEV_KEYCLOAK_DB_SECRET:?}
+      KC_BOOTSTRAP_ADMIN_USERNAME: local-admin
+      KC_BOOTSTRAP_ADMIN_PASSWORD: ${DEV_KEYCLOAK_ADMIN_SECRET:?}
+      KC_HOSTNAME: https://id.localhost:19443
+      KC_HTTP_ENABLED: "false"
+      KC_HTTPS_PORT: "19443"
+      KC_HTTPS_CERTIFICATE_FILE: /tls/server.pem
+      KC_HTTPS_CERTIFICATE_KEY_FILE: /tls/server.key
+    volumes:
+      - "${DEV_DATA:?}/server.pem:/tls/server.pem:ro"
+      - "${DEV_DATA:?}/server.key:/tls/server.key:ro"
+      - "${DEV_DATA:?}/realm:/opt/keycloak/data/import:ro"
+    command: ["start", "--import-realm", "--cache=local"]
+    networks:
+      default:
+        aliases: [id.localhost]
+
+volumes:
+  rustfs-data:
+  postgres-data:
