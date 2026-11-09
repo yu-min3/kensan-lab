@@ -14,5 +14,13 @@
     "avro_extension": "345c3f4e82"
   },
   "verified_platform": "darwin/arm64 + Docker Desktop",
-  "issuer": "https://id.localhost:19443/realms/llmops"
+  "issuer": "https://id.localhost:19443/realms/llmops",
+  "admin_cli": {
+    "name": "minio/mc",
+    "release": "RELEASE.2025-08-13T08-35-41Z",
+    "verified_platform": "darwin/arm64",
+    "sha256": "a877fd0c183409da9f20f9d6e1811987298bbbca1aa03428eebdffba79fb9445",
+    "license": "AGPL-3.0",
+    "purpose": "isolated bootstrap only"
+  }
 }

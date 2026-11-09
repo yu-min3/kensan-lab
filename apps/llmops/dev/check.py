@@ -1,6 +1,6 @@
 """Assert local-service health and trusted HTTPS issuer from host and container."""
 from pathlib import Path
-import json,ssl,subprocess,time,urllib.request,urllib.error
+import json,ssl,subprocess,time,urllib.request,urllib.error,http.client
 root=Path(__file__).resolve().parents[3];data=root/'temp/llmops-dev'
 issuer='https://id.localhost:19443/realms/llmops'
 context=ssl.create_default_context(cafile=str(data/'ca.pem'))
@@ -10,7 +10,7 @@ for _ in range(60):
   with urllib.request.urlopen(url,context=context,timeout=2) as response:discovery=json.load(response)
   assert discovery['issuer']==issuer
   break
- except (urllib.error.URLError,TimeoutError):time.sleep(1)
+ except (urllib.error.URLError,TimeoutError,http.client.RemoteDisconnected):time.sleep(1)
 else:raise RuntimeError('Keycloak TLS readiness timed out')
 try:urllib.request.urlopen(url,timeout=3)
 except urllib.error.URLError:pass
@@ -27,6 +27,6 @@ for endpoint in ['http://127.0.0.1:19300/health','http://127.0.0.1:19382/q/healt
   try:
    with urllib.request.urlopen(endpoint,timeout=2) as response:assert response.status==200
    break
-  except urllib.error.URLError:time.sleep(1)
+  except (urllib.error.URLError,http.client.RemoteDisconnected):time.sleep(1)
  else:raise RuntimeError('data service readiness timed out')
 print(json.dumps({'host_trusted_https':True,'container_trusted_https':True,'same_issuer':issuer,'jwks_available':True,'untrusted_CA_rejected':True,'storage_and_catalog_healthy':True}))

@@ -1,0 +1,66 @@
+{
+  "version": "v1",
+  "catalogs": {
+    "konro": {
+      "storage_prefix": "apps/konro/warehouse/",
+      "namespaces": [
+        "curated",
+        "datasets"
+      ]
+    },
+    "sample": {
+      "storage_prefix": "apps/sample/warehouse/",
+      "namespaces": [
+        "curated",
+        "datasets"
+      ]
+    }
+  },
+  "object_roles": {
+    "api-konro": {
+      "read_append": [
+        "apps/konro/raw/",
+        "apps/konro/records/feedback/",
+        "apps/konro/runs/",
+        "apps/konro/reports/"
+      ]
+    },
+    "api-sample": {
+      "read_append": [
+        "apps/sample/raw/",
+        "apps/sample/records/feedback/",
+        "apps/sample/runs/",
+        "apps/sample/reports/"
+      ]
+    },
+    "transform-konro": {
+      "read": [
+        "apps/konro/raw/",
+        "apps/konro/records/feedback/"
+      ],
+      "read_write": [
+        "apps/konro/warehouse/"
+      ],
+      "read_append": [
+        "apps/konro/releases/"
+      ]
+    },
+    "eval-konro": {
+      "read": [
+        "apps/konro/raw/",
+        "apps/konro/warehouse/",
+        "apps/konro/releases/"
+      ],
+      "read_append": [
+        "apps/konro/runs/",
+        "apps/konro/reports/"
+      ]
+    },
+    "catalog-store": {
+      "read_write": [
+        "apps/konro/warehouse/",
+        "apps/sample/warehouse/"
+      ]
+    }
+  }
+}

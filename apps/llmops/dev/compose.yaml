@@ -50,8 +50,22 @@ services:
       AWS_REGION: us-east-1
       AWS_ACCESS_KEY_ID: ${CATALOG_S3_KEY:-}
       AWS_SECRET_ACCESS_KEY: ${CATALOG_S3_SECRET:-}
+      polaris.authentication.type: mixed
+      quarkus.oidc.tenant-enabled: "true"
+      quarkus.oidc.auth-server-url: https://id.localhost:19443/realms/llmops
+      quarkus.oidc.token.issuer: https://id.localhost:19443/realms/llmops
+      quarkus.oidc.client-id: polaris
+      quarkus.oidc.token.audience: polaris
+      quarkus.oidc.roles.role-claim-path: polaris_role
+      quarkus.oidc.tls.tls-configuration-name: oidc
+      quarkus.tls.oidc.trust-store.pem.certs: /tls/ca.pem
+      polaris.oidc.principal-mapper.name-claim-path: azp
+      polaris.oidc.principal-roles-mapper.mappings[0].regex: (.+)
+      polaris.oidc.principal-roles-mapper.mappings[0].replacement: PRINCIPAL_ROLE:$1
       polaris.realm-context.realms: POLARIS
       quarkus.otel.sdk.disabled: "true"
+    volumes:
+      - "${DEV_DATA:?}/ca.pem:/tls/ca.pem:ro"
   keycloak:
     image: quay.io/keycloak/keycloak:26.8.2@sha256:3879c623248408de29a5303178b5816c77e8dfef3890c361f8c0bbeaa979ba3b
     user: "${DEV_UID:?}:0"

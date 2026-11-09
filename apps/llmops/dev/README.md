@@ -44,7 +44,7 @@ HTTPのcatalog/object endpointsはローカル開発用。OIDC issuerはhostとc
 
 ## 資格を混ぜない
 
-RustFS root資格はストレージ自身と後続の管理bootstrapだけが使う。PolarisサーバーやAPI/workerへ同じキーを渡さない。Polarisには将来の限定資格`CATALOG_S3_KEY`／`CATALOG_S3_SECRET`を注入する入口だけを置き、未設定時は空で起動する。catalog作成・app別client・role・S3 policyはT005の対象で、この起動成功をapp別認可成功と扱わない。
+RustFS root資格はストレージ自身と後続の管理bootstrapだけが使う。PolarisサーバーやAPI/workerへ同じキーを渡さない。Polarisには将来の限定資格`CATALOG_S3_KEY`／`CATALOG_S3_SECRET`を注入する入口だけを置き、未設定時は空で起動する。catalog作成・app別client・role・S3 policyは[bootstrap](bootstrap/README.md)で構築する。この起動成功だけをapp別認可成功と扱わない。
 
 PostgreSQLの初期化とPolaris metastoreの初期化は異なる。schemaを作成してから、versionの一致した`polaris-admin-tool`でrealmのbootstrapを行う。bootstrap用principal資格は長時間動くPolarisサーバーの環境へ渡さない。
 
@@ -52,7 +52,7 @@ Keycloakのlocal admin資格はtempにのみ生成し、この環境の初期構
 
 ## 次に検証すること
 
-この段階はサービス起動とTLS trustまで。Keycloakのclient credentials/audience、Polarisへの外部認証、限定S3資格、appごとのgrantは後続bootstrapと分離試験で確認する。Java/Goの各clientも明示的にこのCAを信頼する設定が必要。
+サービス起動とTLS trustに続き、[bootstrap](bootstrap/README.md)がKeycloakのclient credentials/audience、Polarisへの外部認証、限定S3資格、appごとのgrantを構築・検証する。Java/Goの各clientも明示的にこのCAを信頼する設定が必要。
 
 CAとserver証明書は30日で期限切れになる。期限切れ時は接続を失敗させる。共有環境や本番でこれらを流用しない。volumeと資格は対で保持し、volumeを残したままdev.envだけ再生成して異なるDB資格へ置き換えない。
 
