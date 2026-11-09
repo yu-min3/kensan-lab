@@ -67,7 +67,7 @@ func TestGradesUseConfirmedExpectations(t *testing.T) {
 		{"unknown field", "failed", "confirmed", &expected, json.RawMessage(`{"title":"スープ","servings":"","ingredients":["玉ねぎ1/2個"],"steps":["煮る"],"shell":"id"}`)},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			r := call(t, "grade", gradeInput{tc.output, tc.expected, tc.annotation})
+			r := call(t, "grade", gradeInput{Output: tc.output, Expected: tc.expected, AnnotationStatus: tc.annotation})
 			var g graded
 			json.Unmarshal(r["result"], &g)
 			if g.Status != tc.status {
@@ -85,5 +85,40 @@ func TestProtocolRejectsInjectionAndTrailingInput(t *testing.T) {
 	r := call(t, "prepare", map[string]any{"raw": "x", "mime_type": "text/plain", "command": "id"})
 	if r["error"] == nil {
 		t.Fatal("unknown payload accepted")
+	}
+}
+
+func TestConstraintGradingDetectsCorruptionAndPreservesUnknown(t *testing.T) {
+	expected := importer.Content{Title: "スープ", Ingredients: []string{"玉ねぎ1/2個", "じゃがいも2個"}, Steps: []string{"切る", "煮る"}}
+	output := func(c importer.Content) json.RawMessage { b, _ := json.Marshal(c); return b }
+	for _, tc := range []struct {
+		name, status, annotation string
+		recipe                   importer.Content
+		constraints              map[string]any
+	}{
+		{"synthetic oracle", "passed", "synthetic", expected, map[string]any{"expected": expected}},
+		{"reviewed oracle", "passed", "reviewed", expected, map[string]any{"expected": expected}},
+		{"unreviewed oracle", "needs_review", "unreviewed", expected, map[string]any{"expected": expected}},
+		// Both outputs contain the same global numeric tokens, attached to different ingredients.
+		{"swapped quantities", "failed", "reviewed", importer.Content{Title: "スープ", Ingredients: []string{"玉ねぎ2個", "じゃがいも1/2個"}, Steps: expected.Steps}, map[string]any{"expected": expected}},
+		{"invented ingredient", "failed", "synthetic", importer.Content{Title: "スープ", Ingredients: []string{"玉ねぎ1/2個", "じゃがいも2個", "塩5g"}, Steps: expected.Steps}, map[string]any{"expected": expected}},
+		{"missing step", "failed", "synthetic", importer.Content{Title: "スープ", Ingredients: expected.Ingredients, Steps: []string{"切る"}}, map[string]any{"expected": expected}},
+		{"invented servings", "failed", "reviewed", importer.Content{Title: "スープ", Servings: "2人分", Ingredients: expected.Ingredients, Steps: expected.Steps}, map[string]any{"preserve_unknown_servings": true}},
+		{"missing required line", "failed", "synthetic", expected, map[string]any{"required_ingredients": []string{"塩5g"}}},
+		{"partial meaning unknown", "needs_review", "reviewed", expected, map[string]any{"required_ingredients": []string{"玉ねぎ1/2個"}}},
+		{"unknown constraint", "needs_review", "reviewed", expected, map[string]any{"semantic_safety": true, "expected": expected}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			constraints, _ := json.Marshal(tc.constraints)
+			response := call(t, "grade", gradeInput{Output: output(tc.recipe), AnnotationStatus: tc.annotation, ExpectedConstraints: constraints})
+			if response["error"] != nil {
+				t.Fatal(string(response["error"]))
+			}
+			var g graded
+			json.Unmarshal(response["result"], &g)
+			if g.Status != tc.status || g.AnnotationStatus != tc.annotation {
+				t.Fatalf("expected %s/%s got %+v", tc.status, tc.annotation, g)
+			}
+		})
 	}
 }
