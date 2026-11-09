@@ -1,0 +1,610 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: grafana-cw-evidence-mesh-dashboard
+  namespace: monitoring
+  labels:
+    grafana_dashboard: "1"
+    grafana_folder: "Platform"
+data:
+  cw-evidence-mesh.json: |
+    {
+      "uid": "cw-evidence-mesh",
+      "id": null,
+      "title": "Cluster Watch · Istio Evidence",
+      "schemaVersion": 41,
+      "version": 1,
+      "editable": false,
+      "timezone": "Asia/Tokyo",
+      "refresh": "1m",
+      "time": {
+        "from": "now-6h",
+        "to": "now"
+      },
+      "tags": [
+        "platform",
+        "watch"
+      ],
+      "panels": [
+        {
+          "type": "text",
+          "title": "",
+          "gridPos": {
+            "x": 0,
+            "y": 0,
+            "w": 24,
+            "h": 3
+          },
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "targets": [],
+          "fieldConfig": {
+            "defaults": {
+              "color": {
+                "mode": "thresholds"
+              },
+              "noValue": "◇ 未取得",
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "gray",
+                    "value": null
+                  },
+                  {
+                    "color": "green",
+                    "value": 0
+                  },
+                  {
+                    "color": "orange",
+                    "value": 75
+                  },
+                  {
+                    "color": "red",
+                    "value": 90
+                  }
+                ]
+              }
+            },
+            "overrides": []
+          },
+          "options": {
+            "mode": "markdown",
+            "content": "## Istio — 確認の根拠\n稼働状態・機能確認・回復実証を分けて見る。"
+          },
+          "id": 1
+        },
+        {
+          "type": "stat",
+          "title": "稼働 · Ready / Replica",
+          "gridPos": {
+            "x": 0,
+            "y": 3,
+            "w": 8,
+            "h": 4
+          },
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "targets": [
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "prometheus"
+              },
+              "editorMode": "code",
+              "expr": "((min(kube_deployment_status_replicas_available{namespace=\"istio-system\",deployment=~\"istiod|gateway-platform-istio|gateway-prod-istio\"} >= bool on(namespace,deployment) kube_deployment_spec_replicas{namespace=\"istio-system\",deployment=~\"istiod|gateway-platform-istio|gateway-prod-istio\"})) and on() ((cluster_watch:ksm_healthy:bool == 1) and on() (time() - timestamp(cluster_watch:ksm_healthy:bool) < 120)) and on() (count(kube_deployment_status_replicas_available{namespace=\"istio-system\",deployment=~\"istiod|gateway-platform-istio|gateway-prod-istio\"}) == 3) and on() (count(kube_deployment_spec_replicas{namespace=\"istio-system\",deployment=~\"istiod|gateway-platform-istio|gateway-prod-istio\"}) == 3) and on() (min(kube_deployment_spec_replicas{namespace=\"istio-system\",deployment=~\"istiod|gateway-platform-istio|gateway-prod-istio\"}) > 0) and on() ((time() - min(timestamp(kube_deployment_status_replicas_available{namespace=\"istio-system\",deployment=~\"istiod|gateway-platform-istio|gateway-prod-istio\"})) < 120)) and on() ((time() - min(timestamp(kube_deployment_spec_replicas{namespace=\"istio-system\",deployment=~\"istiod|gateway-platform-istio|gateway-prod-istio\"})) < 120))) or vector(-1)",
+              "legendFormat": "稼働 · Ready / Replica",
+              "refId": "A",
+              "range": false,
+              "instant": true,
+              "format": "time_series"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "color": {
+                "mode": "thresholds"
+              },
+              "noValue": "◇ 未取得",
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "gray",
+                    "value": null
+                  },
+                  {
+                    "color": "green",
+                    "value": 0
+                  },
+                  {
+                    "color": "orange",
+                    "value": 1
+                  }
+                ]
+              },
+              "unit": "short",
+              "decimals": 0,
+              "mappings": [
+                {
+                  "type": "value",
+                  "options": {
+                    "-1": {
+                      "text": "◇ 未取得",
+                      "color": "gray"
+                    },
+                    "0": {
+                      "text": "× 未Ready",
+                      "color": "red"
+                    },
+                    "1": {
+                      "text": "● 稼働確認",
+                      "color": "green"
+                    }
+                  }
+                }
+              ]
+            },
+            "overrides": []
+          },
+          "options": {
+            "colorMode": "value",
+            "graphMode": "none",
+            "textMode": "value",
+            "justifyMode": "center",
+            "reduceOptions": {
+              "calcs": [
+                "last"
+              ],
+              "values": false
+            },
+            "text": {
+              "valueSize": 22
+            }
+          },
+          "id": 2
+        },
+        {
+          "type": "text",
+          "title": "機能確認",
+          "gridPos": {
+            "x": 8,
+            "y": 3,
+            "w": 8,
+            "h": 4
+          },
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "targets": [],
+          "fieldConfig": {
+            "defaults": {
+              "color": {
+                "mode": "thresholds"
+              },
+              "noValue": "◇ 未取得",
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "gray",
+                    "value": null
+                  },
+                  {
+                    "color": "green",
+                    "value": 0
+                  },
+                  {
+                    "color": "orange",
+                    "value": 75
+                  },
+                  {
+                    "color": "red",
+                    "value": 90
+                  }
+                ]
+              }
+            },
+            "overrides": []
+          },
+          "options": {
+            "mode": "markdown",
+            "content": "### ? 未計測\nxDS同期・mesh通信の機能試験は未計測。"
+          },
+          "id": 3
+        },
+        {
+          "type": "text",
+          "title": "回復実証",
+          "gridPos": {
+            "x": 16,
+            "y": 3,
+            "w": 8,
+            "h": 4
+          },
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "targets": [],
+          "fieldConfig": {
+            "defaults": {
+              "color": {
+                "mode": "thresholds"
+              },
+              "noValue": "◇ 未取得",
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "gray",
+                    "value": null
+                  },
+                  {
+                    "color": "green",
+                    "value": 0
+                  },
+                  {
+                    "color": "orange",
+                    "value": 75
+                  },
+                  {
+                    "color": "red",
+                    "value": 90
+                  }
+                ]
+              }
+            },
+            "overrides": []
+          },
+          "options": {
+            "mode": "markdown",
+            "content": "### ? 未計測\n故障注入・新UID生成・応答復帰の試験は未導入。"
+          },
+          "id": 4
+        },
+        {
+          "type": "state-timeline",
+          "title": "稼働履歴",
+          "gridPos": {
+            "x": 0,
+            "y": 7,
+            "w": 24,
+            "h": 5
+          },
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "targets": [
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "prometheus"
+              },
+              "editorMode": "code",
+              "expr": "((min(kube_deployment_status_replicas_available{namespace=\"istio-system\",deployment=~\"istiod|gateway-platform-istio|gateway-prod-istio\"} >= bool on(namespace,deployment) kube_deployment_spec_replicas{namespace=\"istio-system\",deployment=~\"istiod|gateway-platform-istio|gateway-prod-istio\"})) and on() ((cluster_watch:ksm_healthy:bool == 1) and on() (time() - timestamp(cluster_watch:ksm_healthy:bool) < 120)) and on() (count(kube_deployment_status_replicas_available{namespace=\"istio-system\",deployment=~\"istiod|gateway-platform-istio|gateway-prod-istio\"}) == 3) and on() (count(kube_deployment_spec_replicas{namespace=\"istio-system\",deployment=~\"istiod|gateway-platform-istio|gateway-prod-istio\"}) == 3) and on() (min(kube_deployment_spec_replicas{namespace=\"istio-system\",deployment=~\"istiod|gateway-platform-istio|gateway-prod-istio\"}) > 0) and on() ((time() - min(timestamp(kube_deployment_status_replicas_available{namespace=\"istio-system\",deployment=~\"istiod|gateway-platform-istio|gateway-prod-istio\"})) < 120)) and on() ((time() - min(timestamp(kube_deployment_spec_replicas{namespace=\"istio-system\",deployment=~\"istiod|gateway-platform-istio|gateway-prod-istio\"})) < 120))) or vector(-1)",
+              "legendFormat": "Istio",
+              "refId": "A",
+              "range": true,
+              "instant": false,
+              "format": "time_series"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "color": {
+                "mode": "fixed",
+                "fixedColor": "green"
+              },
+              "noValue": "◇ 未取得",
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "gray",
+                    "value": null
+                  },
+                  {
+                    "color": "green",
+                    "value": 0
+                  },
+                  {
+                    "color": "orange",
+                    "value": 75
+                  },
+                  {
+                    "color": "red",
+                    "value": 90
+                  }
+                ]
+              },
+              "mappings": [
+                {
+                  "type": "value",
+                  "options": {
+                    "-1": {
+                      "text": "◇ 未取得",
+                      "color": "gray"
+                    },
+                    "0": {
+                      "text": "× 未Ready",
+                      "color": "red"
+                    },
+                    "1": {
+                      "text": "● 稼働確認",
+                      "color": "green"
+                    }
+                  }
+                }
+              ],
+              "custom": {
+                "lineWidth": 0,
+                "fillOpacity": 55,
+                "spanNulls": false
+              }
+            },
+            "overrides": []
+          },
+          "options": {
+            "mergeValues": true,
+            "rowHeight": 0.7,
+            "showValue": "never",
+            "alignValue": "left",
+            "legend": {
+              "displayMode": "list",
+              "placement": "bottom",
+              "showLegend": false
+            },
+            "tooltip": {
+              "mode": "single",
+              "sort": "none"
+            }
+          },
+          "id": 5
+        },
+        {
+          "type": "text",
+          "title": "専用メトリクス",
+          "gridPos": {
+            "x": 0,
+            "y": 12,
+            "w": 8,
+            "h": 4
+          },
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "targets": [],
+          "fieldConfig": {
+            "defaults": {
+              "color": {
+                "mode": "thresholds"
+              },
+              "noValue": "◇ 未取得",
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "gray",
+                    "value": null
+                  },
+                  {
+                    "color": "green",
+                    "value": 0
+                  },
+                  {
+                    "color": "orange",
+                    "value": 75
+                  },
+                  {
+                    "color": "red",
+                    "value": 90
+                  }
+                ]
+              }
+            },
+            "overrides": []
+          },
+          "options": {
+            "mode": "markdown",
+            "content": "### ? 収集範囲を未確認\nこの試作ではKSMの稼働情報を利用。"
+          },
+          "id": 6
+        },
+        {
+          "type": "text",
+          "title": "根拠の読み方",
+          "gridPos": {
+            "x": 8,
+            "y": 12,
+            "w": 16,
+            "h": 4
+          },
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "targets": [],
+          "fieldConfig": {
+            "defaults": {
+              "color": {
+                "mode": "thresholds"
+              },
+              "noValue": "◇ 未取得",
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "gray",
+                    "value": null
+                  },
+                  {
+                    "color": "green",
+                    "value": 0
+                  },
+                  {
+                    "color": "orange",
+                    "value": 75
+                  },
+                  {
+                    "color": "red",
+                    "value": 90
+                  }
+                ]
+              }
+            },
+            "overrides": []
+          },
+          "options": {
+            "mode": "markdown",
+            "content": "KSMのReady・期待Replicaと稼働数を比較。欠測・古いサンプルは不明。\n\n**scrape失敗は機能停止と同義ではありません。**"
+          },
+          "id": 7
+        },
+        {
+          "type": "table",
+          "title": "istio-system · Pod Ready（クリックで詳細）",
+          "gridPos": {
+            "x": 0,
+            "y": 16,
+            "w": 24,
+            "h": 8
+          },
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "targets": [
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "prometheus"
+              },
+              "editorMode": "code",
+              "expr": "(max by(namespace,pod) (kube_pod_status_ready{namespace=\"istio-system\",condition=\"true\"})) and on() ((cluster_watch:ksm_healthy:bool == 1) and on() (time() - timestamp(cluster_watch:ksm_healthy:bool) < 120)) and on() (count(kube_pod_status_ready{namespace=\"istio-system\",condition=\"true\"}) > 0) and on() ((time() - min(timestamp(kube_pod_status_ready{namespace=\"istio-system\",condition=\"true\"})) < 120))",
+              "legendFormat": "",
+              "refId": "A",
+              "range": false,
+              "instant": true,
+              "format": "table"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "color": {
+                "mode": "fixed",
+                "fixedColor": "text"
+              },
+              "noValue": "◇ 未取得",
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "gray",
+                    "value": null
+                  },
+                  {
+                    "color": "green",
+                    "value": 0
+                  },
+                  {
+                    "color": "orange",
+                    "value": 75
+                  },
+                  {
+                    "color": "red",
+                    "value": 90
+                  }
+                ]
+              },
+              "unit": "short",
+              "decimals": 2,
+              "custom": {
+                "align": "auto",
+                "cellOptions": {
+                  "type": "auto"
+                },
+                "filterable": true
+              }
+            },
+            "overrides": [
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Pod"
+                },
+                "properties": [
+                  {
+                    "id": "links",
+                    "value": [
+                      {
+                        "title": "対象の詳細へ",
+                        "url": "/d/cw-detail-pod/details?var-datasource=prometheus&var-cluster=&from=${__from}&to=${__to}&var-namespace=${__data.fields.Namespace}&var-pod=${__data.fields.Pod}",
+                        "targetBlank": false
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          "options": {
+            "showHeader": true,
+            "cellHeight": "sm",
+            "footer": {
+              "show": false
+            },
+            "sortBy": [
+              {
+                "displayName": "Ready",
+                "desc": true
+              }
+            ]
+          },
+          "transformations": [
+            {
+              "id": "organize",
+              "options": {
+                "excludeByName": {
+                  "Time": true,
+                  "__name__": true
+                },
+                "renameByName": {
+                  "namespace": "Namespace",
+                  "pod": "Pod",
+                  "Value": "Ready"
+                }
+              }
+            }
+          ],
+          "id": 8
+        }
+      ],
+      "templating": {
+        "list": []
+      },
+      "annotations": {
+        "list": []
+      },
+      "graphTooltip": 1,
+      "links": [
+        {
+          "type": "link",
+          "title": "← Cluster Watch",
+          "url": "/d/cluster-watch/details?var-datasource=prometheus&var-cluster=&from=${__from}&to=${__to}",
+          "keepTime": false
+        },
+        {
+          "type": "link",
+          "title": "istio-systemの詳細",
+          "url": "/d/cw-detail-namespace/details?var-datasource=prometheus&var-cluster=&from=${__from}&to=${__to}&var-namespace=istio-system"
+        }
+      ]
+    }
