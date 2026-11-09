@@ -6,6 +6,11 @@ import {SourceCredit} from "../components/SourceCredit";
 import { Field, Panel } from "../components/Editor";
 
 const reasons: Record<string, string> = {
+  backend_unavailable: "元のAI接続を利用できません。下書きは保持されています。接続の復旧を待つか、手入力に切り替えてください。",
+  runtime_auth_required: "AI接続の認証を確認してください。下書きは保持されています。",
+  runtime_quota_wait: "利用枠の空きを待っています。再開するときだけ再試行してください。",
+  dispatch_reconciliation_required: "AI依頼の受付を確認しています。同じ依頼の再開か手入力を選べます。",
+
   quota_wait: "利用枠が空くのを待っています。自動での再実行はしません。時間をおいて再確認してください。",
   auth_required: "抽出サービスに接続できません。読み取れた内容は残しています。手入力するか、時間をおいて再試行してください。",
   billing_blocked: "抽出サービスを利用できないため停止しています。読み取れた内容を編集できます。",

@@ -12,6 +12,7 @@ import (
 
 type Option func(*options)
 type options struct {
+	imports     *importer.Service
 	agent       agentclient.Gateway
 	searchFetch discovery.Fetcher
 }
@@ -19,6 +20,8 @@ type options struct {
 func WithSearchFetcher(fetch discovery.Fetcher) Option {
 	return func(o *options) { o.searchFetch = fetch }
 }
+
+func WithImportService(s *importer.Service) Option { return func(o *options) { o.imports = s } }
 
 func WithAgent(agent agentclient.Gateway) Option { return func(o *options) { o.agent = agent } }
 func registerDrafts(mux *http.ServeMux, s *importer.Service) {

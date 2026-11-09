@@ -133,3 +133,7 @@ contract試験に加え、実Keycloak／Polaris／S3で自app成功・別app拒�
 外向き形式と上限は[contracts](../contracts/README.md)、[OpenAPI](../contracts/openapi.json)、[record schemas](../contracts/schemas/)を参照する。
 
 Konro固有のpayload・実行例・採点条件は[adapter契約](../../konro/docs/llmops-adapter.md)を参照。
+
+## Konro取り込みの接続境界
+
+Konroの取り込みは下書き作成時にdirect／platformとendpoint IDを固定する。起動flagを変更しても、既存jobの照会・取消・再開は保存済みbackendへ送る。元資格がない場合は待機と入力保持を優先し、別backendへ自動fallbackしない。献立の推論経路は既存directのまま。詳しい設定・切戻しは[Konro接続契約](../../konro/docs/llmops-platform.md)を参照。原文・feedbackのoutboxは後続実装。

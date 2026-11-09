@@ -35,7 +35,11 @@ func New(dataDir, staticDir string, opts ...Option) http.Handler {
 	for _, opt := range opts {
 		opt(&config)
 	}
-	registerDrafts(mux, importer.New(dataDir, config.agent))
+	drafts := config.imports
+	if drafts == nil {
+		drafts = importer.New(dataDir, config.agent)
+	}
+	registerDrafts(mux, drafts)
 	registerRecipeWrites(mux, dataDir)
 	registerPhotos(mux, dataDir)
 	registerTaxonomy(mux, dataDir)

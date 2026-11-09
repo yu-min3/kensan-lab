@@ -83,25 +83,30 @@ func privateFile(path string) (string, error) {
 
 // FromEnvironment supports local development or a Keycloak client-credentials
 // token. These are service credentials; model-provider credentials stay remote.
+type Config struct{ URL, TokenFile, TokenURL, ClientID, ClientSecretFile, CAFile string }
+
 func FromEnvironment(ctx context.Context) (Gateway, error) {
-	base := os.Getenv("KONRO_AGENT_URL")
+	return FromConfig(ctx, Config{URL: os.Getenv("KONRO_AGENT_URL"), TokenFile: os.Getenv("KONRO_AGENT_TOKEN_FILE"), TokenURL: os.Getenv("KONRO_AGENT_TOKEN_URL"), ClientID: os.Getenv("KONRO_AGENT_CLIENT_ID"), ClientSecretFile: os.Getenv("KONRO_AGENT_CLIENT_SECRET_FILE"), CAFile: os.Getenv("KONRO_AGENT_CA_FILE")})
+}
+func FromConfig(ctx context.Context, cfg Config) (Gateway, error) {
+	base := cfg.URL
 	if base == "" {
 		return nil, nil
 	}
-	local := os.Getenv("KONRO_AGENT_TOKEN_FILE")
+	local := cfg.TokenFile
 	if local != "" {
 		return New(base, func(context.Context) (string, error) { return privateFile(local) })
 	}
-	endpoint := os.Getenv("KONRO_AGENT_TOKEN_URL")
+	endpoint := cfg.TokenURL
 	u, e := url.Parse(endpoint)
 	if e != nil || u.Scheme != "https" || u.Host == "" {
 		return nil, errors.New("HTTPS Keycloak token URL required")
 	}
-	secret, e := privateFile(os.Getenv("KONRO_AGENT_CLIENT_SECRET_FILE"))
+	secret, e := privateFile(cfg.ClientSecretFile)
 	if e != nil {
 		return nil, e
 	}
-	id := os.Getenv("KONRO_AGENT_CLIENT_ID")
+	id := cfg.ClientID
 	if id == "" {
 		return nil, errors.New("agent client ID required")
 	}
@@ -118,7 +123,7 @@ func FromEnvironment(ctx context.Context) (Gateway, error) {
 	if err != nil {
 		return nil, err
 	}
-	if caFile := os.Getenv("KONRO_AGENT_CA_FILE"); caFile != "" {
+	if caFile := cfg.CAFile; caFile != "" {
 		pem, err := os.ReadFile(caFile)
 		if err != nil {
 			return nil, errors.New("runtime CA unavailable")
@@ -133,6 +138,7 @@ func FromEnvironment(ctx context.Context) (Gateway, error) {
 		transport := http.DefaultTransport.(*http.Transport).Clone()
 		transport.TLSClientConfig = &tls.Config{RootCAs: roots, MinVersion: tls.VersionTLS12}
 		client.http.Transport = transport
+		httpClient.Transport = transport
 	}
 	return client, nil
 }
