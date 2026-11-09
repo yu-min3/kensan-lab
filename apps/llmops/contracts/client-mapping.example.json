@@ -1,0 +1,28 @@
+{
+  "version": "v1",
+  "clients": {
+    "konro-app": {
+      "app_id": "konro",
+      "role": "app",
+      "audience": "llmops-platform",
+      "runtime_client": "runtime-konro-online"
+    },
+    "konro-transform": {
+      "app_id": "konro",
+      "role": "transform",
+      "audience": "llmops-platform"
+    },
+    "konro-eval": {
+      "app_id": "konro",
+      "role": "eval",
+      "audience": "llmops-platform",
+      "runtime_client": "runtime-konro-eval"
+    },
+    "sample-app": {
+      "app_id": "sample",
+      "role": "app",
+      "audience": "llmops-platform",
+      "runtime_client": "runtime-sample-online"
+    }
+  }
+}

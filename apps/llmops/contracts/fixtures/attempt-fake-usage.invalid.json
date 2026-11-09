@@ -1,0 +1,19 @@
+{
+  "schema_version": "1",
+  "app_id": "example",
+  "run_id": "run-1",
+  "attempt_id": "attempt-1",
+  "state": "waiting",
+  "input": {
+    "object_id": "obj-1",
+    "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "size": 12,
+    "app_id": "example"
+  },
+  "model": null,
+  "usage": {
+    "input_tokens": -1,
+    "output_tokens": 0
+  },
+  "created_at": "2026-01-01T00:00:00Z"
+}

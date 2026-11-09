@@ -1,0 +1,80 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://llmops.example/contracts/v1/run.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {
+      "type": "string",
+      "enum": [
+        "1"
+      ]
+    },
+    "app_id": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9-]{0,62}$"
+    },
+    "task_id": {
+      "type": "string",
+      "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_-]{0,127}$"
+    },
+    "run_id": {
+      "type": "string",
+      "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_-]{0,127}$"
+    },
+    "dataset_release_id": {
+      "type": "string",
+      "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_-]{0,127}$"
+    },
+    "prompt_version": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256
+    },
+    "evaluator_version": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256
+    },
+    "code_version": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256
+    },
+    "policy_version": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256
+    },
+    "trace_id": {
+      "type": "string",
+      "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_-]{0,127}$"
+    },
+    "attempts": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_-]{0,127}$"
+      },
+      "minItems": 0
+    },
+    "created_at": {
+      "type": "string",
+      "format": "date-time"
+    }
+  },
+  "required": [
+    "schema_version",
+    "app_id",
+    "task_id",
+    "run_id",
+    "dataset_release_id",
+    "prompt_version",
+    "evaluator_version",
+    "code_version",
+    "policy_version",
+    "trace_id",
+    "attempts",
+    "created_at"
+  ]
+}

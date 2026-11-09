@@ -1,0 +1,19 @@
+{
+  "schema_version": "1",
+  "app_id": "example",
+  "record_id": "rec-1",
+  "capture_id": "cap-1",
+  "raw": {
+    "object_id": "obj-1",
+    "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "size": 12,
+    "app_id": "example"
+  },
+  "text": "sample",
+  "data": {
+    "custom_field": "not a recipe"
+  },
+  "domain_schema_version": "sample-v1",
+  "transform_version": "v1",
+  "source_group": "group-1"
+}

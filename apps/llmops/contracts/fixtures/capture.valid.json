@@ -1,0 +1,15 @@
+{
+  "schema_version": "1",
+  "app_id": "example",
+  "capture_id": "cap-1",
+  "capture_key": "capture-1",
+  "mime": "text/plain",
+  "source_uri": "",
+  "captured_at": "2026-01-01T00:00:00Z",
+  "object": {
+    "object_id": "obj-1",
+    "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "size": 12,
+    "app_id": "example"
+  }
+}

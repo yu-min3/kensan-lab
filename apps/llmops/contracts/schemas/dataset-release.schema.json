@@ -1,0 +1,98 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://llmops.example/contracts/v1/dataset-release.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {
+      "type": "string",
+      "enum": [
+        "1"
+      ]
+    },
+    "app_id": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9-]{0,62}$"
+    },
+    "release_id": {
+      "type": "string",
+      "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_-]{0,127}$"
+    },
+    "task_id": {
+      "type": "string",
+      "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_-]{0,127}$"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "published"
+      ]
+    },
+    "tables": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "table": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 256
+          },
+          "snapshot_id": {
+            "type": "string",
+            "pattern": "^[0-9]+$"
+          },
+          "retention_tag": {
+            "type": "string",
+            "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_-]{0,127}$"
+          }
+        },
+        "required": [
+          "table",
+          "snapshot_id",
+          "retention_tag"
+        ]
+      },
+      "minItems": 1
+    },
+    "raw": {
+      "type": "array",
+      "items": {
+        "$ref": "object-ref.schema.json"
+      },
+      "minItems": 1
+    },
+    "case_list_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "code_version": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256
+    },
+    "adapter_version": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256
+    },
+    "created_at": {
+      "type": "string",
+      "format": "date-time"
+    }
+  },
+  "required": [
+    "schema_version",
+    "app_id",
+    "release_id",
+    "task_id",
+    "status",
+    "tables",
+    "raw",
+    "case_list_sha256",
+    "code_version",
+    "adapter_version",
+    "created_at"
+  ]
+}

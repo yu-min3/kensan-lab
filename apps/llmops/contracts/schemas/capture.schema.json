@@ -1,0 +1,53 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://llmops.example/contracts/v1/capture.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {
+      "type": "string",
+      "enum": [
+        "1"
+      ]
+    },
+    "app_id": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9-]{0,62}$"
+    },
+    "capture_id": {
+      "type": "string",
+      "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_-]{0,127}$"
+    },
+    "capture_key": {
+      "type": "string",
+      "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_-]{0,127}$"
+    },
+    "mime": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256
+    },
+    "source_uri": {
+      "type": "string",
+      "minLength": 0,
+      "maxLength": 2048
+    },
+    "captured_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "object": {
+      "$ref": "object-ref.schema.json"
+    }
+  },
+  "required": [
+    "schema_version",
+    "app_id",
+    "capture_id",
+    "capture_key",
+    "mime",
+    "source_uri",
+    "captured_at",
+    "object"
+  ]
+}

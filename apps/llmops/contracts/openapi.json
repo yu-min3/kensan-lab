@@ -1,0 +1,1012 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Shared LLMOps Platform",
+    "version": "0.1.0",
+    "description": "V0 contract. JWT authentication does not replace per-resource authorization. Other-app IDs return 404."
+  },
+  "servers": [
+    {
+      "url": "https://llmops.example"
+    }
+  ],
+  "security": [
+    {
+      "bearerAuth": []
+    }
+  ],
+  "paths": {
+    "/v1/captures": {
+      "post": {
+        "operationId": "createCapture",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "202": {
+            "description": "Accepted",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "./schemas/capture.schema.json"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "./schemas/error.schema.json"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Invalid or missing token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "./schemas/error.schema.json"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Action denied",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "./schemas/error.schema.json"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Unknown or inaccessible resource",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "./schemas/error.schema.json"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Idempotency or state conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "./schemas/error.schema.json"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "Size limit exceeded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "./schemas/error.schema.json"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Admission quota exceeded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "./schemas/error.schema.json"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Dependency unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "./schemas/error.schema.json"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "metadata": {
+                    "$ref": "./schemas/capture-metadata.schema.json"
+                  },
+                  "source": {
+                    "type": "string",
+                    "format": "binary"
+                  }
+                },
+                "required": [
+                  "metadata",
+                  "source"
+                ]
+              },
+              "encoding": {
+                "metadata": {
+                  "contentType": "application/json"
+                },
+                "source": {
+                  "contentType": "application/octet-stream"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/jobs": {
+      "post": {
+        "operationId": "createJob",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "202": {
+            "description": "Accepted",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "./schemas/job.schema.json"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "./schemas/error.schema.json"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Invalid or missing token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "./schemas/error.schema.json"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Action denied",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "./schemas/error.schema.json"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Unknown or inaccessible resource",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "./schemas/error.schema.json"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Idempotency or state conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "./schemas/error.schema.json"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "Size limit exceeded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "./schemas/error.schema.json"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Admission quota exceeded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "./schemas/error.schema.json"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Dependency unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "./schemas/error.schema.json"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "./schemas/job-request.schema.json"
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_-]{0,127}$"
+            }
+          }
+        ]
+      },
+      "get": {
+        "operationId": "listJobs",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "items": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "./schemas/job.schema.json"
+                      },
+                      "minItems": 0
+                    },
+                    "next_cursor": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 2048
+                    }
+                  },
+                  "required": [
+                    "items"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "./schemas/error.schema.json"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Invalid or missing token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "./schemas/error.schema.json"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Action denied",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "./schemas/error.schema.json"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Unknown or inaccessible resource",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "./schemas/error.schema.json"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Idempotency or state conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "./schemas/error.schema.json"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "Size limit exceeded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "./schemas/error.schema.json"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Admission quota exceeded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "./schemas/error.schema.json"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Dependency unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "./schemas/error.schema.json"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "cursor",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 2048
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20
+            }
+          }
+        ]
+      }
+    },
+    "/v1/jobs/{id}": {
+      "get": {
+        "operationId": "getJob",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "./schemas/job.schema.json"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "./schemas/error.schema.json"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Invalid or missing token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "./schemas/error.schema.json"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Action denied",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "./schemas/error.schema.json"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Unknown or inaccessible resource",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "./schemas/error.schema.json"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Idempotency or state conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "./schemas/error.schema.json"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "Size limit exceeded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "./schemas/error.schema.json"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Admission quota exceeded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "./schemas/error.schema.json"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Dependency unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "./schemas/error.schema.json"
+                }
+              }
+            }
+          }
+        }
+      },
+      "parameters": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_-]{0,127}$"
+          }
+        }
+      ]
+    },
+    "/v1/jobs/{id}/cancel": {
+      "post": {
+        "operationId": "cancelJob",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "202": {
+            "description": "Accepted",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "./schemas/job.schema.json"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "./schemas/error.schema.json"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Invalid or missing token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "./schemas/error.schema.json"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Action denied",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "./schemas/error.schema.json"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Unknown or inaccessible resource",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "./schemas/error.schema.json"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Idempotency or state conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "./schemas/error.schema.json"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "Size limit exceeded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "./schemas/error.schema.json"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Admission quota exceeded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "./schemas/error.schema.json"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Dependency unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "./schemas/error.schema.json"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_-]{0,127}$"
+            }
+          }
+        ]
+      },
+      "parameters": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_-]{0,127}$"
+          }
+        }
+      ]
+    },
+    "/v1/jobs/{id}/retry": {
+      "post": {
+        "operationId": "retryJob",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "202": {
+            "description": "Accepted",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "./schemas/job.schema.json"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "./schemas/error.schema.json"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Invalid or missing token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "./schemas/error.schema.json"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Action denied",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "./schemas/error.schema.json"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Unknown or inaccessible resource",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "./schemas/error.schema.json"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Idempotency or state conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "./schemas/error.schema.json"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "Size limit exceeded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "./schemas/error.schema.json"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Admission quota exceeded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "./schemas/error.schema.json"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Dependency unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "./schemas/error.schema.json"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_-]{0,127}$"
+            }
+          }
+        ]
+      },
+      "parameters": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_-]{0,127}$"
+          }
+        }
+      ]
+    },
+    "/v1/feedback": {
+      "post": {
+        "operationId": "createFeedback",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "202": {
+            "description": "Accepted",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "./schemas/feedback.schema.json"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "./schemas/error.schema.json"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Invalid or missing token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "./schemas/error.schema.json"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Action denied",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "./schemas/error.schema.json"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Unknown or inaccessible resource",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "./schemas/error.schema.json"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Idempotency or state conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "./schemas/error.schema.json"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "Size limit exceeded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "./schemas/error.schema.json"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Admission quota exceeded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "./schemas/error.schema.json"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Dependency unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "./schemas/error.schema.json"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "./schemas/feedback-request.schema.json"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/artifacts/{id}": {
+      "get": {
+        "operationId": "getArtifact",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Authorized object bytes; original MIME, attachment disposition, nosniff; HTML is never served as an active document",
+            "content": {
+              "application/octet-stream": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "./schemas/error.schema.json"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Invalid or missing token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "./schemas/error.schema.json"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Action denied",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "./schemas/error.schema.json"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Unknown or inaccessible resource",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "./schemas/error.schema.json"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Idempotency or state conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "./schemas/error.schema.json"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "Size limit exceeded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "./schemas/error.schema.json"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Admission quota exceeded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "./schemas/error.schema.json"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Dependency unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "./schemas/error.schema.json"
+                }
+              }
+            }
+          }
+        }
+      },
+      "parameters": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_-]{0,127}$"
+          }
+        }
+      ]
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "bearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT"
+      }
+    }
+  }
+}

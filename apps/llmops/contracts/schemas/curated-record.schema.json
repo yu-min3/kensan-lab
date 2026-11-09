@@ -1,0 +1,63 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://llmops.example/contracts/v1/curated-record.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {
+      "type": "string",
+      "enum": [
+        "1"
+      ]
+    },
+    "app_id": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9-]{0,62}$"
+    },
+    "record_id": {
+      "type": "string",
+      "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_-]{0,127}$"
+    },
+    "capture_id": {
+      "type": "string",
+      "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_-]{0,127}$"
+    },
+    "raw": {
+      "$ref": "object-ref.schema.json"
+    },
+    "text": {
+      "type": "string",
+      "minLength": 0,
+      "maxLength": 131072
+    },
+    "data": {
+      "type": "object"
+    },
+    "domain_schema_version": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256
+    },
+    "transform_version": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256
+    },
+    "source_group": {
+      "type": "string",
+      "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_-]{0,127}$"
+    }
+  },
+  "required": [
+    "schema_version",
+    "app_id",
+    "record_id",
+    "capture_id",
+    "raw",
+    "text",
+    "data",
+    "domain_schema_version",
+    "transform_version",
+    "source_group"
+  ]
+}

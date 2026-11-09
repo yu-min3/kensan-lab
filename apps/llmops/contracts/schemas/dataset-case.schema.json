@@ -1,0 +1,63 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://llmops.example/contracts/v1/dataset-case.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {
+      "type": "string",
+      "enum": [
+        "1"
+      ]
+    },
+    "app_id": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9-]{0,62}$"
+    },
+    "case_id": {
+      "type": "string",
+      "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_-]{0,127}$"
+    },
+    "input": {
+      "$ref": "object-ref.schema.json"
+    },
+    "expected_constraints": {
+      "type": "object"
+    },
+    "annotation_version": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256
+    },
+    "annotation_status": {
+      "type": "string",
+      "enum": [
+        "synthetic",
+        "unreviewed",
+        "reviewed"
+      ]
+    },
+    "split": {
+      "type": "string",
+      "enum": [
+        "development",
+        "holdout"
+      ]
+    },
+    "source_group": {
+      "type": "string",
+      "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_-]{0,127}$"
+    }
+  },
+  "required": [
+    "schema_version",
+    "app_id",
+    "case_id",
+    "input",
+    "expected_constraints",
+    "annotation_version",
+    "annotation_status",
+    "split",
+    "source_group"
+  ]
+}

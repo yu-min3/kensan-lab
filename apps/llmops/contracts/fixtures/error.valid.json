@@ -1,0 +1,5 @@
+{
+  "code": "forbidden",
+  "message": "action denied",
+  "trace_id": "trace-1"
+}

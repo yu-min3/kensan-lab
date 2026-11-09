@@ -1,0 +1,12 @@
+{
+  "profile": "text",
+  "kind": "online",
+  "prompt": "Extract supplied text",
+  "input": {
+    "text": "sample"
+  },
+  "output_schema": {
+    "type": "object"
+  },
+  "owner": "other"
+}

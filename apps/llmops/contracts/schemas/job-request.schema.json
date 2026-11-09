@@ -1,0 +1,41 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://llmops.example/contracts/v1/job-request.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "profile": {
+      "type": "string",
+      "enum": [
+        "text"
+      ]
+    },
+    "kind": {
+      "type": "string",
+      "enum": [
+        "online",
+        "eval"
+      ]
+    },
+    "prompt": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 32768
+    },
+    "input": {},
+    "output_schema": {
+      "type": "object"
+    },
+    "app_id": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9-]{0,62}$"
+    }
+  },
+  "required": [
+    "profile",
+    "kind",
+    "prompt",
+    "input",
+    "output_schema"
+  ]
+}

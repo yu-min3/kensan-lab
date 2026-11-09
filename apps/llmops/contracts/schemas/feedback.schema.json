@@ -1,0 +1,80 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://llmops.example/contracts/v1/feedback.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {
+      "type": "string",
+      "enum": [
+        "1"
+      ]
+    },
+    "app_id": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9-]{0,62}$"
+    },
+    "event_id": {
+      "type": "string",
+      "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_-]{0,127}$"
+    },
+    "capture_id": {
+      "type": "string",
+      "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_-]{0,127}$"
+    },
+    "job_id": {
+      "type": "string",
+      "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_-]{0,127}$"
+    },
+    "reason": {
+      "type": "string",
+      "enum": [
+        "extraction_error",
+        "preference_change",
+        "incomplete",
+        "annotation_proposal"
+      ]
+    },
+    "before": {
+      "$ref": "object-ref.schema.json"
+    },
+    "after": {
+      "$ref": "object-ref.schema.json"
+    },
+    "actor_user_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256
+    },
+    "annotation_status": {
+      "type": "string",
+      "enum": [
+        "unreviewed"
+      ]
+    },
+    "created_at": {
+      "type": "string",
+      "format": "date-time"
+    }
+  },
+  "required": [
+    "schema_version",
+    "app_id",
+    "event_id",
+    "reason",
+    "annotation_status",
+    "created_at"
+  ],
+  "anyOf": [
+    {
+      "required": [
+        "capture_id"
+      ]
+    },
+    {
+      "required": [
+        "job_id"
+      ]
+    }
+  ]
+}

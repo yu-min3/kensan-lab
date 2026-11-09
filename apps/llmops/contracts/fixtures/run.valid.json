@@ -1,0 +1,16 @@
+{
+  "schema_version": "1",
+  "app_id": "example",
+  "task_id": "sample-task",
+  "run_id": "run-1",
+  "dataset_release_id": "release-1",
+  "prompt_version": "v1",
+  "evaluator_version": "v1",
+  "code_version": "revision-1",
+  "policy_version": "v1",
+  "trace_id": "trace-1",
+  "attempts": [
+    "attempt-1"
+  ],
+  "created_at": "2026-01-01T00:00:00Z"
+}

@@ -1,0 +1,57 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://llmops.example/contracts/v1/client-mapping.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "version": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256
+    },
+    "clients": {
+      "type": "object",
+      "propertyNames": {
+        "type": "string",
+        "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_-]{0,127}$"
+      },
+      "additionalProperties": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "app_id": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9-]{0,62}$"
+          },
+          "role": {
+            "type": "string",
+            "enum": [
+              "app",
+              "transform",
+              "eval"
+            ]
+          },
+          "audience": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 256
+          },
+          "runtime_client": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 256
+          }
+        },
+        "required": [
+          "app_id",
+          "role",
+          "audience"
+        ]
+      }
+    }
+  },
+  "required": [
+    "version",
+    "clients"
+  ]
+}

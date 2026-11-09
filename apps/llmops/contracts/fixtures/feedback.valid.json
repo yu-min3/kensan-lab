@@ -1,0 +1,9 @@
+{
+  "schema_version": "1",
+  "app_id": "example",
+  "event_id": "evt-1",
+  "capture_id": "cap-1",
+  "reason": "annotation_proposal",
+  "annotation_status": "unreviewed",
+  "created_at": "2026-01-01T00:00:00Z"
+}

@@ -1,0 +1,137 @@
+[
+  {
+    "file": "job-request.valid.json",
+    "schema": "job-request",
+    "valid": true
+  },
+  {
+    "file": "capture-metadata.valid.json",
+    "schema": "capture-metadata",
+    "valid": true
+  },
+  {
+    "file": "capture.valid.json",
+    "schema": "capture",
+    "valid": true
+  },
+  {
+    "file": "curated-record.valid.json",
+    "schema": "curated-record",
+    "valid": true
+  },
+  {
+    "file": "dataset-case.valid.json",
+    "schema": "dataset-case",
+    "valid": true
+  },
+  {
+    "file": "dataset-release.valid.json",
+    "schema": "dataset-release",
+    "valid": true
+  },
+  {
+    "file": "feedback-request.valid.json",
+    "schema": "feedback-request",
+    "valid": true
+  },
+  {
+    "file": "feedback.valid.json",
+    "schema": "feedback",
+    "valid": true
+  },
+  {
+    "file": "run.valid.json",
+    "schema": "run",
+    "valid": true
+  },
+  {
+    "file": "attempt.valid.json",
+    "schema": "attempt",
+    "valid": true
+  },
+  {
+    "file": "adapter-request.valid.json",
+    "schema": "adapter-request",
+    "valid": true
+  },
+  {
+    "file": "adapter-response.valid.json",
+    "schema": "adapter-response",
+    "valid": true
+  },
+  {
+    "file": "object-ref.valid.json",
+    "schema": "object-ref",
+    "valid": true
+  },
+  {
+    "file": "error.valid.json",
+    "schema": "error",
+    "valid": true
+  },
+  {
+    "file": "job.valid.json",
+    "schema": "job",
+    "valid": true
+  },
+  {
+    "file": "client-mapping.valid.json",
+    "schema": "client-mapping",
+    "valid": true
+  },
+  {
+    "file": "job-owner-injection.invalid.json",
+    "schema": "job-request",
+    "valid": false
+  },
+  {
+    "file": "job-path-injection.invalid.json",
+    "schema": "job-request",
+    "valid": false
+  },
+  {
+    "file": "job-profile.invalid.json",
+    "schema": "job-request",
+    "valid": false
+  },
+  {
+    "file": "job-kind.invalid.json",
+    "schema": "job-request",
+    "valid": false
+  },
+  {
+    "file": "capture-hash.invalid.json",
+    "schema": "capture-metadata",
+    "valid": false
+  },
+  {
+    "file": "feedback-no-source.invalid.json",
+    "schema": "feedback-request",
+    "valid": false
+  },
+  {
+    "file": "feedback-gold.invalid.json",
+    "schema": "feedback",
+    "valid": false
+  },
+  {
+    "file": "release-latest.invalid.json",
+    "schema": "dataset-release",
+    "valid": false
+  },
+  {
+    "file": "adapter-shell.invalid.json",
+    "schema": "adapter-request",
+    "valid": false
+  },
+  {
+    "file": "adapter-version.invalid.json",
+    "schema": "adapter-request",
+    "valid": false
+  },
+  {
+    "file": "attempt-fake-usage.invalid.json",
+    "schema": "attempt",
+    "valid": false
+  }
+]
