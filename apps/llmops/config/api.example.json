@@ -1,0 +1,42 @@
+{
+  "listen": "127.0.0.1:19400",
+  "issuer": "https://id.localhost:19443/realms/llmops",
+  "audience": "llmops-platform",
+  "jwks_url": "https://id.localhost:19443/realms/llmops/protocol/openid-connect/certs",
+  "ca_file": "/run/llmops/ca.pem",
+  "mapping_file": "/run/llmops/client-mapping.json",
+  "state_directory": "/run/llmops/state",
+  "cursor_key_file": "/run/llmops/secrets/cursor-key",
+  "stores": [
+    {
+      "app": "konro",
+      "bucket": "llmops",
+      "region": "us-east-1",
+      "endpoint": "http://127.0.0.1:19300",
+      "credentials_file": "/run/llmops/secrets/api-konro.json"
+    }
+  ],
+  "runtimes": [
+    {
+      "app": "konro",
+      "role": "app",
+      "target_id": "local-runtime",
+      "client_id": "runtime-konro-online",
+      "base_url": "https://runtime.example.test",
+      "token_url": "https://id.localhost:19443/realms/llmops/protocol/openid-connect/token",
+      "client_secret_file": "/run/llmops/secrets/runtime-konro-online.secret",
+      "ca_file": "/run/llmops/ca.pem"
+    },
+    {
+      "app": "konro",
+      "role": "eval",
+      "target_id": "local-runtime",
+      "client_id": "runtime-konro-eval",
+      "base_url": "https://runtime.example.test",
+      "token_url": "https://id.localhost:19443/realms/llmops/protocol/openid-connect/token",
+      "client_secret_file": "/run/llmops/secrets/runtime-konro-eval.secret",
+      "ca_file": "/run/llmops/ca.pem"
+    }
+  ],
+  "daily_limits": {"konro": {"online": 20, "eval": 8}}
+}

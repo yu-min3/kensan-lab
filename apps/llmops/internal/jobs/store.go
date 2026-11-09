@@ -449,7 +449,7 @@ func (s *Store) load() error {
 		}
 		switch r.Phase {
 		case "prepared", "uncertain", "reconciling":
-			if r.RuntimeJobID != "" || r.State != "queued" {
+			if !validBeforeLink(r) {
 				return ErrUnavailable
 			}
 		case "linked":
@@ -457,7 +457,7 @@ func (s *Store) load() error {
 				return ErrUnavailable
 			}
 		case "terminal":
-			if (!validToken(r.RuntimeJobID) && !(r.RuntimeJobID == "" && r.State == "cancelled" && r.Reason == "cancelled_before_dispatch")) || !terminal(r.State) {
+			if (!validToken(r.RuntimeJobID) && !validUnlinkedTerminal(r)) || !terminal(r.State) {
 				return ErrUnavailable
 			}
 		default:
