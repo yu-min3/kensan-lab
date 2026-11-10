@@ -46,6 +46,9 @@ sidecar:
 
 # Grafana configuration
 grafana.ini:
+  feature_toggles:
+    # Cluster Watch Canvas: match the locally verified fit-to-panel behavior.
+    enable: canvasPanelPanZoom
   server:
     # 公開 URL (Keycloak redirect_uri / oauth2 callback の組み立てに使う)。
     # auth.generic_oauth の callback path は `/login/generic_oauth` 固定。
