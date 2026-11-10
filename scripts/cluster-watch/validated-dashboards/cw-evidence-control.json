@@ -1,0 +1,1032 @@
+{
+  "uid": "cw-evidence-control",
+  "id": null,
+  "title": "Cluster Watch / API serverの詳細",
+  "schemaVersion": 41,
+  "version": 1,
+  "editable": false,
+  "timezone": "Asia/Tokyo",
+  "refresh": "1m",
+  "time": {
+    "from": "now-6h",
+    "to": "now"
+  },
+  "tags": [
+    "cluster-watch",
+    "local-prototype"
+  ],
+  "panels": [
+    {
+      "type": "text",
+      "title": "",
+      "gridPos": {
+        "x": 0,
+        "y": 0,
+        "w": 24,
+        "h": 2
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "targets": [],
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "noValue": "◇ 未取得",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "gray",
+                "value": null
+              },
+              {
+                "color": "green",
+                "value": 0
+              },
+              {
+                "color": "orange",
+                "value": 75
+              },
+              {
+                "color": "red",
+                "value": 90
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "mode": "markdown",
+        "content": "**API server / 観測の詳細**　選択した期間と判定の根拠"
+      },
+      "id": 1
+    },
+    {
+      "type": "stat",
+      "title": "観測指標の評価",
+      "gridPos": {
+        "x": 0,
+        "y": 2,
+        "w": 6,
+        "h": 4
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "editorMode": "code",
+          "expr": "(vector(0) and on() ((((min(kube_pod_status_ready{namespace=\"kube-system\",condition=\"true\",pod=~\"kube-apiserver-master\"})) and on() ((cluster_watch:ksm_healthy:bool == 1) and on() (time() - timestamp(cluster_watch:ksm_healthy:bool) < 120)) and on() (count(kube_pod_status_ready{namespace=\"kube-system\",condition=\"true\",pod=~\"kube-apiserver-master\"}) == 1) and on() ((time() - min(timestamp(kube_pod_status_ready{namespace=\"kube-system\",condition=\"true\",pod=~\"kube-apiserver-master\"})) < 120))) or vector(-1)) == 0)) or (((2 - ((((((100 * sum(rate(apiserver_request_total{job=\"apiserver\",code=~\"5..\"}[5m])) / sum(rate(apiserver_request_total{job=\"apiserver\"}[5m]))) >= 0) and on() (count(up{job=\"apiserver\"}) == 1) and on() (min(up{job=\"apiserver\"}) == 1) and on() ((time() - min(timestamp(up{job=\"apiserver\"})) < 120)) and on() (count(apiserver_request_total{job=\"apiserver\"}) > 0) and on() ((time() - min(timestamp(apiserver_request_total{job=\"apiserver\"})) < 120))) or vector(-1)) < bool 1) * (((((1000 * histogram_quantile(0.99,sum by(le)(rate(apiserver_request_duration_seconds_bucket{job=\"apiserver\",verb!~\"WATCH|WATCHLIST|CONNECT\"}[5m])))) >= 0) and on() (count(up{job=\"apiserver\"}) == 1) and on() (min(up{job=\"apiserver\"}) == 1) and on() ((time() - min(timestamp(up{job=\"apiserver\"})) < 120)) and on() (count(apiserver_request_duration_seconds_bucket{job=\"apiserver\"}) > 0) and on() ((time() - min(timestamp(apiserver_request_duration_seconds_bucket{job=\"apiserver\"})) < 120))) or vector(-1)) < bool 1000))) and on() ((((((100 * sum(rate(apiserver_request_total{job=\"apiserver\",code=~\"5..\"}[5m])) / sum(rate(apiserver_request_total{job=\"apiserver\"}[5m]))) >= 0) and on() (count(up{job=\"apiserver\"}) == 1) and on() (min(up{job=\"apiserver\"}) == 1) and on() ((time() - min(timestamp(up{job=\"apiserver\"})) < 120)) and on() (count(apiserver_request_total{job=\"apiserver\"}) > 0) and on() ((time() - min(timestamp(apiserver_request_total{job=\"apiserver\"})) < 120))) or vector(-1)) >= 0) and on() (((((1000 * histogram_quantile(0.99,sum by(le)(rate(apiserver_request_duration_seconds_bucket{job=\"apiserver\",verb!~\"WATCH|WATCHLIST|CONNECT\"}[5m])))) >= 0) and on() (count(up{job=\"apiserver\"}) == 1) and on() (min(up{job=\"apiserver\"}) == 1) and on() ((time() - min(timestamp(up{job=\"apiserver\"})) < 120)) and on() (count(apiserver_request_duration_seconds_bucket{job=\"apiserver\"}) > 0) and on() ((time() - min(timestamp(apiserver_request_duration_seconds_bucket{job=\"apiserver\"})) < 120))) or vector(-1)) >= 0))) and on() ((((min(kube_pod_status_ready{namespace=\"kube-system\",condition=\"true\",pod=~\"kube-apiserver-master\"})) and on() ((cluster_watch:ksm_healthy:bool == 1) and on() (time() - timestamp(cluster_watch:ksm_healthy:bool) < 120)) and on() (count(kube_pod_status_ready{namespace=\"kube-system\",condition=\"true\",pod=~\"kube-apiserver-master\"}) == 1) and on() ((time() - min(timestamp(kube_pod_status_ready{namespace=\"kube-system\",condition=\"true\",pod=~\"kube-apiserver-master\"})) < 120))) or vector(-1)) == 1)) or vector(-1)",
+          "legendFormat": "観測指標の評価",
+          "refId": "A",
+          "range": false,
+          "instant": true,
+          "format": "time_series"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "noValue": "◇ 未取得",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "gray",
+                "value": null
+              },
+              {
+                "color": "green",
+                "value": 0
+              },
+              {
+                "color": "orange",
+                "value": 1
+              }
+            ]
+          },
+          "unit": "short",
+          "decimals": 0,
+          "mappings": [
+            {
+              "type": "value",
+              "options": {
+                "-1": {
+                  "text": "? 判定不明",
+                  "color": "gray"
+                },
+                "0": {
+                  "text": "× 異常",
+                  "color": "red"
+                },
+                "1": {
+                  "text": "● 正常（暫定）",
+                  "color": "green"
+                },
+                "2": {
+                  "text": "▲ 要確認",
+                  "color": "orange"
+                },
+                "3": {
+                  "text": "? 機能未確認",
+                  "color": "gray"
+                }
+              }
+            }
+          ]
+        },
+        "overrides": []
+      },
+      "options": {
+        "colorMode": "value",
+        "graphMode": "none",
+        "textMode": "value",
+        "justifyMode": "center",
+        "reduceOptions": {
+          "calcs": [
+            "last"
+          ],
+          "values": false
+        },
+        "text": {
+          "valueSize": 22
+        }
+      },
+      "id": 2
+    },
+    {
+      "type": "text",
+      "title": "判定基準と観測範囲",
+      "gridPos": {
+        "x": 6,
+        "y": 2,
+        "w": 18,
+        "h": 4
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "targets": [],
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "noValue": "◇ 未取得",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "gray",
+                "value": null
+              },
+              {
+                "color": "green",
+                "value": 0
+              },
+              {
+                "color": "orange",
+                "value": 75
+              },
+              {
+                "color": "red",
+                "value": 90
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "mode": "markdown",
+        "content": "暫定基準：5xx率 < 1%、p99 < 1000ms、API Pod Ready。内部controllerのアクセスも含む。無トラフィックで比率未定義なら不明。\n\n**正常は上記の観測範囲内の評価です。** 能動probe・自己回復試験は未導入。"
+      },
+      "id": 3
+    },
+    {
+      "type": "timeseries",
+      "title": "リクエスト",
+      "gridPos": {
+        "x": 0,
+        "y": 6,
+        "w": 8,
+        "h": 8
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "editorMode": "code",
+          "expr": "(((sum(rate(apiserver_request_total{job=\"apiserver\"}[5m]))) >= 0) and on() (count(up{job=\"apiserver\"}) == 1) and on() (min(up{job=\"apiserver\"}) == 1) and on() ((time() - min(timestamp(up{job=\"apiserver\"})) < 120)) and on() (count(apiserver_request_total{job=\"apiserver\"}) > 0) and on() ((time() - min(timestamp(apiserver_request_total{job=\"apiserver\"})) < 120))) or vector(-1)",
+          "legendFormat": "リクエスト",
+          "refId": "A",
+          "range": true,
+          "instant": false,
+          "format": "time_series"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "noValue": "◇ 未取得",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "gray",
+                "value": null
+              },
+              {
+                "color": "green",
+                "value": 0
+              },
+              {
+                "color": "orange",
+                "value": 75
+              },
+              {
+                "color": "red",
+                "value": 90
+              }
+            ]
+          },
+          "unit": "suffix:req/s",
+          "min": 0,
+          "decimals": 1,
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 2,
+            "fillOpacity": 10,
+            "showPoints": "never"
+          },
+          "mappings": [
+            {
+              "type": "value",
+              "options": {
+                "-1": {
+                  "text": "? 未取得",
+                  "color": "gray"
+                }
+              }
+            }
+          ]
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "calcs": [
+            "last"
+          ]
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
+      "id": 4
+    },
+    {
+      "type": "timeseries",
+      "title": "5xx率 / 5分",
+      "gridPos": {
+        "x": 8,
+        "y": 6,
+        "w": 8,
+        "h": 8
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "editorMode": "code",
+          "expr": "(((100 * sum(rate(apiserver_request_total{job=\"apiserver\",code=~\"5..\"}[5m])) / sum(rate(apiserver_request_total{job=\"apiserver\"}[5m]))) >= 0) and on() (count(up{job=\"apiserver\"}) == 1) and on() (min(up{job=\"apiserver\"}) == 1) and on() ((time() - min(timestamp(up{job=\"apiserver\"})) < 120)) and on() (count(apiserver_request_total{job=\"apiserver\"}) > 0) and on() ((time() - min(timestamp(apiserver_request_total{job=\"apiserver\"})) < 120))) or vector(-1)",
+          "legendFormat": "5xx率 / 5分",
+          "refId": "A",
+          "range": true,
+          "instant": false,
+          "format": "time_series"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "noValue": "◇ 未取得",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "gray",
+                "value": null
+              },
+              {
+                "color": "green",
+                "value": 0
+              },
+              {
+                "color": "orange",
+                "value": 75
+              },
+              {
+                "color": "red",
+                "value": 90
+              }
+            ]
+          },
+          "unit": "percent",
+          "min": 0,
+          "decimals": 1,
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 2,
+            "fillOpacity": 10,
+            "showPoints": "never"
+          },
+          "mappings": [
+            {
+              "type": "value",
+              "options": {
+                "-1": {
+                  "text": "? 未取得",
+                  "color": "gray"
+                }
+              }
+            }
+          ]
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "calcs": [
+            "last"
+          ]
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
+      "id": 5
+    },
+    {
+      "type": "timeseries",
+      "title": "応答p99 / 5分",
+      "gridPos": {
+        "x": 16,
+        "y": 6,
+        "w": 8,
+        "h": 8
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "editorMode": "code",
+          "expr": "(((1000 * histogram_quantile(0.99,sum by(le)(rate(apiserver_request_duration_seconds_bucket{job=\"apiserver\",verb!~\"WATCH|WATCHLIST|CONNECT\"}[5m])))) >= 0) and on() (count(up{job=\"apiserver\"}) == 1) and on() (min(up{job=\"apiserver\"}) == 1) and on() ((time() - min(timestamp(up{job=\"apiserver\"})) < 120)) and on() (count(apiserver_request_duration_seconds_bucket{job=\"apiserver\"}) > 0) and on() ((time() - min(timestamp(apiserver_request_duration_seconds_bucket{job=\"apiserver\"})) < 120))) or vector(-1)",
+          "legendFormat": "応答p99 / 5分",
+          "refId": "A",
+          "range": true,
+          "instant": false,
+          "format": "time_series"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "noValue": "◇ 未取得",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "gray",
+                "value": null
+              },
+              {
+                "color": "green",
+                "value": 0
+              },
+              {
+                "color": "orange",
+                "value": 75
+              },
+              {
+                "color": "red",
+                "value": 90
+              }
+            ]
+          },
+          "unit": "ms",
+          "min": 0,
+          "decimals": 1,
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 2,
+            "fillOpacity": 10,
+            "showPoints": "never"
+          },
+          "mappings": [
+            {
+              "type": "value",
+              "options": {
+                "-1": {
+                  "text": "? 未取得",
+                  "color": "gray"
+                }
+              }
+            }
+          ]
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "calcs": [
+            "last"
+          ]
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
+      "id": 6
+    },
+    {
+      "type": "state-timeline",
+      "title": "Podの稼働履歴 / 機能の正常性とは別",
+      "gridPos": {
+        "x": 0,
+        "y": 14,
+        "w": 24,
+        "h": 5
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "editorMode": "code",
+          "expr": "((min(kube_pod_status_ready{namespace=\"kube-system\",condition=\"true\",pod=~\"kube-apiserver-master\"})) and on() ((cluster_watch:ksm_healthy:bool == 1) and on() (time() - timestamp(cluster_watch:ksm_healthy:bool) < 120)) and on() (count(kube_pod_status_ready{namespace=\"kube-system\",condition=\"true\",pod=~\"kube-apiserver-master\"}) == 1) and on() ((time() - min(timestamp(kube_pod_status_ready{namespace=\"kube-system\",condition=\"true\",pod=~\"kube-apiserver-master\"})) < 120))) or vector(-1)",
+          "legendFormat": "API server",
+          "refId": "A",
+          "range": true,
+          "instant": false,
+          "format": "time_series"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "fixed",
+            "fixedColor": "green"
+          },
+          "noValue": "◇ 未取得",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "gray",
+                "value": null
+              },
+              {
+                "color": "green",
+                "value": 0
+              },
+              {
+                "color": "orange",
+                "value": 75
+              },
+              {
+                "color": "red",
+                "value": 90
+              }
+            ]
+          },
+          "mappings": [
+            {
+              "type": "value",
+              "options": {
+                "-1": {
+                  "text": "◇ 未取得",
+                  "color": "gray"
+                },
+                "0": {
+                  "text": "× 未Ready",
+                  "color": "red"
+                },
+                "1": {
+                  "text": "● 稼働確認",
+                  "color": "green"
+                }
+              }
+            }
+          ],
+          "custom": {
+            "lineWidth": 0,
+            "fillOpacity": 55,
+            "spanNulls": false
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "mergeValues": true,
+        "rowHeight": 0.7,
+        "showValue": "never",
+        "alignValue": "left",
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": false
+        },
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "id": 7
+    },
+    {
+      "type": "row",
+      "title": "収集状況・Pod・回復試験の詳細",
+      "collapsed": true,
+      "gridPos": {
+        "x": 0,
+        "y": 19,
+        "w": 24,
+        "h": 1
+      },
+      "panels": [
+        {
+          "type": "stat",
+          "title": "稼働 · Ready / Replica",
+          "gridPos": {
+            "x": 0,
+            "y": 20,
+            "w": 24,
+            "h": 5
+          },
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "targets": [
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "prometheus"
+              },
+              "editorMode": "code",
+              "expr": "((min(kube_pod_status_ready{namespace=\"kube-system\",condition=\"true\",pod=~\"kube-apiserver-master\"})) and on() ((cluster_watch:ksm_healthy:bool == 1) and on() (time() - timestamp(cluster_watch:ksm_healthy:bool) < 120)) and on() (count(kube_pod_status_ready{namespace=\"kube-system\",condition=\"true\",pod=~\"kube-apiserver-master\"}) == 1) and on() ((time() - min(timestamp(kube_pod_status_ready{namespace=\"kube-system\",condition=\"true\",pod=~\"kube-apiserver-master\"})) < 120))) or vector(-1)",
+              "legendFormat": "稼働 · Ready / Replica",
+              "refId": "A",
+              "range": false,
+              "instant": true,
+              "format": "time_series"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "color": {
+                "mode": "thresholds"
+              },
+              "noValue": "◇ 未取得",
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "gray",
+                    "value": null
+                  },
+                  {
+                    "color": "green",
+                    "value": 0
+                  },
+                  {
+                    "color": "orange",
+                    "value": 1
+                  }
+                ]
+              },
+              "unit": "short",
+              "decimals": 0,
+              "mappings": [
+                {
+                  "type": "value",
+                  "options": {
+                    "-1": {
+                      "text": "◇ 未取得",
+                      "color": "gray"
+                    },
+                    "0": {
+                      "text": "× 未Ready",
+                      "color": "red"
+                    },
+                    "1": {
+                      "text": "● 稼働確認",
+                      "color": "green"
+                    }
+                  }
+                }
+              ]
+            },
+            "overrides": []
+          },
+          "options": {
+            "colorMode": "value",
+            "graphMode": "none",
+            "textMode": "value",
+            "justifyMode": "center",
+            "reduceOptions": {
+              "calcs": [
+                "last"
+              ],
+              "values": false
+            },
+            "text": {
+              "valueSize": 22
+            }
+          },
+          "id": 900
+        },
+        {
+          "type": "stat",
+          "title": "APIの収集 · etcdは未確認",
+          "gridPos": {
+            "x": 0,
+            "y": 25,
+            "w": 24,
+            "h": 5
+          },
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "targets": [
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "prometheus"
+              },
+              "editorMode": "code",
+              "expr": "((min(up{job=~\"apiserver\"})) and on() (count(up{job=~\"apiserver\"}) == 1) and on() ((time() - min(timestamp(up{job=~\"apiserver\"})) < 120))) or vector(-1)",
+              "legendFormat": "APIの収集 · etcdは未確認",
+              "refId": "A",
+              "range": false,
+              "instant": true,
+              "format": "time_series"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "color": {
+                "mode": "thresholds"
+              },
+              "noValue": "◇ 未取得",
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "gray",
+                    "value": null
+                  },
+                  {
+                    "color": "green",
+                    "value": 0
+                  },
+                  {
+                    "color": "orange",
+                    "value": 1
+                  }
+                ]
+              },
+              "unit": "short",
+              "decimals": 0,
+              "mappings": [
+                {
+                  "type": "value",
+                  "options": {
+                    "-1": {
+                      "text": "? 対象未確認",
+                      "color": "gray"
+                    },
+                    "0": {
+                      "text": "▲ 収集失敗",
+                      "color": "orange"
+                    },
+                    "1": {
+                      "text": "取得中",
+                      "color": "green"
+                    }
+                  }
+                }
+              ]
+            },
+            "overrides": []
+          },
+          "options": {
+            "colorMode": "value",
+            "graphMode": "none",
+            "textMode": "value",
+            "justifyMode": "center",
+            "reduceOptions": {
+              "calcs": [
+                "last"
+              ],
+              "values": false
+            },
+            "text": {
+              "valueSize": 22
+            }
+          },
+          "id": 901
+        },
+        {
+          "type": "text",
+          "title": "回復実証",
+          "gridPos": {
+            "x": 0,
+            "y": 30,
+            "w": 24,
+            "h": 5
+          },
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "targets": [],
+          "fieldConfig": {
+            "defaults": {
+              "color": {
+                "mode": "thresholds"
+              },
+              "noValue": "◇ 未取得",
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "gray",
+                    "value": null
+                  },
+                  {
+                    "color": "green",
+                    "value": 0
+                  },
+                  {
+                    "color": "orange",
+                    "value": 75
+                  },
+                  {
+                    "color": "red",
+                    "value": 90
+                  }
+                ]
+              }
+            },
+            "overrides": []
+          },
+          "options": {
+            "mode": "markdown",
+            "content": "### ? 未計測\n故障注入・新UID生成・応答復帰の試験は未導入。"
+          },
+          "id": 902
+        },
+        {
+          "type": "text",
+          "title": "根拠の読み方",
+          "gridPos": {
+            "x": 0,
+            "y": 35,
+            "w": 24,
+            "h": 5
+          },
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "targets": [],
+          "fieldConfig": {
+            "defaults": {
+              "color": {
+                "mode": "thresholds"
+              },
+              "noValue": "◇ 未取得",
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "gray",
+                    "value": null
+                  },
+                  {
+                    "color": "green",
+                    "value": 0
+                  },
+                  {
+                    "color": "orange",
+                    "value": 75
+                  },
+                  {
+                    "color": "red",
+                    "value": 90
+                  }
+                ]
+              }
+            },
+            "overrides": []
+          },
+          "options": {
+            "mode": "markdown",
+            "content": "KSMのReady・期待Replicaと稼働数を比較。欠測・古いサンプルは不明。\n\n**scrape失敗は機能停止と同義ではありません。**"
+          },
+          "id": 903
+        },
+        {
+          "type": "table",
+          "title": "kube-system · Pod Ready（クリックで詳細）",
+          "gridPos": {
+            "x": 0,
+            "y": 40,
+            "w": 24,
+            "h": 8
+          },
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "targets": [
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "prometheus"
+              },
+              "editorMode": "code",
+              "expr": "(max by(namespace,pod) (kube_pod_status_ready{namespace=\"kube-system\",condition=\"true\"})) and on() ((cluster_watch:ksm_healthy:bool == 1) and on() (time() - timestamp(cluster_watch:ksm_healthy:bool) < 120)) and on() (count(kube_pod_status_ready{namespace=\"kube-system\",condition=\"true\"}) > 0) and on() ((time() - min(timestamp(kube_pod_status_ready{namespace=\"kube-system\",condition=\"true\"})) < 120))",
+              "legendFormat": "",
+              "refId": "A",
+              "range": false,
+              "instant": true,
+              "format": "table"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "color": {
+                "mode": "fixed",
+                "fixedColor": "text"
+              },
+              "noValue": "◇ 未取得",
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "gray",
+                    "value": null
+                  },
+                  {
+                    "color": "green",
+                    "value": 0
+                  },
+                  {
+                    "color": "orange",
+                    "value": 75
+                  },
+                  {
+                    "color": "red",
+                    "value": 90
+                  }
+                ]
+              },
+              "unit": "short",
+              "decimals": 2,
+              "custom": {
+                "align": "auto",
+                "cellOptions": {
+                  "type": "auto"
+                },
+                "filterable": true
+              }
+            },
+            "overrides": [
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Pod"
+                },
+                "properties": [
+                  {
+                    "id": "links",
+                    "value": [
+                      {
+                        "title": "対象の詳細へ",
+                        "url": "/d/6581e46e4e5c7ba40a07646395ef7b23/details?var-datasource=prometheus&var-cluster=&from=${__from}&to=${__to}&var-namespace=${__data.fields.Namespace}&var-pod=${__data.fields.Pod}",
+                        "targetBlank": false
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          "options": {
+            "showHeader": true,
+            "cellHeight": "sm",
+            "footer": {
+              "show": false
+            },
+            "sortBy": [
+              {
+                "displayName": "Ready",
+                "desc": true
+              }
+            ]
+          },
+          "transformations": [
+            {
+              "id": "organize",
+              "options": {
+                "excludeByName": {
+                  "Time": true,
+                  "__name__": true
+                },
+                "renameByName": {
+                  "namespace": "Namespace",
+                  "pod": "Pod",
+                  "Value": "Ready"
+                }
+              }
+            }
+          ],
+          "id": 904
+        }
+      ],
+      "id": 8
+    }
+  ],
+  "templating": {
+    "list": []
+  },
+  "annotations": {
+    "list": []
+  },
+  "graphTooltip": 1,
+  "links": [
+    {
+      "type": "link",
+      "title": "← Cluster Watch",
+      "url": "/d/cluster-watch-practical/details?var-datasource=prometheus&var-cluster=&from=${__from}&to=${__to}",
+      "keepTime": false
+    },
+    {
+      "type": "link",
+      "title": "kube-systemの詳細",
+      "url": "/d/85a562078cdf77779eaa1add43ccec1e/details?var-datasource=prometheus&var-cluster=&from=${__from}&to=${__to}&var-namespace=kube-system"
+    }
+  ]
+}

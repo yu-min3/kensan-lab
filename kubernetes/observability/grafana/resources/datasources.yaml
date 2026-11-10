@@ -71,3 +71,12 @@ data:
           exemplarTraceIdDestinations:
             - name: traceID
               datasourceUid: tempo
+
+  cluster-watch-sample.yaml: |
+    apiVersion: 1
+    datasources:
+      - name: App status SAMPLE ONLY
+        uid: app-status-sample
+        type: grafana-testdata-datasource
+        access: proxy
+        editable: false

@@ -1,0 +1,182 @@
+{
+  "uid": "cw-function-incident-mesh",
+  "id": null,
+  "title": "Istio / 通信障害 / 機能観測 SAMPLE",
+  "schemaVersion": 41,
+  "version": 1,
+  "editable": false,
+  "timezone": "Asia/Tokyo",
+  "refresh": "1m",
+  "time": {
+    "from": "now-6h",
+    "to": "now"
+  },
+  "tags": [
+    "cluster-watch",
+    "local-prototype"
+  ],
+  "panels": [
+    {
+      "type": "text",
+      "title": "",
+      "gridPos": {
+        "x": 0,
+        "y": 0,
+        "w": 24,
+        "h": 3
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "targets": [],
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "noValue": "◇ 未取得",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "gray",
+                "value": null
+              },
+              {
+                "color": "green",
+                "value": 0
+              },
+              {
+                "color": "orange",
+                "value": 75
+              },
+              {
+                "color": "red",
+                "value": 90
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "mode": "markdown",
+        "content": "**通信障害 / SAMPLE**"
+      },
+      "id": 1
+    },
+    {
+      "type": "table",
+      "title": "[サンプル] 判定に使う観測",
+      "gridPos": {
+        "x": 0,
+        "y": 3,
+        "w": 24,
+        "h": 7
+      },
+      "datasource": {
+        "type": "grafana-testdata-datasource",
+        "uid": "app-status-sample"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "grafana-testdata-datasource",
+            "uid": "app-status-sample"
+          },
+          "refId": "A",
+          "scenarioId": "csv_content",
+          "csvContent": "観測,値,対象・暫定基準\r\n通信成功率,92.4%,選択アプリ間のHTTP / 5分・99%以上\r\n応答p99,850,選択アプリ間 / 5分・300ms未満\r\n最終取得から,20 秒,300秒以上は不明。無通信・欠測も正常にしない\r\n"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "fixed",
+            "fixedColor": "text"
+          },
+          "custom": {
+            "align": "auto",
+            "cellOptions": {
+              "type": "auto"
+            }
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "showHeader": true,
+        "cellHeight": "md",
+        "footer": {
+          "show": false
+        }
+      },
+      "id": 2
+    },
+    {
+      "type": "text",
+      "title": "ⓘ 観測範囲",
+      "gridPos": {
+        "x": 0,
+        "y": 10,
+        "w": 24,
+        "h": 5
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "targets": [],
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "noValue": "◇ 未取得",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "gray",
+                "value": null
+              },
+              {
+                "color": "green",
+                "value": 0
+              },
+              {
+                "color": "orange",
+                "value": 75
+              },
+              {
+                "color": "red",
+                "value": 90
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "mode": "markdown",
+        "content": "この画面は全て架空データ。collector・probeの導入は未実施。\n\n上段の実測稼働数とは別に、通信を評価した場合の表示例。閾値は試作用。\n\n正常は対象経路・期間内に限る。クラスタ全通信や自己回復を保証しない。"
+      },
+      "id": 3
+    }
+  ],
+  "templating": {
+    "list": []
+  },
+  "annotations": {
+    "list": []
+  },
+  "graphTooltip": 1,
+  "links": [
+    {
+      "type": "link",
+      "title": "← 一覧へ",
+      "url": "/d/cw-function-incident/details?var-datasource=prometheus&var-cluster=&from=${__from}&to=${__to}"
+    }
+  ]
+}
