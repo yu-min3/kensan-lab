@@ -1,0 +1,4786 @@
+{
+  "uid": "cw-function-incident",
+  "id": null,
+  "title": "Cluster Watch / 機能観測 SAMPLE / 通信障害",
+  "schemaVersion": 41,
+  "version": 1,
+  "editable": false,
+  "timezone": "Asia/Tokyo",
+  "refresh": "1m",
+  "time": {
+    "from": "now-6h",
+    "to": "now"
+  },
+  "tags": [
+    "cluster-watch",
+    "local-prototype"
+  ],
+  "panels": [
+    {
+      "type": "text",
+      "title": "",
+      "gridPos": {
+        "x": 0,
+        "y": 0,
+        "w": 18,
+        "h": 2
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "targets": [],
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "noValue": "◇ 未取得",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "gray",
+                "value": null
+              },
+              {
+                "color": "green",
+                "value": 0
+              },
+              {
+                "color": "orange",
+                "value": 75
+              },
+              {
+                "color": "red",
+                "value": 90
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "mode": "markdown",
+        "content": "**CLUSTER WATCH** · SAMPLE　[正常](/d/cw-function-normal/sample?kiosk) · [通信障害](/d/cw-function-incident/sample?kiosk) · [観測停止](/d/cw-function-stale/sample?kiosk)"
+      },
+      "id": 1,
+      "transparent": true
+    },
+    {
+      "type": "stat",
+      "title": "",
+      "gridPos": {
+        "x": 18,
+        "y": 0,
+        "w": 6,
+        "h": 2
+      },
+      "datasource": {
+        "type": "grafana-testdata-datasource",
+        "uid": "app-status-sample"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "grafana-testdata-datasource",
+            "uid": "app-status-sample"
+          },
+          "refId": "A",
+          "scenarioId": "csv_content",
+          "csvContent": "通信更新\r\n20\r\n"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "decimals": 0,
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "text",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 300
+              }
+            ]
+          },
+          "mappings": [
+            {
+              "type": "range",
+              "options": {
+                "from": 300,
+                "to": 1000000000.0,
+                "result": {
+                  "text": "× 取得停止",
+                  "color": "red"
+                }
+              }
+            }
+          ]
+        },
+        "overrides": []
+      },
+      "options": {
+        "colorMode": "value",
+        "graphMode": "none",
+        "textMode": "value_and_name",
+        "justifyMode": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "last"
+          ],
+          "values": false
+        },
+        "text": {
+          "valueSize": 18,
+          "titleSize": 12
+        },
+        "orientation": "horizontal",
+        "wideLayout": true
+      },
+      "description": "表示例。通信観測の取得年齢が300秒以上で停止扱い。実測のKSM更新時刻ではない。",
+      "id": 2,
+      "transparent": true
+    },
+    {
+      "type": "timeseries",
+      "title": "master",
+      "gridPos": {
+        "x": 0,
+        "y": 2,
+        "w": 6,
+        "h": 8
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "editorMode": "code",
+          "expr": "((avg(100 * (1 - avg by(instance)(rate(node_cpu_seconds_total{mode=\"idle\"}[5m]))) * on(instance) group_left(nodename) node_uname_info{nodename=\"master\"})) and on() ((cluster_watch:ksm_healthy:bool == 1) and on() (time() - timestamp(cluster_watch:ksm_healthy:bool) < 120)) and on() (count(kube_node_status_capacity{node=\"master\",resource=\"cpu\",unit=\"core\"}) == 1) and on() ((time() - min(timestamp(kube_node_status_capacity{node=\"master\",resource=\"cpu\",unit=\"core\"})) < 120)) and on() (max(kube_node_status_capacity{node=\"master\",resource=\"cpu\",unit=\"core\"}) > 0) and on() (count(node_cpu_seconds_total{mode=\"idle\"} * on(instance) group_left(nodename) node_uname_info{nodename=\"master\"}) == scalar(max(kube_node_status_capacity{node=\"master\",resource=\"cpu\",unit=\"core\"}))) and on() (count(rate(node_cpu_seconds_total{mode=\"idle\"}[5m]) * on(instance) group_left(nodename) node_uname_info{nodename=\"master\"}) == scalar(max(kube_node_status_capacity{node=\"master\",resource=\"cpu\",unit=\"core\"}))) and on() ((time() - min(timestamp(node_cpu_seconds_total{mode=\"idle\"}) * on(instance) group_left(nodename) node_uname_info{nodename=\"master\"}) < 120)) and on() (count(node_uname_info{nodename=\"master\"}) == 1) and on() ((time() - min(timestamp(node_uname_info{nodename=\"master\"})) < 120)) and on() (min(up{job=\"node-exporter\"} * on(instance) group_left(nodename) node_uname_info{nodename=\"master\"}) == 1) and on() (count(up{job=\"node-exporter\"} * on(instance) group_left(nodename) node_uname_info{nodename=\"master\"}) == 1) and on() ((time() - min(timestamp(up{job=\"node-exporter\"}) * on(instance) group_left(nodename) node_uname_info{nodename=\"master\"}) < 120))) or vector(-1)",
+          "legendFormat": "CPU",
+          "refId": "A",
+          "range": true,
+          "instant": false,
+          "format": "time_series"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "editorMode": "code",
+          "expr": "((avg(100 * (1 - node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes) * on(instance) group_left(nodename) node_uname_info{nodename=\"master\"})) and on() ((cluster_watch:ksm_healthy:bool == 1) and on() (time() - timestamp(cluster_watch:ksm_healthy:bool) < 120)) and on() (min(node_memory_MemTotal_bytes * on(instance) group_left(nodename) node_uname_info{nodename=\"master\"}) > 0) and on() (count(node_memory_MemAvailable_bytes * on(instance) group_left(nodename) node_uname_info{nodename=\"master\"}) == 1) and on() (count(node_memory_MemTotal_bytes * on(instance) group_left(nodename) node_uname_info{nodename=\"master\"}) == 1) and on() ((time() - min(timestamp(node_memory_MemAvailable_bytes) * on(instance) group_left(nodename) node_uname_info{nodename=\"master\"}) < 120)) and on() ((time() - min(timestamp(node_memory_MemTotal_bytes) * on(instance) group_left(nodename) node_uname_info{nodename=\"master\"}) < 120)) and on() (count(node_uname_info{nodename=\"master\"}) == 1) and on() ((time() - min(timestamp(node_uname_info{nodename=\"master\"})) < 120)) and on() (min(up{job=\"node-exporter\"} * on(instance) group_left(nodename) node_uname_info{nodename=\"master\"}) == 1) and on() (count(up{job=\"node-exporter\"} * on(instance) group_left(nodename) node_uname_info{nodename=\"master\"}) == 1) and on() ((time() - min(timestamp(up{job=\"node-exporter\"}) * on(instance) group_left(nodename) node_uname_info{nodename=\"master\"}) < 120))) or vector(-1)",
+          "legendFormat": "Memory",
+          "refId": "B",
+          "range": true,
+          "instant": false,
+          "format": "time_series"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "editorMode": "code",
+          "expr": "((min((kube_node_status_condition{node=\"master\",condition=\"Ready\",status=\"true\"} or kube_node_status_condition{node=\"master\",condition=~\"MemoryPressure|DiskPressure|PIDPressure\",status=\"false\"}))) and on() ((cluster_watch:ksm_healthy:bool == 1) and on() (time() - timestamp(cluster_watch:ksm_healthy:bool) < 120)) and on() (count((kube_node_status_condition{node=\"master\",condition=\"Ready\",status=\"true\"} or kube_node_status_condition{node=\"master\",condition=~\"MemoryPressure|DiskPressure|PIDPressure\",status=\"false\"})) == 4) and on() ((time() - min(timestamp((kube_node_status_condition{node=\"master\",condition=\"Ready\",status=\"true\"} or kube_node_status_condition{node=\"master\",condition=~\"MemoryPressure|DiskPressure|PIDPressure\",status=\"false\"}))) < 120))) or vector(-1)",
+          "legendFormat": "状態",
+          "refId": "C",
+          "range": false,
+          "instant": true,
+          "format": "time_series"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "noValue": "◇ 未取得",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "gray",
+                "value": null
+              },
+              {
+                "color": "green",
+                "value": 0
+              },
+              {
+                "color": "orange",
+                "value": 75
+              },
+              {
+                "color": "red",
+                "value": 90
+              }
+            ]
+          },
+          "unit": "percent",
+          "decimals": 0,
+          "min": 0,
+          "links": [
+            {
+              "title": "Node詳細へ",
+              "url": "/d/200ac8fdbfbb74b39aff88118e4d1c2c/details?var-datasource=prometheus&var-cluster=&from=${__from}&to=${__to}&var-node=master",
+              "targetBlank": false
+            }
+          ],
+          "mappings": [
+            {
+              "type": "value",
+              "options": {
+                "-1": {
+                  "text": "? 不明",
+                  "color": "gray"
+                }
+              }
+            }
+          ],
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 2,
+            "fillOpacity": 12,
+            "spanNulls": false,
+            "showPoints": "never",
+            "axisSoftMax": 50
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "状態"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "none"
+              },
+              {
+                "id": "custom.axisPlacement",
+                "value": "left"
+              },
+              {
+                "id": "custom.hideFrom",
+                "value": {
+                  "viz": true,
+                  "tooltip": true,
+                  "legend": false
+                }
+              },
+              {
+                "id": "color",
+                "value": {
+                  "mode": "thresholds"
+                }
+              },
+              {
+                "id": "thresholds",
+                "value": {
+                  "mode": "absolute",
+                  "steps": [
+                    {
+                      "color": "gray",
+                      "value": null
+                    },
+                    {
+                      "color": "red",
+                      "value": 0
+                    },
+                    {
+                      "color": "green",
+                      "value": 1
+                    }
+                  ]
+                }
+              },
+              {
+                "id": "mappings",
+                "value": [
+                  {
+                    "type": "value",
+                    "options": {
+                      "-1": {
+                        "text": "? 不明",
+                        "color": "gray"
+                      },
+                      "0": {
+                        "text": "× 異常",
+                        "color": "red"
+                      },
+                      "1": {
+                        "text": "● 正常",
+                        "color": "green"
+                      }
+                    }
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "CPU"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "blue"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Memory"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "purple"
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "calcs": [
+            "last"
+          ]
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
+      "description": "青=CPU、紫=メモリ。凡例のNode Readyはkube_node_status_conditionのReady条件。ノードの正常参加を示し、アプリ正常の保証ではありません。右上の↗から詳細へ。",
+      "links": [
+        {
+          "title": "Node詳細 ↗",
+          "url": "/d/200ac8fdbfbb74b39aff88118e4d1c2c/details?var-datasource=prometheus&var-cluster=&from=${__from}&to=${__to}&var-node=master",
+          "targetBlank": false
+        }
+      ],
+      "id": 3
+    },
+    {
+      "type": "timeseries",
+      "title": "m4neo",
+      "gridPos": {
+        "x": 6,
+        "y": 2,
+        "w": 6,
+        "h": 8
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "editorMode": "code",
+          "expr": "((avg(100 * (1 - avg by(instance)(rate(node_cpu_seconds_total{mode=\"idle\"}[5m]))) * on(instance) group_left(nodename) node_uname_info{nodename=\"m4neo\"})) and on() ((cluster_watch:ksm_healthy:bool == 1) and on() (time() - timestamp(cluster_watch:ksm_healthy:bool) < 120)) and on() (count(kube_node_status_capacity{node=\"m4neo\",resource=\"cpu\",unit=\"core\"}) == 1) and on() ((time() - min(timestamp(kube_node_status_capacity{node=\"m4neo\",resource=\"cpu\",unit=\"core\"})) < 120)) and on() (max(kube_node_status_capacity{node=\"m4neo\",resource=\"cpu\",unit=\"core\"}) > 0) and on() (count(node_cpu_seconds_total{mode=\"idle\"} * on(instance) group_left(nodename) node_uname_info{nodename=\"m4neo\"}) == scalar(max(kube_node_status_capacity{node=\"m4neo\",resource=\"cpu\",unit=\"core\"}))) and on() (count(rate(node_cpu_seconds_total{mode=\"idle\"}[5m]) * on(instance) group_left(nodename) node_uname_info{nodename=\"m4neo\"}) == scalar(max(kube_node_status_capacity{node=\"m4neo\",resource=\"cpu\",unit=\"core\"}))) and on() ((time() - min(timestamp(node_cpu_seconds_total{mode=\"idle\"}) * on(instance) group_left(nodename) node_uname_info{nodename=\"m4neo\"}) < 120)) and on() (count(node_uname_info{nodename=\"m4neo\"}) == 1) and on() ((time() - min(timestamp(node_uname_info{nodename=\"m4neo\"})) < 120)) and on() (min(up{job=\"node-exporter\"} * on(instance) group_left(nodename) node_uname_info{nodename=\"m4neo\"}) == 1) and on() (count(up{job=\"node-exporter\"} * on(instance) group_left(nodename) node_uname_info{nodename=\"m4neo\"}) == 1) and on() ((time() - min(timestamp(up{job=\"node-exporter\"}) * on(instance) group_left(nodename) node_uname_info{nodename=\"m4neo\"}) < 120))) or vector(-1)",
+          "legendFormat": "CPU",
+          "refId": "A",
+          "range": true,
+          "instant": false,
+          "format": "time_series"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "editorMode": "code",
+          "expr": "((avg(100 * (1 - node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes) * on(instance) group_left(nodename) node_uname_info{nodename=\"m4neo\"})) and on() ((cluster_watch:ksm_healthy:bool == 1) and on() (time() - timestamp(cluster_watch:ksm_healthy:bool) < 120)) and on() (min(node_memory_MemTotal_bytes * on(instance) group_left(nodename) node_uname_info{nodename=\"m4neo\"}) > 0) and on() (count(node_memory_MemAvailable_bytes * on(instance) group_left(nodename) node_uname_info{nodename=\"m4neo\"}) == 1) and on() (count(node_memory_MemTotal_bytes * on(instance) group_left(nodename) node_uname_info{nodename=\"m4neo\"}) == 1) and on() ((time() - min(timestamp(node_memory_MemAvailable_bytes) * on(instance) group_left(nodename) node_uname_info{nodename=\"m4neo\"}) < 120)) and on() ((time() - min(timestamp(node_memory_MemTotal_bytes) * on(instance) group_left(nodename) node_uname_info{nodename=\"m4neo\"}) < 120)) and on() (count(node_uname_info{nodename=\"m4neo\"}) == 1) and on() ((time() - min(timestamp(node_uname_info{nodename=\"m4neo\"})) < 120)) and on() (min(up{job=\"node-exporter\"} * on(instance) group_left(nodename) node_uname_info{nodename=\"m4neo\"}) == 1) and on() (count(up{job=\"node-exporter\"} * on(instance) group_left(nodename) node_uname_info{nodename=\"m4neo\"}) == 1) and on() ((time() - min(timestamp(up{job=\"node-exporter\"}) * on(instance) group_left(nodename) node_uname_info{nodename=\"m4neo\"}) < 120))) or vector(-1)",
+          "legendFormat": "Memory",
+          "refId": "B",
+          "range": true,
+          "instant": false,
+          "format": "time_series"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "editorMode": "code",
+          "expr": "((min((kube_node_status_condition{node=\"m4neo\",condition=\"Ready\",status=\"true\"} or kube_node_status_condition{node=\"m4neo\",condition=~\"MemoryPressure|DiskPressure|PIDPressure\",status=\"false\"}))) and on() ((cluster_watch:ksm_healthy:bool == 1) and on() (time() - timestamp(cluster_watch:ksm_healthy:bool) < 120)) and on() (count((kube_node_status_condition{node=\"m4neo\",condition=\"Ready\",status=\"true\"} or kube_node_status_condition{node=\"m4neo\",condition=~\"MemoryPressure|DiskPressure|PIDPressure\",status=\"false\"})) == 4) and on() ((time() - min(timestamp((kube_node_status_condition{node=\"m4neo\",condition=\"Ready\",status=\"true\"} or kube_node_status_condition{node=\"m4neo\",condition=~\"MemoryPressure|DiskPressure|PIDPressure\",status=\"false\"}))) < 120))) or vector(-1)",
+          "legendFormat": "状態",
+          "refId": "C",
+          "range": false,
+          "instant": true,
+          "format": "time_series"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "noValue": "◇ 未取得",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "gray",
+                "value": null
+              },
+              {
+                "color": "green",
+                "value": 0
+              },
+              {
+                "color": "orange",
+                "value": 75
+              },
+              {
+                "color": "red",
+                "value": 90
+              }
+            ]
+          },
+          "unit": "percent",
+          "decimals": 0,
+          "min": 0,
+          "links": [
+            {
+              "title": "Node詳細へ",
+              "url": "/d/200ac8fdbfbb74b39aff88118e4d1c2c/details?var-datasource=prometheus&var-cluster=&from=${__from}&to=${__to}&var-node=m4neo",
+              "targetBlank": false
+            }
+          ],
+          "mappings": [
+            {
+              "type": "value",
+              "options": {
+                "-1": {
+                  "text": "? 不明",
+                  "color": "gray"
+                }
+              }
+            }
+          ],
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 2,
+            "fillOpacity": 12,
+            "spanNulls": false,
+            "showPoints": "never",
+            "axisSoftMax": 50
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "状態"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "none"
+              },
+              {
+                "id": "custom.axisPlacement",
+                "value": "left"
+              },
+              {
+                "id": "custom.hideFrom",
+                "value": {
+                  "viz": true,
+                  "tooltip": true,
+                  "legend": false
+                }
+              },
+              {
+                "id": "color",
+                "value": {
+                  "mode": "thresholds"
+                }
+              },
+              {
+                "id": "thresholds",
+                "value": {
+                  "mode": "absolute",
+                  "steps": [
+                    {
+                      "color": "gray",
+                      "value": null
+                    },
+                    {
+                      "color": "red",
+                      "value": 0
+                    },
+                    {
+                      "color": "green",
+                      "value": 1
+                    }
+                  ]
+                }
+              },
+              {
+                "id": "mappings",
+                "value": [
+                  {
+                    "type": "value",
+                    "options": {
+                      "-1": {
+                        "text": "? 不明",
+                        "color": "gray"
+                      },
+                      "0": {
+                        "text": "× 異常",
+                        "color": "red"
+                      },
+                      "1": {
+                        "text": "● 正常",
+                        "color": "green"
+                      }
+                    }
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "CPU"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "blue"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Memory"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "purple"
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "calcs": [
+            "last"
+          ]
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
+      "description": "青=CPU、紫=メモリ。凡例のNode Readyはkube_node_status_conditionのReady条件。ノードの正常参加を示し、アプリ正常の保証ではありません。右上の↗から詳細へ。",
+      "links": [
+        {
+          "title": "Node詳細 ↗",
+          "url": "/d/200ac8fdbfbb74b39aff88118e4d1c2c/details?var-datasource=prometheus&var-cluster=&from=${__from}&to=${__to}&var-node=m4neo",
+          "targetBlank": false
+        }
+      ],
+      "id": 4
+    },
+    {
+      "type": "timeseries",
+      "title": "worker1",
+      "gridPos": {
+        "x": 12,
+        "y": 2,
+        "w": 6,
+        "h": 8
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "editorMode": "code",
+          "expr": "((avg(100 * (1 - avg by(instance)(rate(node_cpu_seconds_total{mode=\"idle\"}[5m]))) * on(instance) group_left(nodename) node_uname_info{nodename=\"worker1\"})) and on() ((cluster_watch:ksm_healthy:bool == 1) and on() (time() - timestamp(cluster_watch:ksm_healthy:bool) < 120)) and on() (count(kube_node_status_capacity{node=\"worker1\",resource=\"cpu\",unit=\"core\"}) == 1) and on() ((time() - min(timestamp(kube_node_status_capacity{node=\"worker1\",resource=\"cpu\",unit=\"core\"})) < 120)) and on() (max(kube_node_status_capacity{node=\"worker1\",resource=\"cpu\",unit=\"core\"}) > 0) and on() (count(node_cpu_seconds_total{mode=\"idle\"} * on(instance) group_left(nodename) node_uname_info{nodename=\"worker1\"}) == scalar(max(kube_node_status_capacity{node=\"worker1\",resource=\"cpu\",unit=\"core\"}))) and on() (count(rate(node_cpu_seconds_total{mode=\"idle\"}[5m]) * on(instance) group_left(nodename) node_uname_info{nodename=\"worker1\"}) == scalar(max(kube_node_status_capacity{node=\"worker1\",resource=\"cpu\",unit=\"core\"}))) and on() ((time() - min(timestamp(node_cpu_seconds_total{mode=\"idle\"}) * on(instance) group_left(nodename) node_uname_info{nodename=\"worker1\"}) < 120)) and on() (count(node_uname_info{nodename=\"worker1\"}) == 1) and on() ((time() - min(timestamp(node_uname_info{nodename=\"worker1\"})) < 120)) and on() (min(up{job=\"node-exporter\"} * on(instance) group_left(nodename) node_uname_info{nodename=\"worker1\"}) == 1) and on() (count(up{job=\"node-exporter\"} * on(instance) group_left(nodename) node_uname_info{nodename=\"worker1\"}) == 1) and on() ((time() - min(timestamp(up{job=\"node-exporter\"}) * on(instance) group_left(nodename) node_uname_info{nodename=\"worker1\"}) < 120))) or vector(-1)",
+          "legendFormat": "CPU",
+          "refId": "A",
+          "range": true,
+          "instant": false,
+          "format": "time_series"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "editorMode": "code",
+          "expr": "((avg(100 * (1 - node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes) * on(instance) group_left(nodename) node_uname_info{nodename=\"worker1\"})) and on() ((cluster_watch:ksm_healthy:bool == 1) and on() (time() - timestamp(cluster_watch:ksm_healthy:bool) < 120)) and on() (min(node_memory_MemTotal_bytes * on(instance) group_left(nodename) node_uname_info{nodename=\"worker1\"}) > 0) and on() (count(node_memory_MemAvailable_bytes * on(instance) group_left(nodename) node_uname_info{nodename=\"worker1\"}) == 1) and on() (count(node_memory_MemTotal_bytes * on(instance) group_left(nodename) node_uname_info{nodename=\"worker1\"}) == 1) and on() ((time() - min(timestamp(node_memory_MemAvailable_bytes) * on(instance) group_left(nodename) node_uname_info{nodename=\"worker1\"}) < 120)) and on() ((time() - min(timestamp(node_memory_MemTotal_bytes) * on(instance) group_left(nodename) node_uname_info{nodename=\"worker1\"}) < 120)) and on() (count(node_uname_info{nodename=\"worker1\"}) == 1) and on() ((time() - min(timestamp(node_uname_info{nodename=\"worker1\"})) < 120)) and on() (min(up{job=\"node-exporter\"} * on(instance) group_left(nodename) node_uname_info{nodename=\"worker1\"}) == 1) and on() (count(up{job=\"node-exporter\"} * on(instance) group_left(nodename) node_uname_info{nodename=\"worker1\"}) == 1) and on() ((time() - min(timestamp(up{job=\"node-exporter\"}) * on(instance) group_left(nodename) node_uname_info{nodename=\"worker1\"}) < 120))) or vector(-1)",
+          "legendFormat": "Memory",
+          "refId": "B",
+          "range": true,
+          "instant": false,
+          "format": "time_series"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "editorMode": "code",
+          "expr": "((min((kube_node_status_condition{node=\"worker1\",condition=\"Ready\",status=\"true\"} or kube_node_status_condition{node=\"worker1\",condition=~\"MemoryPressure|DiskPressure|PIDPressure\",status=\"false\"}))) and on() ((cluster_watch:ksm_healthy:bool == 1) and on() (time() - timestamp(cluster_watch:ksm_healthy:bool) < 120)) and on() (count((kube_node_status_condition{node=\"worker1\",condition=\"Ready\",status=\"true\"} or kube_node_status_condition{node=\"worker1\",condition=~\"MemoryPressure|DiskPressure|PIDPressure\",status=\"false\"})) == 4) and on() ((time() - min(timestamp((kube_node_status_condition{node=\"worker1\",condition=\"Ready\",status=\"true\"} or kube_node_status_condition{node=\"worker1\",condition=~\"MemoryPressure|DiskPressure|PIDPressure\",status=\"false\"}))) < 120))) or vector(-1)",
+          "legendFormat": "状態",
+          "refId": "C",
+          "range": false,
+          "instant": true,
+          "format": "time_series"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "noValue": "◇ 未取得",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "gray",
+                "value": null
+              },
+              {
+                "color": "green",
+                "value": 0
+              },
+              {
+                "color": "orange",
+                "value": 75
+              },
+              {
+                "color": "red",
+                "value": 90
+              }
+            ]
+          },
+          "unit": "percent",
+          "decimals": 0,
+          "min": 0,
+          "links": [
+            {
+              "title": "Node詳細へ",
+              "url": "/d/200ac8fdbfbb74b39aff88118e4d1c2c/details?var-datasource=prometheus&var-cluster=&from=${__from}&to=${__to}&var-node=worker1",
+              "targetBlank": false
+            }
+          ],
+          "mappings": [
+            {
+              "type": "value",
+              "options": {
+                "-1": {
+                  "text": "? 不明",
+                  "color": "gray"
+                }
+              }
+            }
+          ],
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 2,
+            "fillOpacity": 12,
+            "spanNulls": false,
+            "showPoints": "never",
+            "axisSoftMax": 50
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "状態"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "none"
+              },
+              {
+                "id": "custom.axisPlacement",
+                "value": "left"
+              },
+              {
+                "id": "custom.hideFrom",
+                "value": {
+                  "viz": true,
+                  "tooltip": true,
+                  "legend": false
+                }
+              },
+              {
+                "id": "color",
+                "value": {
+                  "mode": "thresholds"
+                }
+              },
+              {
+                "id": "thresholds",
+                "value": {
+                  "mode": "absolute",
+                  "steps": [
+                    {
+                      "color": "gray",
+                      "value": null
+                    },
+                    {
+                      "color": "red",
+                      "value": 0
+                    },
+                    {
+                      "color": "green",
+                      "value": 1
+                    }
+                  ]
+                }
+              },
+              {
+                "id": "mappings",
+                "value": [
+                  {
+                    "type": "value",
+                    "options": {
+                      "-1": {
+                        "text": "? 不明",
+                        "color": "gray"
+                      },
+                      "0": {
+                        "text": "× 異常",
+                        "color": "red"
+                      },
+                      "1": {
+                        "text": "● 正常",
+                        "color": "green"
+                      }
+                    }
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "CPU"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "blue"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Memory"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "purple"
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "calcs": [
+            "last"
+          ]
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
+      "description": "青=CPU、紫=メモリ。凡例のNode Readyはkube_node_status_conditionのReady条件。ノードの正常参加を示し、アプリ正常の保証ではありません。右上の↗から詳細へ。",
+      "links": [
+        {
+          "title": "Node詳細 ↗",
+          "url": "/d/200ac8fdbfbb74b39aff88118e4d1c2c/details?var-datasource=prometheus&var-cluster=&from=${__from}&to=${__to}&var-node=worker1",
+          "targetBlank": false
+        }
+      ],
+      "id": 5
+    },
+    {
+      "type": "timeseries",
+      "title": "worker2",
+      "gridPos": {
+        "x": 18,
+        "y": 2,
+        "w": 6,
+        "h": 8
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "editorMode": "code",
+          "expr": "((avg(100 * (1 - avg by(instance)(rate(node_cpu_seconds_total{mode=\"idle\"}[5m]))) * on(instance) group_left(nodename) node_uname_info{nodename=\"worker2\"})) and on() ((cluster_watch:ksm_healthy:bool == 1) and on() (time() - timestamp(cluster_watch:ksm_healthy:bool) < 120)) and on() (count(kube_node_status_capacity{node=\"worker2\",resource=\"cpu\",unit=\"core\"}) == 1) and on() ((time() - min(timestamp(kube_node_status_capacity{node=\"worker2\",resource=\"cpu\",unit=\"core\"})) < 120)) and on() (max(kube_node_status_capacity{node=\"worker2\",resource=\"cpu\",unit=\"core\"}) > 0) and on() (count(node_cpu_seconds_total{mode=\"idle\"} * on(instance) group_left(nodename) node_uname_info{nodename=\"worker2\"}) == scalar(max(kube_node_status_capacity{node=\"worker2\",resource=\"cpu\",unit=\"core\"}))) and on() (count(rate(node_cpu_seconds_total{mode=\"idle\"}[5m]) * on(instance) group_left(nodename) node_uname_info{nodename=\"worker2\"}) == scalar(max(kube_node_status_capacity{node=\"worker2\",resource=\"cpu\",unit=\"core\"}))) and on() ((time() - min(timestamp(node_cpu_seconds_total{mode=\"idle\"}) * on(instance) group_left(nodename) node_uname_info{nodename=\"worker2\"}) < 120)) and on() (count(node_uname_info{nodename=\"worker2\"}) == 1) and on() ((time() - min(timestamp(node_uname_info{nodename=\"worker2\"})) < 120)) and on() (min(up{job=\"node-exporter\"} * on(instance) group_left(nodename) node_uname_info{nodename=\"worker2\"}) == 1) and on() (count(up{job=\"node-exporter\"} * on(instance) group_left(nodename) node_uname_info{nodename=\"worker2\"}) == 1) and on() ((time() - min(timestamp(up{job=\"node-exporter\"}) * on(instance) group_left(nodename) node_uname_info{nodename=\"worker2\"}) < 120))) or vector(-1)",
+          "legendFormat": "CPU",
+          "refId": "A",
+          "range": true,
+          "instant": false,
+          "format": "time_series"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "editorMode": "code",
+          "expr": "((avg(100 * (1 - node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes) * on(instance) group_left(nodename) node_uname_info{nodename=\"worker2\"})) and on() ((cluster_watch:ksm_healthy:bool == 1) and on() (time() - timestamp(cluster_watch:ksm_healthy:bool) < 120)) and on() (min(node_memory_MemTotal_bytes * on(instance) group_left(nodename) node_uname_info{nodename=\"worker2\"}) > 0) and on() (count(node_memory_MemAvailable_bytes * on(instance) group_left(nodename) node_uname_info{nodename=\"worker2\"}) == 1) and on() (count(node_memory_MemTotal_bytes * on(instance) group_left(nodename) node_uname_info{nodename=\"worker2\"}) == 1) and on() ((time() - min(timestamp(node_memory_MemAvailable_bytes) * on(instance) group_left(nodename) node_uname_info{nodename=\"worker2\"}) < 120)) and on() ((time() - min(timestamp(node_memory_MemTotal_bytes) * on(instance) group_left(nodename) node_uname_info{nodename=\"worker2\"}) < 120)) and on() (count(node_uname_info{nodename=\"worker2\"}) == 1) and on() ((time() - min(timestamp(node_uname_info{nodename=\"worker2\"})) < 120)) and on() (min(up{job=\"node-exporter\"} * on(instance) group_left(nodename) node_uname_info{nodename=\"worker2\"}) == 1) and on() (count(up{job=\"node-exporter\"} * on(instance) group_left(nodename) node_uname_info{nodename=\"worker2\"}) == 1) and on() ((time() - min(timestamp(up{job=\"node-exporter\"}) * on(instance) group_left(nodename) node_uname_info{nodename=\"worker2\"}) < 120))) or vector(-1)",
+          "legendFormat": "Memory",
+          "refId": "B",
+          "range": true,
+          "instant": false,
+          "format": "time_series"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "editorMode": "code",
+          "expr": "((min((kube_node_status_condition{node=\"worker2\",condition=\"Ready\",status=\"true\"} or kube_node_status_condition{node=\"worker2\",condition=~\"MemoryPressure|DiskPressure|PIDPressure\",status=\"false\"}))) and on() ((cluster_watch:ksm_healthy:bool == 1) and on() (time() - timestamp(cluster_watch:ksm_healthy:bool) < 120)) and on() (count((kube_node_status_condition{node=\"worker2\",condition=\"Ready\",status=\"true\"} or kube_node_status_condition{node=\"worker2\",condition=~\"MemoryPressure|DiskPressure|PIDPressure\",status=\"false\"})) == 4) and on() ((time() - min(timestamp((kube_node_status_condition{node=\"worker2\",condition=\"Ready\",status=\"true\"} or kube_node_status_condition{node=\"worker2\",condition=~\"MemoryPressure|DiskPressure|PIDPressure\",status=\"false\"}))) < 120))) or vector(-1)",
+          "legendFormat": "状態",
+          "refId": "C",
+          "range": false,
+          "instant": true,
+          "format": "time_series"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "noValue": "◇ 未取得",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "gray",
+                "value": null
+              },
+              {
+                "color": "green",
+                "value": 0
+              },
+              {
+                "color": "orange",
+                "value": 75
+              },
+              {
+                "color": "red",
+                "value": 90
+              }
+            ]
+          },
+          "unit": "percent",
+          "decimals": 0,
+          "min": 0,
+          "links": [
+            {
+              "title": "Node詳細へ",
+              "url": "/d/200ac8fdbfbb74b39aff88118e4d1c2c/details?var-datasource=prometheus&var-cluster=&from=${__from}&to=${__to}&var-node=worker2",
+              "targetBlank": false
+            }
+          ],
+          "mappings": [
+            {
+              "type": "value",
+              "options": {
+                "-1": {
+                  "text": "? 不明",
+                  "color": "gray"
+                }
+              }
+            }
+          ],
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 2,
+            "fillOpacity": 12,
+            "spanNulls": false,
+            "showPoints": "never",
+            "axisSoftMax": 50
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "状態"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "none"
+              },
+              {
+                "id": "custom.axisPlacement",
+                "value": "left"
+              },
+              {
+                "id": "custom.hideFrom",
+                "value": {
+                  "viz": true,
+                  "tooltip": true,
+                  "legend": false
+                }
+              },
+              {
+                "id": "color",
+                "value": {
+                  "mode": "thresholds"
+                }
+              },
+              {
+                "id": "thresholds",
+                "value": {
+                  "mode": "absolute",
+                  "steps": [
+                    {
+                      "color": "gray",
+                      "value": null
+                    },
+                    {
+                      "color": "red",
+                      "value": 0
+                    },
+                    {
+                      "color": "green",
+                      "value": 1
+                    }
+                  ]
+                }
+              },
+              {
+                "id": "mappings",
+                "value": [
+                  {
+                    "type": "value",
+                    "options": {
+                      "-1": {
+                        "text": "? 不明",
+                        "color": "gray"
+                      },
+                      "0": {
+                        "text": "× 異常",
+                        "color": "red"
+                      },
+                      "1": {
+                        "text": "● 正常",
+                        "color": "green"
+                      }
+                    }
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "CPU"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "blue"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Memory"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "purple"
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "calcs": [
+            "last"
+          ]
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
+      "description": "青=CPU、紫=メモリ。凡例のNode Readyはkube_node_status_conditionのReady条件。ノードの正常参加を示し、アプリ正常の保証ではありません。右上の↗から詳細へ。",
+      "links": [
+        {
+          "title": "Node詳細 ↗",
+          "url": "/d/200ac8fdbfbb74b39aff88118e4d1c2c/details?var-datasource=prometheus&var-cluster=&from=${__from}&to=${__to}&var-node=worker2",
+          "targetBlank": false
+        }
+      ],
+      "id": 6
+    },
+    {
+      "type": "canvas",
+      "title": "基盤の状態 · Cilium／IstioはSAMPLE",
+      "gridPos": {
+        "x": 0,
+        "y": 10,
+        "w": 24,
+        "h": 7
+      },
+      "datasource": {
+        "type": "datasource",
+        "uid": "-- Mixed --"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "editorMode": "code",
+          "expr": "(vector(0) and on() ((((min(kube_pod_status_ready{namespace=\"kube-system\",condition=\"true\",pod=~\"kube-apiserver-master\"})) and on() ((cluster_watch:ksm_healthy:bool == 1) and on() (time() - timestamp(cluster_watch:ksm_healthy:bool) < 120)) and on() (count(kube_pod_status_ready{namespace=\"kube-system\",condition=\"true\",pod=~\"kube-apiserver-master\"}) == 1) and on() ((time() - min(timestamp(kube_pod_status_ready{namespace=\"kube-system\",condition=\"true\",pod=~\"kube-apiserver-master\"})) < 120))) or vector(-1)) == 0)) or (((2 - ((((((100 * sum(rate(apiserver_request_total{job=\"apiserver\",code=~\"5..\"}[5m])) / sum(rate(apiserver_request_total{job=\"apiserver\"}[5m]))) >= 0) and on() (count(up{job=\"apiserver\"}) == 1) and on() (min(up{job=\"apiserver\"}) == 1) and on() ((time() - min(timestamp(up{job=\"apiserver\"})) < 120)) and on() (count(apiserver_request_total{job=\"apiserver\"}) > 0) and on() ((time() - min(timestamp(apiserver_request_total{job=\"apiserver\"})) < 120))) or vector(-1)) < bool 1) * (((((1000 * histogram_quantile(0.99,sum by(le)(rate(apiserver_request_duration_seconds_bucket{job=\"apiserver\",verb!~\"WATCH|WATCHLIST|CONNECT\"}[5m])))) >= 0) and on() (count(up{job=\"apiserver\"}) == 1) and on() (min(up{job=\"apiserver\"}) == 1) and on() ((time() - min(timestamp(up{job=\"apiserver\"})) < 120)) and on() (count(apiserver_request_duration_seconds_bucket{job=\"apiserver\"}) > 0) and on() ((time() - min(timestamp(apiserver_request_duration_seconds_bucket{job=\"apiserver\"})) < 120))) or vector(-1)) < bool 1000))) and on() ((((((100 * sum(rate(apiserver_request_total{job=\"apiserver\",code=~\"5..\"}[5m])) / sum(rate(apiserver_request_total{job=\"apiserver\"}[5m]))) >= 0) and on() (count(up{job=\"apiserver\"}) == 1) and on() (min(up{job=\"apiserver\"}) == 1) and on() ((time() - min(timestamp(up{job=\"apiserver\"})) < 120)) and on() (count(apiserver_request_total{job=\"apiserver\"}) > 0) and on() ((time() - min(timestamp(apiserver_request_total{job=\"apiserver\"})) < 120))) or vector(-1)) >= 0) and on() (((((1000 * histogram_quantile(0.99,sum by(le)(rate(apiserver_request_duration_seconds_bucket{job=\"apiserver\",verb!~\"WATCH|WATCHLIST|CONNECT\"}[5m])))) >= 0) and on() (count(up{job=\"apiserver\"}) == 1) and on() (min(up{job=\"apiserver\"}) == 1) and on() ((time() - min(timestamp(up{job=\"apiserver\"})) < 120)) and on() (count(apiserver_request_duration_seconds_bucket{job=\"apiserver\"}) > 0) and on() ((time() - min(timestamp(apiserver_request_duration_seconds_bucket{job=\"apiserver\"})) < 120))) or vector(-1)) >= 0))) and on() ((((min(kube_pod_status_ready{namespace=\"kube-system\",condition=\"true\",pod=~\"kube-apiserver-master\"})) and on() ((cluster_watch:ksm_healthy:bool == 1) and on() (time() - timestamp(cluster_watch:ksm_healthy:bool) < 120)) and on() (count(kube_pod_status_ready{namespace=\"kube-system\",condition=\"true\",pod=~\"kube-apiserver-master\"}) == 1) and on() ((time() - min(timestamp(kube_pod_status_ready{namespace=\"kube-system\",condition=\"true\",pod=~\"kube-apiserver-master\"})) < 120))) or vector(-1)) == 1)) or vector(-1)",
+          "legendFormat": "state-control",
+          "refId": "A",
+          "range": false,
+          "instant": true,
+          "format": "time_series"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "editorMode": "code",
+          "expr": "(((100 * sum(rate(apiserver_request_total{job=\"apiserver\",code=~\"5..\"}[5m])) / sum(rate(apiserver_request_total{job=\"apiserver\"}[5m]))) >= 0) and on() (count(up{job=\"apiserver\"}) == 1) and on() (min(up{job=\"apiserver\"}) == 1) and on() ((time() - min(timestamp(up{job=\"apiserver\"})) < 120)) and on() (count(apiserver_request_total{job=\"apiserver\"}) > 0) and on() ((time() - min(timestamp(apiserver_request_total{job=\"apiserver\"})) < 120))) or vector(-1)",
+          "legendFormat": "control-metric-0",
+          "refId": "control0",
+          "range": false,
+          "instant": true,
+          "format": "time_series"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "editorMode": "code",
+          "expr": "(((1000 * histogram_quantile(0.99,sum by(le)(rate(apiserver_request_duration_seconds_bucket{job=\"apiserver\",verb!~\"WATCH|WATCHLIST|CONNECT\"}[5m])))) >= 0) and on() (count(up{job=\"apiserver\"}) == 1) and on() (min(up{job=\"apiserver\"}) == 1) and on() ((time() - min(timestamp(up{job=\"apiserver\"})) < 120)) and on() (count(apiserver_request_duration_seconds_bucket{job=\"apiserver\"}) > 0) and on() ((time() - min(timestamp(apiserver_request_duration_seconds_bucket{job=\"apiserver\"})) < 120))) or vector(-1)",
+          "legendFormat": "control-metric-1",
+          "refId": "control1",
+          "range": false,
+          "instant": true,
+          "format": "time_series"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "editorMode": "code",
+          "expr": "(vector(0) and on() ((((min(kube_pod_status_ready{namespace=\"kube-system\",condition=\"true\",pod=~\"etcd-master\"})) and on() ((cluster_watch:ksm_healthy:bool == 1) and on() (time() - timestamp(cluster_watch:ksm_healthy:bool) < 120)) and on() (count(kube_pod_status_ready{namespace=\"kube-system\",condition=\"true\",pod=~\"etcd-master\"}) == 1) and on() ((time() - min(timestamp(kube_pod_status_ready{namespace=\"kube-system\",condition=\"true\",pod=~\"etcd-master\"})) < 120))) or vector(-1)) == 0)) or (((3 - (((((1000 * histogram_quantile(0.99,sum by(le)(rate(etcd_request_duration_seconds_bucket{job=\"apiserver\"}[5m])))) >= 0) and on() (count(up{job=\"apiserver\"}) == 1) and on() (min(up{job=\"apiserver\"}) == 1) and on() ((time() - min(timestamp(up{job=\"apiserver\"})) < 120)) and on() (count(etcd_request_duration_seconds_bucket{job=\"apiserver\"}) > 0) and on() ((time() - min(timestamp(etcd_request_duration_seconds_bucket{job=\"apiserver\"})) < 120))) or vector(-1)) >= bool 100)) and on() (((((1000 * histogram_quantile(0.99,sum by(le)(rate(etcd_request_duration_seconds_bucket{job=\"apiserver\"}[5m])))) >= 0) and on() (count(up{job=\"apiserver\"}) == 1) and on() (min(up{job=\"apiserver\"}) == 1) and on() ((time() - min(timestamp(up{job=\"apiserver\"})) < 120)) and on() (count(etcd_request_duration_seconds_bucket{job=\"apiserver\"}) > 0) and on() ((time() - min(timestamp(etcd_request_duration_seconds_bucket{job=\"apiserver\"})) < 120))) or vector(-1)) >= 0)) and on() ((((min(kube_pod_status_ready{namespace=\"kube-system\",condition=\"true\",pod=~\"etcd-master\"})) and on() ((cluster_watch:ksm_healthy:bool == 1) and on() (time() - timestamp(cluster_watch:ksm_healthy:bool) < 120)) and on() (count(kube_pod_status_ready{namespace=\"kube-system\",condition=\"true\",pod=~\"etcd-master\"}) == 1) and on() ((time() - min(timestamp(kube_pod_status_ready{namespace=\"kube-system\",condition=\"true\",pod=~\"etcd-master\"})) < 120))) or vector(-1)) == 1)) or vector(-1)",
+          "legendFormat": "state-etcd",
+          "refId": "B",
+          "range": false,
+          "instant": true,
+          "format": "time_series"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "editorMode": "code",
+          "expr": "(((sum(rate(etcd_requests_total{job=\"apiserver\"}[5m]))) >= 0) and on() (count(up{job=\"apiserver\"}) == 1) and on() (min(up{job=\"apiserver\"}) == 1) and on() ((time() - min(timestamp(up{job=\"apiserver\"})) < 120)) and on() (count(etcd_requests_total{job=\"apiserver\"}) > 0) and on() ((time() - min(timestamp(etcd_requests_total{job=\"apiserver\"})) < 120))) or vector(-1)",
+          "legendFormat": "etcd-metric-0",
+          "refId": "etcd0",
+          "range": false,
+          "instant": true,
+          "format": "time_series"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "editorMode": "code",
+          "expr": "(((1000 * histogram_quantile(0.99,sum by(le)(rate(etcd_request_duration_seconds_bucket{job=\"apiserver\"}[5m])))) >= 0) and on() (count(up{job=\"apiserver\"}) == 1) and on() (min(up{job=\"apiserver\"}) == 1) and on() ((time() - min(timestamp(up{job=\"apiserver\"})) < 120)) and on() (count(etcd_request_duration_seconds_bucket{job=\"apiserver\"}) > 0) and on() ((time() - min(timestamp(etcd_request_duration_seconds_bucket{job=\"apiserver\"})) < 120))) or vector(-1)",
+          "legendFormat": "etcd-metric-1",
+          "refId": "etcd1",
+          "range": false,
+          "instant": true,
+          "format": "time_series"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "editorMode": "code",
+          "expr": "(vector(0) and on() ((((((count(((max by(namespace,pod) (kube_pod_status_ready{namespace=\"kube-system\",condition=\"true\"})) == 1) and on(namespace,pod) (max by(namespace,pod) (kube_pod_status_phase{namespace=\"kube-system\",phase=~\"Running|Pending|Unknown|Failed\"} == 1))) or ((count(max by(namespace,pod) (kube_pod_status_phase{namespace=\"kube-system\",phase=~\"Running|Pending|Unknown|Failed\"} == 1))) * 0))) == bool (count(max by(namespace,pod) (kube_pod_status_phase{namespace=\"kube-system\",phase=~\"Running|Pending|Unknown|Failed\"} == 1)))) and on() ((cluster_watch:ksm_healthy:bool == 1) and on() (time() - timestamp(cluster_watch:ksm_healthy:bool) < 120)) and on() (count(kube_pod_info{namespace=\"kube-system\"}) > 0) and on() (count(max by(namespace,pod) (kube_pod_status_phase{namespace=\"kube-system\"})) == count(max by(namespace,pod) (kube_pod_info{namespace=\"kube-system\"}))) and on() ((count(max by(namespace,pod) (kube_pod_status_phase{namespace=\"kube-system\",phase=~\"Running|Pending|Unknown|Failed\"} == 1))) > 0) and on() (((count((max by(namespace,pod) (kube_pod_status_ready{namespace=\"kube-system\",condition=\"true\"})) and on(namespace,pod) (max by(namespace,pod) (kube_pod_status_phase{namespace=\"kube-system\",phase=\"Running\"} == 1))) or vector(0))) == (count(max by(namespace,pod) (kube_pod_status_phase{namespace=\"kube-system\",phase=\"Running\"} == 1)) or vector(0))) and on() ((time() - min(timestamp(kube_pod_info{namespace=\"kube-system\"})) < 120)) and on() ((time() - min(timestamp(kube_pod_status_phase{namespace=\"kube-system\"})) < 120)) and on() ((time() - min(timestamp(kube_pod_status_ready{namespace=\"kube-system\",condition=\"true\"})) < 120))) or vector(-1)) == 0)) or ((vector(1)) and on() ((((((count(((max by(namespace,pod) (kube_pod_status_ready{namespace=\"kube-system\",condition=\"true\"})) == 1) and on(namespace,pod) (max by(namespace,pod) (kube_pod_status_phase{namespace=\"kube-system\",phase=~\"Running|Pending|Unknown|Failed\"} == 1))) or ((count(max by(namespace,pod) (kube_pod_status_phase{namespace=\"kube-system\",phase=~\"Running|Pending|Unknown|Failed\"} == 1))) * 0))) == bool (count(max by(namespace,pod) (kube_pod_status_phase{namespace=\"kube-system\",phase=~\"Running|Pending|Unknown|Failed\"} == 1)))) and on() ((cluster_watch:ksm_healthy:bool == 1) and on() (time() - timestamp(cluster_watch:ksm_healthy:bool) < 120)) and on() (count(kube_pod_info{namespace=\"kube-system\"}) > 0) and on() (count(max by(namespace,pod) (kube_pod_status_phase{namespace=\"kube-system\"})) == count(max by(namespace,pod) (kube_pod_info{namespace=\"kube-system\"}))) and on() ((count(max by(namespace,pod) (kube_pod_status_phase{namespace=\"kube-system\",phase=~\"Running|Pending|Unknown|Failed\"} == 1))) > 0) and on() (((count((max by(namespace,pod) (kube_pod_status_ready{namespace=\"kube-system\",condition=\"true\"})) and on(namespace,pod) (max by(namespace,pod) (kube_pod_status_phase{namespace=\"kube-system\",phase=\"Running\"} == 1))) or vector(0))) == (count(max by(namespace,pod) (kube_pod_status_phase{namespace=\"kube-system\",phase=\"Running\"} == 1)) or vector(0))) and on() ((time() - min(timestamp(kube_pod_info{namespace=\"kube-system\"})) < 120)) and on() ((time() - min(timestamp(kube_pod_status_phase{namespace=\"kube-system\"})) < 120)) and on() ((time() - min(timestamp(kube_pod_status_ready{namespace=\"kube-system\",condition=\"true\"})) < 120))) or vector(-1)) == 1)) or vector(-1)",
+          "legendFormat": "state-scheduler",
+          "refId": "C",
+          "range": false,
+          "instant": true,
+          "format": "time_series"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "editorMode": "code",
+          "expr": "(((count(((max by(namespace,pod) (kube_pod_status_ready{namespace=\"kube-system\",condition=\"true\"})) == 1) and on(namespace,pod) (max by(namespace,pod) (kube_pod_status_phase{namespace=\"kube-system\",phase=~\"Running|Pending|Unknown|Failed\"} == 1))) or ((count(max by(namespace,pod) (kube_pod_status_phase{namespace=\"kube-system\",phase=~\"Running|Pending|Unknown|Failed\"} == 1))) * 0))) and on() ((((((count(((max by(namespace,pod) (kube_pod_status_ready{namespace=\"kube-system\",condition=\"true\"})) == 1) and on(namespace,pod) (max by(namespace,pod) (kube_pod_status_phase{namespace=\"kube-system\",phase=~\"Running|Pending|Unknown|Failed\"} == 1))) or ((count(max by(namespace,pod) (kube_pod_status_phase{namespace=\"kube-system\",phase=~\"Running|Pending|Unknown|Failed\"} == 1))) * 0))) == bool (count(max by(namespace,pod) (kube_pod_status_phase{namespace=\"kube-system\",phase=~\"Running|Pending|Unknown|Failed\"} == 1)))) and on() ((cluster_watch:ksm_healthy:bool == 1) and on() (time() - timestamp(cluster_watch:ksm_healthy:bool) < 120)) and on() (count(kube_pod_info{namespace=\"kube-system\"}) > 0) and on() (count(max by(namespace,pod) (kube_pod_status_phase{namespace=\"kube-system\"})) == count(max by(namespace,pod) (kube_pod_info{namespace=\"kube-system\"}))) and on() ((count(max by(namespace,pod) (kube_pod_status_phase{namespace=\"kube-system\",phase=~\"Running|Pending|Unknown|Failed\"} == 1))) > 0) and on() (((count((max by(namespace,pod) (kube_pod_status_ready{namespace=\"kube-system\",condition=\"true\"})) and on(namespace,pod) (max by(namespace,pod) (kube_pod_status_phase{namespace=\"kube-system\",phase=\"Running\"} == 1))) or vector(0))) == (count(max by(namespace,pod) (kube_pod_status_phase{namespace=\"kube-system\",phase=\"Running\"} == 1)) or vector(0))) and on() ((time() - min(timestamp(kube_pod_info{namespace=\"kube-system\"})) < 120)) and on() ((time() - min(timestamp(kube_pod_status_phase{namespace=\"kube-system\"})) < 120)) and on() ((time() - min(timestamp(kube_pod_status_ready{namespace=\"kube-system\",condition=\"true\"})) < 120))) or vector(-1)) >= 0)) or vector(-1)",
+          "legendFormat": "scheduler-metric-0",
+          "refId": "scheduler0",
+          "range": false,
+          "instant": true,
+          "format": "time_series"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "editorMode": "code",
+          "expr": "((count(max by(namespace,pod) (kube_pod_status_phase{namespace=\"kube-system\",phase=~\"Running|Pending|Unknown|Failed\"} == 1))) and on() ((((((count(((max by(namespace,pod) (kube_pod_status_ready{namespace=\"kube-system\",condition=\"true\"})) == 1) and on(namespace,pod) (max by(namespace,pod) (kube_pod_status_phase{namespace=\"kube-system\",phase=~\"Running|Pending|Unknown|Failed\"} == 1))) or ((count(max by(namespace,pod) (kube_pod_status_phase{namespace=\"kube-system\",phase=~\"Running|Pending|Unknown|Failed\"} == 1))) * 0))) == bool (count(max by(namespace,pod) (kube_pod_status_phase{namespace=\"kube-system\",phase=~\"Running|Pending|Unknown|Failed\"} == 1)))) and on() ((cluster_watch:ksm_healthy:bool == 1) and on() (time() - timestamp(cluster_watch:ksm_healthy:bool) < 120)) and on() (count(kube_pod_info{namespace=\"kube-system\"}) > 0) and on() (count(max by(namespace,pod) (kube_pod_status_phase{namespace=\"kube-system\"})) == count(max by(namespace,pod) (kube_pod_info{namespace=\"kube-system\"}))) and on() ((count(max by(namespace,pod) (kube_pod_status_phase{namespace=\"kube-system\",phase=~\"Running|Pending|Unknown|Failed\"} == 1))) > 0) and on() (((count((max by(namespace,pod) (kube_pod_status_ready{namespace=\"kube-system\",condition=\"true\"})) and on(namespace,pod) (max by(namespace,pod) (kube_pod_status_phase{namespace=\"kube-system\",phase=\"Running\"} == 1))) or vector(0))) == (count(max by(namespace,pod) (kube_pod_status_phase{namespace=\"kube-system\",phase=\"Running\"} == 1)) or vector(0))) and on() ((time() - min(timestamp(kube_pod_info{namespace=\"kube-system\"})) < 120)) and on() ((time() - min(timestamp(kube_pod_status_phase{namespace=\"kube-system\"})) < 120)) and on() ((time() - min(timestamp(kube_pod_status_ready{namespace=\"kube-system\",condition=\"true\"})) < 120))) or vector(-1)) >= 0)) or vector(-1)",
+          "legendFormat": "scheduler-metric-1",
+          "refId": "scheduler1",
+          "range": false,
+          "instant": true,
+          "format": "time_series"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "editorMode": "code",
+          "expr": "(vector(0) and on() ((((min(kube_deployment_status_replicas_available{namespace=\"kube-system\",deployment=~\"coredns\"} >= bool on(namespace,deployment) kube_deployment_spec_replicas{namespace=\"kube-system\",deployment=~\"coredns\"})) and on() ((cluster_watch:ksm_healthy:bool == 1) and on() (time() - timestamp(cluster_watch:ksm_healthy:bool) < 120)) and on() (count(kube_deployment_status_replicas_available{namespace=\"kube-system\",deployment=~\"coredns\"}) == 1) and on() (count(kube_deployment_spec_replicas{namespace=\"kube-system\",deployment=~\"coredns\"}) == 1) and on() (min(kube_deployment_spec_replicas{namespace=\"kube-system\",deployment=~\"coredns\"}) > 0) and on() ((time() - min(timestamp(kube_deployment_status_replicas_available{namespace=\"kube-system\",deployment=~\"coredns\"})) < 120)) and on() ((time() - min(timestamp(kube_deployment_spec_replicas{namespace=\"kube-system\",deployment=~\"coredns\"})) < 120))) or vector(-1)) == 0)) or (((2 - ((((((100 * ((sum(rate(coredns_dns_responses_total{rcode=~\"SERVFAIL|REFUSED\"}[5m]))) or ((sum(rate(coredns_dns_responses_total[5m]))) * 0)) / (sum(rate(coredns_dns_responses_total[5m])))) >= 0) and on() (count(up{job=\"coredns\"}) == 2) and on() (min(up{job=\"coredns\"}) == 1) and on() ((time() - min(timestamp(up{job=\"coredns\"})) < 120)) and on() (count(coredns_dns_responses_total) > 0) and on() ((time() - min(timestamp(coredns_dns_responses_total)) < 120))) or vector(-1)) < bool 1) * (((((1000 * histogram_quantile(0.99,sum by(le)(rate(coredns_dns_request_duration_seconds_bucket[5m])))) >= 0) and on() (count(up{job=\"coredns\"}) == 2) and on() (min(up{job=\"coredns\"}) == 1) and on() ((time() - min(timestamp(up{job=\"coredns\"})) < 120)) and on() (count(coredns_dns_request_duration_seconds_bucket) > 0) and on() ((time() - min(timestamp(coredns_dns_request_duration_seconds_bucket)) < 120))) or vector(-1)) < bool 100))) and on() ((((((100 * ((sum(rate(coredns_dns_responses_total{rcode=~\"SERVFAIL|REFUSED\"}[5m]))) or ((sum(rate(coredns_dns_responses_total[5m]))) * 0)) / (sum(rate(coredns_dns_responses_total[5m])))) >= 0) and on() (count(up{job=\"coredns\"}) == 2) and on() (min(up{job=\"coredns\"}) == 1) and on() ((time() - min(timestamp(up{job=\"coredns\"})) < 120)) and on() (count(coredns_dns_responses_total) > 0) and on() ((time() - min(timestamp(coredns_dns_responses_total)) < 120))) or vector(-1)) >= 0) and on() (((((1000 * histogram_quantile(0.99,sum by(le)(rate(coredns_dns_request_duration_seconds_bucket[5m])))) >= 0) and on() (count(up{job=\"coredns\"}) == 2) and on() (min(up{job=\"coredns\"}) == 1) and on() ((time() - min(timestamp(up{job=\"coredns\"})) < 120)) and on() (count(coredns_dns_request_duration_seconds_bucket) > 0) and on() ((time() - min(timestamp(coredns_dns_request_duration_seconds_bucket)) < 120))) or vector(-1)) >= 0))) and on() ((((min(kube_deployment_status_replicas_available{namespace=\"kube-system\",deployment=~\"coredns\"} >= bool on(namespace,deployment) kube_deployment_spec_replicas{namespace=\"kube-system\",deployment=~\"coredns\"})) and on() ((cluster_watch:ksm_healthy:bool == 1) and on() (time() - timestamp(cluster_watch:ksm_healthy:bool) < 120)) and on() (count(kube_deployment_status_replicas_available{namespace=\"kube-system\",deployment=~\"coredns\"}) == 1) and on() (count(kube_deployment_spec_replicas{namespace=\"kube-system\",deployment=~\"coredns\"}) == 1) and on() (min(kube_deployment_spec_replicas{namespace=\"kube-system\",deployment=~\"coredns\"}) > 0) and on() ((time() - min(timestamp(kube_deployment_status_replicas_available{namespace=\"kube-system\",deployment=~\"coredns\"})) < 120)) and on() ((time() - min(timestamp(kube_deployment_spec_replicas{namespace=\"kube-system\",deployment=~\"coredns\"})) < 120))) or vector(-1)) == 1)) or vector(-1)",
+          "legendFormat": "state-dns",
+          "refId": "D",
+          "range": false,
+          "instant": true,
+          "format": "time_series"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "editorMode": "code",
+          "expr": "(((100 * ((sum(rate(coredns_dns_responses_total{rcode=~\"SERVFAIL|REFUSED\"}[5m]))) or ((sum(rate(coredns_dns_responses_total[5m]))) * 0)) / (sum(rate(coredns_dns_responses_total[5m])))) >= 0) and on() (count(up{job=\"coredns\"}) == 2) and on() (min(up{job=\"coredns\"}) == 1) and on() ((time() - min(timestamp(up{job=\"coredns\"})) < 120)) and on() (count(coredns_dns_responses_total) > 0) and on() ((time() - min(timestamp(coredns_dns_responses_total)) < 120))) or vector(-1)",
+          "legendFormat": "dns-metric-0",
+          "refId": "dns0",
+          "range": false,
+          "instant": true,
+          "format": "time_series"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "editorMode": "code",
+          "expr": "(((1000 * histogram_quantile(0.99,sum by(le)(rate(coredns_dns_request_duration_seconds_bucket[5m])))) >= 0) and on() (count(up{job=\"coredns\"}) == 2) and on() (min(up{job=\"coredns\"}) == 1) and on() ((time() - min(timestamp(up{job=\"coredns\"})) < 120)) and on() (count(coredns_dns_request_duration_seconds_bucket) > 0) and on() ((time() - min(timestamp(coredns_dns_request_duration_seconds_bucket)) < 120))) or vector(-1)",
+          "legendFormat": "dns-metric-1",
+          "refId": "dns1",
+          "range": false,
+          "instant": true,
+          "format": "time_series"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "editorMode": "code",
+          "expr": "(vector(0) and on() ((((min(kube_daemonset_status_number_ready{namespace=\"longhorn-system\",daemonset=~\"longhorn-manager|longhorn-csi-plugin\"} >= bool on(namespace,daemonset) kube_daemonset_status_desired_number_scheduled{namespace=\"longhorn-system\",daemonset=~\"longhorn-manager|longhorn-csi-plugin\"})) and on() ((cluster_watch:ksm_healthy:bool == 1) and on() (time() - timestamp(cluster_watch:ksm_healthy:bool) < 120)) and on() (count(kube_daemonset_status_number_ready{namespace=\"longhorn-system\",daemonset=~\"longhorn-manager|longhorn-csi-plugin\"}) == 2) and on() (count(kube_daemonset_status_desired_number_scheduled{namespace=\"longhorn-system\",daemonset=~\"longhorn-manager|longhorn-csi-plugin\"}) == 2) and on() (min(kube_daemonset_status_desired_number_scheduled{namespace=\"longhorn-system\",daemonset=~\"longhorn-manager|longhorn-csi-plugin\"}) > 0) and on() ((time() - min(timestamp(kube_daemonset_status_number_ready{namespace=\"longhorn-system\",daemonset=~\"longhorn-manager|longhorn-csi-plugin\"})) < 120)) and on() ((time() - min(timestamp(kube_daemonset_status_desired_number_scheduled{namespace=\"longhorn-system\",daemonset=~\"longhorn-manager|longhorn-csi-plugin\"})) < 120))) or vector(-1)) == 0)) or ((((2 - (((((((count((longhorn_volume_robustness == 1) and on(volume) (longhorn_volume_state == 2)) or ((count((longhorn_volume_state == 2))) * 0))) and on() ((count(longhorn_volume_robustness and on(volume) (longhorn_volume_state == 2))) == (count((longhorn_volume_state == 2)))) and on() (min(longhorn_volume_robustness and on(volume) (longhorn_volume_state == 2)) > 0)) >= 0) and on() (count(up{job=\"longhorn-backend\"}) == 3) and on() (min(up{job=\"longhorn-backend\"}) == 1) and on() ((time() - min(timestamp(up{job=\"longhorn-backend\"})) < 120)) and on() (count(longhorn_volume_state) > 0) and on() ((time() - min(timestamp(longhorn_volume_state)) < 120)) and on() (count(longhorn_volume_robustness) > 0) and on() ((time() - min(timestamp(longhorn_volume_robustness)) < 120))) or vector(-1)) == bool ((((count((longhorn_volume_state == 2))) >= 0) and on() (count(up{job=\"longhorn-backend\"}) == 3) and on() (min(up{job=\"longhorn-backend\"}) == 1) and on() ((time() - min(timestamp(up{job=\"longhorn-backend\"})) < 120)) and on() (count(longhorn_volume_state) > 0) and on() ((time() - min(timestamp(longhorn_volume_state)) < 120)) and on() (count(longhorn_volume_robustness) > 0) and on() ((time() - min(timestamp(longhorn_volume_robustness)) < 120))) or vector(-1)))) * (((count((longhorn_volume_robustness == 3) and on(volume) (longhorn_volume_state == 2)) or ((count((longhorn_volume_state == 2))) * 0))) == bool 0)) and on() (((((((count((longhorn_volume_robustness == 1) and on(volume) (longhorn_volume_state == 2)) or ((count((longhorn_volume_state == 2))) * 0))) and on() ((count(longhorn_volume_robustness and on(volume) (longhorn_volume_state == 2))) == (count((longhorn_volume_state == 2)))) and on() (min(longhorn_volume_robustness and on(volume) (longhorn_volume_state == 2)) > 0)) >= 0) and on() (count(up{job=\"longhorn-backend\"}) == 3) and on() (min(up{job=\"longhorn-backend\"}) == 1) and on() ((time() - min(timestamp(up{job=\"longhorn-backend\"})) < 120)) and on() (count(longhorn_volume_state) > 0) and on() ((time() - min(timestamp(longhorn_volume_state)) < 120)) and on() (count(longhorn_volume_robustness) > 0) and on() ((time() - min(timestamp(longhorn_volume_robustness)) < 120))) or vector(-1)) >= 0) and on() (((((count((longhorn_volume_state == 2))) >= 0) and on() (count(up{job=\"longhorn-backend\"}) == 3) and on() (min(up{job=\"longhorn-backend\"}) == 1) and on() ((time() - min(timestamp(up{job=\"longhorn-backend\"})) < 120)) and on() (count(longhorn_volume_state) > 0) and on() ((time() - min(timestamp(longhorn_volume_state)) < 120)) and on() (count(longhorn_volume_robustness) > 0) and on() ((time() - min(timestamp(longhorn_volume_robustness)) < 120))) or vector(-1)) > 0)) and on() ((((min(kube_daemonset_status_number_ready{namespace=\"longhorn-system\",daemonset=~\"longhorn-manager|longhorn-csi-plugin\"} >= bool on(namespace,daemonset) kube_daemonset_status_desired_number_scheduled{namespace=\"longhorn-system\",daemonset=~\"longhorn-manager|longhorn-csi-plugin\"})) and on() ((cluster_watch:ksm_healthy:bool == 1) and on() (time() - timestamp(cluster_watch:ksm_healthy:bool) < 120)) and on() (count(kube_daemonset_status_number_ready{namespace=\"longhorn-system\",daemonset=~\"longhorn-manager|longhorn-csi-plugin\"}) == 2) and on() (count(kube_daemonset_status_desired_number_scheduled{namespace=\"longhorn-system\",daemonset=~\"longhorn-manager|longhorn-csi-plugin\"}) == 2) and on() (min(kube_daemonset_status_desired_number_scheduled{namespace=\"longhorn-system\",daemonset=~\"longhorn-manager|longhorn-csi-plugin\"}) > 0) and on() ((time() - min(timestamp(kube_daemonset_status_number_ready{namespace=\"longhorn-system\",daemonset=~\"longhorn-manager|longhorn-csi-plugin\"})) < 120)) and on() ((time() - min(timestamp(kube_daemonset_status_desired_number_scheduled{namespace=\"longhorn-system\",daemonset=~\"longhorn-manager|longhorn-csi-plugin\"})) < 120))) or vector(-1)) == 1)) or vector(-1)",
+          "legendFormat": "state-storage",
+          "refId": "G",
+          "range": false,
+          "instant": true,
+          "format": "time_series"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "editorMode": "code",
+          "expr": "(((count((longhorn_volume_state == 2))) >= 0) and on() (count(up{job=\"longhorn-backend\"}) == 3) and on() (min(up{job=\"longhorn-backend\"}) == 1) and on() ((time() - min(timestamp(up{job=\"longhorn-backend\"})) < 120)) and on() (count(longhorn_volume_state) > 0) and on() ((time() - min(timestamp(longhorn_volume_state)) < 120)) and on() (count(longhorn_volume_robustness) > 0) and on() ((time() - min(timestamp(longhorn_volume_robustness)) < 120))) or vector(-1)",
+          "legendFormat": "storage-metric-0",
+          "refId": "storage0",
+          "range": false,
+          "instant": true,
+          "format": "time_series"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "editorMode": "code",
+          "expr": "(((((count((longhorn_volume_robustness == 1) and on(volume) (longhorn_volume_state == 2)) or ((count((longhorn_volume_state == 2))) * 0))) and on() ((count(longhorn_volume_robustness and on(volume) (longhorn_volume_state == 2))) == (count((longhorn_volume_state == 2)))) and on() (min(longhorn_volume_robustness and on(volume) (longhorn_volume_state == 2)) > 0)) >= 0) and on() (count(up{job=\"longhorn-backend\"}) == 3) and on() (min(up{job=\"longhorn-backend\"}) == 1) and on() ((time() - min(timestamp(up{job=\"longhorn-backend\"})) < 120)) and on() (count(longhorn_volume_state) > 0) and on() ((time() - min(timestamp(longhorn_volume_state)) < 120)) and on() (count(longhorn_volume_robustness) > 0) and on() ((time() - min(timestamp(longhorn_volume_robustness)) < 120))) or vector(-1)",
+          "legendFormat": "storage-metric-1",
+          "refId": "storage1",
+          "range": false,
+          "instant": true,
+          "format": "time_series"
+        },
+        {
+          "datasource": {
+            "type": "grafana-testdata-datasource",
+            "uid": "app-status-sample"
+          },
+          "refId": "functional-fixture",
+          "scenarioId": "csv_content",
+          "csvContent": "state-network,state-mesh,network-metric-0,network-metric-1,mesh-metric-0,mesh-metric-1\r\n0,0,98.2,34,92.4,850\r\n"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "noValue": "◇ 未取得",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "gray",
+                "value": null
+              },
+              {
+                "color": "green",
+                "value": 0
+              },
+              {
+                "color": "orange",
+                "value": 75
+              },
+              {
+                "color": "red",
+                "value": 90
+              }
+            ]
+          },
+          "mappings": [
+            {
+              "type": "value",
+              "options": {
+                "-1": {
+                  "text": "? 未取得",
+                  "color": "gray"
+                }
+              }
+            }
+          ]
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "state-control"
+            },
+            "properties": [
+              {
+                "id": "mappings",
+                "value": [
+                  {
+                    "type": "value",
+                    "options": {
+                      "-1": {
+                        "text": "? 判定不明",
+                        "color": "gray"
+                      },
+                      "0": {
+                        "text": "× 異常",
+                        "color": "red"
+                      },
+                      "1": {
+                        "text": "● 正常（暫定）",
+                        "color": "green"
+                      },
+                      "2": {
+                        "text": "▲ 要確認",
+                        "color": "orange"
+                      },
+                      "3": {
+                        "text": "? 機能未確認",
+                        "color": "gray"
+                      }
+                    }
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "control-metric-0"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "text"
+                }
+              },
+              {
+                "id": "unit",
+                "value": "percent"
+              },
+              {
+                "id": "decimals",
+                "value": 1
+              },
+              {
+                "id": "mappings",
+                "value": [
+                  {
+                    "type": "value",
+                    "options": {
+                      "-1": {
+                        "text": "? 未取得",
+                        "color": "gray"
+                      }
+                    }
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "control-metric-1"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "text"
+                }
+              },
+              {
+                "id": "unit",
+                "value": "ms"
+              },
+              {
+                "id": "decimals",
+                "value": 1
+              },
+              {
+                "id": "mappings",
+                "value": [
+                  {
+                    "type": "value",
+                    "options": {
+                      "-1": {
+                        "text": "? 未取得",
+                        "color": "gray"
+                      }
+                    }
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "state-control"
+            },
+            "properties": [
+              {
+                "id": "links",
+                "value": [
+                  {
+                    "title": "根拠・詳細へ",
+                    "url": "/d/cw-evidence-control/details?var-datasource=prometheus&var-cluster=&from=${__from}&to=${__to}",
+                    "targetBlank": false,
+                    "oneClick": true
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "state-etcd"
+            },
+            "properties": [
+              {
+                "id": "mappings",
+                "value": [
+                  {
+                    "type": "value",
+                    "options": {
+                      "-1": {
+                        "text": "? 判定不明",
+                        "color": "gray"
+                      },
+                      "0": {
+                        "text": "× 異常",
+                        "color": "red"
+                      },
+                      "1": {
+                        "text": "● 正常（暫定）",
+                        "color": "green"
+                      },
+                      "2": {
+                        "text": "▲ 要確認",
+                        "color": "orange"
+                      },
+                      "3": {
+                        "text": "◐ 部分確認",
+                        "color": "blue"
+                      }
+                    }
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "etcd-metric-0"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "text"
+                }
+              },
+              {
+                "id": "unit",
+                "value": "suffix:ops/s"
+              },
+              {
+                "id": "decimals",
+                "value": 1
+              },
+              {
+                "id": "mappings",
+                "value": [
+                  {
+                    "type": "value",
+                    "options": {
+                      "-1": {
+                        "text": "? 未取得",
+                        "color": "gray"
+                      }
+                    }
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "etcd-metric-1"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "text"
+                }
+              },
+              {
+                "id": "unit",
+                "value": "ms"
+              },
+              {
+                "id": "decimals",
+                "value": 1
+              },
+              {
+                "id": "mappings",
+                "value": [
+                  {
+                    "type": "value",
+                    "options": {
+                      "-1": {
+                        "text": "? 未取得",
+                        "color": "gray"
+                      }
+                    }
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "state-etcd"
+            },
+            "properties": [
+              {
+                "id": "links",
+                "value": [
+                  {
+                    "title": "根拠・詳細へ",
+                    "url": "/d/cw-evidence-etcd/details?var-datasource=prometheus&var-cluster=&from=${__from}&to=${__to}",
+                    "targetBlank": false,
+                    "oneClick": true
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "state-scheduler"
+            },
+            "properties": [
+              {
+                "id": "mappings",
+                "value": [
+                  {
+                    "type": "value",
+                    "options": {
+                      "-1": {
+                        "text": "? 判定不明",
+                        "color": "gray"
+                      },
+                      "0": {
+                        "text": "× Pod稼働不足",
+                        "color": "red"
+                      },
+                      "1": {
+                        "text": "● Pod稼働正常",
+                        "color": "green"
+                      },
+                      "2": {
+                        "text": "▲ 要確認",
+                        "color": "orange"
+                      },
+                      "3": {
+                        "text": "? 機能未確認",
+                        "color": "gray"
+                      }
+                    }
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "scheduler-metric-0"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "text"
+                }
+              },
+              {
+                "id": "unit",
+                "value": "suffix:個"
+              },
+              {
+                "id": "decimals",
+                "value": 0
+              },
+              {
+                "id": "mappings",
+                "value": [
+                  {
+                    "type": "value",
+                    "options": {
+                      "-1": {
+                        "text": "? 未取得",
+                        "color": "gray"
+                      }
+                    }
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "scheduler-metric-1"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "text"
+                }
+              },
+              {
+                "id": "unit",
+                "value": "suffix:個"
+              },
+              {
+                "id": "decimals",
+                "value": 0
+              },
+              {
+                "id": "mappings",
+                "value": [
+                  {
+                    "type": "value",
+                    "options": {
+                      "-1": {
+                        "text": "? 未取得",
+                        "color": "gray"
+                      }
+                    }
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "state-scheduler"
+            },
+            "properties": [
+              {
+                "id": "links",
+                "value": [
+                  {
+                    "title": "根拠・詳細へ",
+                    "url": "/d/cw-evidence-scheduler/details?var-datasource=prometheus&var-cluster=&from=${__from}&to=${__to}",
+                    "targetBlank": false,
+                    "oneClick": true
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "state-dns"
+            },
+            "properties": [
+              {
+                "id": "mappings",
+                "value": [
+                  {
+                    "type": "value",
+                    "options": {
+                      "-1": {
+                        "text": "? 判定不明",
+                        "color": "gray"
+                      },
+                      "0": {
+                        "text": "× 異常",
+                        "color": "red"
+                      },
+                      "1": {
+                        "text": "● 正常（暫定）",
+                        "color": "green"
+                      },
+                      "2": {
+                        "text": "▲ 要確認",
+                        "color": "orange"
+                      },
+                      "3": {
+                        "text": "? 機能未確認",
+                        "color": "gray"
+                      }
+                    }
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "dns-metric-0"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "text"
+                }
+              },
+              {
+                "id": "unit",
+                "value": "percent"
+              },
+              {
+                "id": "decimals",
+                "value": 1
+              },
+              {
+                "id": "mappings",
+                "value": [
+                  {
+                    "type": "value",
+                    "options": {
+                      "-1": {
+                        "text": "? 未取得",
+                        "color": "gray"
+                      }
+                    }
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "dns-metric-1"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "text"
+                }
+              },
+              {
+                "id": "unit",
+                "value": "ms"
+              },
+              {
+                "id": "decimals",
+                "value": 1
+              },
+              {
+                "id": "mappings",
+                "value": [
+                  {
+                    "type": "value",
+                    "options": {
+                      "-1": {
+                        "text": "? 未取得",
+                        "color": "gray"
+                      }
+                    }
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "state-dns"
+            },
+            "properties": [
+              {
+                "id": "links",
+                "value": [
+                  {
+                    "title": "根拠・詳細へ",
+                    "url": "/d/cw-evidence-dns/details?var-datasource=prometheus&var-cluster=&from=${__from}&to=${__to}",
+                    "targetBlank": false,
+                    "oneClick": true
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "state-storage"
+            },
+            "properties": [
+              {
+                "id": "mappings",
+                "value": [
+                  {
+                    "type": "value",
+                    "options": {
+                      "-1": {
+                        "text": "? 判定不明",
+                        "color": "gray"
+                      },
+                      "0": {
+                        "text": "× 異常",
+                        "color": "red"
+                      },
+                      "1": {
+                        "text": "● 正常（暫定）",
+                        "color": "green"
+                      },
+                      "2": {
+                        "text": "▲ 要確認",
+                        "color": "orange"
+                      },
+                      "3": {
+                        "text": "? 機能未確認",
+                        "color": "gray"
+                      }
+                    }
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "storage-metric-0"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "text"
+                }
+              },
+              {
+                "id": "unit",
+                "value": "suffix:個"
+              },
+              {
+                "id": "decimals",
+                "value": 0
+              },
+              {
+                "id": "mappings",
+                "value": [
+                  {
+                    "type": "value",
+                    "options": {
+                      "-1": {
+                        "text": "? 未取得",
+                        "color": "gray"
+                      }
+                    }
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "storage-metric-1"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "text"
+                }
+              },
+              {
+                "id": "unit",
+                "value": "suffix:個"
+              },
+              {
+                "id": "decimals",
+                "value": 0
+              },
+              {
+                "id": "mappings",
+                "value": [
+                  {
+                    "type": "value",
+                    "options": {
+                      "-1": {
+                        "text": "? 未取得",
+                        "color": "gray"
+                      }
+                    }
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "state-storage"
+            },
+            "properties": [
+              {
+                "id": "links",
+                "value": [
+                  {
+                    "title": "根拠・詳細へ",
+                    "url": "/d/cw-evidence-storage/details?var-datasource=prometheus&var-cluster=&from=${__from}&to=${__to}",
+                    "targetBlank": false,
+                    "oneClick": true
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "state-network"
+            },
+            "properties": [
+              {
+                "id": "mappings",
+                "value": [
+                  {
+                    "type": "value",
+                    "options": {
+                      "-1": {
+                        "text": "? 観測停止",
+                        "color": "gray"
+                      },
+                      "0": {
+                        "text": "× 通信異常",
+                        "color": "red"
+                      },
+                      "1": {
+                        "text": "● 通信正常",
+                        "color": "green"
+                      }
+                    }
+                  }
+                ]
+              },
+              {
+                "id": "color",
+                "value": {
+                  "mode": "thresholds"
+                }
+              },
+              {
+                "id": "thresholds",
+                "value": {
+                  "mode": "absolute",
+                  "steps": [
+                    {
+                      "value": null,
+                      "color": "gray"
+                    },
+                    {
+                      "value": 0,
+                      "color": "red"
+                    },
+                    {
+                      "value": 1,
+                      "color": "green"
+                    }
+                  ]
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "network-metric-0"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "percent"
+              },
+              {
+                "id": "decimals",
+                "value": 2
+              },
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "text"
+                }
+              },
+              {
+                "id": "mappings",
+                "value": [
+                  {
+                    "type": "value",
+                    "options": {
+                      "-1": {
+                        "text": "—",
+                        "color": "gray"
+                      }
+                    }
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "network-metric-1"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "none"
+              },
+              {
+                "id": "decimals",
+                "value": 0
+              },
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "text"
+                }
+              },
+              {
+                "id": "mappings",
+                "value": [
+                  {
+                    "type": "value",
+                    "options": {
+                      "-1": {
+                        "text": "—",
+                        "color": "gray"
+                      }
+                    }
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "state-mesh"
+            },
+            "properties": [
+              {
+                "id": "mappings",
+                "value": [
+                  {
+                    "type": "value",
+                    "options": {
+                      "-1": {
+                        "text": "? 観測停止",
+                        "color": "gray"
+                      },
+                      "0": {
+                        "text": "× 通信異常",
+                        "color": "red"
+                      },
+                      "1": {
+                        "text": "● 通信正常",
+                        "color": "green"
+                      }
+                    }
+                  }
+                ]
+              },
+              {
+                "id": "color",
+                "value": {
+                  "mode": "thresholds"
+                }
+              },
+              {
+                "id": "thresholds",
+                "value": {
+                  "mode": "absolute",
+                  "steps": [
+                    {
+                      "value": null,
+                      "color": "gray"
+                    },
+                    {
+                      "value": 0,
+                      "color": "red"
+                    },
+                    {
+                      "value": 1,
+                      "color": "green"
+                    }
+                  ]
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "mesh-metric-0"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "percent"
+              },
+              {
+                "id": "decimals",
+                "value": 1
+              },
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "text"
+                }
+              },
+              {
+                "id": "mappings",
+                "value": [
+                  {
+                    "type": "value",
+                    "options": {
+                      "-1": {
+                        "text": "—",
+                        "color": "gray"
+                      }
+                    }
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "mesh-metric-1"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "ms"
+              },
+              {
+                "id": "decimals",
+                "value": 0
+              },
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "text"
+                }
+              },
+              {
+                "id": "mappings",
+                "value": [
+                  {
+                    "type": "value",
+                    "options": {
+                      "-1": {
+                        "text": "—",
+                        "color": "gray"
+                      }
+                    }
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "inlineEditing": false,
+        "panZoom": true,
+        "zoomToContent": true,
+        "showAdvancedTypes": false,
+        "root": {
+          "name": "System fabric",
+          "type": "frame",
+          "elements": [
+            {
+              "name": "control box",
+              "type": "rectangle",
+              "placement": {
+                "left": 18,
+                "top": 12,
+                "width": 262,
+                "height": 110
+              },
+              "constraint": {
+                "horizontal": "left",
+                "vertical": "top"
+              },
+              "background": {
+                "color": {
+                  "fixed": "transparent"
+                }
+              },
+              "config": {
+                "align": "left",
+                "valign": "middle",
+                "size": 12,
+                "color": {
+                  "fixed": "text"
+                },
+                "text": {
+                  "mode": "fixed",
+                  "fixed": " "
+                }
+              },
+              "border": {
+                "color": {
+                  "field": "state-control",
+                  "fixed": "gray"
+                },
+                "width": 2,
+                "radius": 8
+              },
+              "links": [
+                {
+                  "title": "根拠・詳細へ",
+                  "url": "/d/cw-evidence-control/details?var-datasource=prometheus&var-cluster=&from=${__from}&to=${__to}",
+                  "targetBlank": false,
+                  "oneClick": true
+                }
+              ]
+            },
+            {
+              "name": "control title",
+              "type": "text",
+              "placement": {
+                "left": 32,
+                "top": 20,
+                "width": 215,
+                "height": 26
+              },
+              "constraint": {
+                "horizontal": "left",
+                "vertical": "top"
+              },
+              "background": {
+                "color": {
+                  "fixed": "transparent"
+                }
+              },
+              "config": {
+                "align": "left",
+                "valign": "middle",
+                "size": 19,
+                "color": {
+                  "fixed": "text"
+                },
+                "text": {
+                  "mode": "fixed",
+                  "fixed": "API server"
+                }
+              },
+              "links": [
+                {
+                  "title": "根拠・詳細へ",
+                  "url": "/d/cw-evidence-control/details?var-datasource=prometheus&var-cluster=&from=${__from}&to=${__to}",
+                  "targetBlank": false,
+                  "oneClick": true
+                }
+              ]
+            },
+            {
+              "name": "control state",
+              "type": "metric-value",
+              "placement": {
+                "left": 32,
+                "top": 98,
+                "width": 230,
+                "height": 20
+              },
+              "constraint": {
+                "horizontal": "left",
+                "vertical": "top"
+              },
+              "background": {
+                "color": {
+                  "fixed": "transparent"
+                }
+              },
+              "config": {
+                "align": "left",
+                "valign": "middle",
+                "size": 16,
+                "color": {
+                  "field": "state-control",
+                  "fixed": "text"
+                },
+                "text": {
+                  "mode": "field",
+                  "field": "state-control"
+                }
+              },
+              "links": [
+                {
+                  "title": "根拠・詳細へ",
+                  "url": "/d/cw-evidence-control/details?var-datasource=prometheus&var-cluster=&from=${__from}&to=${__to}",
+                  "targetBlank": false,
+                  "oneClick": true
+                }
+              ]
+            },
+            {
+              "name": "control-metric-0 label",
+              "type": "text",
+              "placement": {
+                "left": 32,
+                "top": 50,
+                "width": 150,
+                "height": 20
+              },
+              "constraint": {
+                "horizontal": "left",
+                "vertical": "top"
+              },
+              "background": {
+                "color": {
+                  "fixed": "transparent"
+                }
+              },
+              "config": {
+                "align": "left",
+                "valign": "middle",
+                "size": 16,
+                "color": {
+                  "fixed": "text"
+                },
+                "text": {
+                  "mode": "fixed",
+                  "fixed": "5xx率"
+                }
+              }
+            },
+            {
+              "name": "control-metric-0",
+              "type": "metric-value",
+              "placement": {
+                "left": 189,
+                "top": 50,
+                "width": 82,
+                "height": 20
+              },
+              "constraint": {
+                "horizontal": "left",
+                "vertical": "top"
+              },
+              "background": {
+                "color": {
+                  "fixed": "transparent"
+                }
+              },
+              "config": {
+                "align": "left",
+                "valign": "middle",
+                "size": 15,
+                "color": {
+                  "field": "control-metric-0",
+                  "fixed": "text"
+                },
+                "text": {
+                  "mode": "field",
+                  "field": "control-metric-0"
+                }
+              },
+              "links": [
+                {
+                  "title": "メトリクスの根拠へ",
+                  "url": "/d/cw-evidence-control/details?var-datasource=prometheus&var-cluster=&from=${__from}&to=${__to}",
+                  "targetBlank": false,
+                  "oneClick": true
+                }
+              ]
+            },
+            {
+              "name": "control-metric-1 label",
+              "type": "text",
+              "placement": {
+                "left": 32,
+                "top": 71,
+                "width": 150,
+                "height": 20
+              },
+              "constraint": {
+                "horizontal": "left",
+                "vertical": "top"
+              },
+              "background": {
+                "color": {
+                  "fixed": "transparent"
+                }
+              },
+              "config": {
+                "align": "left",
+                "valign": "middle",
+                "size": 16,
+                "color": {
+                  "fixed": "text"
+                },
+                "text": {
+                  "mode": "fixed",
+                  "fixed": "応答p99"
+                }
+              }
+            },
+            {
+              "name": "control-metric-1",
+              "type": "metric-value",
+              "placement": {
+                "left": 189,
+                "top": 71,
+                "width": 82,
+                "height": 20
+              },
+              "constraint": {
+                "horizontal": "left",
+                "vertical": "top"
+              },
+              "background": {
+                "color": {
+                  "fixed": "transparent"
+                }
+              },
+              "config": {
+                "align": "left",
+                "valign": "middle",
+                "size": 15,
+                "color": {
+                  "field": "control-metric-1",
+                  "fixed": "text"
+                },
+                "text": {
+                  "mode": "field",
+                  "field": "control-metric-1"
+                }
+              },
+              "links": [
+                {
+                  "title": "メトリクスの根拠へ",
+                  "url": "/d/cw-evidence-control/details?var-datasource=prometheus&var-cluster=&from=${__from}&to=${__to}",
+                  "targetBlank": false,
+                  "oneClick": true
+                }
+              ]
+            },
+            {
+              "name": "etcd box",
+              "type": "rectangle",
+              "placement": {
+                "left": 296,
+                "top": 12,
+                "width": 262,
+                "height": 110
+              },
+              "constraint": {
+                "horizontal": "left",
+                "vertical": "top"
+              },
+              "background": {
+                "color": {
+                  "fixed": "transparent"
+                }
+              },
+              "config": {
+                "align": "left",
+                "valign": "middle",
+                "size": 12,
+                "color": {
+                  "fixed": "text"
+                },
+                "text": {
+                  "mode": "fixed",
+                  "fixed": " "
+                }
+              },
+              "border": {
+                "color": {
+                  "field": "state-etcd",
+                  "fixed": "gray"
+                },
+                "width": 2,
+                "radius": 8
+              },
+              "links": [
+                {
+                  "title": "根拠・詳細へ",
+                  "url": "/d/cw-evidence-etcd/details?var-datasource=prometheus&var-cluster=&from=${__from}&to=${__to}",
+                  "targetBlank": false,
+                  "oneClick": true
+                }
+              ]
+            },
+            {
+              "name": "etcd title",
+              "type": "text",
+              "placement": {
+                "left": 310,
+                "top": 20,
+                "width": 215,
+                "height": 26
+              },
+              "constraint": {
+                "horizontal": "left",
+                "vertical": "top"
+              },
+              "background": {
+                "color": {
+                  "fixed": "transparent"
+                }
+              },
+              "config": {
+                "align": "left",
+                "valign": "middle",
+                "size": 19,
+                "color": {
+                  "fixed": "text"
+                },
+                "text": {
+                  "mode": "fixed",
+                  "fixed": "etcd"
+                }
+              },
+              "links": [
+                {
+                  "title": "根拠・詳細へ",
+                  "url": "/d/cw-evidence-etcd/details?var-datasource=prometheus&var-cluster=&from=${__from}&to=${__to}",
+                  "targetBlank": false,
+                  "oneClick": true
+                }
+              ]
+            },
+            {
+              "name": "etcd state",
+              "type": "metric-value",
+              "placement": {
+                "left": 310,
+                "top": 98,
+                "width": 230,
+                "height": 20
+              },
+              "constraint": {
+                "horizontal": "left",
+                "vertical": "top"
+              },
+              "background": {
+                "color": {
+                  "fixed": "transparent"
+                }
+              },
+              "config": {
+                "align": "left",
+                "valign": "middle",
+                "size": 16,
+                "color": {
+                  "field": "state-etcd",
+                  "fixed": "text"
+                },
+                "text": {
+                  "mode": "field",
+                  "field": "state-etcd"
+                }
+              },
+              "links": [
+                {
+                  "title": "根拠・詳細へ",
+                  "url": "/d/cw-evidence-etcd/details?var-datasource=prometheus&var-cluster=&from=${__from}&to=${__to}",
+                  "targetBlank": false,
+                  "oneClick": true
+                }
+              ]
+            },
+            {
+              "name": "etcd-metric-0 label",
+              "type": "text",
+              "placement": {
+                "left": 310,
+                "top": 50,
+                "width": 150,
+                "height": 20
+              },
+              "constraint": {
+                "horizontal": "left",
+                "vertical": "top"
+              },
+              "background": {
+                "color": {
+                  "fixed": "transparent"
+                }
+              },
+              "config": {
+                "align": "left",
+                "valign": "middle",
+                "size": 16,
+                "color": {
+                  "fixed": "text"
+                },
+                "text": {
+                  "mode": "fixed",
+                  "fixed": "API→etcd操作"
+                }
+              }
+            },
+            {
+              "name": "etcd-metric-0",
+              "type": "metric-value",
+              "placement": {
+                "left": 467,
+                "top": 50,
+                "width": 82,
+                "height": 20
+              },
+              "constraint": {
+                "horizontal": "left",
+                "vertical": "top"
+              },
+              "background": {
+                "color": {
+                  "fixed": "transparent"
+                }
+              },
+              "config": {
+                "align": "left",
+                "valign": "middle",
+                "size": 15,
+                "color": {
+                  "field": "etcd-metric-0",
+                  "fixed": "text"
+                },
+                "text": {
+                  "mode": "field",
+                  "field": "etcd-metric-0"
+                }
+              },
+              "links": [
+                {
+                  "title": "メトリクスの根拠へ",
+                  "url": "/d/cw-evidence-etcd/details?var-datasource=prometheus&var-cluster=&from=${__from}&to=${__to}",
+                  "targetBlank": false,
+                  "oneClick": true
+                }
+              ]
+            },
+            {
+              "name": "etcd-metric-1 label",
+              "type": "text",
+              "placement": {
+                "left": 310,
+                "top": 71,
+                "width": 150,
+                "height": 20
+              },
+              "constraint": {
+                "horizontal": "left",
+                "vertical": "top"
+              },
+              "background": {
+                "color": {
+                  "fixed": "transparent"
+                }
+              },
+              "config": {
+                "align": "left",
+                "valign": "middle",
+                "size": 16,
+                "color": {
+                  "fixed": "text"
+                },
+                "text": {
+                  "mode": "fixed",
+                  "fixed": "操作p99"
+                }
+              }
+            },
+            {
+              "name": "etcd-metric-1",
+              "type": "metric-value",
+              "placement": {
+                "left": 467,
+                "top": 71,
+                "width": 82,
+                "height": 20
+              },
+              "constraint": {
+                "horizontal": "left",
+                "vertical": "top"
+              },
+              "background": {
+                "color": {
+                  "fixed": "transparent"
+                }
+              },
+              "config": {
+                "align": "left",
+                "valign": "middle",
+                "size": 15,
+                "color": {
+                  "field": "etcd-metric-1",
+                  "fixed": "text"
+                },
+                "text": {
+                  "mode": "field",
+                  "field": "etcd-metric-1"
+                }
+              },
+              "links": [
+                {
+                  "title": "メトリクスの根拠へ",
+                  "url": "/d/cw-evidence-etcd/details?var-datasource=prometheus&var-cluster=&from=${__from}&to=${__to}",
+                  "targetBlank": false,
+                  "oneClick": true
+                }
+              ]
+            },
+            {
+              "name": "scheduler box",
+              "type": "rectangle",
+              "placement": {
+                "left": 574,
+                "top": 12,
+                "width": 262,
+                "height": 110
+              },
+              "constraint": {
+                "horizontal": "left",
+                "vertical": "top"
+              },
+              "background": {
+                "color": {
+                  "fixed": "transparent"
+                }
+              },
+              "config": {
+                "align": "left",
+                "valign": "middle",
+                "size": 12,
+                "color": {
+                  "fixed": "text"
+                },
+                "text": {
+                  "mode": "fixed",
+                  "fixed": " "
+                }
+              },
+              "border": {
+                "color": {
+                  "field": "state-scheduler",
+                  "fixed": "gray"
+                },
+                "width": 2,
+                "radius": 8
+              },
+              "links": [
+                {
+                  "title": "根拠・詳細へ",
+                  "url": "/d/cw-evidence-scheduler/details?var-datasource=prometheus&var-cluster=&from=${__from}&to=${__to}",
+                  "targetBlank": false,
+                  "oneClick": true
+                }
+              ]
+            },
+            {
+              "name": "scheduler title",
+              "type": "text",
+              "placement": {
+                "left": 588,
+                "top": 20,
+                "width": 215,
+                "height": 26
+              },
+              "constraint": {
+                "horizontal": "left",
+                "vertical": "top"
+              },
+              "background": {
+                "color": {
+                  "fixed": "transparent"
+                }
+              },
+              "config": {
+                "align": "left",
+                "valign": "middle",
+                "size": 19,
+                "color": {
+                  "fixed": "text"
+                },
+                "text": {
+                  "mode": "fixed",
+                  "fixed": "kube-system / Pod"
+                }
+              },
+              "links": [
+                {
+                  "title": "根拠・詳細へ",
+                  "url": "/d/cw-evidence-scheduler/details?var-datasource=prometheus&var-cluster=&from=${__from}&to=${__to}",
+                  "targetBlank": false,
+                  "oneClick": true
+                }
+              ]
+            },
+            {
+              "name": "scheduler state",
+              "type": "metric-value",
+              "placement": {
+                "left": 588,
+                "top": 98,
+                "width": 230,
+                "height": 20
+              },
+              "constraint": {
+                "horizontal": "left",
+                "vertical": "top"
+              },
+              "background": {
+                "color": {
+                  "fixed": "transparent"
+                }
+              },
+              "config": {
+                "align": "left",
+                "valign": "middle",
+                "size": 16,
+                "color": {
+                  "field": "state-scheduler",
+                  "fixed": "text"
+                },
+                "text": {
+                  "mode": "field",
+                  "field": "state-scheduler"
+                }
+              },
+              "links": [
+                {
+                  "title": "根拠・詳細へ",
+                  "url": "/d/cw-evidence-scheduler/details?var-datasource=prometheus&var-cluster=&from=${__from}&to=${__to}",
+                  "targetBlank": false,
+                  "oneClick": true
+                }
+              ]
+            },
+            {
+              "name": "scheduler-metric-0 label",
+              "type": "text",
+              "placement": {
+                "left": 588,
+                "top": 50,
+                "width": 150,
+                "height": 20
+              },
+              "constraint": {
+                "horizontal": "left",
+                "vertical": "top"
+              },
+              "background": {
+                "color": {
+                  "fixed": "transparent"
+                }
+              },
+              "config": {
+                "align": "left",
+                "valign": "middle",
+                "size": 16,
+                "color": {
+                  "fixed": "text"
+                },
+                "text": {
+                  "mode": "fixed",
+                  "fixed": "Ready Pod"
+                }
+              }
+            },
+            {
+              "name": "scheduler-metric-0",
+              "type": "metric-value",
+              "placement": {
+                "left": 745,
+                "top": 50,
+                "width": 82,
+                "height": 20
+              },
+              "constraint": {
+                "horizontal": "left",
+                "vertical": "top"
+              },
+              "background": {
+                "color": {
+                  "fixed": "transparent"
+                }
+              },
+              "config": {
+                "align": "left",
+                "valign": "middle",
+                "size": 15,
+                "color": {
+                  "field": "scheduler-metric-0",
+                  "fixed": "text"
+                },
+                "text": {
+                  "mode": "field",
+                  "field": "scheduler-metric-0"
+                }
+              },
+              "links": [
+                {
+                  "title": "メトリクスの根拠へ",
+                  "url": "/d/cw-evidence-scheduler/details?var-datasource=prometheus&var-cluster=&from=${__from}&to=${__to}",
+                  "targetBlank": false,
+                  "oneClick": true
+                }
+              ]
+            },
+            {
+              "name": "scheduler-metric-1 label",
+              "type": "text",
+              "placement": {
+                "left": 588,
+                "top": 71,
+                "width": 150,
+                "height": 20
+              },
+              "constraint": {
+                "horizontal": "left",
+                "vertical": "top"
+              },
+              "background": {
+                "color": {
+                  "fixed": "transparent"
+                }
+              },
+              "config": {
+                "align": "left",
+                "valign": "middle",
+                "size": 16,
+                "color": {
+                  "fixed": "text"
+                },
+                "text": {
+                  "mode": "fixed",
+                  "fixed": "対象Pod"
+                }
+              }
+            },
+            {
+              "name": "scheduler-metric-1",
+              "type": "metric-value",
+              "placement": {
+                "left": 745,
+                "top": 71,
+                "width": 82,
+                "height": 20
+              },
+              "constraint": {
+                "horizontal": "left",
+                "vertical": "top"
+              },
+              "background": {
+                "color": {
+                  "fixed": "transparent"
+                }
+              },
+              "config": {
+                "align": "left",
+                "valign": "middle",
+                "size": 15,
+                "color": {
+                  "field": "scheduler-metric-1",
+                  "fixed": "text"
+                },
+                "text": {
+                  "mode": "field",
+                  "field": "scheduler-metric-1"
+                }
+              },
+              "links": [
+                {
+                  "title": "メトリクスの根拠へ",
+                  "url": "/d/cw-evidence-scheduler/details?var-datasource=prometheus&var-cluster=&from=${__from}&to=${__to}",
+                  "targetBlank": false,
+                  "oneClick": true
+                }
+              ]
+            },
+            {
+              "name": "dns box",
+              "type": "rectangle",
+              "placement": {
+                "left": 852,
+                "top": 12,
+                "width": 262,
+                "height": 110
+              },
+              "constraint": {
+                "horizontal": "left",
+                "vertical": "top"
+              },
+              "background": {
+                "color": {
+                  "fixed": "transparent"
+                }
+              },
+              "config": {
+                "align": "left",
+                "valign": "middle",
+                "size": 12,
+                "color": {
+                  "fixed": "text"
+                },
+                "text": {
+                  "mode": "fixed",
+                  "fixed": " "
+                }
+              },
+              "border": {
+                "color": {
+                  "field": "state-dns",
+                  "fixed": "gray"
+                },
+                "width": 2,
+                "radius": 8
+              },
+              "links": [
+                {
+                  "title": "根拠・詳細へ",
+                  "url": "/d/cw-evidence-dns/details?var-datasource=prometheus&var-cluster=&from=${__from}&to=${__to}",
+                  "targetBlank": false,
+                  "oneClick": true
+                }
+              ]
+            },
+            {
+              "name": "dns title",
+              "type": "text",
+              "placement": {
+                "left": 866,
+                "top": 20,
+                "width": 215,
+                "height": 26
+              },
+              "constraint": {
+                "horizontal": "left",
+                "vertical": "top"
+              },
+              "background": {
+                "color": {
+                  "fixed": "transparent"
+                }
+              },
+              "config": {
+                "align": "left",
+                "valign": "middle",
+                "size": 19,
+                "color": {
+                  "fixed": "text"
+                },
+                "text": {
+                  "mode": "fixed",
+                  "fixed": "CoreDNS"
+                }
+              },
+              "links": [
+                {
+                  "title": "根拠・詳細へ",
+                  "url": "/d/cw-evidence-dns/details?var-datasource=prometheus&var-cluster=&from=${__from}&to=${__to}",
+                  "targetBlank": false,
+                  "oneClick": true
+                }
+              ]
+            },
+            {
+              "name": "dns state",
+              "type": "metric-value",
+              "placement": {
+                "left": 866,
+                "top": 98,
+                "width": 230,
+                "height": 20
+              },
+              "constraint": {
+                "horizontal": "left",
+                "vertical": "top"
+              },
+              "background": {
+                "color": {
+                  "fixed": "transparent"
+                }
+              },
+              "config": {
+                "align": "left",
+                "valign": "middle",
+                "size": 16,
+                "color": {
+                  "field": "state-dns",
+                  "fixed": "text"
+                },
+                "text": {
+                  "mode": "field",
+                  "field": "state-dns"
+                }
+              },
+              "links": [
+                {
+                  "title": "根拠・詳細へ",
+                  "url": "/d/cw-evidence-dns/details?var-datasource=prometheus&var-cluster=&from=${__from}&to=${__to}",
+                  "targetBlank": false,
+                  "oneClick": true
+                }
+              ]
+            },
+            {
+              "name": "dns-metric-0 label",
+              "type": "text",
+              "placement": {
+                "left": 866,
+                "top": 50,
+                "width": 150,
+                "height": 20
+              },
+              "constraint": {
+                "horizontal": "left",
+                "vertical": "top"
+              },
+              "background": {
+                "color": {
+                  "fixed": "transparent"
+                }
+              },
+              "config": {
+                "align": "left",
+                "valign": "middle",
+                "size": 16,
+                "color": {
+                  "fixed": "text"
+                },
+                "text": {
+                  "mode": "fixed",
+                  "fixed": "DNS失敗率"
+                }
+              }
+            },
+            {
+              "name": "dns-metric-0",
+              "type": "metric-value",
+              "placement": {
+                "left": 1023,
+                "top": 50,
+                "width": 82,
+                "height": 20
+              },
+              "constraint": {
+                "horizontal": "left",
+                "vertical": "top"
+              },
+              "background": {
+                "color": {
+                  "fixed": "transparent"
+                }
+              },
+              "config": {
+                "align": "left",
+                "valign": "middle",
+                "size": 15,
+                "color": {
+                  "field": "dns-metric-0",
+                  "fixed": "text"
+                },
+                "text": {
+                  "mode": "field",
+                  "field": "dns-metric-0"
+                }
+              },
+              "links": [
+                {
+                  "title": "メトリクスの根拠へ",
+                  "url": "/d/cw-evidence-dns/details?var-datasource=prometheus&var-cluster=&from=${__from}&to=${__to}",
+                  "targetBlank": false,
+                  "oneClick": true
+                }
+              ]
+            },
+            {
+              "name": "dns-metric-1 label",
+              "type": "text",
+              "placement": {
+                "left": 866,
+                "top": 71,
+                "width": 150,
+                "height": 20
+              },
+              "constraint": {
+                "horizontal": "left",
+                "vertical": "top"
+              },
+              "background": {
+                "color": {
+                  "fixed": "transparent"
+                }
+              },
+              "config": {
+                "align": "left",
+                "valign": "middle",
+                "size": 16,
+                "color": {
+                  "fixed": "text"
+                },
+                "text": {
+                  "mode": "fixed",
+                  "fixed": "応答p99"
+                }
+              }
+            },
+            {
+              "name": "dns-metric-1",
+              "type": "metric-value",
+              "placement": {
+                "left": 1023,
+                "top": 71,
+                "width": 82,
+                "height": 20
+              },
+              "constraint": {
+                "horizontal": "left",
+                "vertical": "top"
+              },
+              "background": {
+                "color": {
+                  "fixed": "transparent"
+                }
+              },
+              "config": {
+                "align": "left",
+                "valign": "middle",
+                "size": 15,
+                "color": {
+                  "field": "dns-metric-1",
+                  "fixed": "text"
+                },
+                "text": {
+                  "mode": "field",
+                  "field": "dns-metric-1"
+                }
+              },
+              "links": [
+                {
+                  "title": "メトリクスの根拠へ",
+                  "url": "/d/cw-evidence-dns/details?var-datasource=prometheus&var-cluster=&from=${__from}&to=${__to}",
+                  "targetBlank": false,
+                  "oneClick": true
+                }
+              ]
+            },
+            {
+              "name": "network box",
+              "type": "rectangle",
+              "placement": {
+                "left": 18,
+                "top": 138,
+                "width": 262,
+                "height": 110
+              },
+              "constraint": {
+                "horizontal": "left",
+                "vertical": "top"
+              },
+              "background": {
+                "color": {
+                  "fixed": "transparent"
+                }
+              },
+              "config": {
+                "align": "left",
+                "valign": "middle",
+                "size": 12,
+                "color": {
+                  "fixed": "text"
+                },
+                "text": {
+                  "mode": "fixed",
+                  "fixed": " "
+                }
+              },
+              "border": {
+                "color": {
+                  "field": "state-network",
+                  "fixed": "gray"
+                },
+                "width": 2,
+                "radius": 8
+              },
+              "links": [
+                {
+                  "title": "観測対象と判定根拠（サンプル）",
+                  "url": "/d/cw-function-incident-network/details?var-datasource=prometheus&var-cluster=&from=${__from}&to=${__to}",
+                  "targetBlank": false,
+                  "oneClick": true
+                }
+              ]
+            },
+            {
+              "name": "network title",
+              "type": "text",
+              "placement": {
+                "left": 32,
+                "top": 146,
+                "width": 215,
+                "height": 26
+              },
+              "constraint": {
+                "horizontal": "left",
+                "vertical": "top"
+              },
+              "background": {
+                "color": {
+                  "fixed": "transparent"
+                }
+              },
+              "config": {
+                "align": "left",
+                "valign": "middle",
+                "size": 19,
+                "color": {
+                  "fixed": "text"
+                },
+                "text": {
+                  "mode": "fixed",
+                  "fixed": "Pod通信 · Cilium"
+                }
+              },
+              "links": [
+                {
+                  "title": "観測対象と判定根拠（サンプル）",
+                  "url": "/d/cw-function-incident-network/details?var-datasource=prometheus&var-cluster=&from=${__from}&to=${__to}",
+                  "targetBlank": false,
+                  "oneClick": true
+                }
+              ]
+            },
+            {
+              "name": "network state",
+              "type": "metric-value",
+              "placement": {
+                "left": 32,
+                "top": 224,
+                "width": 230,
+                "height": 20
+              },
+              "constraint": {
+                "horizontal": "left",
+                "vertical": "top"
+              },
+              "background": {
+                "color": {
+                  "fixed": "transparent"
+                }
+              },
+              "config": {
+                "align": "left",
+                "valign": "middle",
+                "size": 16,
+                "color": {
+                  "field": "state-network",
+                  "fixed": "text"
+                },
+                "text": {
+                  "mode": "field",
+                  "field": "state-network"
+                }
+              },
+              "links": [
+                {
+                  "title": "観測対象と判定根拠（サンプル）",
+                  "url": "/d/cw-function-incident-network/details?var-datasource=prometheus&var-cluster=&from=${__from}&to=${__to}",
+                  "targetBlank": false,
+                  "oneClick": true
+                }
+              ]
+            },
+            {
+              "name": "network-metric-0 label",
+              "type": "text",
+              "placement": {
+                "left": 32,
+                "top": 176,
+                "width": 150,
+                "height": 20
+              },
+              "constraint": {
+                "horizontal": "left",
+                "vertical": "top"
+              },
+              "background": {
+                "color": {
+                  "fixed": "transparent"
+                }
+              },
+              "config": {
+                "align": "left",
+                "valign": "middle",
+                "size": 16,
+                "color": {
+                  "fixed": "text"
+                },
+                "text": {
+                  "mode": "fixed",
+                  "fixed": "代表経路 成功率"
+                }
+              },
+              "links": [
+                {
+                  "title": "観測対象と判定根拠（サンプル）",
+                  "url": "/d/cw-function-incident-network/details?var-datasource=prometheus&var-cluster=&from=${__from}&to=${__to}",
+                  "targetBlank": false,
+                  "oneClick": true
+                }
+              ]
+            },
+            {
+              "name": "network-metric-0",
+              "type": "metric-value",
+              "placement": {
+                "left": 189,
+                "top": 176,
+                "width": 82,
+                "height": 20
+              },
+              "constraint": {
+                "horizontal": "left",
+                "vertical": "top"
+              },
+              "background": {
+                "color": {
+                  "fixed": "transparent"
+                }
+              },
+              "config": {
+                "align": "left",
+                "valign": "middle",
+                "size": 15,
+                "color": {
+                  "field": "network-metric-0",
+                  "fixed": "text"
+                },
+                "text": {
+                  "mode": "field",
+                  "field": "network-metric-0"
+                }
+              },
+              "links": [
+                {
+                  "title": "観測対象と判定根拠（サンプル）",
+                  "url": "/d/cw-function-incident-network/details?var-datasource=prometheus&var-cluster=&from=${__from}&to=${__to}",
+                  "targetBlank": false,
+                  "oneClick": true
+                }
+              ]
+            },
+            {
+              "name": "network-metric-1 label",
+              "type": "text",
+              "placement": {
+                "left": 32,
+                "top": 197,
+                "width": 150,
+                "height": 20
+              },
+              "constraint": {
+                "horizontal": "left",
+                "vertical": "top"
+              },
+              "background": {
+                "color": {
+                  "fixed": "transparent"
+                }
+              },
+              "config": {
+                "align": "left",
+                "valign": "middle",
+                "size": 16,
+                "color": {
+                  "fixed": "text"
+                },
+                "text": {
+                  "mode": "fixed",
+                  "fixed": "想定外drop / 5m"
+                }
+              },
+              "links": [
+                {
+                  "title": "観測対象と判定根拠（サンプル）",
+                  "url": "/d/cw-function-incident-network/details?var-datasource=prometheus&var-cluster=&from=${__from}&to=${__to}",
+                  "targetBlank": false,
+                  "oneClick": true
+                }
+              ]
+            },
+            {
+              "name": "network-metric-1",
+              "type": "metric-value",
+              "placement": {
+                "left": 189,
+                "top": 197,
+                "width": 82,
+                "height": 20
+              },
+              "constraint": {
+                "horizontal": "left",
+                "vertical": "top"
+              },
+              "background": {
+                "color": {
+                  "fixed": "transparent"
+                }
+              },
+              "config": {
+                "align": "left",
+                "valign": "middle",
+                "size": 15,
+                "color": {
+                  "field": "network-metric-1",
+                  "fixed": "text"
+                },
+                "text": {
+                  "mode": "field",
+                  "field": "network-metric-1"
+                }
+              },
+              "links": [
+                {
+                  "title": "観測対象と判定根拠（サンプル）",
+                  "url": "/d/cw-function-incident-network/details?var-datasource=prometheus&var-cluster=&from=${__from}&to=${__to}",
+                  "targetBlank": false,
+                  "oneClick": true
+                }
+              ]
+            },
+            {
+              "name": "mesh box",
+              "type": "rectangle",
+              "placement": {
+                "left": 296,
+                "top": 138,
+                "width": 262,
+                "height": 110
+              },
+              "constraint": {
+                "horizontal": "left",
+                "vertical": "top"
+              },
+              "background": {
+                "color": {
+                  "fixed": "transparent"
+                }
+              },
+              "config": {
+                "align": "left",
+                "valign": "middle",
+                "size": 12,
+                "color": {
+                  "fixed": "text"
+                },
+                "text": {
+                  "mode": "fixed",
+                  "fixed": " "
+                }
+              },
+              "border": {
+                "color": {
+                  "field": "state-mesh",
+                  "fixed": "gray"
+                },
+                "width": 2,
+                "radius": 8
+              },
+              "links": [
+                {
+                  "title": "観測対象と判定根拠（サンプル）",
+                  "url": "/d/cw-function-incident-mesh/details?var-datasource=prometheus&var-cluster=&from=${__from}&to=${__to}",
+                  "targetBlank": false,
+                  "oneClick": true
+                }
+              ]
+            },
+            {
+              "name": "mesh title",
+              "type": "text",
+              "placement": {
+                "left": 310,
+                "top": 146,
+                "width": 215,
+                "height": 26
+              },
+              "constraint": {
+                "horizontal": "left",
+                "vertical": "top"
+              },
+              "background": {
+                "color": {
+                  "fixed": "transparent"
+                }
+              },
+              "config": {
+                "align": "left",
+                "valign": "middle",
+                "size": 19,
+                "color": {
+                  "fixed": "text"
+                },
+                "text": {
+                  "mode": "fixed",
+                  "fixed": "アプリ間通信 · Istio"
+                }
+              },
+              "links": [
+                {
+                  "title": "観測対象と判定根拠（サンプル）",
+                  "url": "/d/cw-function-incident-mesh/details?var-datasource=prometheus&var-cluster=&from=${__from}&to=${__to}",
+                  "targetBlank": false,
+                  "oneClick": true
+                }
+              ]
+            },
+            {
+              "name": "mesh state",
+              "type": "metric-value",
+              "placement": {
+                "left": 310,
+                "top": 224,
+                "width": 230,
+                "height": 20
+              },
+              "constraint": {
+                "horizontal": "left",
+                "vertical": "top"
+              },
+              "background": {
+                "color": {
+                  "fixed": "transparent"
+                }
+              },
+              "config": {
+                "align": "left",
+                "valign": "middle",
+                "size": 16,
+                "color": {
+                  "field": "state-mesh",
+                  "fixed": "text"
+                },
+                "text": {
+                  "mode": "field",
+                  "field": "state-mesh"
+                }
+              },
+              "links": [
+                {
+                  "title": "観測対象と判定根拠（サンプル）",
+                  "url": "/d/cw-function-incident-mesh/details?var-datasource=prometheus&var-cluster=&from=${__from}&to=${__to}",
+                  "targetBlank": false,
+                  "oneClick": true
+                }
+              ]
+            },
+            {
+              "name": "mesh-metric-0 label",
+              "type": "text",
+              "placement": {
+                "left": 310,
+                "top": 176,
+                "width": 150,
+                "height": 20
+              },
+              "constraint": {
+                "horizontal": "left",
+                "vertical": "top"
+              },
+              "background": {
+                "color": {
+                  "fixed": "transparent"
+                }
+              },
+              "config": {
+                "align": "left",
+                "valign": "middle",
+                "size": 16,
+                "color": {
+                  "fixed": "text"
+                },
+                "text": {
+                  "mode": "fixed",
+                  "fixed": "通信成功率"
+                }
+              },
+              "links": [
+                {
+                  "title": "観測対象と判定根拠（サンプル）",
+                  "url": "/d/cw-function-incident-mesh/details?var-datasource=prometheus&var-cluster=&from=${__from}&to=${__to}",
+                  "targetBlank": false,
+                  "oneClick": true
+                }
+              ]
+            },
+            {
+              "name": "mesh-metric-0",
+              "type": "metric-value",
+              "placement": {
+                "left": 467,
+                "top": 176,
+                "width": 82,
+                "height": 20
+              },
+              "constraint": {
+                "horizontal": "left",
+                "vertical": "top"
+              },
+              "background": {
+                "color": {
+                  "fixed": "transparent"
+                }
+              },
+              "config": {
+                "align": "left",
+                "valign": "middle",
+                "size": 15,
+                "color": {
+                  "field": "mesh-metric-0",
+                  "fixed": "text"
+                },
+                "text": {
+                  "mode": "field",
+                  "field": "mesh-metric-0"
+                }
+              },
+              "links": [
+                {
+                  "title": "観測対象と判定根拠（サンプル）",
+                  "url": "/d/cw-function-incident-mesh/details?var-datasource=prometheus&var-cluster=&from=${__from}&to=${__to}",
+                  "targetBlank": false,
+                  "oneClick": true
+                }
+              ]
+            },
+            {
+              "name": "mesh-metric-1 label",
+              "type": "text",
+              "placement": {
+                "left": 310,
+                "top": 197,
+                "width": 150,
+                "height": 20
+              },
+              "constraint": {
+                "horizontal": "left",
+                "vertical": "top"
+              },
+              "background": {
+                "color": {
+                  "fixed": "transparent"
+                }
+              },
+              "config": {
+                "align": "left",
+                "valign": "middle",
+                "size": 16,
+                "color": {
+                  "fixed": "text"
+                },
+                "text": {
+                  "mode": "fixed",
+                  "fixed": "応答p99"
+                }
+              },
+              "links": [
+                {
+                  "title": "観測対象と判定根拠（サンプル）",
+                  "url": "/d/cw-function-incident-mesh/details?var-datasource=prometheus&var-cluster=&from=${__from}&to=${__to}",
+                  "targetBlank": false,
+                  "oneClick": true
+                }
+              ]
+            },
+            {
+              "name": "mesh-metric-1",
+              "type": "metric-value",
+              "placement": {
+                "left": 467,
+                "top": 197,
+                "width": 82,
+                "height": 20
+              },
+              "constraint": {
+                "horizontal": "left",
+                "vertical": "top"
+              },
+              "background": {
+                "color": {
+                  "fixed": "transparent"
+                }
+              },
+              "config": {
+                "align": "left",
+                "valign": "middle",
+                "size": 15,
+                "color": {
+                  "field": "mesh-metric-1",
+                  "fixed": "text"
+                },
+                "text": {
+                  "mode": "field",
+                  "field": "mesh-metric-1"
+                }
+              },
+              "links": [
+                {
+                  "title": "観測対象と判定根拠（サンプル）",
+                  "url": "/d/cw-function-incident-mesh/details?var-datasource=prometheus&var-cluster=&from=${__from}&to=${__to}",
+                  "targetBlank": false,
+                  "oneClick": true
+                }
+              ]
+            },
+            {
+              "name": "storage box",
+              "type": "rectangle",
+              "placement": {
+                "left": 574,
+                "top": 138,
+                "width": 262,
+                "height": 110
+              },
+              "constraint": {
+                "horizontal": "left",
+                "vertical": "top"
+              },
+              "background": {
+                "color": {
+                  "fixed": "transparent"
+                }
+              },
+              "config": {
+                "align": "left",
+                "valign": "middle",
+                "size": 12,
+                "color": {
+                  "fixed": "text"
+                },
+                "text": {
+                  "mode": "fixed",
+                  "fixed": " "
+                }
+              },
+              "border": {
+                "color": {
+                  "field": "state-storage",
+                  "fixed": "gray"
+                },
+                "width": 2,
+                "radius": 8
+              },
+              "links": [
+                {
+                  "title": "根拠・詳細へ",
+                  "url": "/d/cw-evidence-storage/details?var-datasource=prometheus&var-cluster=&from=${__from}&to=${__to}",
+                  "targetBlank": false,
+                  "oneClick": true
+                }
+              ]
+            },
+            {
+              "name": "storage title",
+              "type": "text",
+              "placement": {
+                "left": 588,
+                "top": 146,
+                "width": 215,
+                "height": 26
+              },
+              "constraint": {
+                "horizontal": "left",
+                "vertical": "top"
+              },
+              "background": {
+                "color": {
+                  "fixed": "transparent"
+                }
+              },
+              "config": {
+                "align": "left",
+                "valign": "middle",
+                "size": 19,
+                "color": {
+                  "fixed": "text"
+                },
+                "text": {
+                  "mode": "fixed",
+                  "fixed": "Storage"
+                }
+              },
+              "links": [
+                {
+                  "title": "根拠・詳細へ",
+                  "url": "/d/cw-evidence-storage/details?var-datasource=prometheus&var-cluster=&from=${__from}&to=${__to}",
+                  "targetBlank": false,
+                  "oneClick": true
+                }
+              ]
+            },
+            {
+              "name": "storage state",
+              "type": "metric-value",
+              "placement": {
+                "left": 588,
+                "top": 224,
+                "width": 230,
+                "height": 20
+              },
+              "constraint": {
+                "horizontal": "left",
+                "vertical": "top"
+              },
+              "background": {
+                "color": {
+                  "fixed": "transparent"
+                }
+              },
+              "config": {
+                "align": "left",
+                "valign": "middle",
+                "size": 16,
+                "color": {
+                  "field": "state-storage",
+                  "fixed": "text"
+                },
+                "text": {
+                  "mode": "field",
+                  "field": "state-storage"
+                }
+              },
+              "links": [
+                {
+                  "title": "根拠・詳細へ",
+                  "url": "/d/cw-evidence-storage/details?var-datasource=prometheus&var-cluster=&from=${__from}&to=${__to}",
+                  "targetBlank": false,
+                  "oneClick": true
+                }
+              ]
+            },
+            {
+              "name": "storage-metric-0 label",
+              "type": "text",
+              "placement": {
+                "left": 588,
+                "top": 176,
+                "width": 150,
+                "height": 20
+              },
+              "constraint": {
+                "horizontal": "left",
+                "vertical": "top"
+              },
+              "background": {
+                "color": {
+                  "fixed": "transparent"
+                }
+              },
+              "config": {
+                "align": "left",
+                "valign": "middle",
+                "size": 16,
+                "color": {
+                  "fixed": "text"
+                },
+                "text": {
+                  "mode": "fixed",
+                  "fixed": "接続Volume"
+                }
+              }
+            },
+            {
+              "name": "storage-metric-0",
+              "type": "metric-value",
+              "placement": {
+                "left": 745,
+                "top": 176,
+                "width": 82,
+                "height": 20
+              },
+              "constraint": {
+                "horizontal": "left",
+                "vertical": "top"
+              },
+              "background": {
+                "color": {
+                  "fixed": "transparent"
+                }
+              },
+              "config": {
+                "align": "left",
+                "valign": "middle",
+                "size": 15,
+                "color": {
+                  "field": "storage-metric-0",
+                  "fixed": "text"
+                },
+                "text": {
+                  "mode": "field",
+                  "field": "storage-metric-0"
+                }
+              },
+              "links": [
+                {
+                  "title": "メトリクスの根拠へ",
+                  "url": "/d/cw-evidence-storage/details?var-datasource=prometheus&var-cluster=&from=${__from}&to=${__to}",
+                  "targetBlank": false,
+                  "oneClick": true
+                }
+              ]
+            },
+            {
+              "name": "storage-metric-1 label",
+              "type": "text",
+              "placement": {
+                "left": 588,
+                "top": 197,
+                "width": 150,
+                "height": 20
+              },
+              "constraint": {
+                "horizontal": "left",
+                "vertical": "top"
+              },
+              "background": {
+                "color": {
+                  "fixed": "transparent"
+                }
+              },
+              "config": {
+                "align": "left",
+                "valign": "middle",
+                "size": 16,
+                "color": {
+                  "fixed": "text"
+                },
+                "text": {
+                  "mode": "fixed",
+                  "fixed": "健全Volume"
+                }
+              }
+            },
+            {
+              "name": "storage-metric-1",
+              "type": "metric-value",
+              "placement": {
+                "left": 745,
+                "top": 197,
+                "width": 82,
+                "height": 20
+              },
+              "constraint": {
+                "horizontal": "left",
+                "vertical": "top"
+              },
+              "background": {
+                "color": {
+                  "fixed": "transparent"
+                }
+              },
+              "config": {
+                "align": "left",
+                "valign": "middle",
+                "size": 15,
+                "color": {
+                  "field": "storage-metric-1",
+                  "fixed": "text"
+                },
+                "text": {
+                  "mode": "field",
+                  "field": "storage-metric-1"
+                }
+              },
+              "links": [
+                {
+                  "title": "メトリクスの根拠へ",
+                  "url": "/d/cw-evidence-storage/details?var-datasource=prometheus&var-cluster=&from=${__from}&to=${__to}",
+                  "targetBlank": false,
+                  "oneClick": true
+                }
+              ]
+            },
+            {
+              "name": "control info",
+              "type": "text",
+              "placement": {
+                "left": 256,
+                "top": 20,
+                "width": 18,
+                "height": 24
+              },
+              "constraint": {
+                "horizontal": "left",
+                "vertical": "top"
+              },
+              "background": {
+                "color": {
+                  "fixed": "transparent"
+                }
+              },
+              "config": {
+                "align": "left",
+                "valign": "middle",
+                "size": 16,
+                "color": {
+                  "fixed": "gray"
+                },
+                "text": {
+                  "mode": "fixed",
+                  "fixed": "ⓘ"
+                }
+              },
+              "links": [
+                {
+                  "title": "観測範囲と判定基準",
+                  "url": "/d/cw-evidence-control/details?var-datasource=prometheus&var-cluster=&from=${__from}&to=${__to}",
+                  "targetBlank": false,
+                  "oneClick": true
+                }
+              ]
+            },
+            {
+              "name": "etcd info",
+              "type": "text",
+              "placement": {
+                "left": 534,
+                "top": 20,
+                "width": 18,
+                "height": 24
+              },
+              "constraint": {
+                "horizontal": "left",
+                "vertical": "top"
+              },
+              "background": {
+                "color": {
+                  "fixed": "transparent"
+                }
+              },
+              "config": {
+                "align": "left",
+                "valign": "middle",
+                "size": 16,
+                "color": {
+                  "fixed": "gray"
+                },
+                "text": {
+                  "mode": "fixed",
+                  "fixed": "ⓘ"
+                }
+              },
+              "links": [
+                {
+                  "title": "観測範囲と判定基準",
+                  "url": "/d/cw-evidence-etcd/details?var-datasource=prometheus&var-cluster=&from=${__from}&to=${__to}",
+                  "targetBlank": false,
+                  "oneClick": true
+                }
+              ]
+            },
+            {
+              "name": "scheduler info",
+              "type": "text",
+              "placement": {
+                "left": 812,
+                "top": 20,
+                "width": 18,
+                "height": 24
+              },
+              "constraint": {
+                "horizontal": "left",
+                "vertical": "top"
+              },
+              "background": {
+                "color": {
+                  "fixed": "transparent"
+                }
+              },
+              "config": {
+                "align": "left",
+                "valign": "middle",
+                "size": 16,
+                "color": {
+                  "fixed": "gray"
+                },
+                "text": {
+                  "mode": "fixed",
+                  "fixed": "ⓘ"
+                }
+              },
+              "links": [
+                {
+                  "title": "観測範囲と判定基準",
+                  "url": "/d/cw-evidence-scheduler/details?var-datasource=prometheus&var-cluster=&from=${__from}&to=${__to}",
+                  "targetBlank": false,
+                  "oneClick": true
+                }
+              ]
+            },
+            {
+              "name": "dns info",
+              "type": "text",
+              "placement": {
+                "left": 1090,
+                "top": 20,
+                "width": 18,
+                "height": 24
+              },
+              "constraint": {
+                "horizontal": "left",
+                "vertical": "top"
+              },
+              "background": {
+                "color": {
+                  "fixed": "transparent"
+                }
+              },
+              "config": {
+                "align": "left",
+                "valign": "middle",
+                "size": 16,
+                "color": {
+                  "fixed": "gray"
+                },
+                "text": {
+                  "mode": "fixed",
+                  "fixed": "ⓘ"
+                }
+              },
+              "links": [
+                {
+                  "title": "観測範囲と判定基準",
+                  "url": "/d/cw-evidence-dns/details?var-datasource=prometheus&var-cluster=&from=${__from}&to=${__to}",
+                  "targetBlank": false,
+                  "oneClick": true
+                }
+              ]
+            },
+            {
+              "name": "network info",
+              "type": "text",
+              "placement": {
+                "left": 256,
+                "top": 146,
+                "width": 18,
+                "height": 24
+              },
+              "constraint": {
+                "horizontal": "left",
+                "vertical": "top"
+              },
+              "background": {
+                "color": {
+                  "fixed": "transparent"
+                }
+              },
+              "config": {
+                "align": "left",
+                "valign": "middle",
+                "size": 16,
+                "color": {
+                  "fixed": "gray"
+                },
+                "text": {
+                  "mode": "fixed",
+                  "fixed": "ⓘ"
+                }
+              },
+              "links": [
+                {
+                  "title": "観測対象と判定根拠（サンプル）",
+                  "url": "/d/cw-function-incident-network/details?var-datasource=prometheus&var-cluster=&from=${__from}&to=${__to}",
+                  "targetBlank": false,
+                  "oneClick": true
+                }
+              ]
+            },
+            {
+              "name": "mesh info",
+              "type": "text",
+              "placement": {
+                "left": 534,
+                "top": 146,
+                "width": 18,
+                "height": 24
+              },
+              "constraint": {
+                "horizontal": "left",
+                "vertical": "top"
+              },
+              "background": {
+                "color": {
+                  "fixed": "transparent"
+                }
+              },
+              "config": {
+                "align": "left",
+                "valign": "middle",
+                "size": 16,
+                "color": {
+                  "fixed": "gray"
+                },
+                "text": {
+                  "mode": "fixed",
+                  "fixed": "ⓘ"
+                }
+              },
+              "links": [
+                {
+                  "title": "観測対象と判定根拠（サンプル）",
+                  "url": "/d/cw-function-incident-mesh/details?var-datasource=prometheus&var-cluster=&from=${__from}&to=${__to}",
+                  "targetBlank": false,
+                  "oneClick": true
+                }
+              ]
+            },
+            {
+              "name": "storage info",
+              "type": "text",
+              "placement": {
+                "left": 812,
+                "top": 146,
+                "width": 18,
+                "height": 24
+              },
+              "constraint": {
+                "horizontal": "left",
+                "vertical": "top"
+              },
+              "background": {
+                "color": {
+                  "fixed": "transparent"
+                }
+              },
+              "config": {
+                "align": "left",
+                "valign": "middle",
+                "size": 16,
+                "color": {
+                  "fixed": "gray"
+                },
+                "text": {
+                  "mode": "fixed",
+                  "fixed": "ⓘ"
+                }
+              },
+              "links": [
+                {
+                  "title": "観測範囲と判定基準",
+                  "url": "/d/cw-evidence-storage/details?var-datasource=prometheus&var-cluster=&from=${__from}&to=${__to}",
+                  "targetBlank": false,
+                  "oneClick": true
+                }
+              ]
+            }
+          ]
+        }
+      },
+      "description": "カードは観測指標の暫定基準で評価。正常/異常/要確認/機能未確認/不明を区別。クリックで指標・閾値・観測範囲を表示。",
+      "id": 7
+    },
+    {
+      "type": "table",
+      "title": "[サンプル] アプリの状態",
+      "gridPos": {
+        "x": 0,
+        "y": 17,
+        "w": 24,
+        "h": 7
+      },
+      "datasource": {
+        "type": "grafana-testdata-datasource",
+        "uid": "app-status-sample"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "grafana-testdata-datasource",
+            "uid": "app-status-sample"
+          },
+          "refId": "A",
+          "scenarioId": "csv_content",
+          "csvContent": "対象ID,アプリ,Sync,Health,経路,応答p99\r\nfunction-incident,アプリA / 通信障害例,1,0,0,-2\r\nb,アプリB / 障害例,1,0,0,-2\r\nc,アプリC / Git差分例,0,1,1,62\r\nd,アプリD / 未収集例,-1,-1,-1,-1\r\n"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "fixed",
+            "fixedColor": "text"
+          },
+          "custom": {
+            "align": "auto",
+            "cellOptions": {
+              "type": "auto"
+            }
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Health"
+            },
+            "properties": [
+              {
+                "id": "mappings",
+                "value": [
+                  {
+                    "type": "value",
+                    "options": {
+                      "-1": {
+                        "text": "? 未収集",
+                        "color": "gray"
+                      },
+                      "0": {
+                        "text": "Degraded",
+                        "color": "red"
+                      },
+                      "1": {
+                        "text": "Healthy",
+                        "color": "green"
+                      }
+                    }
+                  }
+                ]
+              },
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "color-text"
+                }
+              },
+              {
+                "id": "custom.width",
+                "value": 145
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Sync"
+            },
+            "properties": [
+              {
+                "id": "mappings",
+                "value": [
+                  {
+                    "type": "value",
+                    "options": {
+                      "-1": {
+                        "text": "? 未収集",
+                        "color": "gray"
+                      },
+                      "0": {
+                        "text": "OutOfSync",
+                        "color": "orange"
+                      },
+                      "1": {
+                        "text": "Synced",
+                        "color": "text"
+                      }
+                    }
+                  }
+                ]
+              },
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "color-text"
+                }
+              },
+              {
+                "id": "custom.width",
+                "value": 145
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "経路"
+            },
+            "properties": [
+              {
+                "id": "mappings",
+                "value": [
+                  {
+                    "type": "value",
+                    "options": {
+                      "-1": {
+                        "text": "? 未収集",
+                        "color": "gray"
+                      },
+                      "0": {
+                        "text": "× NG",
+                        "color": "red"
+                      },
+                      "1": {
+                        "text": "● OK",
+                        "color": "green"
+                      }
+                    }
+                  }
+                ]
+              },
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "color-text"
+                }
+              },
+              {
+                "id": "custom.width",
+                "value": 145
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "応答p99"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "ms"
+              },
+              {
+                "id": "decimals",
+                "value": 0
+              },
+              {
+                "id": "mappings",
+                "value": [
+                  {
+                    "type": "value",
+                    "options": {
+                      "-1": {
+                        "text": "? 未収集",
+                        "color": "gray"
+                      },
+                      "-2": {
+                        "text": "— 応答なし",
+                        "color": "gray"
+                      }
+                    }
+                  }
+                ]
+              },
+              {
+                "id": "custom.width",
+                "value": 130
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "例"
+            },
+            "properties": [
+              {
+                "id": "custom.hidden",
+                "value": true
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Health"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 115
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Sync"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 110
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "経路"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 120
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "応答p99"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 100
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "アプリ"
+            },
+            "properties": [
+              {
+                "id": "links",
+                "value": [
+                  {
+                    "title": "このアプリの原因を確認（サンプル）",
+                    "url": "/d/app-sample-${__data.fields[0]}/details?var-datasource=prometheus&var-cluster=&from=${__from}&to=${__to}",
+                    "targetBlank": false
+                  }
+                ]
+              },
+              {
+                "id": "custom.width",
+                "value": 190
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "showHeader": true,
+        "cellHeight": "sm",
+        "footer": {
+          "show": false
+        }
+      },
+      "description": "アプリの状態は全て架空データ。上段のノード・基盤は実測。Argo Health/Syncは未収集。 A行は選択シナリオに追従。",
+      "transformations": [
+        {
+          "id": "organize",
+          "options": {
+            "renameByName": {
+              "対象ID": "例"
+            }
+          }
+        }
+      ],
+      "id": 8
+    }
+  ],
+  "templating": {
+    "list": []
+  },
+  "annotations": {
+    "list": []
+  },
+  "graphTooltip": 1,
+  "links": [],
+  "description": "通信カード・通信更新・アプリは架空データ。他のノード・基盤は実測。判定基準は試作用。"
+}
