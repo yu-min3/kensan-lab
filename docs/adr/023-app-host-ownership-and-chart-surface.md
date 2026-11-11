@@ -42,8 +42,13 @@ are deferred below.
    makes that weight explicit and unambiguous. All existing app namespaces (canary, kensan,
    konro, koubou) comply.
 3. **app-base exposes the Pod surface: `initContainers`, `extraContainers`, `podAnnotations`,
-   `podLabels`.** Values pass through unchanged and default to empty, so existing releases render
-   identically. `podLabels` never enter the selector (Deployment selectors are immutable).
+   `podLabels`, plus `httproute.filters` on the app's route.** Values pass through unchanged and
+   default to empty, so existing releases render identically. `podLabels` never enter the
+   selector (Deployment selectors are immutable). Route filters never reach the `/oauth2` route.
+   The first user of filters is markport, which rejects any `Host` other than `localhost` or an
+   IPv4 address (DNS-rebinding protection) and therefore needs a `URLRewrite` of the hostname
+   behind the gateway. The gateway keeps the same protection: it only routes the hostnames an
+   app owns.
 4. **Restrictions live in policy, not in chart omissions.** What a Pod may do is decided by the
    namespace's Pod Security restricted level — today the PSA `enforce: restricted` label, with
    Kyverno `pss-restricted` running in Audit until its Phase 3 promotion ([ADR-012](012-policy-enforcement-kyverno.md)).

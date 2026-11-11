@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# initContainers / extraContainers / podAnnotations / podLabels が Pod spec に入り、
+# initContainers / extraContainers / podAnnotations / podLabels / httproute.filters が描画に入り、
 # selector には podLabels が混ざらないことを確かめる。
 set -euo pipefail
 
@@ -42,7 +42,19 @@ expect "$custom" '.spec.template.metadata.labels["example.invalid/role"]' viewer
 # podLabels は selector に入らない（Deployment の selector は作り直さないと変えられない）
 expect "$custom" '.spec.selector.matchLabels["example.invalid/role"]' null
 
+# httproute.filters は app へのルールにだけ付き、/oauth2 のルートには付かない
+routes="$("${base[@]}" --set httproute.enabled=true --set 'httproute.hostnames[0]=pod-test.app.yu-min3.com' \
+  --set auth.gatewayOAuth2.enabled=true \
+  --set 'httproute.filters[0].type=URLRewrite' --set 'httproute.filters[0].urlRewrite.hostname=localhost')"
+app_route="$(printf '%s\n' "$routes" | yq 'select(.kind == "HTTPRoute" and .metadata.name == "pod-test")')"
+oauth_route="$(printf '%s\n' "$routes" | yq 'select(.kind == "HTTPRoute" and .metadata.name == "pod-test-oauth2")')"
+expect "$app_route" '.spec.rules[0].filters[0].urlRewrite.hostname' localhost
+expect "$oauth_route" '.spec.rules[0].filters' null
+
 # 既定では何も足されない
+plain_route="$("${base[@]}" --set httproute.enabled=true --set 'httproute.hostnames[0]=pod-test.app.yu-min3.com' \
+  | yq 'select(.kind == "HTTPRoute")')"
+expect "$plain_route" '.spec.rules[0].filters' null
 plain="$("${base[@]}" | deployment_of)"
 expect "$plain" '.spec.template.spec.initContainers' null
 expect "$plain" '.spec.template.spec.containers[1]' null
