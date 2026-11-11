@@ -1,5 +1,10 @@
 # DNS trusts hostnames in routes. App namespace names define host ownership;
 # labels cannot bypass this contract. Existing kensan public alias is retained.
+#
+# app-{name} owns {name}.app.yu-min3.com and {name}-{label}.app.yu-min3.com
+# (one extra DNS label, e.g. kensan-markport). The second form is unambiguous
+# only because app names cannot contain hyphens (app-namespace-name below):
+# otherwise app-kensan-markport could claim the same host as app-kensan.
 apiVersion: admissionregistration.k8s.io/v1
 kind: ValidatingAdmissionPolicy
 metadata:
@@ -19,12 +24,17 @@ spec:
   matchConditions:
   - name: app-namespace
     expression: "request.namespace.startsWith('app-')"
+  variables:
+  - name: app
+    expression: "request.namespace.substring(4)"
   validations:
   - expression: >-
       has(object.spec.hostnames) &&
       size(object.spec.hostnames) > 0 &&
       object.spec.hostnames.all(h,
-        'app-' + h == request.namespace + '.app.yu-min3.com' ||
+        h == variables.app + '.app.yu-min3.com' ||
+        h.matches('^' + variables.app +
+          '-[a-z0-9]([-a-z0-9]*[a-z0-9])?\\.app\\.yu-min3\\.com$') ||
         (request.namespace == 'app-kensan' && h == 'kensan.yu-mins.com'))
     message: "App route host must belong to its app namespace"
   - expression: >-
@@ -45,4 +55,37 @@ metadata:
     argocd.argoproj.io/sync-wave: '-1'
 spec:
   policyName: app-httproute-ownership
+  validationActions: [Deny]
+---
+# App names are single words so that {name}-{label} hosts stay unambiguous.
+# Existing app namespaces (canary, kensan, konro, koubou) already comply.
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingAdmissionPolicy
+metadata:
+  name: app-namespace-name
+  annotations:
+    argocd.argoproj.io/sync-wave: '-1'
+spec:
+  failurePolicy: Fail
+  matchConstraints:
+    resourceRules:
+    - apiGroups: ['']
+      apiVersions: [v1]
+      operations: [CREATE]
+      resources: [namespaces]
+  matchConditions:
+  - name: app-namespace
+    expression: "object.metadata.name.startsWith('app-')"
+  validations:
+  - expression: "object.metadata.name.matches('^app-[a-z0-9]+$')"
+    message: "App namespace must be app-{name} with no further hyphen"
+---
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingAdmissionPolicyBinding
+metadata:
+  name: app-namespace-name
+  annotations:
+    argocd.argoproj.io/sync-wave: '-1'
+spec:
+  policyName: app-namespace-name
   validationActions: [Deny]

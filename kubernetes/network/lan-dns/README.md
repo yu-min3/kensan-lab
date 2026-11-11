@@ -36,7 +36,9 @@ DNSは専用CoreDNS `k8s_gateway` イメージをdigest固定で使用する。�
 
 ## 名前の所有境界
 
-ValidatingAdmissionPolicyをAPIサーバーで強制する。App namespace `app-{name}` は `{name}.app.yu-min3.com` のみ登録でき、parentは `istio-system/gateway-prod` に限る。既存 `app-kensan` の `kensan.yu-mins.com` だけ例外として残す。namespace labelを変えてもこの制限を迂回できない。Platform namespaceのRouteはPlatform管理者が管理する。
+ValidatingAdmissionPolicyをAPIサーバーで強制する。App namespace `app-{name}` は `{name}.app.yu-min3.com` と `{name}-{label}.app.yu-min3.com`（1ラベルだけ足した名前。例: `kensan-markport`）を登録でき、parentは `istio-system/gateway-prod` に限る。既存 `app-kensan` の `kensan.yu-mins.com` だけ例外として残す。namespace labelを変えてもこの制限を迂回できない。Platform namespaceのRouteはPlatform管理者が管理する。
+
+`{name}-{label}` の所有が一意になるよう、App名にはハイフンを使えない（`app-namespace-name` が `app-{英小文字・数字}` 以外のnamespace作成を拒否する）。これが無いと `app-kensan-markport` が `app-kensan` と同じ名前を主張できる。既存の canary・kensan・konro・koubou は適合している。外部ドメイン（`*.yu-mins.com`）への公開は、引き続きPlatformで例外として明示する。
 
 新たな別名・開発環境Gatewayが必要な場合は、Platformで所有権の契約を拡張する。Appのchartだけで任意の名前を登録することはできない。
 
@@ -86,7 +88,7 @@ httproute:
 
 ## 検証と一次資料
 
-`python3 scripts/test_lan_dns.py` は専用kind contextでのみ動作する。実image・RBAC・Pod権限制限、所有外hostとGatewayのCREATE/UPDATE拒否、既存kensan別名、UDP/TCP回答、DNS opt-outと削除を検査する。実クラスタCilium/LB・スマホ・DHCPはマージ後の確認対象。
+`python3 scripts/test_lan_dns.py` は専用kind contextでのみ動作する。実image・RBAC・Pod権限制限、所有外hostとGatewayのCREATE/UPDATE拒否、`{name}-{label}` の許可と多階層・他App名の拒否、ハイフンを含むApp namespaceの拒否、既存kensan別名、UDP/TCP回答、DNS opt-outと削除を検査する。実クラスタCilium/LB・スマホ・DHCPはマージ後の確認対象。
 
 - [k8s_gatewayの仕様と権限](https://github.com/k8s-gateway/k8s_gateway/tree/v1.8.2)
 - [Kubernetes ValidatingAdmissionPolicy](https://kubernetes.io/docs/reference/access-authn-authz/validating-admission-policy/)
