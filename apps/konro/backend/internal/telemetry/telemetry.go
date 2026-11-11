@@ -19,7 +19,7 @@ import (
 
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
-	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc"
+	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracehttp"
 	"go.opentelemetry.io/otel/propagation"
 	"go.opentelemetry.io/otel/sdk/resource"
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
@@ -51,14 +51,14 @@ var propagator = propagation.TraceContext{}
 // Tracer is safe to use before or without Setup (no-op until configured).
 func Tracer() trace.Tracer { return otel.Tracer("github.com/yu-min3/kensan-lab/apps/konro") }
 
-// Setup installs an OTLP/gRPC exporter when the standard OTEL endpoint
+// Setup installs an OTLP/HTTP exporter (the platform convention, port 4318) when the standard OTEL endpoint
 // variables are present. The returned shutdown flushes pending spans.
 func Setup(ctx context.Context) (func(context.Context) error, error) {
 	otel.SetTextMapPropagator(propagator)
 	if os.Getenv("OTEL_EXPORTER_OTLP_ENDPOINT") == "" && os.Getenv("OTEL_EXPORTER_OTLP_TRACES_ENDPOINT") == "" {
 		return func(context.Context) error { return nil }, nil
 	}
-	exporter, err := otlptracegrpc.New(ctx)
+	exporter, err := otlptracehttp.New(ctx)
 	if err != nil {
 		return nil, err
 	}
