@@ -52,6 +52,10 @@ namespace 等の raw マニフェストが必要なら 3 つ目の source（`dir
 | `ghcrPullSecret.enabled` | `false` | ns に ghcr pull secret を ExternalSecret で生成し SA に配線 |
 | `reloader` | `true` | Secret/ConfigMap 更新時の自動 rollout（stakater/reloader） |
 | `nodeSelector` / `affinity` | `{}` | スケジューリング制約（例: amd64 限定） |
+| `initContainers` / `extraContainers` | `[]` | Pod spec にそのまま入る。securityContext は自動で付かないので各自で書く |
+| `podAnnotations` / `podLabels` | `{}` | Pod template に付く。`podLabels` は selector に入らない |
+
+chart は Pod の設定項目を素直に出し、危ない設定（root・特権など）の禁止は namespace の Pod Security restricted に任せる。現在は PSA ラベル（`pod-security.kubernetes.io/enforce: restricted`）が拒否し、Kyverno の pss-restricted は Audit で並走している（ADR-012 の Phase 3 で Enforce へ昇格）。どちらも init・追加コンテナを含む全コンテナを検査する。chart に欄が無いことを禁止の代わりにしない。
 
 ## LAN DNSの自動登録
 

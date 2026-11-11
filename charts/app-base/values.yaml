@@ -16,6 +16,16 @@ command: []
 args: []
 extraVolumeMounts: []
 extraVolumes: []
+
+# Pod の追加要素。中身はそのまま Pod spec に入る。
+# 危ない設定（root・特権など）の禁止は chart ではなく namespace の
+# Pod Security restricted（PSA / Kyverno）が担うので、ここでは制限しない。
+# 追加コンテナには securityContext が自動で付かないため各自で書く。
+initContainers: []
+extraContainers: []
+podAnnotations: {}
+# selector には入らない（Deployment の selector は不変のため）
+podLabels: {}
 # null preserves the existing Pod default; apps may explicitly opt out.
 automountServiceAccountToken: null
 
