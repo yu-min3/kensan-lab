@@ -37,3 +37,4 @@ Each ADR follows a lightweight structure:
 | 020 | [Namespace lifecycle app cleanup + backstage/app flatten](020-namespace-lifecycle-app-cleanup.md) | Accepted |
 | 021 | [gateway-prod default-protected (opt-out) authorization](021-gateway-prod-default-protected.md) | Accepted |
 | 022 | [Backstage native OIDC](022-backstage-native-oidc.md) | Accepted |
+| 023 | [App host ownership `{name}-{label}` + app-base Pod surface](023-app-host-ownership-and-chart-surface.md) | Accepted |
