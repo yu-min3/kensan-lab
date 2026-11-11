@@ -1,0 +1,139 @@
+# app-kensan の 2 つ目の release: markport（workspace の read-only ビューア）
+# chart: charts/app-base / Application CR: kubernetes/argocd/applications/apps/app-kensan/app.yaml
+#
+# 公式リリースのバイナリを、起動時に initContainer が取得して sha256 で検証する。
+# 自前イメージは作らない（上流に LICENSE が無く、再配布の扱いが曖昧なため）。
+# 版と sha256 は .github/workflows/markport-bump.yml が PR で更新する。
+
+nameOverride: markport
+
+# 本体は git CLI を持つ最小イメージ（markport の diff / blame は git を呼ぶ）
+image:
+  repository: docker.io/alpine/git
+  tag: ""
+  digest: sha256:4a0e72d49596a1f5d3701aeedafdadc5c0da4062be4657c7bdc4017387f591cc # v2.52.0
+
+command:
+  - /opt/markport/markport
+  - /data
+  - --host
+  - 0.0.0.0
+  - --port
+  - "8080"
+  - --title
+  - kensan workspace
+
+env:
+  # 起動中サーバーの記録が user cache dir に書かれる。読み取り専用 rootfs なので tmp に逃がす
+  - name: HOME
+    value: /tmp
+  - name: XDG_CACHE_HOME
+    value: /tmp/cache
+  # read-only の .git に index の lock を取りに行かない
+  - name: GIT_OPTIONAL_LOCKS
+    value: "0"
+
+# alpine/git は root 既定。Syncthing・kensan と同じ uid にし、
+# workspace のファイル所有者と一致させて git の dubious ownership を避ける
+securityContext:
+  runAsNonRoot: true
+  runAsUser: 65532
+  runAsGroup: 65532
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: true
+  capabilities:
+    drop: ["ALL"]
+  seccompProfile:
+    type: RuntimeDefault
+
+initContainers:
+  - name: fetch-markport
+    image: docker.io/curlimages/curl:8.22.0@sha256:58adaa4e8dca9c988bae2aba4ab3434a0bb2da16bbe3f92dec39ec7785166777
+    env:
+      - name: MARKPORT_VERSION
+        value: v0.28.4
+      - name: MARKPORT_SHA256_AMD64
+        value: a301b5739a82b61a9f155c03a01ad13d7536b8101f74d5c3b4f1f9ce49a02168
+      - name: MARKPORT_SHA256_ARM64
+        value: d7e5cc84542ba3c68e4e8b7d2614c35fce889400d1e214340cf2382a79f57305
+    command:
+      - /bin/sh
+      - -c
+      - |
+        set -eu
+        case "$(uname -m)" in
+          x86_64) arch=amd64; want="$MARKPORT_SHA256_AMD64" ;;
+          aarch64) arch=arm64; want="$MARKPORT_SHA256_ARM64" ;;
+          *) echo "unsupported arch: $(uname -m)" >&2; exit 1 ;;
+        esac
+        url="https://github.com/yomon8/markport/releases/download/${MARKPORT_VERSION}/markport_${MARKPORT_VERSION}_linux_${arch}"
+        curl -fsSL --retry 3 -o /opt/markport/markport.tmp "$url"
+        echo "${want}  /opt/markport/markport.tmp" | sha256sum -c -
+        chmod 0755 /opt/markport/markport.tmp
+        mv /opt/markport/markport.tmp /opt/markport/markport
+    securityContext:
+      runAsNonRoot: true
+      runAsUser: 65532
+      runAsGroup: 65532
+      allowPrivilegeEscalation: false
+      readOnlyRootFilesystem: true
+      capabilities:
+        drop: ["ALL"]
+      seccompProfile:
+        type: RuntimeDefault
+    volumeMounts:
+      - name: markport-bin
+        mountPath: /opt/markport
+    resources:
+      requests:
+        cpu: 10m
+        memory: 16Mi
+      limits:
+        memory: 64Mi
+
+# workspace PVC（app-kensan の resources/pvc-workspace.yaml）を読み取り専用で共有する。
+# chart の pvc.* は readOnly を指定できないので使わない
+extraVolumes:
+  - name: workspace
+    persistentVolumeClaim:
+      claimName: kensan-workspace
+      readOnly: true
+  - name: markport-bin
+    emptyDir:
+      sizeLimit: 64Mi
+  - name: tmp
+    emptyDir:
+      sizeLimit: 64Mi
+extraVolumeMounts:
+  - name: workspace
+    mountPath: /data
+    readOnly: true
+  - name: markport-bin
+    mountPath: /opt/markport
+    readOnly: true
+  - name: tmp
+    mountPath: /tmp
+
+# API を叩かない
+automountServiceAccountToken: false
+
+probes:
+  path: /
+  initialDelaySeconds: 3
+
+httproute:
+  enabled: true
+  # LAN のみ。host の所有は ADR-023（app-kensan は kensan-* を持てる）
+  hostnames:
+    - kensan-markport.app.yu-min3.com
+# gateway 層 Keycloak SSO（ext_authz）。markport 自体は認証を持たない
+auth:
+  gatewayOAuth2:
+    enabled: true
+
+resources:
+  requests:
+    cpu: 20m
+    memory: 64Mi
+  limits:
+    memory: 256Mi
