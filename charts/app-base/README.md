@@ -42,7 +42,9 @@ sources:
     ref: values
 ```
 
-新規App専用namespaceは `namespace.create: true` でchartから生成できる案です。既定はfalseのため、既存Appはそのまま使えます。Platformがenvironment/team/appのラベル値を指定します。
+## App専用namespaceの生成
+
+新規App専用namespaceは `namespace.create: true` でchartから生成できる。既定はfalseのため、既存Appはそのまま使える。Platformがenvironment/team/appのラベル値を指定する。
 
 ```yaml
 namespace:
@@ -52,11 +54,11 @@ namespace:
   app: canary
 ```
 
-namespace名はHelmのrelease namespace（Argo Applicationのdestination.namespace）を使います。`restricted`のラベル、Argoのsync-wave=-2、Prune=false、Helmのkeepを固定します。保持annotationは誤削除を減らす仕組みであり、管理者による手動削除を禁止するものではありません。
+namespace名はHelmのrelease namespace（Argo Applicationのdestination.namespace）を使う。`restricted`のラベル、Argoのsync-wave=-2、Prune=false、Helmのkeepを固定する。保持annotationは誤削除を減らす仕組みであり、管理者による手動削除を禁止するものではない。
 
-既存raw Namespaceから移す場合は、同じPRでraw定義を除き、同じ名前・ラベル・保持annotationが描画されることとGitOpsの所有を確認します。二重定義のまま有効にしません。今回は共通chartのdraftだけで、canaryや既存Appの移行は含めません。observerの権限と資格はPlatform側の別管理を維持します。
+既存raw Namespaceから移す場合は、同じPRでraw定義を除き、同じ名前・ラベル・保持annotationが描画されることとGitOpsの所有を確認する。二重定義のまま有効にしない。同じnamespaceにこのchartのreleaseを複数置く場合も、有効にするのは1つだけにする。observerの権限と資格はPlatform側の別管理を維持する。
 
-他のrawマニフェストが必要なら3つ目のsourceとして足せます。
+他のrawマニフェストが必要なら3つ目のsourceとして足せる。
 
 ## 主要 values
 
