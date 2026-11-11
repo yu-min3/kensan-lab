@@ -375,6 +375,59 @@ func (s *Service) observe(ctx context.Context, d *Draft, outcome string) {
 	}
 	span.End()
 }
+
+// Interpretation is the production acceptance decision for one runtime output.
+// Reason is empty when accepted, otherwise "invalid_recipe" or
+// "numbers_changed". The evaluation grader calls this same gate.
+type Interpretation struct {
+	Content    Content
+	Assessment string
+	KeptInput  bool
+	Reason     string
+}
+
+// Interpret validates a runtime output against the source text and the draft it
+// was asked to improve, and merges fields the model left empty.
+func Interpret(sourceText string, current Content, output json.RawMessage) Interpretation {
+	var parsed struct {
+		Content
+		Assessment string `json:"assessment"`
+	}
+	dec := json.NewDecoder(bytes.NewReader(output))
+	dec.DisallowUnknownFields()
+	var fields map[string]json.RawMessage
+	_ = json.Unmarshal(output, &fields)
+	required := true
+	for _, name := range []string{"title", "servings", "ingredients", "steps"} {
+		v, ok := fields[name]
+		if !ok || string(bytes.TrimSpace(v)) == "null" {
+			required = false
+		}
+	}
+	if e := dec.Decode(&parsed); e != nil || dec.Decode(new(any)) != io.EOF || !required || validateContent(parsed.Content, false) != nil || utf8.RuneCountInString(parsed.Assessment) > 600 {
+		return Interpretation{Reason: "invalid_recipe"}
+	}
+	c := parsed.Content
+	// Compare recipe text, never its JSON representation: encoding/json turns
+	// '&', '<', '>' and line separators into escapes containing unrelated digits.
+	if newNumbers(sourceText+" "+contentText(current), contentText(c)) {
+		return Interpretation{Content: c, Reason: "numbers_changed"}
+	}
+	kept := false
+	if strings.TrimSpace(c.Title) == "" {
+		c.Title = current.Title
+	}
+	if len(c.Ingredients) == 0 && len(current.Ingredients) > 0 {
+		c.Ingredients = current.Ingredients
+		kept = true
+	}
+	if len(c.Steps) == 0 && len(current.Steps) > 0 {
+		c.Steps = current.Steps
+		kept = true
+	}
+	return Interpretation{Content: c, Assessment: strings.TrimSpace(parsed.Assessment), KeptInput: kept}
+}
+
 func (s *Service) apply(ctx context.Context, d *Draft) error {
 	if d.Job != nil && d.Job.State != "succeeded" {
 		s.observe(ctx, d, "job_"+d.Job.State)
@@ -383,52 +436,25 @@ func (s *Service) apply(ctx context.Context, d *Draft) error {
 		return nil
 	}
 	d.AppliedJob = d.Job.ID
-	var output struct {
-		Content
-		Assessment string `json:"assessment"`
-	}
-	dec := json.NewDecoder(bytes.NewReader(d.Job.Output))
-	dec.DisallowUnknownFields()
-	var fields map[string]json.RawMessage
-	_ = json.Unmarshal(d.Job.Output, &fields)
-	required := true
-	for _, name := range []string{"title", "servings", "ingredients", "steps"} {
-		v, ok := fields[name]
-		if !ok || string(bytes.TrimSpace(v)) == "null" {
-			required = false
-		}
-	}
-	if e := dec.Decode(&output); e != nil || dec.Decode(new(any)) != io.EOF || !required || validateContent(output.Content, false) != nil || utf8.RuneCountInString(output.Assessment) > 600 {
+	r := Interpret(d.Source.Text, d.Content, d.Job.Output)
+	switch r.Reason {
+	case "invalid_recipe":
 		d.Job.State = "failed"
 		d.Job.Reason = "invalid_recipe"
 		d.Warnings = append(d.Warnings, "AIの結果がレシピ形式に合わないため採用しませんでした")
 		s.observe(ctx, d, "invalid_recipe")
 		return nil
-	}
-	c := output.Content
-	// Compare recipe text, never its JSON representation: encoding/json turns
-	// '&', '<', '>' and line separators into escapes containing unrelated digits.
-	if newNumbers(d.Source.Text+" "+contentText(d.Content), contentText(c)) {
+	case "numbers_changed":
 		d.Job.State = "failed"
 		d.Job.Reason = "numbers_changed"
 		d.Warnings = append(d.Warnings, "原文にない数値がAIの結果に含まれたため採用しませんでした。材料・時間・温度を確認してください")
 		s.observe(ctx, d, "numbers_changed")
 		return nil
 	}
-	keptInput := false
-	if strings.TrimSpace(c.Title) == "" {
-		c.Title = d.Content.Title
-	}
-	if len(c.Ingredients) == 0 && len(d.Content.Ingredients) > 0 {
-		c.Ingredients = d.Content.Ingredients
-		keptInput = true
-	}
-	if len(c.Steps) == 0 && len(d.Content.Steps) > 0 {
-		c.Steps = d.Content.Steps
-		keptInput = true
-	}
+	c := r.Content
+	keptInput := r.KeptInput
 	d.Content = c
-	d.Assessment = strings.TrimSpace(output.Assessment)
+	d.Assessment = r.Assessment
 	d.Revision++
 	var retained []string
 	for _, w := range d.Warnings {
@@ -451,6 +477,10 @@ func (s *Service) apply(ctx context.Context, d *Draft) error {
 	s.observe(ctx, d, outcome)
 	return nil
 }
+
+// Prompt returns the production instruction for an extraction mode.
+func Prompt(mode string) string { return importPrompt(mode) }
+
 func (s *Service) Action(ctx context.Context, id string, revision int, action string) (*Draft, error) {
 	unlock := s.lock(id)
 	defer unlock()
