@@ -30,6 +30,15 @@ spec:
       path: kubernetes/apps/app-kensan/resources
       directory:
         recurse: true
+    # 4. markport（workspace の read-only ビューア）。同じ chart の 2 つ目の release。
+    # 部品の組み合わせを app 側へ移す（umbrella 化）までの措置（ADR-023 Deferred）
+    - repoURL: https://github.com/yu-min3/kensan-lab
+      targetRevision: main
+      path: charts/app-base
+      helm:
+        releaseName: app-markport
+        valueFiles:
+          - $values/kubernetes/apps/app-kensan/values-markport.yaml
 
   destination:
     server: https://kubernetes.default.svc

@@ -52,6 +52,7 @@ jobs:
         run: |
           find kubernetes environments -name '*.yaml' \
             ! -name 'values.yaml' \
+            ! -name 'values-*.yaml' \
             ! -name 'Chart.yaml' \
             ! -path '*/chart/templates/*' \
             ! -path '*/platform-values/*' \
@@ -67,6 +68,8 @@ jobs:
       # ApplicationSet が inject するのと同等のパラメータを渡して render が壊れていないか確認
       - name: app-base (app-kensan values)
         run: helm template app-kensan charts/app-base -f kubernetes/apps/app-kensan/values.yaml > /dev/null
+      - name: app-base (app-kensan markport values)
+        run: helm template app-markport charts/app-base -f kubernetes/apps/app-kensan/values-markport.yaml > /dev/null
       - name: app-base DNS lifecycle labels
         run: bash charts/app-base/tests/dns-render.sh
       - name: app-base pod surface
