@@ -1,16 +1,26 @@
 #!/usr/bin/env python3
-"""Create only Konro's service client; seal its secret without printing/persisting plaintext."""
-import argparse,base64,json,subprocess,urllib.parse,urllib.request
+"""Create one of Konro's agent-runtime service clients without printing its secret.
+
+konro-agent-runtime (default): the app's client; secret sealed into app-konro.
+konro-eval-agent-runtime: konro-eval on the operator's machine; secret written
+to a private local file (0600) because it never runs in the cluster. The
+runtime counts its jobs against the separate evaluation allowance.
+"""
+import argparse,base64,json,os,subprocess,urllib.parse,urllib.request
 from pathlib import Path
 
 BASE='https://auth.yu-mins.com'
-CLIENT='konro-agent-runtime'
+CLIENTS=('konro-agent-runtime','konro-eval-agent-runtime')
 
 def main():
  p=argparse.ArgumentParser(description=__doc__)
  p.add_argument('--kubeconfig',required=True);p.add_argument('--context',required=True)
- p.add_argument('--sealed-output',required=True);p.add_argument('--apply',action='store_true')
- a=p.parse_args();kube=['kubectl','--kubeconfig',a.kubeconfig,'--context',a.context]
+ p.add_argument('--client',choices=CLIENTS,default=CLIENTS[0])
+ p.add_argument('--sealed-output');p.add_argument('--secret-file');p.add_argument('--apply',action='store_true')
+ a=p.parse_args();CLIENT=a.client
+ if CLIENT==CLIENTS[0] and not a.sealed_output:p.error('--sealed-output is required for the app client')
+ if CLIENT==CLIENTS[1] and not a.secret_file:p.error('--secret-file is required for the eval client')
+ kube=['kubectl','--kubeconfig',a.kubeconfig,'--context',a.context]
  data=subprocess.run(kube+['-n','platform-auth-prod','get','secret','keycloak-secret','-o','json'],capture_output=True,check=True).stdout
  password=base64.b64decode(json.loads(data)['data']['KEYCLOAK_ADMIN_PASSWORD']).decode()
  opener=urllib.request.build_opener(urllib.request.ProxyHandler({}))
@@ -40,10 +50,16 @@ def main():
   assert len(matching)==1 and all(matching[0]['config'].get(k)==v for k,v in config.items())
  if a.apply:
   secret=req(prefix+'/clients/'+cid+'/client-secret',token=token)['value']
-  raw={'apiVersion':'v1','kind':'Secret','metadata':{'name':'konro-agent-runtime','namespace':'app-konro'},'type':'Opaque','stringData':{'client-secret':secret}}
-  sealed=subprocess.run(['kubeseal','--kubeconfig',a.kubeconfig,'--context',a.context,'--controller-name','sealed-secrets','--controller-namespace','kube-system','--format','yaml'],input=json.dumps(raw).encode(),capture_output=True,check=True).stdout
-  path=Path(a.sealed_output);path.parent.mkdir(parents=True,exist_ok=True);path.write_bytes(sealed)
- print(json.dumps({'client':CLIENT,'audience':'agent-runtime','service_only':True,'sealed':a.apply,'credentials_printed':False}))
+  if CLIENT==CLIENTS[1]:
+   path=Path(a.secret_file).expanduser();path.parent.mkdir(parents=True,exist_ok=True,mode=0o700)
+   fd=os.open(path,os.O_WRONLY|os.O_CREAT|os.O_TRUNC,0o600)
+   with os.fdopen(fd,'w') as f:f.write(secret+'\n')
+   os.chmod(path,0o600)
+  else:
+   raw={'apiVersion':'v1','kind':'Secret','metadata':{'name':'konro-agent-runtime','namespace':'app-konro'},'type':'Opaque','stringData':{'client-secret':secret}}
+   sealed=subprocess.run(['kubeseal','--kubeconfig',a.kubeconfig,'--context',a.context,'--controller-name','sealed-secrets','--controller-namespace','kube-system','--format','yaml'],input=json.dumps(raw).encode(),capture_output=True,check=True).stdout
+   path=Path(a.sealed_output);path.parent.mkdir(parents=True,exist_ok=True);path.write_bytes(sealed)
+ print(json.dumps({'client':CLIENT,'audience':'agent-runtime','service_only':True,'written':a.apply,'credentials_printed':False}))
 if __name__=='__main__':
  try:main()
  except Exception as e:
