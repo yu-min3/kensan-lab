@@ -18,6 +18,16 @@ config:
           endpoint: ${env:MY_POD_IP}:4317
         http:
           endpoint: ${env:MY_POD_IP}:4318
+    # LAN senders outside the cluster (agent-runtime on sense, Claude Code on
+    # the Mac) come through gateway-platform. The gateway cannot see real client
+    # IPs (externalTrafficPolicy: Cluster), so this receiver requires a bearer
+    # token instead. In-cluster apps keep using the unauthenticated receiver.
+    otlp/external:
+      protocols:
+        grpc:
+          endpoint: ${env:MY_POD_IP}:4319
+          auth:
+            authenticator: bearertokenauth/external
 
   processors:
     batch:
@@ -38,6 +48,52 @@ config:
       actions:
         - key: http.request.header.authorization
           action: delete
+    # Claude Code attaches account identifiers to every span. Drop them on all
+    # trace paths before anything is stored.
+    transform/identity:
+      error_mode: ignore
+      trace_statements:
+        - context: span
+          statements:
+            - delete_key(attributes, "user.email")
+            - delete_key(attributes, "user.account_uuid")
+            - delete_key(attributes, "user.account_id")
+            - delete_key(attributes, "user.id")
+            - delete_key(attributes, "organization.id")
+        - context: resource
+          statements:
+            - delete_key(attributes, "user.email")
+            - delete_key(attributes, "user.account_uuid")
+            - delete_key(attributes, "user.account_id")
+            - delete_key(attributes, "user.id")
+            - delete_key(attributes, "organization.id")
+    # Operations storage (Tempo) never keeps LLM input/output text.
+    transform/strip-content:
+      error_mode: ignore
+      trace_statements:
+        - context: span
+          statements:
+            - delete_key(attributes, "langfuse.observation.input")
+            - delete_key(attributes, "langfuse.observation.output")
+            - delete_key(attributes, "langfuse.experiment.item.expected_output")
+            - delete_key(attributes, "user_prompt")
+    # One Langfuse project per app. Spans without app=konro do not enter it.
+    filter/app-konro:
+      error_mode: ignore
+      traces:
+        span:
+          - 'resource.attributes["app"] != "konro"'
+    # Claude Code names token counts its own way; map them to the GenAI
+    # convention Langfuse reads, and mark model calls as generations.
+    transform/genai:
+      error_mode: ignore
+      trace_statements:
+        - context: span
+          statements:
+            - set(attributes["langfuse.observation.type"], "generation") where name == "claude_code.llm_request"
+            - set(attributes["gen_ai.usage.input_tokens"], attributes["input_tokens"]) where name == "claude_code.llm_request"
+            - set(attributes["gen_ai.usage.output_tokens"], attributes["output_tokens"]) where name == "claude_code.llm_request"
+            - set(attributes["langfuse.observation.model.name"], attributes["model"]) where name == "claude_code.llm_request"
 
   exporters:
     prometheusremotewrite:
@@ -52,22 +108,33 @@ config:
       endpoint: http://loki.monitoring.svc:3100/loki/api/v1/push
     debug:
       verbosity: detailed
+    otlphttp/langfuse-konro:
+      endpoint: http://langfuse-web.langfuse.svc.cluster.local:3000/api/public/otel
+      headers:
+        Authorization: "Basic ${env:LANGFUSE_KONRO_AUTH}"
+        x-langfuse-ingestion-version: "4"
 
   extensions:
     health_check:
       endpoint: ${env:MY_POD_IP}:13133
+    bearertokenauth/external:
+      token: ${env:OTLP_EXTERNAL_TOKEN}
 
   service:
-    extensions: [health_check]
+    extensions: [health_check, bearertokenauth/external]
     pipelines:
       metrics:
         receivers: [otlp]
         processors: [memory_limiter, batch, resource]
         exporters: [prometheusremotewrite]
       traces:
-        receivers: [otlp]
-        processors: [memory_limiter, batch, resource, attributes]
+        receivers: [otlp, otlp/external]
+        processors: [memory_limiter, batch, resource, attributes, transform/identity, transform/strip-content]
         exporters: [otlp/tempo]
+      traces/langfuse-konro:
+        receivers: [otlp, otlp/external]
+        processors: [memory_limiter, filter/app-konro, attributes, transform/identity, transform/genai, batch]
+        exporters: [otlphttp/langfuse-konro]
       logs:
         receivers: [otlp]
         processors: [memory_limiter, batch, resource]
@@ -91,6 +158,12 @@ ports:
     containerPort: 4318
     servicePort: 4318
     protocol: TCP
+  otlp-external:
+    enabled: true
+    containerPort: 4319
+    servicePort: 4319
+    protocol: TCP
+    appProtocol: grpc
   metrics:
     enabled: true
     containerPort: 8888
@@ -109,6 +182,12 @@ ports:
     enabled: false
   zipkin:
     enabled: false
+
+# OTLP_EXTERNAL_TOKEN and LANGFUSE_KONRO_AUTH (resources/external-secret.yaml).
+# Required: the collector must not start with an empty bearer token.
+extraEnvsFrom:
+  - secretRef:
+      name: otel-collector-credentials
 
 # Resources
 resources:

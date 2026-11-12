@@ -1,0 +1,104 @@
+# Chart: langfuse 2.2.4 (Langfuse v4.77)
+#
+# Every credential comes from resources/external-secret.yaml (Vault). The chart
+# would otherwise generate passwords with randAlphaNum, and Argo CD renders
+# without `lookup`, so they would change on every sync.
+#
+# ClickHouse runs as our own single-node StatefulSet (resources/clickhouse.yaml)
+# instead of the chart's operator + Keeper path: one user, one project, and the
+# measured footprint does not justify a cluster-wide operator.
+
+langfuse:
+  salt:
+    secretKeyRef: {name: langfuse-credentials, key: salt}
+  encryptionKey:
+    secretKeyRef: {name: langfuse-credentials, key: encryption-key}
+  nextauth:
+    url: http://localhost:3000   # UI is reached by kubectl port-forward (README)
+    secret:
+      secretKeyRef: {name: langfuse-credentials, key: nextauth-secret}
+  features:
+    telemetryEnabled: false
+    signUpDisabled: true
+  # Headless init: one org, the konro project with pre-generated API keys, one
+  # user. Keys live in Vault so the collector can be configured before deploy.
+  additionalEnv:
+    - name: LANGFUSE_INIT_ORG_ID
+      value: kensan-lab
+    - name: LANGFUSE_INIT_ORG_NAME
+      value: kensan-lab
+    - name: LANGFUSE_INIT_PROJECT_ID
+      value: konro
+    - name: LANGFUSE_INIT_PROJECT_NAME
+      value: konro
+    - name: LANGFUSE_INIT_PROJECT_PUBLIC_KEY
+      valueFrom: {secretKeyRef: {name: langfuse-credentials, key: konro-public-key}}
+    - name: LANGFUSE_INIT_PROJECT_SECRET_KEY
+      valueFrom: {secretKeyRef: {name: langfuse-credentials, key: konro-secret-key}}
+    - name: LANGFUSE_INIT_USER_EMAIL
+      valueFrom: {secretKeyRef: {name: langfuse-credentials, key: init-user-email}}
+    - name: LANGFUSE_INIT_USER_NAME
+      value: owner
+    - name: LANGFUSE_INIT_USER_PASSWORD
+      valueFrom: {secretKeyRef: {name: langfuse-credentials, key: init-user-password}}
+  web:
+    replicas: 1
+    resources:
+      requests: {cpu: 250m, memory: 1Gi}
+      limits: {memory: 2Gi}
+    nodeSelector:
+      kubernetes.io/arch: amd64
+  worker:
+    replicas: 1
+    resources:
+      requests: {cpu: 250m, memory: 768Mi}
+      limits: {memory: 1536Mi}
+    nodeSelector:
+      kubernetes.io/arch: amd64
+
+postgresql:
+  deploy: true
+  auth:
+    username: langfuse
+    existingSecret: langfuse-postgresql-auth
+    secretKeys:
+      userPasswordKey: USERDB_PASSWORD
+      adminPasswordKey: POSTGRES_PASSWORD
+    database: langfuse
+
+redis:
+  deploy: true
+  auth:
+    existingSecret: langfuse-redis-auth
+    existingSecretPasswordKey: default
+    usersExistingSecret: langfuse-redis-auth
+
+clickhouse:
+  deploy: false
+  host: langfuse-clickhouse.langfuse.svc.cluster.local
+  httpPort: 8123
+  nativePort: 9000
+  auth:
+    username: langfuse
+    existingSecret: langfuse-clickhouse
+    existingSecretKey: password
+  migration:
+    url: clickhouse://langfuse-clickhouse.langfuse.svc.cluster.local:9000
+    ssl: false
+    autoMigrate: true
+  cluster:
+    enabled: false   # CLICKHOUSE_CLUSTER_ENABLED=false: single node, no ON CLUSTER DDL
+
+s3:
+  deploy: true
+  bucket: langfuse
+  auth:
+    rootUser: langfuse
+    existingSecret: langfuse-s3-auth
+    rootUserSecretKey: accessKey
+    rootPasswordSecretKey: secretKey
+  allInOne:
+    s3:
+      existingConfigSecret: langfuse-s3-auth
+    data:
+      size: 20Gi
