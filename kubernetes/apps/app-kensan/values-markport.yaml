@@ -13,13 +13,20 @@ image:
   tag: ""
   digest: sha256:4a0e72d49596a1f5d3701aeedafdadc5c0da4062be4657c7bdc4017387f591cc # v2.52.0
 
+# markport は DNS rebinding 対策で Host を検査し、localhost か IPv4 で、かつポートが
+# 待受ポートと一致するものしか受けない（internal/server/server.go validHost）。
+# gateway で Host を "localhost" に書き換える（httproute.filters）と、ポート無しの Host は
+# 80 とみなされるので、80 で待ち受ける。kubelet の probe は Host が Pod IP:80 なので通る。
+ports:
+  http: 80
+
 command:
   - /opt/markport/markport
   - /data
   - --host
   - 0.0.0.0
   - --port
-  - "8080"
+  - "80"
   - --title
   - kensan workspace
 
@@ -32,6 +39,16 @@ env:
   # read-only の .git に index の lock を取りに行かない
   - name: GIT_OPTIONAL_LOCKS
     value: "0"
+
+# 非 root のまま 80 で待ち受けるため、特権ポートの下限を 0 にする。
+# net.ipv4.ip_unprivileged_port_start は Pod Security の safe sysctl（restricted でも可）
+podSecurityContext:
+  fsGroup: 65532
+  seccompProfile:
+    type: RuntimeDefault
+  sysctls:
+    - name: net.ipv4.ip_unprivileged_port_start
+      value: "0"
 
 # alpine/git は root 既定。Syncthing・kensan と同じ uid にし、
 # workspace のファイル所有者と一致させて git の dubious ownership を避ける
@@ -126,6 +143,12 @@ httproute:
   # LAN のみ。host の所有は ADR-023（app-kensan は kensan-* を持てる）
   hostnames:
     - kensan-markport.app.yu-min3.com
+  # markport が受け付ける Host に書き換える（上の ports.http を参照）。
+  # gateway は所有するホスト名しか routing しないので、rebinding 対策は gateway 側で保たれる
+  filters:
+    - type: URLRewrite
+      urlRewrite:
+        hostname: localhost
 # gateway 層 Keycloak SSO（ext_authz）。markport 自体は認証を持たない
 auth:
   gatewayOAuth2:
