@@ -1,0 +1,47 @@
+# markport（workspace の read-only ビューア）の通信を最小にする。
+# 配置: app 固有の policy なので app-kensan の resources/ に置く（per-app-namespace 設計）。
+#
+# markport 自体は認証を持たず、workspace 全体を読める。gateway（Keycloak SSO）を
+# 迂回してクラスタ内の他 Pod から直接読まれないよう、ingress は gateway-prod だけに絞る。
+# egress は initContainer がリリースを取得する GitHub だけ（本体は外へ出る必要がない）。
+# toFQDNs は Cilium の DNS proxy で解決結果を学習するので、DNS も同じ名前に限る。
+# kubelet の liveness/readiness probe は Cilium が host 由来として自動許可する。
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: markport-guard
+  namespace: app-kensan
+spec:
+  endpointSelector:
+    matchLabels:
+      app.kubernetes.io/name: markport
+  ingress:
+    - fromEndpoints:
+        - matchLabels:
+            k8s:io.kubernetes.pod.namespace: istio-system
+            gateway.networking.k8s.io/gateway-name: gateway-prod
+      toPorts:
+        - ports:
+            - port: "80"
+              protocol: TCP
+  egress:
+    - toEndpoints:
+        - matchLabels:
+            k8s:io.kubernetes.pod.namespace: kube-system
+            k8s-app: kube-dns
+      toPorts:
+        - ports:
+            - port: "53"
+              protocol: ANY
+          rules:
+            dns:
+              - matchName: github.com
+              - matchName: release-assets.githubusercontent.com
+    - toFQDNs:
+        # リリースの URL は github.com で、302 で release-assets へ転送される
+        - matchName: github.com
+        - matchName: release-assets.githubusercontent.com
+      toPorts:
+        - ports:
+            - port: "443"
+              protocol: TCP
