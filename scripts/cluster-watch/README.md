@@ -22,7 +22,7 @@ Regenerate snapshots and manifests together when the UI changes. The packager re
 
 ## Rollback
 
-Revert this deployment PR to restore the previous entry and remove added dashboard ConfigMaps through GitOps. Only ConfigMaps change; no stateful resources are pruned. The existing Prometheus/Loki/Tempo datasource entries are preserved. Remove the sample datasource through Grafana provisioning `deleteDatasources` if it also needs to be removed; removing its YAML alone does not guarantee deletion of an already provisioned datasource.
+Revert this deployment PR to restore the previous entry and remove added dashboard ConfigMaps through GitOps. Only dashboard ConfigMaps and the Application Controller PodMonitor change; no stateful resources are pruned. The existing Prometheus/Loki/Tempo datasource entries are preserved. Remove the sample datasource through Grafana provisioning `deleteDatasources` if it also needs to be removed; removing its YAML alone does not guarantee deletion of an already provisioned datasource.
 
 ## Live application state
 

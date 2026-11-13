@@ -71,8 +71,11 @@ class AppPanelTest(unittest.TestCase):
         self.assertEqual(p['targets'][0]['format'],'table')
 
     def test_packaged_home_is_live_and_scenarios_stay_explicit_samples(self):
-        subprocess.run(['python3',str(HERE/'build.py')],check=True,capture_output=True)
         resources=ROOT/'kubernetes/observability/grafana/resources'
+        committed={p.name:p.read_bytes() for p in resources.glob('*dashboard.yaml')}
+        subprocess.run(['python3',str(HERE/'build.py')],check=True,capture_output=True)
+        for name, content in committed.items():
+            self.assertEqual((resources/name).read_bytes(),content,'Regenerate '+name)
         cm=yaml.safe_load((resources/'cluster-watch-dashboard.yaml').read_text())
         home=json.loads(cm['data']['cluster-watch.json'])
         p=next(p for p in home['panels'] if p['id']==8)
