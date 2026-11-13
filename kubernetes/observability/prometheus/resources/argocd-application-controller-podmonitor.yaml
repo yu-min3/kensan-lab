@@ -1,0 +1,29 @@
+# The controller already serves its named metrics port. No Service or restart
+# is needed; scrape only Application state for Cluster Watch.
+apiVersion: monitoring.coreos.com/v1
+kind: PodMonitor
+metadata:
+  name: argocd-application-controller
+  namespace: monitoring
+  labels:
+    release: prometheus
+spec:
+  namespaceSelector:
+    matchNames:
+      - argocd
+  selector:
+    matchLabels:
+      app.kubernetes.io/instance: argocd
+      app.kubernetes.io/name: argocd-application-controller
+  # Also identifies the automatic up series used by the freshness guard.
+  jobLabel: app.kubernetes.io/name
+  podMetricsEndpoints:
+    - port: metrics
+      path: /metrics
+      interval: 30s
+      scrapeTimeout: 10s
+      honorLabels: false
+      metricRelabelings:
+        - sourceLabels: [__name__]
+          regex: argocd_app_info
+          action: keep
