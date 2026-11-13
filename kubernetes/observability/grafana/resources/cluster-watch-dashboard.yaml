@@ -5290,8 +5290,10 @@ data:
           "id": 7
         },
         {
+          "id": 8,
           "type": "table",
-          "title": "[サンプル] アプリの状態",
+          "title": "アプリの状態",
+          "description": "Argo CDのapp-projectを実測。SyncはGitとの一致、Healthはリソースの健全性です。利用者のHTTP経路は未計測です。収集失敗・120秒以上古い値・情報なしは未取得として扱います。アプリ名からArgo CDの実リソースへ進めます。",
           "gridPos": {
             "x": 0,
             "y": 17,
@@ -5299,28 +5301,64 @@ data:
             "h": 7
           },
           "datasource": {
-            "type": "grafana-testdata-datasource",
-            "uid": "app-status-sample"
+            "type": "prometheus",
+            "uid": "prometheus"
           },
           "targets": [
             {
-              "datasource": {
-                "type": "grafana-testdata-datasource",
-                "uid": "app-status-sample"
-              },
               "refId": "A",
-              "scenarioId": "csv_content",
-              "csvContent": "対象ID,アプリ,Sync,Health,経路,応答p99\r\na,アプリA / 正常例,1,1,1,45\r\nb,アプリB / 障害例,1,0,0,-2\r\nc,アプリC / Git差分例,0,1,1,62\r\nd,アプリD / 未収集例,-1,-1,-1,-1\r\n"
+              "datasource": {
+                "type": "prometheus",
+                "uid": "prometheus"
+              },
+              "expr": "label_replace((label_replace((max by(name,sync_status,health_status) (timestamp(argocd_app_info{job=\"argocd-application-controller\",namespace=\"argocd\",project=\"app-project\"}) and (((argocd_app_info{job=\"argocd-application-controller\",namespace=\"argocd\",project=\"app-project\"} == 1) and (time() - timestamp(argocd_app_info{job=\"argocd-application-controller\",namespace=\"argocd\",project=\"app-project\"}) < 120)) and on() ((min(up{job=\"argocd-application-controller\",namespace=\"argocd\"}) == 1) and (time() - min(timestamp(up{job=\"argocd-application-controller\",namespace=\"argocd\"})) < 120)))) * 1000), \"application_url\", \"https://argocd.platform.yu-min3.com/applications/argocd/$1\", \"name\", \"(.+)\") or label_replace((label_replace((label_replace((label_replace((vector(-1) unless on() (max by(name,sync_status,health_status) (timestamp(argocd_app_info{job=\"argocd-application-controller\",namespace=\"argocd\",project=\"app-project\"}) and (((argocd_app_info{job=\"argocd-application-controller\",namespace=\"argocd\",project=\"app-project\"} == 1) and (time() - timestamp(argocd_app_info{job=\"argocd-application-controller\",namespace=\"argocd\",project=\"app-project\"}) < 120)) and on() ((min(up{job=\"argocd-application-controller\",namespace=\"argocd\"}) == 1) and (time() - min(timestamp(up{job=\"argocd-application-controller\",namespace=\"argocd\"})) < 120)))) * 1000)), \"name\", \"アプリ情報を取得できません\", \"\", \"\")), \"sync_status\", \"未取得\", \"\", \"\")), \"health_status\", \"未取得\", \"\", \"\")), \"application_url\", \"https://argocd.platform.yu-min3.com/applications\", \"\", \"\")), \"route_status\", \"未計測\", \"\", \"\")",
+              "format": "table",
+              "instant": true,
+              "range": false,
+              "editorMode": "code"
+            }
+          ],
+          "links": [
+            {
+              "title": "Argo CDの全Application",
+              "url": "https://argocd.platform.yu-min3.com/applications",
+              "targetBlank": true
+            }
+          ],
+          "transformations": [
+            {
+              "id": "organize",
+              "options": {
+                "excludeByName": {
+                  "Time": true
+                },
+                "indexByName": {
+                  "name": 0,
+                  "sync_status": 1,
+                  "health_status": 2,
+                  "route_status": 3,
+                  "Value": 4,
+                  "application_url": 5
+                },
+                "renameByName": {
+                  "name": "アプリ",
+                  "sync_status": "Sync",
+                  "health_status": "Health",
+                  "route_status": "経路",
+                  "Value": "観測時刻"
+                }
+              }
             }
           ],
           "fieldConfig": {
             "defaults": {
+              "noValue": "未取得",
               "color": {
                 "mode": "fixed",
                 "fixedColor": "text"
               },
               "custom": {
-                "align": "auto",
+                "align": "left",
                 "cellOptions": {
                   "type": "auto"
                 }
@@ -5330,40 +5368,22 @@ data:
               {
                 "matcher": {
                   "id": "byName",
-                  "options": "Health"
+                  "options": "アプリ"
                 },
                 "properties": [
                   {
-                    "id": "mappings",
+                    "id": "custom.width",
+                    "value": 235
+                  },
+                  {
+                    "id": "links",
                     "value": [
                       {
-                        "type": "value",
-                        "options": {
-                          "-1": {
-                            "text": "? 未収集",
-                            "color": "gray"
-                          },
-                          "0": {
-                            "text": "Degraded",
-                            "color": "red"
-                          },
-                          "1": {
-                            "text": "Healthy",
-                            "color": "green"
-                          }
-                        }
+                        "title": "Argo CDでリソースを確認",
+                        "url": "${__data.fields[\"application_url\"]}",
+                        "targetBlank": true
                       }
                     ]
-                  },
-                  {
-                    "id": "custom.cellOptions",
-                    "value": {
-                      "type": "color-text"
-                    }
-                  },
-                  {
-                    "id": "custom.width",
-                    "value": 145
                   }
                 ]
               },
@@ -5371,153 +5391,99 @@ data:
                 "matcher": {
                   "id": "byName",
                   "options": "Sync"
-                },
-                "properties": [
-                  {
-                    "id": "mappings",
-                    "value": [
-                      {
-                        "type": "value",
-                        "options": {
-                          "-1": {
-                            "text": "? 未収集",
-                            "color": "gray"
-                          },
-                          "0": {
-                            "text": "OutOfSync",
-                            "color": "orange"
-                          },
-                          "1": {
-                            "text": "Synced",
-                            "color": "text"
-                          }
-                        }
-                      }
-                    ]
-                  },
-                  {
-                    "id": "custom.cellOptions",
-                    "value": {
-                      "type": "color-text"
-                    }
-                  },
-                  {
-                    "id": "custom.width",
-                    "value": 145
-                  }
-                ]
-              },
-              {
-                "matcher": {
-                  "id": "byName",
-                  "options": "経路"
-                },
-                "properties": [
-                  {
-                    "id": "mappings",
-                    "value": [
-                      {
-                        "type": "value",
-                        "options": {
-                          "-1": {
-                            "text": "? 未収集",
-                            "color": "gray"
-                          },
-                          "0": {
-                            "text": "× NG",
-                            "color": "red"
-                          },
-                          "1": {
-                            "text": "● OK",
-                            "color": "green"
-                          }
-                        }
-                      }
-                    ]
-                  },
-                  {
-                    "id": "custom.cellOptions",
-                    "value": {
-                      "type": "color-text"
-                    }
-                  },
-                  {
-                    "id": "custom.width",
-                    "value": 145
-                  }
-                ]
-              },
-              {
-                "matcher": {
-                  "id": "byName",
-                  "options": "応答p99"
-                },
-                "properties": [
-                  {
-                    "id": "unit",
-                    "value": "ms"
-                  },
-                  {
-                    "id": "decimals",
-                    "value": 0
-                  },
-                  {
-                    "id": "mappings",
-                    "value": [
-                      {
-                        "type": "value",
-                        "options": {
-                          "-1": {
-                            "text": "? 未収集",
-                            "color": "gray"
-                          },
-                          "-2": {
-                            "text": "— 応答なし",
-                            "color": "gray"
-                          }
-                        }
-                      }
-                    ]
-                  },
-                  {
-                    "id": "custom.width",
-                    "value": 130
-                  }
-                ]
-              },
-              {
-                "matcher": {
-                  "id": "byName",
-                  "options": "例"
-                },
-                "properties": [
-                  {
-                    "id": "custom.hidden",
-                    "value": true
-                  }
-                ]
-              },
-              {
-                "matcher": {
-                  "id": "byName",
-                  "options": "Health"
                 },
                 "properties": [
                   {
                     "id": "custom.width",
                     "value": 115
+                  },
+                  {
+                    "id": "custom.cellOptions",
+                    "value": {
+                      "type": "color-text"
+                    }
+                  },
+                  {
+                    "id": "mappings",
+                    "value": [
+                      {
+                        "type": "value",
+                        "options": {
+                          "Synced": {
+                            "text": "Synced",
+                            "color": "text"
+                          },
+                          "OutOfSync": {
+                            "text": "OutOfSync",
+                            "color": "orange"
+                          },
+                          "Unknown": {
+                            "text": "Unknown",
+                            "color": "gray"
+                          },
+                          "未取得": {
+                            "text": "◇ 未取得",
+                            "color": "gray"
+                          }
+                        }
+                      }
+                    ]
                   }
                 ]
               },
               {
                 "matcher": {
                   "id": "byName",
-                  "options": "Sync"
+                  "options": "Health"
                 },
                 "properties": [
                   {
                     "id": "custom.width",
-                    "value": 110
+                    "value": 125
+                  },
+                  {
+                    "id": "custom.cellOptions",
+                    "value": {
+                      "type": "color-text"
+                    }
+                  },
+                  {
+                    "id": "mappings",
+                    "value": [
+                      {
+                        "type": "value",
+                        "options": {
+                          "Healthy": {
+                            "text": "● Healthy",
+                            "color": "green"
+                          },
+                          "Degraded": {
+                            "text": "× Degraded",
+                            "color": "red"
+                          },
+                          "Progressing": {
+                            "text": "◷ Progressing",
+                            "color": "blue"
+                          },
+                          "Missing": {
+                            "text": "× Missing",
+                            "color": "red"
+                          },
+                          "Suspended": {
+                            "text": "Ⅱ Suspended",
+                            "color": "gray"
+                          },
+                          "Unknown": {
+                            "text": "◇ Unknown",
+                            "color": "gray"
+                          },
+                          "未取得": {
+                            "text": "◇ 未取得",
+                            "color": "gray"
+                          }
+                        }
+                      }
+                    ]
                   }
                 ]
               },
@@ -5529,41 +5495,69 @@ data:
                 "properties": [
                   {
                     "id": "custom.width",
-                    "value": 120
-                  }
-                ]
-              },
-              {
-                "matcher": {
-                  "id": "byName",
-                  "options": "応答p99"
-                },
-                "properties": [
-                  {
-                    "id": "custom.width",
                     "value": 100
-                  }
-                ]
-              },
-              {
-                "matcher": {
-                  "id": "byName",
-                  "options": "アプリ"
-                },
-                "properties": [
+                  },
                   {
-                    "id": "links",
+                    "id": "custom.cellOptions",
+                    "value": {
+                      "type": "color-text"
+                    }
+                  },
+                  {
+                    "id": "mappings",
                     "value": [
                       {
-                        "title": "このアプリの原因を確認（サンプル）",
-                        "url": "/d/app-sample-${__data.fields[0]}/details?var-datasource=prometheus&var-cluster=&from=${__from}&to=${__to}",
-                        "targetBlank": false
+                        "type": "value",
+                        "options": {
+                          "未計測": {
+                            "text": "— 未計測",
+                            "color": "gray"
+                          }
+                        }
                       }
                     ]
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "観測時刻"
+                },
+                "properties": [
+                  {
+                    "id": "unit",
+                    "value": "time:YYYY-MM-DD HH:mm:ss"
                   },
                   {
                     "id": "custom.width",
-                    "value": 190
+                    "value": 180
+                  },
+                  {
+                    "id": "mappings",
+                    "value": [
+                      {
+                        "type": "value",
+                        "options": {
+                          "-1": {
+                            "text": "—",
+                            "color": "gray"
+                          }
+                        }
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "application_url"
+                },
+                "properties": [
+                  {
+                    "id": "custom.hidden",
+                    "value": true
                   }
                 ]
               }
@@ -5572,22 +5566,16 @@ data:
           "options": {
             "showHeader": true,
             "cellHeight": "sm",
+            "sortBy": [
+              {
+                "displayName": "アプリ",
+                "desc": false
+              }
+            ],
             "footer": {
               "show": false
             }
-          },
-          "description": "アプリの状態は全て架空データ。上段のノード・基盤は実測。Argo Health/Syncは未収集。",
-          "transformations": [
-            {
-              "id": "organize",
-              "options": {
-                "renameByName": {
-                  "対象ID": "例"
-                }
-              }
-            }
-          ],
-          "id": 8
+          }
         }
       ],
       "templating": {
@@ -5609,5 +5597,5 @@ data:
           "url": "/d/cluster-watch-classic/overview"
         }
       ],
-      "description": "上段のノードと基盤は実測、アプリ欄は架空データ。Argoメトリクス未収集のデザイン試作。"
+      "description": "ノード・基盤とArgo CDのアプリ状態を実測。HTTP経路とCilium/Istioの通信機能は未計測。"
     }

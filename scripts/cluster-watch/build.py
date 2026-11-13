@@ -4,6 +4,8 @@ import copy
 import json
 from pathlib import Path
 
+from apps import application_panel
+
 HERE = Path(__file__).resolve().parent
 OUTPUT = HERE.parents[1] / 'kubernetes/observability/grafana/resources'
 REMAP = {'200ac8fdbfbb74b39aff88118e4d1c2c':'cw-detail-node',
@@ -36,6 +38,8 @@ def build():
     docs = [production(json.loads(p.read_text())) for p in sorted((HERE / 'validated-dashboards').glob('*.json'))]
     home = copy.deepcopy(next(d for d in docs if d['uid'] == 'cluster-watch-app-sample'))
     home.update(uid='cluster-watch', title='Cluster Watch', tags=['platform', 'watch'])
+    home['panels'] = [application_panel() if p['id'] == 8 else p for p in home['panels']]
+    home['description'] = 'ノード・基盤とArgo CDのアプリ状態を実測。HTTP経路とCilium/Istioの通信機能は未計測。'
     home['links'] = [
         {'type':'link', 'title':'通信機能の表示例 / SAMPLE', 'url':'/d/cw-function-normal/sample'},
         {'type':'link', 'title':'従来のCluster Watch', 'url':'/d/cluster-watch-classic/overview'}]
