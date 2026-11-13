@@ -1,5 +1,6 @@
 """Regression checks for the operational app table, including PromQL failure paths."""
 import json
+import os
 from pathlib import Path
 import subprocess
 import tempfile
@@ -92,7 +93,10 @@ class AppPanelTest(unittest.TestCase):
             path=Path(temp)/'cases.yaml'
             tests=cases()
             path.write_text(yaml.safe_dump({'rule_files':[], 'evaluation_interval':'1m','tests':tests},allow_unicode=True))
-            subprocess.run(['docker','run','--rm','-v',f'{path.parent}:/work:ro',
+            # TemporaryDirectory is 0700. Match its owner on Linux runners;
+            # Docker Desktop's bind-mount permissions can hide this mismatch.
+            subprocess.run(['docker','run','--rm','--user',f'{os.getuid()}:{os.getgid()}',
+                            '-v',f'{path.parent}:/work:ro',
                             '--entrypoint','promtool','prom/prometheus:v3.1.0','test','rules','/work/cases.yaml'],check=True)
             print(f'{len(tests)} app state / collection cases passed')
 
