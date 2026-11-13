@@ -20,7 +20,18 @@ env:
     value: konro-agent-runtime
   - name: KONRO_AGENT_CLIENT_SECRET_FILE
     value: /etc/konro/agent-credentials/client-secret
+  # LLMOps: one trace per import/menu proposal. Content (LLM input/output) is
+  # attached for Langfuse; the collector strips it on the Tempo path.
+  - name: KONRO_TRACE_CONTENT
+    value: "true"
+  # Sends traceparent to agent-runtime. Keep "false" until the runtime on sense
+  # supports it (older runtimes reject unknown request fields with 400).
+  - name: KONRO_AGENT_TRACE
+    value: "false"
 reloader: true
+otel:
+  enabled: true
+  serviceName: konro
 extraVolumeMounts:
   - name: agent-ca
     mountPath: /etc/konro/agent-ca

@@ -2,11 +2,16 @@ package agentclient
 
 import (
 	"context"
+	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"testing"
+
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/propagation"
+	sdktrace "go.opentelemetry.io/otel/sdk/trace"
 )
 
 func TestTransportRejectsRedirectAndInvalidResponses(t *testing.T) {
@@ -55,5 +60,35 @@ func TestProjectedCredentialAllowsOnlyPrivateGroup(t *testing.T) {
 	}
 	if _, e := privateFile(link); e == nil {
 		t.Fatal("world readable accepted")
+	}
+}
+
+func TestTraceparentSentOnlyWhenEnabled(t *testing.T) {
+	var got []string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var body map[string]any
+		_ = json.NewDecoder(r.Body).Decode(&body)
+		v, _ := body["traceparent"].(string)
+		got = append(got, v)
+		w.WriteHeader(202)
+		_, _ = w.Write([]byte(`{"id":"j","state":"queued"}`))
+	}))
+	defer srv.Close()
+	otel.SetTextMapPropagator(propagation.TraceContext{})
+	otel.SetTracerProvider(sdktrace.NewTracerProvider())
+	ctx, span := otel.Tracer("t").Start(context.Background(), "s")
+	defer span.End()
+	for _, enabled := range []string{"", "true"} {
+		t.Setenv("KONRO_AGENT_TRACE", enabled)
+		c, err := New("http://127.0.0.1"+srv.URL[len("http://127.0.0.1"):], func(context.Context) (string, error) { return "t", nil })
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, err = c.Create(ctx, Request{Profile: "text", Traceparent: "00-ffffffffffffffffffffffffffffffff-ffffffffffffffff-01"}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if got[0] != "" || len(got[1]) != 55 || got[1][:3] != "00-" {
+		t.Fatalf("traceparent gating: %q", got)
 	}
 }
