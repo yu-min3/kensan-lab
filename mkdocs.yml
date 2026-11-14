@@ -236,6 +236,7 @@ nav:
           - 020 — Namespace Lifecycle App Cleanup: adr/020-namespace-lifecycle-app-cleanup.md
           - 021 — gateway-prod Default-Protected Authorization: adr/021-gateway-prod-default-protected.md
           - 022 — Backstage Native OIDC: adr/022-backstage-native-oidc.md
+          - 023 — App Host Ownership & Chart Surface: adr/023-app-host-ownership-and-chart-surface.md
   - Reference:
       - reference/index.md
       - Bare-metal bootstrap:

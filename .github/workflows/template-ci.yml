@@ -52,13 +52,13 @@ jobs:
           cp -r "${SKELETON}" /tmp/scaffolded
           python3 - <<'PY'
           import pathlib, re
-          # What the scaffolder would fill in, for a service called sample-api.
+          # What the scaffolder would fill in, for a service called widget.
           sample = {
-              "name": "widget-service",
+              "name": "widget",
               "description": "Sample FastAPI service",
               "ownerSlug": "platform-engineering",
               "repoOwner": "yu-min3",
-              "repoName": "app-widget-service",
+              "repoName": "app-widget",
               "owner": "platform-engineering",
               "system": "developer-portal",
               "domain": "platform",
@@ -67,18 +67,18 @@ jobs:
               # so the rendered values file is where they have to appear.
               "theme": "night",
               "message": "hello from CI",
-              "hostname": "widget-service.app.yu-min3.com",
-              "imageRepository": "ghcr.io/yu-min3/app-widget-service",
+              "hostname": "widget.app.yu-min3.com",
+              "imageRepository": "ghcr.io/yu-min3/app-widget",
               "imageTag": "v0.1.0",
-              "applicationUrl": "https://widget-service.app.yu-min3.com/docs",
-              "argocdUrl": "https://argocd.platform.yu-min3.com/applications/app-widget-service",
+              "applicationUrl": "https://widget.app.yu-min3.com/docs",
+              "argocdUrl": "https://argocd.platform.yu-min3.com/applications/app-widget",
               "loadButtonEnabled": "false",
               "ghcrPullSecretEnabled": "true",
               "otelEnabled": "true",
               "gatewayName": "gateway-prod",
               "gatewayNamespace": "istio-system",
               "platformRepoUrl": "https://github.com/yu-min3/kensan-lab",
-              "applicationRepoUrl": "https://github.com/yu-min3/app-widget-service",
+              "applicationRepoUrl": "https://github.com/yu-min3/app-widget",
           }
           # Dotted references (values.destination.x) count too — the earlier
           # pattern matched only single words, so a placeholder the scaffolder
@@ -126,7 +126,7 @@ jobs:
       # rather than on somebody's first deploy.
       - name: Render through charts/app-base
         run: |
-          helm template widget-service charts/app-base -f /tmp/scaffolded/deploy/values.yaml > /tmp/rendered.yaml
+          helm template widget charts/app-base -f /tmp/scaffolded/deploy/values.yaml > /tmp/rendered.yaml
           grep -q 'kind: Deployment' /tmp/rendered.yaml
           grep -q 'kind: HTTPRoute' /tmp/rendered.yaml
           # The image declares a named USER, so the values must pin the numeric
@@ -137,7 +137,7 @@ jobs:
           # service published on it without the /oauth2 route sends people to
           # Keycloak and then 404s the callback. The failure looks like a broken
           # login rather than a missing route, so assert the route exists.
-          grep -q 'widget-service-oauth2' /tmp/rendered.yaml
+          grep -q 'widget-oauth2' /tmp/rendered.yaml
 
       - name: Check the environment-specific entry points
         run: |
@@ -282,7 +282,7 @@ jobs:
               #    expressions; substitute the service name as the scaffolder
               #    would.
               for f in steps["rename-platform-paths"]["input"]["files"]:
-                  dest = root / expr.sub("widget-service", f["to"])
+                  dest = root / expr.sub("widget", f["to"])
                   dest.parent.mkdir(parents=True, exist_ok=True)
                   (root / f["from"]).rename(dest)
 
@@ -291,30 +291,30 @@ jobs:
               print(f"{template} pull request would carry:", *want, sep="\n  ")
 
           check("template.yaml", [
-              ".backstage/kubernetes/argocd/applications/apps/app-widget-service/app.yaml",
-              ".backstage/kubernetes/auth/oauth2-proxy/resources/referencegrant-app-widget-service.yaml",
+              ".backstage/kubernetes/argocd/applications/apps/app-widget/app.yaml",
+              ".backstage/kubernetes/auth/oauth2-proxy/resources/referencegrant-app-widget.yaml",
           ])
           # Explore's root reads exactly one directory, so both files land there.
           # Asserting the ReferenceGrant by name is the point: shipped in the
           # wrong directory it is still committed and merged, and the only
           # symptom is a login redirect that dead-ends after the app goes green.
           check("template-explore.yaml", [
-              ".backstage/environments/kind/generated-applications/app-widget-service/app.yaml",
-              ".backstage/environments/kind/generated-applications/app-widget-service/referencegrant.yaml",
+              ".backstage/environments/kind/generated-applications/app-widget/app.yaml",
+              ".backstage/environments/kind/generated-applications/app-widget/referencegrant.yaml",
           ])
           PY
 
       - name: Run the image build's test stage
-        run: docker build --target test -t widget-service:test /tmp/scaffolded
+        run: docker build --target test -t widget:test /tmp/scaffolded
 
       - name: Build the image
-        run: docker build -t widget-service:ci /tmp/scaffolded
+        run: docker build -t widget:ci /tmp/scaffolded
 
       # Building is not enough: both defects this job exists for produced an
       # image that built and then exited immediately.
       - name: Run it and check the endpoints
         run: |
-          docker run -d --name widget-service -p 8000:8000 widget-service:ci
+          docker run -d --name widget -p 8000:8000 widget:ci
           for i in $(seq 1 30); do
             if curl -fsS -m 2 http://127.0.0.1:8000/health >/dev/null 2>&1; then
               echo "healthy after ${i}s"
@@ -332,7 +332,7 @@ jobs:
           # that is never substituted looks identical to a working app.
           cfg="$(curl -fsS -m 5 http://127.0.0.1:8000/api/config)"
           echo "$cfg"
-          echo "$cfg" | grep -q "widget-service" || {
+          echo "$cfg" | grep -q "widget" || {
             echo "the running app does not know its own name" >&2; exit 1; }
           echo "$cfg" | grep -qF '{{' && {
             echo "an unsubstituted placeholder reached the running app" >&2; exit 1; }
@@ -361,8 +361,8 @@ jobs:
             echo "/api/whoami did not read the gateway headers" >&2; exit 1; }
 
           # charts/app-base runs it as UID 1000; the image must agree.
-          test "$(docker exec widget-service id -u)" = "1000"
+          test "$(docker exec widget id -u)" = "1000"
 
       - name: Container logs
         if: failure()
-        run: docker logs widget-service 2>&1 | tail -40
+        run: docker logs widget 2>&1 | tail -40

@@ -16,6 +16,16 @@ command: []
 args: []
 extraVolumeMounts: []
 extraVolumes: []
+
+# Pod の追加要素。中身はそのまま Pod spec に入る。
+# 危ない設定（root・特権など）の禁止は chart ではなく namespace の
+# Pod Security restricted（PSA / Kyverno）が担うので、ここでは制限しない。
+# 追加コンテナには securityContext が自動で付かないため各自で書く。
+initContainers: []
+extraContainers: []
+podAnnotations: {}
+# selector には入らない（Deployment の selector は不変のため）
+podLabels: {}
 # null preserves the existing Pod default; apps may explicitly opt out.
 automountServiceAccountToken: null
 
@@ -84,6 +94,9 @@ httproute:
     name: gateway-prod
     namespace: istio-system
     sectionName: "" # Optional listener (e.g. https); empty keeps existing behavior
+  # app へのルール（PathPrefix /）に付ける Gateway API の filters。そのまま入る。
+  # 例: Host を検査するアプリへ URLRewrite で hostname を書き換える
+  filters: []
 
 # gateway 層 OAuth2（oauth2-proxy ext_authz、Keycloak SSO）の /oauth2/* ルート。
 #
@@ -102,3 +115,11 @@ auth:
 
 # Secret/ConfigMap 更新時の自動 rollout（stakater/reloader）
 reloader: true
+
+# 新規App専用namespaceをchartで管理する場合だけ有効化する。
+# 既存namespaceの所有を自動で移さない。Platformがラベル値を選ぶ。
+namespace:
+  create: false
+  environment: production
+  team: ""
+  app: ""

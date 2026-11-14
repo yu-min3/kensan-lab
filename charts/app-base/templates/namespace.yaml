@@ -1,0 +1,25 @@
+{{- if .Values.namespace.create }}
+{{- $environment := required "namespace.environment is required when namespace.create=true" .Values.namespace.environment }}
+{{- $team := required "namespace.team is required when namespace.create=true" .Values.namespace.team }}
+{{- $app := required "namespace.app is required when namespace.create=true" .Values.namespace.app }}
+{{- range $value := list $environment $team $app }}
+{{- if or (gt (len $value) 63) (not (regexMatch "^[a-zA-Z0-9]([a-zA-Z0-9_.-]*[a-zA-Z0-9])?$" $value)) }}
+{{- fail "namespace label values must be valid Kubernetes labels" }}
+{{- end }}
+{{- end }}
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: {{ .Release.Namespace | quote }}
+  annotations:
+    helm.sh/resource-policy: keep
+    argocd.argoproj.io/sync-options: Prune=false
+    argocd.argoproj.io/sync-wave: "-2"
+  labels:
+    kensan-lab.platform/environment: {{ $environment | quote }}
+    kensan-lab.platform/team: {{ $team | quote }}
+    kensan-lab.platform/app: {{ $app | quote }}
+    kensan-lab.platform/tier: application
+    kensan-lab.platform/pss-level: restricted
+    pod-security.kubernetes.io/enforce: restricted
+{{- end }}
