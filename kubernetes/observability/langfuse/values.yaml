@@ -14,7 +14,7 @@ langfuse:
   encryptionKey:
     secretKeyRef: {name: langfuse-credentials, key: encryption-key}
   nextauth:
-    url: http://localhost:3000   # UI is reached by kubectl port-forward (README)
+    url: http://localhost:3300   # UI via kubectl port-forward svc/langfuse-web 3300:3000 (3000 is often taken locally)
     secret:
       secretKeyRef: {name: langfuse-credentials, key: nextauth-secret}
   features:
