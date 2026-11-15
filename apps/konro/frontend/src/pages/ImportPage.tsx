@@ -79,8 +79,9 @@ export function ImportPage({ onClose, onSaved, initialURL="",initialDraft="",ret
           <Field id="import-ingredients" label="材料（1行に1項目）" rows={6} value={ingredients} onChange={(value)=>{setIngredients(value);setConfirmed(false);}} />
           <Field id="import-steps" label="手順（1行に1つの手順）" rows={8} value={steps} onChange={(value)=>{setSteps(value);setConfirmed(false);}} />
           <label className="confirm-field"><input type="checkbox" checked={confirmed} onChange={(e) => setConfirmed(e.target.checked)} />分量・時間・温度と手順を確認しました</label>
-          <p className="recipe-summary" role="status">{!complete?'タイトル・材料・手順を入力してください。':!confirmed?'内容を確認してチェックすると、上部の保存ボタンが使えます。':'確認済みです。上部の保存ボタンでレシピに追加できます。'}</p>
+          <p className="recipe-summary" role="status">{!complete?'タイトル・材料・手順を入力してください。':!confirmed?'内容を確認してチェックすると、保存できます。':'確認済みです。保存するとレシピに追加されます。'}</p>
           <div className="editor-actions">
+            <button className="recipe-action recipe-action-primary" aria-label="確認したレシピを保存" disabled={!canSave} onClick={commit}>{busy ? "保存中…" : "レシピとして保存"}</button>
             <button className="chip" onClick={() => perform(async () => { await persist(); onClose(); })}>下書きを保存して戻る</button>
           </div>
         </fieldset>
