@@ -2,88 +2,68 @@
 
 ${{ values.description }}
 
-Generated from the Backstage FastAPI template.
+Generated from the Backstage FastAPI template: a FastAPI backend, React frontend, CI workflows, shared-chart deployment configuration and TechDocs sources.
 
-## Quick Start
+## Local Development
 
-### Option 1: Dev Container (recommended)
-
-Open the folder in VS Code → `F1` → "Dev Containers: Reopen in Container". First boot builds the container (Python 3.11 + uv + ruff + kubectl + Docker CLI + VS Code extensions). Shortcuts inside the container: `F5` run/debug, `Ctrl+Shift+B` sync deps, `Ctrl+Shift+T` test.
-
-Prereqs: [Docker](https://www.docker.com/get-started) (or [Podman](https://podman.io/)), [VS Code](https://code.visualstudio.com/), [Dev Containers extension](https://marketplace.visualstudio.com/items?itemName=ms-vscode-remote.remote-containers).
-
-### Option 2: Local
+With Python 3.11, [uv](https://docs.astral.sh/uv/) and Make installed:
 
 ```bash
-curl -LsSf https://astral.sh/uv/install.sh | sh   # uv (Python package manager)
-make help                                         # see all targets
-make sync                                         # create .venv + uv.lock (commit uv.lock!)
-make run-local                                    # run on :8000
+make sync
+make run-local
 ```
 
-API docs: <http://localhost:8000/docs> (Swagger) · <http://localhost:8000/redoc>.
+The backend listens on port 8000. API docs: [Swagger UI](http://localhost:8000/docs) and [ReDoc](http://localhost:8000/redoc).
 
-## Common Commands
+For the frontend, install Node.js and npm, then run in a second terminal:
 
 ```bash
-make help                  # full target list
-make format / lint / test  # code quality
-make build TAG=v1.0        # build image
-make deploy TAG=v0.2.0     # build + push + bump deploy/values.yaml
-make validate              # kubectl apply --dry-run on deploy/resources/
+cd frontend
+npm install
+npm run dev
 ```
 
-`TAG` is required and must be `vX.Y` (e.g. `v1.0`, `v10.5`). See `make help` for the container runtime switch (`CONTAINER_RUNTIME=podman`) and other knobs.
+Open the URL printed by Vite. It proxies `/api` to the backend; `make run-local` alone does not build the React page. The Dockerfile builds and serves both together.
+
+An optional VS Code Dev Container is included. Its configuration uses Podman-specific options; inspect `.devcontainer/devcontainer.json` before choosing a runtime.
+
+## Checks
+
+```bash
+make format
+make lint
+make test
+```
+
+These targets operate on the Python backend. Run `npm run build` from `frontend/` after installing its dependencies to verify the frontend build. `make help` lists the other targets; the GHCR publishing helpers are not the Explore delivery workflow.
 
 ## Deployment
 
-GitOps via Argo CD. `make deploy TAG=v0.2.0` builds, pushes to GHCR, and rewrites the image tag in `deploy/values.yaml`. **Commit + push** that change to trigger sync:
+The platform owns `charts/app-base`. This service owns `deploy/values.yaml` and `deploy/resources/` (namespace and ServiceMonitor). Backstage creates a platform configuration PR that registers an Argo CD Application and the OAuth2 cross-namespace ReferenceGrant.
 
-```bash
-git add deploy/values.yaml
-git commit -m "Deploy v1.0"
-git push
-```
+Review and merge that platform PR to add the service. The active Git host determines the image workflow:
 
-Argo CD then syncs the app namespace.
+- **Explore / Gitea:** `.gitea/workflows/explore-build.yaml` tests, builds and pushes the image to the in-cluster registry, then records the source SHA tag in `deploy/values.yaml`. Backstage waits for the first build before opening the platform PR.
+- **GitHub:** `.github/workflows/build-and-push.yaml` lints, tests and builds ARM64/AMD64 images. Non-PR runs publish to GHCR; commit the chosen published tag in `deploy/values.yaml` to deploy it.
 
-## Directory Structure
+Runtime configuration such as replicas, theme and greeting is also in `deploy/values.yaml`. In Explore, changes confined to `deploy/**` skip the image build while still reaching Argo CD.
 
-```
-.
-├── app/main.py                     # application source
-├── deploy/
-│   ├── values.yaml              # values for charts/app-base — the only deploy configuration
-│   └── resources/              # namespace / ServiceMonitor — owned by this repository
-│   ├── deployment.yaml
-│   ├── service.yaml
-│   ├── httproute.yaml
-│   ├── authz-policy.yaml
-│   └── servicemonitor.yaml
-├── docs/index.md                   # TechDocs source
-├── .backstage/                     # what gets raised as a PR against the platform repo
-│   └── kubernetes/                 #   the Application and the ReferenceGrant
-├── Dockerfile
-├── requirements.txt
-└── catalog-info.yaml               # Backstage catalog entry
-```
+## Files and Documentation
 
-## Endpoints
+- `app/`, `frontend/`, `tests/`: application source and backend tests
+- `Dockerfile`: frontend build, backend tests and runtime image
+- `pyproject.toml`, `uv.lock`: Python dependencies
+- `deploy/values.yaml`: values consumed by the shared platform chart
+- `deploy/resources/`: namespace and ServiceMonitor manifests
+- `catalog-info.yaml`: Backstage Component, API and TechDocs registration
+- `docs/index.md`, `mkdocs.yml`: documentation source and site configuration
 
-- `GET /` — the page
-- `GET /health` — health check
-- `GET /metrics` — Prometheus metrics (scraped via ServiceMonitor)
-- `GET /api/config` — the name, theme and greeting, read from the environment
-- `GET /api/whoami` — the caller, as the gateway reported it
-- `GET /api/v1/example` — example
-- `GET|POST|DELETE /api/load` — occupy a core on purpose, for a demonstration.
-  Refused unless `DEMO_LOAD_ENABLED` is set, which only the disposable kind
-  environment does
+Read [the service documentation](docs/index.md) for development, delivery, authentication, monitoring and troubleshooting. The same content is available in the service's Docs tab in Backstage.
 
 ## Links
 
-- [Argo CD](https://argocd.yu-min3.com/applications/app-${{ values.name }})
-- [Live App](https://${{ values.name }}.yu-min3.com)
+- [Argo CD](${{ values.argocdUrl }})
+- [Application](https://${{ values.hostname }})
 
 ## Owner
 
