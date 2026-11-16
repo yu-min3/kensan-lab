@@ -35,6 +35,7 @@ from __future__ import annotations
 import base64
 import os
 import pathlib
+import re
 import sys
 
 from playwright.sync_api import (
@@ -135,7 +136,15 @@ def shot(page: Page, url: str, name: str, *, wait_for: str | None = None,
         before_shot(page)
 
     path = OUT / f"{name}.png"
-    page.screenshot(path=str(path))
+    # Argo CD displays commit authors from the checkout seeded into Gitea.
+    # Keep personal email addresses out of published screenshots without
+    # changing repository metadata or inventing a replacement author.
+    masks = []
+    if name == "argocd-tree":
+        masks.append(page.get_by_text(re.compile(
+            r"[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}", re.IGNORECASE)))
+        masks.append(page.locator('a[href^="mailto:"]'))
+    page.screenshot(path=str(path), mask=masks, mask_color="#64748b")
     if height or width:
         page.set_viewport_size(VIEWPORT)
     print(f"  {path.relative_to(OUT.parent.parent.parent)}")
