@@ -4,7 +4,10 @@
 # markport 自体は認証を持たず、workspace 全体を読める。gateway（Keycloak SSO）を
 # 迂回してクラスタ内の他 Pod から直接読まれないよう、ingress は gateway-prod だけに絞る。
 # egress は initContainer がリリースを取得する GitHub だけ（本体は外へ出る必要がない）。
-# toFQDNs は Cilium の DNS proxy で解決結果を学習するので、DNS も同じ名前に限る。
+# toFQDNs は Cilium の DNS proxy で解決結果を学習するので、DNS は proxy を通す。
+# 問い合わせる名前は絞らない。resolver は search domain を付けた名前
+# （github.com.app-kensan.svc.cluster.local 等）から引き、proxy がそれを拒否すると
+# musl（curl イメージ）は名前解決ごと諦める。接続先は下の toFQDNs で絞っている。
 # kubelet の liveness/readiness probe は Cilium が host 由来として自動許可する。
 apiVersion: cilium.io/v2
 kind: CiliumNetworkPolicy
@@ -35,8 +38,7 @@ spec:
               protocol: ANY
           rules:
             dns:
-              - matchName: github.com
-              - matchName: release-assets.githubusercontent.com
+              - matchPattern: "*"
     - toFQDNs:
         # リリースの URL は github.com で、302 で release-assets へ転送される
         - matchName: github.com
