@@ -54,6 +54,10 @@ spec:
     kind: Service
   - group: "networking.k8s.io"
     kind: NetworkPolicy
+  # 宛先を FQDN や L7 で絞るとき用（例: markport の GitHub 取得だけ許す egress）。
+  # namespaced なので効くのは自 namespace の Pod だけ。Clusterwide 版は許可しない
+  - group: "cilium.io"
+    kind: CiliumNetworkPolicy
   - group: "gateway.networking.k8s.io"
     kind: HTTPRoute
   # Configuration & Identity
