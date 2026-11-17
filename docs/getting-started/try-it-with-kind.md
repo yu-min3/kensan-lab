@@ -235,8 +235,11 @@ flowchart LR
 Watch the new Argo CD Application appear:
 
 ```bash
-kubectl -n argocd get application app-$APP -w
+kubectl -n argocd get applications --field-selector metadata.name=app-$APP -w
 ```
+
+The watch can start before the Application exists. It prints the new Application
+when Argo CD discovers it; press **Ctrl+C** when it is `Synced` and `Healthy`.
 
 When it is `Synced` and `Healthy`, open `https://<name>.127-0-0-1.sslip.io` and
 compare it with the [original demo](https://demo.127-0-0-1.sslip.io){ target="_blank" rel="noopener" }.
