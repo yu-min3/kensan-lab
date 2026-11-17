@@ -40,7 +40,8 @@ export function SearchPage({search:s,onClose,onImport,managing,onManage,onCloseM
  return <main className="editor-page search-page">
   <header className="header-row"><h1 className="h-serif">Webでレシピを探す</h1><button className="chip" onClick={onClose}>一覧へ</button></header>
   <CreatorNotice favorites={favorites}/>
-  <Panel>
+  <Panel className="search-conditions" aria-labelledby="web-search-title">
+   <h2 id="web-search-title" className="h-serif">検索する条件</h2>
    <form onSubmit={e=>{e.preventDefault();void s.search()}} aria-label="Webレシピ検索">
     <div className="web-search-query"><Field id="web-query" label="料理名・材料" value={s.q} onChange={s.setQ} maxLength={100}/>
     <button className="recipe-action recipe-action-primary" disabled={!s.q.trim()} type="submit">{s.loading?'検索し直す':'検索する'}</button></div>
@@ -55,7 +56,7 @@ export function SearchPage({search:s,onClose,onImport,managing,onManage,onCloseM
   {s.loading&&<p role="status"><span className="import-spinner" aria-hidden="true"/>Webで候補を探しています…</p>}
   {s.error&&<p className="notice" role="alert">{s.error}</p>}
   {s.data&&<>
-   <h2 className="h-serif">「{s.submitted}」の検索結果</h2>
+   <h2 className="h-serif recipe-results-heading">「{s.submitted}」の検索結果</h2>
    {s.data.results.some(r=>r.preferred)&&<p className="recipe-summary">検索内容に合う好きな作り手を先に表示しています。</p>}
    {s.data.warnings.length>0&&<details className="editor-panel" open={!s.data.results.length}><summary>検索の補足（{s.data.warnings.length}件）</summary>{s.data.warnings.map((w,i)=><p key={i}>{w}</p>)}</details>}
    {!s.data.results.length&&<p role="status">候補が見つかりませんでした。言葉やサイトを変えるか、URLから取り込んでください。</p>}
