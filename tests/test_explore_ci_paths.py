@@ -37,7 +37,7 @@ class ExplorePathsTest(unittest.TestCase):
                      "kubernetes/argocd/projects/new.yaml",
                      "backstage/yarn.lock", "backstage/catalog/explore/demo.yaml",
                      "backstage/templates/fastapi-template/skeleton/docs/index.md",
-                     "scripts/explore-new-check.sh", "environments/kind/new-file.yaml"]:
+                     "scripts/explore-ready-pod.py", "environments/kind/new-file.yaml"]:
             with self.subTest(name=name):
                 self.assertTrue(self.selected(name))
 
@@ -56,8 +56,7 @@ class ExplorePathsTest(unittest.TestCase):
                      "kubernetes/auth/keycloak/new-resource.yaml",
                      "kubernetes/network/istio/new-component/new-values.yaml",
                      "kubernetes/observability/grafana/resources/new-dashboard.yaml",
-                     "kubernetes/secrets/cert-manager/new-issuer.yaml",
-                     "kubernetes/argocd/applications/network/istiod/new-source.yaml"]:
+                     "kubernetes/secrets/cert-manager/new-issuer.yaml"]:
             with self.subTest(name=name):
                 self.assertTrue(self.selected(name))
 
@@ -65,11 +64,14 @@ class ExplorePathsTest(unittest.TestCase):
         self.assertTrue(self.selected("kubernetes/backstage/backstage-deployment.yaml"))
         self.assertTrue(self.selected("kubernetes/network/istio/gateway-prod.yaml"))
 
-    def test_mirror_version_contracts_are_covered(self):
-        for name in ["kubernetes/argocd/applications/gitops/argocd/app.yaml",
-                     "kubernetes/observability/prometheus/config.json",
-                     "kubernetes/observability/grafana/config.json"]:
-            self.assertTrue(self.selected(name))
+    def test_comparison_only_and_non_runtime_scripts_are_excluded(self):
+        for name in ["kubernetes/argocd/applications/apps/app-konro/app.yaml",
+                     "kubernetes/argocd/applications/network/istiod/app.yaml",
+                     "kubernetes/argocd/applications/gitops/argocd/app.yaml",
+                     "kubernetes/argocd/applications/observability/applicationset.yaml",
+                     "scripts/explore-screenshots.py", "scripts/explore-unused-check.sh"]:
+            with self.subTest(name=name):
+                self.assertFalse(self.selected(name))
 
     def test_markdown_exclusions_do_not_hide_template_documents(self):
         self.assertFalse(self.selected("charts/app-base/README.md"))

@@ -29,8 +29,6 @@ def component_scope(path):
     parts = path.split("/")
     if parts[:2] == ["kubernetes", "backstage"]:
         return "kubernetes/backstage/**"
-    if parts[:3] == ["kubernetes", "argocd", "applications"]:
-        return str(Path(path).parent) + "/**"
     if parts[:2] == ["kubernetes", "argocd"]:
         # Do not widen values.yaml to argocd/**: that includes every production app.
         return path if len(parts) == 3 else "/".join(parts[:3]) + "/**"
@@ -41,25 +39,13 @@ def component_scope(path):
 
 
 def dependencies(root):
-    paths = {"environments/kind/**", "backstage/**", "scripts/explore-*.sh",
-             "scripts/explore-*.py", "tests/test_explore*.py", "Makefile",
+    paths = {"environments/kind/**", "backstage/**", "tests/test_explore*.py", "Makefile",
              "scripts/check-explore-ci-paths.py", ".github/workflows/explore-ci.yml"}
     rendered = subprocess.check_output(
         ["helm", "template", "explore", "environments/kind/applications"], cwd=root, text=True)
     for app in yaml.safe_load_all(rendered):
         if not app:
             continue
-        mirror = app.get("metadata", {}).get("annotations", {}).get("kensan-lab.platform/mirrors")
-        if mirror:
-            paths.add(mirror)
-            # ApplicationSet chart versions live in matching generator files.
-            mirrored = yaml.safe_load((root / mirror).read_text())
-            if mirrored.get("kind") == "ApplicationSet":
-                for generator in mirrored["spec"].get("generators", []):
-                    for item in generator.get("git", {}).get("files", []):
-                        for config in root.glob(item["path"]):
-                            if json.loads(config.read_text()).get("name") == app["metadata"]["name"]:
-                                paths.add(config.relative_to(root).as_posix())
         spec = app["spec"]
         sources = spec.get("sources", [spec.get("source", {})])
         for source in sources:
@@ -76,9 +62,22 @@ def dependencies(root):
             else:
                 # Covers chart helpers, nested charts, policies and new files.
                 paths.add(f"{path}/**")
+    # Follow the workflow's executable scripts and their local helpers. Ignore
+    # the generated filter block to avoid retaining obsolete script inputs.
+    workflow = (root / ".github/workflows/explore-ci.yml").read_text()
+    workflow = re.sub(re.escape(BEGIN) + r".*?" + re.escape(END), "", workflow, flags=re.DOTALL)
+    pending = set(re.findall(r"scripts/(explore-[A-Za-z0-9_.-]+\.(?:sh|py))", workflow))
+    pending.update(["explore-up.sh", "explore-down.sh"])
+    visited = set()
+    while pending:
+        name = pending.pop()
+        if name in visited:
+            continue
+        visited.add(name)
+        script = root / "scripts" / name
+        paths.add(f"scripts/{name}")
+        pending.update(re.findall(r"explore-[A-Za-z0-9_.-]+\.(?:sh|py)", script.read_text()))
     bootstrap = (root / "scripts/explore-up.sh").read_text()
-    versions = (root / "environments/kind/versions.sh").read_text()
-    paths.update(re.findall(r"^# mirrors: (\S+)", versions, re.MULTILINE))
     for path in re.findall(r'\$\{REPO_ROOT\}/([^"\s]+)', bootstrap):
         if "$" in path:
             raise ValueError(f"unresolved bootstrap input: {path}")
