@@ -104,6 +104,8 @@ export function RecipesPage({ onStart, starting = false, routing, cooking=false,
             {importMsg}
           </p>
         )}
+        <section className="editor-panel search-conditions" aria-labelledby="library-search-title">
+        <h2 id="library-search-title" className="h-serif">保存したレシピを探す</h2>
         <div className="library-search-tools">
           <label className="library-query" htmlFor="library-query"><span>レシピを探す</span><input id="library-query" type="search" aria-label="レシピを検索" placeholder="料理名・タグで検索" value={q} onChange={e=>setQ(e.target.value)}/></label>
           <label htmlFor="library-sort"><span id="library-sort-label">並べ替え</span><select aria-labelledby="library-sort-label" id="library-sort" value={sort} onChange={e=>setSort(e.target.value as LibrarySort)}><option value="rating">評価順</option><option value="name">名前順</option><option value="time">時間順</option></select></label>
@@ -111,10 +113,12 @@ export function RecipesPage({ onStart, starting = false, routing, cooking=false,
         <div className="library-rating-filters" role="group" aria-label="自分の評価で絞る">{([['all','すべて'],['high','★4以上'],['unrated','未評価']] as const).map(([value,label])=><button key={value} className={`chip ${rating===value?'chip-on':''}`} aria-pressed={rating===value} onClick={()=>setRating(value)}>{label}</button>)}</div>
         {taxonomyError&&<p className="notice" role="alert">{taxonomyError}</p>}
         <TagFilters recipes={recipes} q={q} rating={rating} sort={sort} selected={tags} onChange={setTags} taxonomy={taxonomy}/>
+        </section>
       </header>
 
       {error && <p className="error">{error}</p>}
 
+      <h2 className="h-serif recipe-results-heading">レシピ一覧</h2>
       <div className="library-result-info"><p className="recipe-summary" aria-live="polite">{loaded?`${shown.length}品 / 全${recipes.length}品`:'レシピを読み込んでいます…'} · 星は自分の評価</p>{(q||tags.length>0||rating!=='all')&&<button className="chip" onClick={clearFilters}>絞り込みを解除</button>}</div>
       <div className="display-options" role="group" aria-label="一覧の表示"><button className={`chip ${display==='photos'?'chip-on':''}`} aria-pressed={display==='photos'} onClick={()=>setDisplay('photos')}>写真</button><button className={`chip ${display==='compact'?'chip-on':''}`} aria-pressed={display==='compact'} onClick={()=>setDisplay('compact')}>コンパクト</button></div>
       <div className="library-layout"><div className="library-results">
