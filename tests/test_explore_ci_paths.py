@@ -46,12 +46,24 @@ class ExplorePathsTest(unittest.TestCase):
                      "kubernetes/storage/longhorn/values.yaml",
                      "kubernetes/secrets/vault/values.yaml",
                      "charts/unrelated/templates/deployment.yaml",
-                     "kubernetes/backstage/backstage-deployment.yaml",
-                     "kubernetes/network/istio/gateway-prod.yaml",
                      "bootstrap/keycloak/setup.sh", "apps/kensan/main.go",
                      "docs/getting-started/try-it-with-kind.md"]:
             with self.subTest(name=name):
                 self.assertFalse(self.selected(name))
+
+    def test_new_files_in_shared_components_are_covered(self):
+        for name in ["kubernetes/backstage/new-resource.yaml",
+                     "kubernetes/auth/keycloak/new-resource.yaml",
+                     "kubernetes/network/istio/new-component/new-values.yaml",
+                     "kubernetes/observability/grafana/resources/new-dashboard.yaml",
+                     "kubernetes/secrets/cert-manager/new-issuer.yaml",
+                     "kubernetes/argocd/applications/network/istiod/new-source.yaml"]:
+            with self.subTest(name=name):
+                self.assertTrue(self.selected(name))
+
+    def test_production_files_within_shared_components_are_intentionally_covered(self):
+        self.assertTrue(self.selected("kubernetes/backstage/backstage-deployment.yaml"))
+        self.assertTrue(self.selected("kubernetes/network/istio/gateway-prod.yaml"))
 
     def test_mirror_version_contracts_are_covered(self):
         for name in ["kubernetes/argocd/applications/gitops/argocd/app.yaml",

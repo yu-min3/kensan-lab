@@ -24,6 +24,22 @@ def braces(pattern):
             for expanded in braces(pattern[:match.start()] + part + pattern[match.end():])]
 
 
+def component_scope(path):
+    """Broaden shared inputs to components, keeping cross-component files exact."""
+    parts = path.split("/")
+    if parts[:2] == ["kubernetes", "backstage"]:
+        return "kubernetes/backstage/**"
+    if parts[:3] == ["kubernetes", "argocd", "applications"]:
+        return str(Path(path).parent) + "/**"
+    if parts[:2] == ["kubernetes", "argocd"]:
+        # Do not widen values.yaml to argocd/**: that includes every production app.
+        return path if len(parts) == 3 else "/".join(parts[:3]) + "/**"
+    if parts[0] == "kubernetes" and len(parts) >= 4:
+        return "/".join(parts[:3]) + "/**"
+    # e.g. observability/namespace.yaml spans several components; no broadening.
+    return path
+
+
 def dependencies(root):
     paths = {"environments/kind/**", "backstage/**", "scripts/explore-*.sh",
              "scripts/explore-*.py", "tests/test_explore*.py", "Makefile",
@@ -70,6 +86,10 @@ def dependencies(root):
     # These directories are already covered by broader runtime input scopes.
     paths = {p for p in paths if not p.startswith(("environments/kind/", "backstage/"))} | {
         "environments/kind/**", "backstage/**"}
+    paths = {component_scope(p) for p in paths}
+    paths = {p for p in paths if not any(
+        other != p and other.endswith("/**") and p.startswith(other[:-2])
+        for other in paths)}
     return sorted(paths) + ["!kubernetes/**/*.md", "!charts/**/*.md", "!environments/**/*.md"]
 
 

@@ -19,7 +19,11 @@ updated workflow. Manifest CI checks that the lists remain current, including
 new source references that the previous Explore filter would not have covered.
 The checker renders the kind Applications; it does not create a cluster.
 
-Directory includes and recursive sources determine the scope. Docker's
+References select components rather than individual files: a shared Istio,
+Keycloak or Grafana directory is covered in full, including new files and some
+production-only resources in that component. Root-level shared namespace and
+Argo CD values files stay explicit so they do not select unrelated components.
+Docker's
 Backstage context stays broad to cover package manifests, lockfiles and catalog
 inputs. Markdown is excluded only under Kubernetes, charts and environments;
 template Markdown remains an input because scaffolding renders it.
