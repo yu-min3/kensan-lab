@@ -3,7 +3,7 @@
 #
 # 公式リリースのバイナリを、起動時に initContainer が取得して sha256 で検証する。
 # 自前イメージは作らない（上流に LICENSE が無く、再配布の扱いが曖昧なため）。
-# 版と sha256 は .github/workflows/markport-bump.yml が PR で更新する。
+# 版と sha256 は scripts/markport-bump.sh で更新する（手動。たまに最新へ上げる）。
 
 nameOverride: markport
 
