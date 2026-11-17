@@ -4,175 +4,121 @@ ${{ values.description }}
 
 ## Overview
 
-This application was generated from the FastAPI template using Backstage. It includes a complete GitOps deployment setup with Kustomize for Dev and Prod environments.
+This service was generated from Backstage's FastAPI template. It contains a FastAPI backend, a React frontend, CI workflows, deployment values and this documentation.
 
-## Quick Start
+The platform owns the shared Helm chart, `charts/app-base`. This repository owns `deploy/values.yaml` and the namespace and ServiceMonitor manifests in `deploy/resources/`. Argo CD combines those sources to deploy the service into `app-${{ values.name }}`.
 
-### Development with Dev Container (Recommended)
+## Local Development
 
-The fastest way to get started is using VS Code Dev Containers:
+### Backend
 
-1. Install prerequisites:
-   - Docker or Podman
-   - VS Code
-   - Dev Containers extension
-
-2. Open in VS Code and reopen in container:
-   - Press `F1` → "Dev Containers: Reopen in Container"
-
-3. Start developing:
-   - Press `F5` to run and debug the application
-   - Save files to auto-format with ruff
-   - Use VS Code tasks for common operations
-
-The Dev Container includes Python 3.11, uv, ruff, kubectl, and Docker CLI - everything pre-configured!
-
-### Local Development (Alternative)
-
-**Prerequisites:**
-
-Install [uv](https://docs.astral.sh/uv/) - a fast Python package manager:
+Install Python 3.11, [uv](https://docs.astral.sh/uv/) and Make, then run:
 
 ```bash
-curl -LsSf https://astral.sh/uv/install.sh | sh
+make sync
+make run-local
 ```
 
-**Steps:**
+The API listens on port 8000. Open [Swagger UI](http://localhost:8000/docs) or [ReDoc](http://localhost:8000/redoc). Running the backend alone does not build or serve the React page.
 
-1. Sync dependencies (creates .venv automatically):
-   ```bash
-   uv sync
-   ```
+### Frontend
 
-2. Run the application:
-   ```bash
-   uv run python app/main.py
-   ```
-
-3. Access the application at `http://localhost:8000`
-
-### Code Quality Tools
-
-The project uses modern Python tooling:
-
-- **uv**: Fast package manager and dependency resolver
-- **ruff**: Fast linter and formatter (replaces flake8, black, isort)
+With Node.js and npm installed, run these commands in a second terminal while the backend is running:
 
 ```bash
-# Format code
+cd frontend
+npm install
+npm run dev
+```
+
+Open the URL printed by Vite. Its development server proxies `/api` requests to the backend on port 8000. The Dockerfile builds the frontend and packages its static assets with FastAPI for deployment.
+
+### Dev Container
+
+The repository includes `.devcontainer/` for VS Code. With the Dev Containers extension and a compatible container runtime installed, use **Dev Containers: Reopen in Container**. The configuration uses Podman-specific container options; check `.devcontainer/devcontainer.json` before using it with another runtime. The Python, uv and Podman tools are defined in its Dockerfile.
+
+### Code Quality
+
+```bash
 make format
-
-# Run linter
 make lint
-
-# Run tests
 make test
 ```
 
-### API Documentation
-
-The FastAPI application automatically generates OpenAPI documentation:
-- Swagger UI: `http://localhost:8000/docs`
-- ReDoc: `http://localhost:8000/redoc`
-
-## Available Endpoints
-
-- `GET /` - Root endpoint
-- `GET /health` - Health check endpoint (used by Kubernetes probes)
-- `GET /metrics` - Prometheus metrics endpoint
-- `GET /api/v1/example` - Example API endpoint
-
-## Building and Deploying
-
-### Quick Start with Makefile
+These targets format, lint and test the Python backend. To check that the frontend builds:
 
 ```bash
-make deploy TAG=v0.2.0
+cd frontend
+npm install
+npm run build
 ```
 
-The Makefile automates:
-- Docker image build
-- Push to GHCR
-- Updating the image tag in `deploy/values.yaml`
+## Delivery Through Git
 
-Commit and push the change. Argo CD deploys to the `app-${{ values.name }}` namespace — one namespace per application (ADR-006).
+Backstage creates a separate platform configuration PR to register the service with Argo CD. Review and merge that PR to add the application. The image referenced by `deploy/values.yaml` must be available before the workload can start.
 
-### Manual Build and Deploy
+The repository includes workflows for both Git hosts. The active host determines which workflow runs:
 
-```bash
-docker build -t ghcr.io/${{ values.repoOwner }}/${{ values.repoName }}:v0.2.0 .
-docker push ghcr.io/${{ values.repoOwner }}/${{ values.repoName }}:v0.2.0
+- **Explore / Gitea:** `.gitea/workflows/explore-build.yaml` tests the source, builds and pushes an image to the in-cluster registry, then commits the source SHA as the image tag in `deploy/values.yaml`. Backstage waits for the initial build before opening the platform PR.
+- **GitHub:** `.github/workflows/build-and-push.yaml` lints and tests the source, then builds images for ARM64 and AMD64. Non-PR runs publish to GHCR. Set the intended published image tag in `deploy/values.yaml` and commit the change for Argo CD to deploy it.
+
+For runtime settings such as replicas, theme and greeting, edit `deploy/values.yaml` and commit the change. In Explore, a commit that changes only `deploy/**` skips the image build; Argo CD still applies the new configuration. A manual `kubectl scale` does not update Git and can be reverted by Argo CD.
+
+## Repository Structure
+
+```text
+app/                         FastAPI backend
+frontend/                    React frontend and Vite configuration
+tests/                       Backend tests
+deploy/values.yaml           Values for the platform's charts/app-base
+deploy/resources/            Namespace and ServiceMonitor manifests
+docs/index.md                TechDocs content
+mkdocs.yml                   TechDocs site configuration
+catalog-info.yaml            Backstage Component and API definitions
+Dockerfile                   Frontend build, backend tests and runtime image
+pyproject.toml / uv.lock      Python dependencies and lockfile
+.github/workflows/           GitHub CI
+.gitea/workflows/            Explore CI
+.devcontainer/               Optional development container
 ```
 
-Update the image tag in `deploy/values.yaml`:
+The platform PR carries the Argo CD Application and the cross-namespace ReferenceGrant needed by the OAuth2 route. The platform chart renders the Deployment, Service and HTTPRoutes; this repository does not contain separate manifests for those resources.
 
-```yaml
-  tag: v0.2.0   # deploy/values.yaml
-```
+## Authentication
 
-Commit and push the change. Argo CD will automatically deploy.
+The platform's Gateway-level Istio AuthorizationPolicy delegates authentication to oauth2-proxy. The application receives identity headers after login instead of implementing an OIDC flow itself.
 
-## Architecture
+`auth.gatewayOAuth2.enabled` in the service values adds the `/oauth2` route used for login and callbacks. The Gateway policy, ReferenceGrant and Keycloak redirect-URI registration are platform responsibilities. A local development server on port 8000 is outside that Gateway authentication flow.
 
-### Kubernetes Resources
+## Monitoring and Endpoints
 
-- **Deployment**: Runs the FastAPI application
-- **Service**: ClusterIP service exposing port 8000
-- **HTTPRoute**: Gateway API route for external access via Istio
-- **AuthorizationPolicy**: Istio security policy
-- **ServiceMonitor**: Prometheus metrics collection
+`deploy/resources/servicemonitor.yaml` connects the service's `/metrics` endpoint to Prometheus. The backend exposes `http_requests_total` and `http_request_duration_seconds` for HTTP request counts and latency.
 
-### Environment Configuration
-
-| Resource | Dev | Prod |
-|----------|-----|------|
-| Replicas | 1 | 3 |
-| CPU Request | 100m | 200m |
-| CPU Limit | 500m | 1000m |
-| Memory Request | 128Mi | 256Mi |
-| Memory Limit | 512Mi | 1Gi |
-| Gateway | gateway-dev | gateway-prod |
-
-## Monitoring
-
-The application exposes Prometheus metrics at `/metrics` endpoint. Metrics include:
-- `http_requests_total` - Total HTTP requests counter
-- `http_request_duration_seconds` - HTTP request latency histogram
-
-These metrics are automatically scraped by Prometheus via the ServiceMonitor resource.
-
-## Security
-
-- Application runs as non-root user (UID 1000)
-- Read-only root filesystem capability
-- All privileges dropped
-- Istio AuthorizationPolicy enforces access control
-- HTTPS/TLS termination at Istio Gateway
+| Endpoint | Purpose |
+| --- | --- |
+| `/` | React page in the built container |
+| `/health` | Kubernetes health probes |
+| `/metrics` | Prometheus metrics |
+| `/api/config` | Runtime name, theme and greeting |
+| `/api/whoami` | Identity headers received from the Gateway |
+| `/api/v1/example` | Example API response |
+| `/api/load` | Demonstration load generator, enabled only when `DEMO_LOAD_ENABLED` is set |
+| `/docs`, `/redoc` | FastAPI API documentation |
 
 ## Troubleshooting
 
-### Check Application Logs
+Check the application logs with:
 
 ```bash
 kubectl logs -n app-${{ values.name }} deployment/${{ values.name }} -f
 ```
 
-### Check Argo CD Sync Status
+Use [Argo CD](${{ values.argocdUrl }}) to inspect sync and health status. Deployment follows Git polling and reconciliation, so a merged change may take several minutes to appear.
 
-Visit Argo CD UI:
-- https://argocd.platform.yu-min3.com/applications/app-${{ values.name }}
+Open the [application](https://${{ values.hostname }}) through the Gateway and sign in when prompted. An unauthenticated request to the public `/health` URL may redirect to login; it is not the same request path as Kubernetes' Pod health probe.
 
-### Test Health Endpoint
+## Documentation and Ownership
 
-```bash
-curl https://${{ values.name }}.yu-min3.com/health
-```
-
-## Owner
+Edit this file alongside application changes. `mkdocs.yml` defines the site and the `backstage.io/techdocs-ref` annotation in `catalog-info.yaml` connects it to the service's Docs tab in Backstage.
 
 Owner: ${{ values.owner }}
-
-## Links
-
-- [GitHub Repository](https://github.com/yu-min3/${{ values.name }})
-- [Argo CD](https://argocd.platform.yu-min3.com/applications/app-${{ values.name }})
