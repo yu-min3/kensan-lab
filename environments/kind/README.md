@@ -6,8 +6,6 @@ User-facing instructions are in
 [docs/getting-started/try-it-with-kind.md](https://github.com/yu-min3/kensan-lab/blob/main/docs/getting-started/try-it-with-kind.md);
 this file is for whoever has to keep it working.
 
-## What is here
-
 ## Explore CI input filters
 
 Explore CI runs for the kind layer, its shared chart and manifest inputs,
@@ -26,7 +24,7 @@ Backstage context stays broad to cover package manifests, lockfiles and catalog
 inputs. Markdown is excluded only under Kubernetes, charts and environments;
 template Markdown remains an input because scaffolding renders it.
 
-## Directory contents
+## What is here
 
 ```
 environments/kind/
