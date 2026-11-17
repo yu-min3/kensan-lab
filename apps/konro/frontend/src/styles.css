@@ -833,3 +833,8 @@ html:has(.recipe-detail) { scroll-padding-top: calc(var(--row-h) + var(--gap-inl
 .proposal-progress-times { display:flex; flex-wrap:wrap; gap:var(--gap-inline) var(--gap-stack); margin-block:var(--gap-stack); font-size:var(--text-label); color:hsl(var(--muted-foreground)); font-variant-numeric:tabular-nums; }
 @keyframes proposal-progress { to { background-position:right; } }
 @media(prefers-reduced-motion:reduce) { .proposal-progress progress:indeterminate { animation:none; background-position:center; } }
+
+/* Separate search controls from recipe results using the shared panel tokens. */
+.search-conditions { margin-block: var(--gap-stack); }
+.search-conditions > h2 { margin: 0; font-size: var(--text-size); }
+.recipe-results-heading { border-top: 1px solid hsl(var(--border-strong)); padding-top: var(--section-gap); margin-top: var(--section-gap); margin-bottom: var(--gap-stack); }
