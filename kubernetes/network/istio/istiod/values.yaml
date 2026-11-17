@@ -14,7 +14,7 @@ pilot:
   # annotation when adding a provider so Argo CD rolls the long-lived pod and
   # Gateway config does not fall back to "bad CUSTOM action" deny rules.
   podAnnotations:
-    kensan-lab.platform/auth-config-revision: "2026-08-11-backstage-sso"
+    kensan-lab.platform/auth-config-revision: "2026-11-17-session-refresh"
   cni:
     enabled: true
   env:
@@ -37,8 +37,9 @@ meshConfig:
         pathPrefix: /oauth2/auth
         # 失敗時に閉じる (oauth2-proxy 落ちたら deny)。secure default。
         failOpen: false
-        # オーバヘッド最小化 (intra-cluster な service-to-service)
-        timeout: 0.2s
+        # Expired sessions require a Keycloak token refresh, not only a local
+        # cookie check. Allow that round trip while continuing to fail closed.
+        timeout: 2s
         # request 認証判断のために必要なヘッダ
         includeRequestHeadersInCheck:
           - cookie
@@ -57,6 +58,9 @@ meshConfig:
           - x-auth-request-email
           - x-auth-request-groups
           - x-auth-request-access-token
+        # Persist refreshed sessions in the browser after a successful check.
+        headersToDownstreamOnAllow:
+          - set-cookie
         # 拒否時 (302/401) に browser へ流すヘッダ。OIDC redirect 成立に必須。
         headersToDownstreamOnDeny:
           - content-type

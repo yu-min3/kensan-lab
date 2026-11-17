@@ -19,6 +19,8 @@ set -euo pipefail
 HOST="${1:-demo.127-0-0-1.sslip.io}"
 USER_NAME="${2:-demo}"
 PASSWORD="${3:-demo}"
+CHECK_REFRESH="${4:-}"
+[[ -z "$CHECK_REFRESH" || "$CHECK_REFRESH" = --refresh ]] || exit 2
 JAR="$(mktemp)"
 trap 'rm -f "$JAR"' EXIT
 
@@ -52,4 +54,27 @@ esac
 
 # 5. And now the front door should simply open.
 code="$("${C[@]}" -o /dev/null -w '%{http_code}' "https://${HOST}/")"
+if [[ "$CHECK_REFRESH" = --refresh ]]; then
+  [ "$code" = 200 ] || { echo "initial login failed: $code" >&2; exit 1; }
+  # Include every split session cookie, without printing credential values.
+  session() {
+    awk -F '\t' '$6 ~ /^_oauth2_proxy(_[0-9]+)?$/ {print $6 "=" $7}' "$JAR" | sort
+  }
+  before="$(session)"
+  [ -n "$before" ] || { echo "no session cookies" >&2; exit 1; }
+  # Keycloak's default token lifetime is five minutes. No requests during this
+  # wait: otherwise an earlier refresh would hide the expired-session path.
+  sleep 310
+  code="$("${C[@]}" -o /dev/null -w '%{http_code}' "https://${HOST}/")"
+  [ "$code" = 200 ] || { echo "expired session returned $code" >&2; exit 1; }
+  renewed="$(session)"
+  [ "$renewed" != "$before" ] || { echo "refreshed cookies did not reach the client" >&2; exit 1; }
+  [ "$(printf '%s\n' "$renewed" | cut -d= -f1)" = "$(printf '%s\n' "$before" | cut -d= -f1)" ] \
+    || { echo "split session cookies changed unexpectedly" >&2; exit 1; }
+  for _ in 1 2 3; do
+    code="$("${C[@]}" -o /dev/null -w '%{http_code}' "https://${HOST}/api/config")"
+    [ "$code" = 200 ] && [ "$(session)" = "$renewed" ] \
+      || { echo "renewed session was not retained" >&2; exit 1; }
+  done
+fi
 echo "$code"
