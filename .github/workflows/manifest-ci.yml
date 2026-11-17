@@ -12,6 +12,9 @@ on:
       - "environments/**"
       - ".yamllint"
       - "scripts/validate_argocd_apps.py"
+      - "scripts/check-explore-ci-paths.py"
+      - "tests/test_explore_ci_paths.py"
+      - ".github/workflows/explore-ci.yml"
       - "scripts/cluster-watch/**"
       - ".github/workflows/manifest-ci.yml"
       - "!kubernetes/**/*.md"
@@ -25,6 +28,9 @@ on:
       - "environments/**"
       - ".yamllint"
       - "scripts/validate_argocd_apps.py"
+      - "scripts/check-explore-ci-paths.py"
+      - "tests/test_explore_ci_paths.py"
+      - ".github/workflows/explore-ci.yml"
       - "scripts/cluster-watch/**"
       - ".github/workflows/manifest-ci.yml"
       - "!kubernetes/**/*.md"
@@ -119,6 +125,8 @@ jobs:
       - uses: actions/checkout@v4
       - run: pip install pyyaml
       - run: python3 scripts/validate_argocd_apps.py
+      - run: python3 scripts/check-explore-ci-paths.py
+      - run: python3 -m unittest discover -s tests -p test_explore_ci_paths.py
 
   cluster-watch:
     name: Cluster Watch app state
