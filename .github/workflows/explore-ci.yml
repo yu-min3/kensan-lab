@@ -231,7 +231,7 @@ jobs:
           # longer opens the gate, and a test using one would prove nothing a
           # person can do. These walk the flows a browser walks.
           code="$(scripts/explore-login-check.sh \
-            demo.127-0-0-1.sslip.io demo demo 2>&1 || true)"
+            demo.127-0-0-1.sslip.io demo demo --refresh 2>&1 || true)"
           echo "demo (gateway ext_authz): ${code}"
           [ "$code" = "200" ] || { echo "signing in to the demo app failed" >&2; exit 1; }
 
