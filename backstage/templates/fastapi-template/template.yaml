@@ -24,7 +24,7 @@ spec:
           title: Application Name
           type: string
           description: |
-            アプリケーション名（小文字、英数字、ハイフンのみ）
+            アプリケーション名（英小文字と数字のみ。ハイフンは使えない）
 
             📌 **この名前が影響するもの:**
             - Argo CD Application 名: `app-{name}`
@@ -33,7 +33,10 @@ spec:
             - Backstage カタログのコンポーネント名
 
             💡 リポジトリ名とは独立して設定可能です
-          pattern: '^[a-z0-9-]+$'
+
+            ⚠️ `{name}-{任意}.app.yu-min3.com` もこの app の名前になるため、
+            ハイフンを含む app 名は namespace 作成時に拒否されます
+          pattern: '^[a-z0-9]+$'
           ui:autofocus: true
         description:
           title: Description

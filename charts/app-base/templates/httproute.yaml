@@ -22,6 +22,10 @@ spec:
         - path:
             type: PathPrefix
             value: /
+      {{- with .Values.httproute.filters }}
+      filters:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
       backendRefs:
         - name: {{ include "app-base.name" . }}
           port: {{ .Values.ports.http }}

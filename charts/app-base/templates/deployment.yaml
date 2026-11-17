@@ -17,6 +17,13 @@ spec:
     metadata:
       labels:
         {{- include "app-base.selectorLabels" . | nindent 8 }}
+        {{- with .Values.podLabels }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+      {{- with .Values.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
     spec:
       {{- if kindIs "bool" .Values.automountServiceAccountToken }}
       automountServiceAccountToken: {{ .Values.automountServiceAccountToken }}
@@ -32,6 +39,10 @@ spec:
       {{- end }}
       {{- with .Values.affinity }}
       affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.initContainers }}
+      initContainers:
         {{- toYaml . | nindent 8 }}
       {{- end }}
       containers:
@@ -95,6 +106,9 @@ spec:
             {{- toYaml . | nindent 12 }}
             {{- end }}
           {{- end }}
+        {{- with .Values.extraContainers }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
       {{- if or .Values.pvc.enabled .Values.extraVolumes }}
       volumes:
         {{- if .Values.pvc.enabled }}

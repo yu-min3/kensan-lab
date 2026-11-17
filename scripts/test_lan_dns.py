@@ -25,9 +25,9 @@ def apply(obj):
 def namespace(name):
     apply({'apiVersion':'v1','kind':'Namespace','metadata':{'name':name}})
 
-def route(host='smoke.app.yu-min3.com', gateway='gateway-prod', namespace='app-smoke', ignore=False):
+def route(host='smoke.app.yu-min3.com', gateway='gateway-prod', namespace='app-smoke', ignore=False, name='smoke'):
     return {'apiVersion':'gateway.networking.k8s.io/v1','kind':'HTTPRoute',
-            'metadata':{'name':'smoke','namespace':namespace,'labels':{'k8s-gateway.dns/ignore':str(ignore).lower()}},
+            'metadata':{'name':name,'namespace':namespace,'labels':{'k8s-gateway.dns/ignore':str(ignore).lower()}},
             'spec':{'hostnames':[host],'parentRefs':[{'name':gateway,'namespace':'istio-system'}],
                     'rules':[{'backendRefs':[{'name':'placeholder','port':80}]}]}}
 
@@ -70,17 +70,25 @@ apply({'apiVersion':'gateway.networking.k8s.io/v1','kind':'Gateway',
 run('-n','istio-system','patch','gateway','gateway-prod','--subresource=status','--type=merge',
     '-p',json.dumps({'status':{'addresses':[{'type':'IPAddress','value':'192.168.0.243'}]}}))
 # Wait for admission type checking before testing denial, never silently skip.
-for _ in range(30):
-    policy=json.loads(run('get','validatingadmissionpolicy','app-httproute-ownership','-o','json').stdout)
-    if 'typeChecking' in policy.get('status',{}): break
-    time.sleep(1)
-assert policy.get('status',{}).get('observedGeneration') == policy['metadata']['generation'], policy.get('status')
-assert 'typeChecking' in policy.get('status',{}), policy.get('status')
-assert not policy['status']['typeChecking'].get('expressionWarnings'), policy.get('status')
+for name in ['app-httproute-ownership','app-namespace-name']:
+    for _ in range(30):
+        policy=json.loads(run('get','validatingadmissionpolicy',name,'-o','json').stdout)
+        if 'typeChecking' in policy.get('status',{}): break
+        time.sleep(1)
+    assert policy.get('status',{}).get('observedGeneration') == policy['metadata']['generation'], policy.get('status')
+    assert 'typeChecking' in policy.get('status',{}), policy.get('status')
+    assert not policy['status']['typeChecking'].get('expressionWarnings'), policy.get('status')
 for host,gateway in [('konro.app.yu-min3.com','gateway-prod'),('auth.platform.yu-min3.com','gateway-prod'),
-                     ('*.app.yu-min3.com','gateway-prod'),('smoke.app.yu-min3.com','gateway-platform')]:
+                     ('*.app.yu-min3.com','gateway-prod'),('smoke.app.yu-min3.com','gateway-platform'),
+                     # {name}-{label} is one DNS label owned by the namespace, nothing wider
+                     ('smokey.app.yu-min3.com','gateway-prod'),('smoke-a.b.app.yu-min3.com','gateway-prod'),
+                     ('konro-viewer.app.yu-min3.com','gateway-prod'),('smoke-viewer.yu-mins.com','gateway-prod')]:
     p=run('apply','-f','-',data=json.dumps(route(host,gateway)),ok=False)
-    assert p.returncode and 'App route' in p.stderr, p.stderr
+    assert p.returncode and 'App route' in p.stderr, (host, p.stderr)
+apply(route('smoke-viewer.app.yu-min3.com',name='smoke-viewer'))
+run('-n','app-smoke','delete','httproute','smoke-viewer')
+p=run('apply','-f','-',data=json.dumps({'apiVersion':'v1','kind':'Namespace','metadata':{'name':'app-smoke-viewer'}}),ok=False)
+assert p.returncode and 'App namespace' in p.stderr, p.stderr
 apply(route('kensan.yu-mins.com',namespace='app-kensan'))
 apply(route())
 p=run('apply','-f','-',data=json.dumps(route('konro.app.yu-min3.com')),ok=False)
@@ -100,6 +108,6 @@ try:
     apply(route(ignore=True)); wait_answer(False)
     apply(route()); wait_answer(True)
     run('-n','app-smoke','delete','httproute','smoke'); wait_answer(False)
-    print('PASS: restricted image, minimal RBAC, owner/parent CREATE+UPDATE denial, legacy host, UDP/TCP, opt-out and deletion (TTL <=30s).')
+    print('PASS: restricted image, minimal RBAC, owner/parent CREATE+UPDATE denial, {name}-{label} hosts, app namespace names, legacy host, UDP/TCP, opt-out and deletion (TTL <=30s).')
 finally:
     forward.terminate(); forward.wait(timeout=10)

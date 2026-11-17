@@ -1,3 +1,12 @@
+---
+type: note
+title: app-base
+status: active
+tags: [platform, helm]
+created: 2026-10-10
+updated: 2026-10-10
+---
+
 # app-base
 
 kensan-lab platform が application に提供する汎用デプロイ chart。
@@ -33,7 +42,23 @@ sources:
     ref: values
 ```
 
-namespace 等の raw マニフェストが必要なら 3 つ目の source（`directory.recurse`）として足す。
+## App専用namespaceの生成
+
+新規App専用namespaceは `namespace.create: true` でchartから生成できる。既定はfalseのため、既存Appはそのまま使える。Platformがenvironment/team/appのラベル値を指定する。
+
+```yaml
+namespace:
+  create: true
+  environment: production
+  team: platform-engineering
+  app: canary
+```
+
+namespace名はHelmのrelease namespace（Argo Applicationのdestination.namespace）を使う。`restricted`のラベル、Argoのsync-wave=-2、Prune=false、Helmのkeepを固定する。保持annotationは誤削除を減らす仕組みであり、管理者による手動削除を禁止するものではない。
+
+既存raw Namespaceから移す場合は、同じPRでraw定義を除き、同じ名前・ラベル・保持annotationが描画されることとGitOpsの所有を確認する。二重定義のまま有効にしない。同じnamespaceにこのchartのreleaseを複数置く場合も、有効にするのは1つだけにする。observerの権限と資格はPlatform側の別管理を維持する。
+
+他のrawマニフェストが必要なら3つ目のsourceとして足せる。
 
 ## 主要 values
 
@@ -52,6 +77,11 @@ namespace 等の raw マニフェストが必要なら 3 つ目の source（`dir
 | `ghcrPullSecret.enabled` | `false` | ns に ghcr pull secret を ExternalSecret で生成し SA に配線 |
 | `reloader` | `true` | Secret/ConfigMap 更新時の自動 rollout（stakater/reloader） |
 | `nodeSelector` / `affinity` | `{}` | スケジューリング制約（例: amd64 限定） |
+| `initContainers` / `extraContainers` | `[]` | Pod spec にそのまま入る。securityContext は自動で付かないので各自で書く |
+| `podAnnotations` / `podLabels` | `{}` | Pod template に付く。`podLabels` は selector に入らない |
+| `httproute.filters` | `[]` | app へのルールに付く Gateway API の filters（例: Host を検査するアプリへ `URLRewrite` の hostname）。`/oauth2` のルートには付かない |
+
+chart は Pod の設定項目を素直に出し、危ない設定（root・特権など）の禁止は namespace の Pod Security restricted に任せる。現在は PSA ラベル（`pod-security.kubernetes.io/enforce: restricted`）が拒否し、Kyverno の pss-restricted は Audit で並走している（ADR-012 の Phase 3 で Enforce へ昇格）。どちらも init・追加コンテナを含む全コンテナを検査する。chart に欄が無いことを禁止の代わりにしない。
 
 ## LAN DNSの自動登録
 
