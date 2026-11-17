@@ -33,8 +33,10 @@ on:
       - "scripts/explore-login-check.sh"
       - "scripts/explore-backstage-login-check.sh"
       - "scripts/explore-golden-path-check.sh"
+      - "scripts/explore-e2e-check.sh"
       - "scripts/explore-ready-pod.py"
       - "tests/test_explore_ready_pod.py"
+      - "tests/test_explore_e2e_check.py"
       - ".github/workflows/explore-ci.yml"
       - "!kubernetes/**/*.md"
       - "!charts/**/*.md"
@@ -55,8 +57,10 @@ on:
       - "scripts/explore-login-check.sh"
       - "scripts/explore-backstage-login-check.sh"
       - "scripts/explore-golden-path-check.sh"
+      - "scripts/explore-e2e-check.sh"
       - "scripts/explore-ready-pod.py"
       - "tests/test_explore_ready_pod.py"
+      - "tests/test_explore_e2e_check.py"
       - ".github/workflows/explore-ci.yml"
       - "!kubernetes/**/*.md"
       - "!charts/**/*.md"
@@ -87,6 +91,9 @@ jobs:
 
       - name: Check rollout Pod selection
         run: python3 -m unittest discover -s tests -p test_explore_ready_pod.py
+
+      - name: Check concurrent E2E failure propagation
+        run: python3 -m unittest discover -s tests -p test_explore_e2e_check.py
 
       - name: Install kind
         uses: helm/kind-action@v1
@@ -250,10 +257,11 @@ jobs:
       # onto one line and keeps the backslash, so the shell reads `\ ` as an
       # escaped space and the first argument arrives with a space in front of
       # it. curl then exits 3 on a malformed URL, before anything is printed.
-      - name: Check the golden path through deployment
+      # Keep the five-minute expiry test, but overlap its idle period with the
+      # independent scaffolding/build/rollout checks. Both must pass.
+      - name: Check session expiry and the golden path concurrently
         run: |
-          scripts/explore-golden-path-check.sh \
-            backstage.127-0-0-1.sslip.io demo demo checkservice --deploy
+          scripts/explore-e2e-check.sh
 
       - name: Collect diagnostics
         if: failure()
