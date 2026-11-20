@@ -1,34 +1,9 @@
-#!/bin/bash
-# Keycloak realm + user + Vault OIDC client セットアップ
-#
-# 使い方: ./bootstrap/keycloak/setup.sh
-#
-# 何をするか:
-#   1. realm "kensan" 作成
-#   2. groups "platform-admin", "platform-dev" 作成
-#   3. user "yu" (email: ymisaki00@gmail.com) 作成 → platform-admin に assign
-#   4. OIDC client "vault" 作成 (Vault Stage 1 Bootstrap TF が使う)
-#   5. client_secret + user password を Bitwarden に保存 (既存アイテムは現在値で更新)
-#
-# 前提:
-#   - kubectl context が kensan-lab cluster
-#   - Keycloak が platform-auth-prod ns で稼働中 (auth.yu-mins.com)
-#   - bw login + unlock 済み (BW_SESSION 設定済み)
-#   - host 側に jq, openssl install 済み
-#
-# 設計メモ:
-#   - Keycloak image (quay.io/keycloak/keycloak:23.0) には jq が無いので、
-#     kcadm の JSON 出力は host 側に流して host の jq で処理する。
-#   - kcadm は pod 内で `~/.keycloak/kcadm.config` に session を保存するので、
-#     login は 1 回だけで以降の exec は同じ session を使える。
-#
-# 冪等性: Keycloak リソースは既存なら skip (user password は触らない)。
-# Bitwarden は常に Keycloak の現在値に同期 (再実行 = secret drift の修復手段)。
-
+#!/usr/bin/env bash
+# Reconcile the Keycloak realm, then publish issuer-owned OIDC secrets to Vault.
+set +x
 set -euo pipefail
+source "$(dirname "${BASH_SOURCE[0]}")/read-vault-client-secret.sh"
 
-NS="platform-auth-prod"
-KC_DEPLOY="deployment/keycloak"
 REALM="kensan"
 USER_NAME="yu"
 USER_EMAIL="ymisaki00@gmail.com"
@@ -41,81 +16,20 @@ VAULT_HOSTNAME="vault.platform.yu-min3.com"
 SSO_SESSION_IDLE_SECONDS=259200   # 3 days
 SSO_SESSION_MAX_SECONDS=2592000  # 30 days
 
-BW_CLIENT_ITEM="kensan-lab/keycloak/oidc-client-vault"
-BW_USER_ITEM="kensan-lab/keycloak/user-yu"
-BW_BACKSTAGE_CLIENT_ITEM="kensan-lab/keycloak/oidc-client-backstage"
-
-# === 前提チェック ===
-for cmd in kubectl jq bw openssl; do
-  if ! command -v "$cmd" &> /dev/null; then
-    echo "ERROR: $cmd not found"; exit 1
-  fi
+for cmd in kubectl jq openssl; do
+  command -v "$cmd" >/dev/null || { echo "Missing $cmd" >&2; exit 1; }
 done
-
-bw_status=$(bw status 2>/dev/null | jq -r '.status' 2>/dev/null || echo "unknown")
-if [ "$bw_status" != "unlocked" ]; then
-  echo "ERROR: bw が unlock 状態じゃない (status: $bw_status)"
-  echo "  export BW_SESSION=\$(bw unlock --raw)"
-  exit 1
-fi
-
-if ! kubectl -n "$NS" get "$KC_DEPLOY" &> /dev/null; then
-  echo "ERROR: $KC_DEPLOY not found in namespace $NS"; exit 1
-fi
-
-echo "==> kubectl context: $(kubectl config current-context)"
+KC_CONTEXT=$(kubectl config current-context)
+echo "==> kubectl context: $KC_CONTEXT"
 echo "==> 続行する場合は Enter、違うなら Ctrl-C"
 read -r
-
-# === Bitwarden 既存 item チェック ===
-if bw get item "$BW_CLIENT_ITEM" &> /dev/null; then
-  echo "NOTE: Bitwarden に '$BW_CLIENT_ITEM' が既に存在"
-  echo "  再実行時は Keycloak の現在値で Bitwarden を更新する (旧値は password history に残る)"
-  echo "  ※ client 'vault' の secret が変わった場合、Vault の auth/oidc/config への"
-  echo "    反映が別途必要 (bootstrap TF の state は廃棄済みのため vault write で直接):"
-  echo "    vault write auth/oidc/config \\"
-  echo "      oidc_discovery_url=\"https://auth.yu-mins.com/realms/$REALM\" \\"
-  echo "      oidc_client_id=\"$CLIENT_ID\" \\"
-  echo "      oidc_client_secret=\"\$(bw get password '$BW_CLIENT_ITEM')\""
-  echo ""
-  echo "==> 続行する? 続行=Enter, 中止=Ctrl-C"
-  read -r
-fi
-
-# === admin password 取得 ===
-echo ""
-echo "==> Pulling Keycloak admin password from K8s secret..."
-ADMIN_PW=$(kubectl -n "$NS" get secret keycloak-secret \
-  -o jsonpath='{.data.KEYCLOAK_ADMIN_PASSWORD}' | base64 -d)
-if [ -z "$ADMIN_PW" ]; then
-  echo "ERROR: KEYCLOAK_ADMIN_PASSWORD が secret から取れない"; exit 1
-fi
-echo "    admin password 取得 OK"
-
-# === user password 生成 ===
-USER_PW=$(openssl rand -base64 24)
-
-# === kcadm helper ===
-# pod 内の kcadm を直接呼ぶ。第1引数以降が kcadm.sh の引数。
-# 出力 (JSON 等) は stdout でホスト側に届く → ホストの jq で処理する。
-kcadm() {
-  kubectl -n "$NS" exec -i "$KC_DEPLOY" -- /opt/keycloak/bin/kcadm.sh "$@"
-}
-
-# === kcadm login (session は ~/.keycloak/kcadm.config に保存される) ===
-echo ""
-echo "==> Logging in to kcadm..."
-kcadm config credentials \
-  --server http://localhost:8080 \
-  --realm master \
-  --user admin \
-  --password "$ADMIN_PW" > /dev/null
-echo "    OK"
+keycloak_open_session
 
 # === Realm 作成 ===
 echo ""
 echo "==> Ensuring realm '$REALM'..."
-if kcadm get "realms/$REALM" > /dev/null 2>&1; then
+current_realm=$(kcadm get realms --fields realm | jq -r --arg realm "$REALM" '.[] | select(.realm == $realm) | .realm')
+if [[ -n $current_realm ]]; then
   echo "    realm '$REALM' already exists, skip"
 else
   kcadm create realms \
@@ -142,8 +56,8 @@ ensure_group() {
   echo ""
   echo "==> Ensuring group '$g' in realm '$REALM'..."
   local existing
-  existing=$(kcadm get groups -r "$REALM" --fields name 2>/dev/null \
-    | jq -r --arg g "$g" '.[] | select(.name == $g) | .name' || true)
+  existing=$(kcadm get groups -r "$REALM" --fields name \
+    | jq -r --arg g "$g" '.[] | select(.name == $g) | .name')
   if [ -n "$existing" ]; then
     echo "    group '$g' already exists, skip"
   else
@@ -157,45 +71,32 @@ ensure_group "$DEV_GROUP"
 # === User 作成 ===
 echo ""
 echo "==> Ensuring user '$USER_NAME' in realm '$REALM'..."
-USER_ID=$(kcadm get users -r "$REALM" --query "username=$USER_NAME" --fields id 2>/dev/null \
-  | jq -r '.[0].id // empty' || true)
-
-if [ -n "$USER_ID" ] && [ "$USER_ID" != "null" ]; then
-  echo "    user '$USER_NAME' already exists (id: $USER_ID), skip create"
-  echo "    NOTE: 既存 user のパスワードは変更しない (勝手な reset 防止)。"
-  echo "          手動で reset した場合は Bitwarden '$BW_USER_ITEM' も忘れずに更新すること"
-  USER_PW=""  # 既存の場合は BW に save しない
+USER_ID=$(kcadm get users -r "$REALM" --query "username=$USER_NAME" --query exact=true --fields id,username |
+  jq -r --arg user "$USER_NAME" '.[] | select(.username == $user) | .id')
+if [[ -n "$USER_ID" ]]; then
+  echo "    existing user; preserving password and memberships"
 else
-  kcadm create users -r "$REALM" \
-    -s "username=$USER_NAME" \
-    -s "email=$USER_EMAIL" \
-    -s "firstName=$USER_FIRST" \
-    -s "lastName=$USER_LAST" \
-    -s emailVerified=true \
-    -s enabled=true > /dev/null
-  USER_ID=$(kcadm get users -r "$REALM" --query "username=$USER_NAME" --fields id \
-    | jq -r '.[0].id')
-  echo "    user '$USER_NAME' created (id: $USER_ID)"
-
-  echo "==> Setting password (temporary=false)..."
-  kcadm set-password -r "$REALM" \
-    --username "$USER_NAME" \
-    --new-password "$USER_PW" > /dev/null
-  echo "    password set"
-
-  echo "==> Joining user to group '$ADMIN_GROUP'..."
-  GROUP_ID=$(kcadm get groups -r "$REALM" --fields id,name \
-    | jq -r --arg g "$ADMIN_GROUP" '.[] | select(.name == $g) | .id')
-  kcadm update "users/$USER_ID/groups/$GROUP_ID" -r "$REALM" \
-    -s "realm=$REALM" -s "userId=$USER_ID" -s "groupId=$GROUP_ID" -n > /dev/null
-  echo "    user joined to '$ADMIN_GROUP'"
+  : "${KENSAN_OP_VAULT:?Set KENSAN_OP_VAULT to the dedicated 1Password vault}"
+  # Create user, credential and membership in one request. A failed lookup
+  # must never result in a passwordless user that a retry would skip.
+  user_json=$(op read --no-newline "op://${KENSAN_OP_VAULT}/keycloak-user-yu/password" |
+    jq -Rsec --arg user "$USER_NAME" --arg email "$USER_EMAIL" --arg first "$USER_FIRST" \
+      --arg last "$USER_LAST" --arg group "/$ADMIN_GROUP" '
+        select(length > 0) |
+        {username:$user, email:$email, firstName:$first, lastName:$last,
+         enabled:true, emailVerified:true, groups:[$group],
+         credentials:[{type:"password", temporary:false, value:.}] }')
+  printf '%s' "$user_json" | kcadm create users -r "$REALM" -f - >/dev/null
+  unset user_json
+  echo "    created user with a password and group membership"
 fi
 
 # === OIDC Client 共通関数 ===
 # 引数: <client_id> <name> <description> <redirect_uris_json> <web_origins_json> <post_logout_uri>
 # 戻り値: stdout に client UUID を 1 行で出力。
 # 副作用: 存在しなければ作成し groups protocol mapper を付ける。冪等。
-ensure_oidc_client() {
+ensure_oidc_client() (
+  set -euo pipefail
   local cid="$1"
   local cname="$2"
   local cdesc="$3"
@@ -205,9 +106,9 @@ ensure_oidc_client() {
 
   echo "" >&2
   echo "==> Ensuring OIDC client '$cid' in realm '$REALM'..." >&2
-  local uuid
-  uuid=$(kcadm get clients -r "$REALM" --query "clientId=$cid" --fields id 2>/dev/null \
-    | jq -r '.[0].id // empty' || true)
+  local uuid groups_mapper
+  uuid=$(kcadm get clients -r "$REALM" --query "clientId=$cid" --fields id \
+    | jq -r '.[0].id // empty')
 
   if [ -n "$uuid" ] && [ "$uuid" != "null" ]; then
     echo "    client '$cid' already exists (id: $uuid)" >&2
@@ -225,9 +126,14 @@ ensure_oidc_client() {
       -s "webOrigins=$web_origins_json" \
       -s "attributes.\"post.logout.redirect.uris\"=$post_logout_uri" > /dev/null
     uuid=$(kcadm get clients -r "$REALM" --query "clientId=$cid" --fields id \
-      | jq -r '.[0].id')
+      | jq -er '.[0].id | strings | select(length > 0)')
     echo "    client '$cid' created (id: $uuid)" >&2
 
+  fi
+  # A previous run may have stopped immediately after creating the client.
+  groups_mapper=$(kcadm get "clients/$uuid/protocol-mappers/models" -r "$REALM" --fields name |
+    jq -r '.[] | select(.name == "groups") | .name')
+  if [[ -z "$groups_mapper" ]]; then
     echo "==> Adding 'groups' protocol mapper to '$cid'..." >&2
     kcadm create "clients/$uuid/protocol-mappers/models" -r "$REALM" \
       -s name=groups \
@@ -250,7 +156,7 @@ ensure_oidc_client() {
     -s "attributes.\"post.logout.redirect.uris\"=$post_logout_uri" > /dev/null
 
   echo "$uuid"
-}
+)
 
 # === Vault OIDC client ===
 VAULT_REDIRECT_URIS=$(jq -nc \
@@ -259,13 +165,13 @@ VAULT_REDIRECT_URIS=$(jq -nc \
   '[$vault_cb, $cli_cb]')
 VAULT_WEB_ORIGINS=$(jq -nc --arg origin "https://$VAULT_HOSTNAME" '[$origin]')
 
-CLIENT_UUID=$(ensure_oidc_client \
+ensure_oidc_client \
   "$CLIENT_ID" \
   "Vault OIDC" \
   "Vault HA OIDC auth method (Stage 1)" \
   "$VAULT_REDIRECT_URIS" \
   "$VAULT_WEB_ORIGINS" \
-  "https://$VAULT_HOSTNAME")
+  "https://$VAULT_HOSTNAME" >/dev/null
 
 # === Istio Gateway OIDC client (Phase 2) — ADR-010 Path A + AuthZ binding ===
 # oauth2-proxy が Keycloak へ redirect する際の redirect_uri は、
@@ -374,373 +280,52 @@ BACKSTAGE_CLIENT_UUID=$(ensure_oidc_client \
   "$BACKSTAGE_WEB_ORIGINS" \
   "https://$BACKSTAGE_HOSTNAME")
 
-# === Vault client_secret 取得 ===
-echo ""
-echo "==> Fetching Vault client_secret..."
-CLIENT_SECRET=$(kcadm get "clients/$CLIENT_UUID/client-secret" -r "$REALM" 2>/dev/null \
-  | jq -r '.value')
-if [ -z "$CLIENT_SECRET" ] || [ "$CLIENT_SECRET" = "null" ]; then
-  echo "ERROR: client_secret が取れない"; exit 1
-fi
-echo "    client_secret 取得 OK (${CLIENT_SECRET:0:8}...)"
-
-# === Bitwarden 保存 ===
-# 既存 item は現在値で更新する (bw edit)。旧値は Bitwarden の password history に残る。
-#
-# 背景 (2026-06-06 incident): 旧実装は既存 item を skip していたため、5/12 の
-# 災害復旧で realm を再構築した際、再生成された client secret が Bitwarden に
-# 反映されず、Bitwarden を SoT とする Vault TF / 手動ログインが 3 週間
-# 静かに壊れていた。再実行 = 「Keycloak の現在値を SoT 連鎖に伝播する」操作にする。
-save_bw() {
-  local item_name="$1"
-  local username="$2"
-  local password="$3"
-  local notes="$4"
-
-  local item_id
-  item_id=$(bw get item "$item_name" 2>/dev/null | jq -r '.id // empty' || true)
-
-  if [ -n "$item_id" ]; then
-    local current_pw
-    current_pw=$(bw get item "$item_name" | jq -r '.login.password // empty')
-    if [ "$current_pw" = "$password" ]; then
-      echo "    unchanged: '$item_name' (値が一致)"
-      return 0
+# Publish the four current client secrets. Compare-and-set preserves concurrent
+# changes and prevents silently re-creating a deleted KV version.
+sync_client_to_vault() {
+  local client=$1 uuid=$2 path=$3 session_field=${4:-}
+  local current version old next session='' client_secret
+  if current=$(vault kv get -format=json -mount=secret "$path" 2>&1); then
+    version=$(printf '%s' "$current" | jq -er '.data.metadata.version | numbers | select(. > 0)')
+    old=$(printf '%s' "$current" | jq -ceS '.data.data | objects')
+    if [[ -n "$session_field" ]]; then
+      session=$(printf '%s' "$old" | jq -er --arg key "$session_field" '.[$key] | strings | select(length > 0)') || {
+        echo "Expected $session_field at secret/$path; restore the existing value before retrying" >&2
+        return 1
+      }
     fi
-    bw get item "$item_name" | jq \
-      --arg notes "$notes" \
-      --arg user "$username" \
-      --arg pw "$password" \
-      '.notes = $notes
-       | .login.username = $user
-       | .login.password = $pw' \
-      | bw encode | bw edit item "$item_id" > /dev/null
-    echo "    updated: '$item_name' (旧値は password history 参照)"
-    return 0
+  elif [[ "$current" == "No value found at secret/data/$path" ]]; then
+    version=0
+    old='{}'
+    case "$session_field" in
+      cookie-secret) session=$(openssl rand -base64 32 | tr '+/' '-_' | tr -d '=\n');;
+      session-secret) session=$(openssl rand -hex 32);;
+    esac
+  else
+    echo "Unable to read secret/$path; check Vault access and retry" >&2
+    return 1
   fi
-
-  local item_json
-  item_json=$(bw get template item | jq \
-    --arg name "$item_name" \
-    --arg notes "$notes" \
-    --arg user "$username" \
-    --arg pw "$password" \
-    '.name = $name
-     | .notes = $notes
-     | .login = {uris: [], username: $user, password: $pw, totp: null}
-     | .fields = []')
-
-  echo "$item_json" | bw encode | bw create item > /dev/null
-  echo "    saved: '$item_name'"
+  client_secret=$(keycloak_client_secret "$uuid")
+  # Build on existing fields so a sync never discards another consumer's data.
+  next=$(printf '%s' "$old" | jq -cSe --arg client "$client" --arg field "$session_field" \
+    --rawfile credential <(printf '%s' "$client_secret") --rawfile session <(printf '%s' "$session") '
+    .["client-id"] = $client | .["client-secret"] = $credential |
+    if $field != "" then .[$field] = $session else . end')
+  if [[ "$old" == "$next" ]]; then
+    echo "    secret/$path already current"
+    return
+  fi
+  printf '%s' "$next" | vault kv put -mount=secret -cas="$version" "$path" - >/dev/null
+  echo "    synced secret/$path"
 }
 
-echo ""
-echo "==> Saving secrets to Bitwarden..."
-
-CLIENT_NOTES="Vault Stage 1 OIDC client.
-Realm: $REALM
-ClientID: $CLIENT_ID
-DiscoveryURL: https://auth.yu-mins.com/realms/$REALM
-Created by: bootstrap/keycloak/setup.sh"
-save_bw "$BW_CLIENT_ITEM" "$CLIENT_ID" "$CLIENT_SECRET" "$CLIENT_NOTES"
-
-# === Istio Gateway client_secret 取得 + Bitwarden 保存 ===
-echo ""
-echo "==> Fetching istio-gateway-platform client_secret..."
-GATEWAY_CLIENT_SECRET=$(kcadm get "clients/$GATEWAY_CLIENT_UUID/client-secret" -r "$REALM" 2>/dev/null \
-  | jq -r '.value')
-if [ -z "$GATEWAY_CLIENT_SECRET" ] || [ "$GATEWAY_CLIENT_SECRET" = "null" ]; then
-  echo "ERROR: istio-gateway-platform client_secret が取れない"; exit 1
+if [[ -z ${VAULT_ADDR:-} ]]; then
+  echo 'Keycloak clients ready. App KV sync pending: set VAULT_ADDR, sign in to Vault, and rerun.'
+  exit 0
 fi
-echo "    gateway client_secret 取得 OK (${GATEWAY_CLIENT_SECRET:0:8}...)"
-
-GATEWAY_NOTES="Istio Gateway Platform OIDC client (Phase 1 Gateway-level auth).
-Realm: $REALM
-ClientID: istio-gateway-platform
-DiscoveryURL: https://auth.yu-mins.com/realms/$REALM
-Used by: oauth2-proxy in auth-system namespace
-Created by: bootstrap/keycloak/setup.sh"
-save_bw "kensan-lab/keycloak/oidc-client-istio-gateway-platform" \
-  "istio-gateway-platform" "$GATEWAY_CLIENT_SECRET" "$GATEWAY_NOTES"
-
-# === Grafana client_secret 取得 + Bitwarden 保存 ===
-echo ""
-echo "==> Fetching grafana client_secret..."
-GRAFANA_CLIENT_SECRET=$(kcadm get "clients/$GRAFANA_CLIENT_UUID/client-secret" -r "$REALM" 2>/dev/null \
-  | jq -r '.value')
-if [ -z "$GRAFANA_CLIENT_SECRET" ] || [ "$GRAFANA_CLIENT_SECRET" = "null" ]; then
-  echo "ERROR: grafana client_secret が取れない"; exit 1
-fi
-echo "    grafana client_secret 取得 OK (${GRAFANA_CLIENT_SECRET:0:8}...)"
-
-GRAFANA_NOTES="Grafana OIDC client (Path B — gateway bypass + Grafana 自前 generic_oauth).
-Realm: $REALM
-ClientID: grafana
-DiscoveryURL: https://auth.yu-mins.com/realms/$REALM
-Used by: Grafana in monitoring namespace (auth.generic_oauth)
-Created by: bootstrap/keycloak/setup.sh"
-save_bw "kensan-lab/keycloak/oidc-client-grafana" \
-  "grafana" "$GRAFANA_CLIENT_SECRET" "$GRAFANA_NOTES"
-
-# === ArgoCD client_secret 取得 + Bitwarden 保存 ===
-echo ""
-echo "==> Fetching argocd client_secret..."
-ARGOCD_CLIENT_SECRET=$(kcadm get "clients/$ARGOCD_CLIENT_UUID/client-secret" -r "$REALM" 2>/dev/null \
-  | jq -r '.value')
-if [ -z "$ARGOCD_CLIENT_SECRET" ] || [ "$ARGOCD_CLIENT_SECRET" = "null" ]; then
-  echo "ERROR: argocd client_secret が取れない"; exit 1
-fi
-echo "    argocd client_secret 取得 OK (${ARGOCD_CLIENT_SECRET:0:8}...)"
-
-ARGOCD_NOTES="ArgoCD OIDC client (Path B — gateway bypass + argocd-cm.oidc.config 直結).
-Realm: $REALM
-ClientID: argocd
-DiscoveryURL: https://auth.yu-mins.com/realms/$REALM
-Used by: ArgoCD in argocd namespace (configs.cm.oidc.config)
-Created by: bootstrap/keycloak/setup.sh"
-save_bw "kensan-lab/keycloak/oidc-client-argocd" \
-  "argocd" "$ARGOCD_CLIENT_SECRET" "$ARGOCD_NOTES"
-
-# === Backstage client_secret 取得 + Bitwarden 保存 ===
-echo ""
-echo "==> Fetching backstage client_secret..."
-BACKSTAGE_CLIENT_SECRET=$(kcadm get "clients/$BACKSTAGE_CLIENT_UUID/client-secret" -r "$REALM" 2>/dev/null \
-  | jq -r '.value')
-if [ -z "$BACKSTAGE_CLIENT_SECRET" ] || [ "$BACKSTAGE_CLIENT_SECRET" = "null" ]; then
-  echo "ERROR: backstage client_secret が取れない"; exit 1
-fi
-echo "    backstage client_secret 取得 OK"
-
-BACKSTAGE_NOTES="Backstage OIDC client (Path B — gateway bypass + Backstage native OIDC).
-Realm: $REALM
-ClientID: backstage
-DiscoveryURL: https://auth.yu-mins.com/realms/$REALM
-Used by: Backstage in backstage namespace (auth.providers.oidc)
-Created by: bootstrap/keycloak/setup.sh"
-save_bw "$BW_BACKSTAGE_CLIENT_ITEM" \
-  "backstage" "$BACKSTAGE_CLIENT_SECRET" "$BACKSTAGE_NOTES"
-
-if [ -n "${USER_PW:-}" ]; then
-  USER_NOTES="Keycloak user for kensan realm.
-Realm: $REALM
-Email: $USER_EMAIL
-Group: $ADMIN_GROUP
-Login URL: https://auth.yu-mins.com/realms/$REALM/account
-Created by: bootstrap/keycloak/setup.sh"
-  save_bw "$BW_USER_ITEM" "$USER_NAME" "$USER_PW" "$USER_NOTES"
-fi
-
-# === Vault KV 投入 (oauth2-proxy 用) ===
-# vault CLI + 有効 token があれば自動投入。なければ手動手順を案内。
-# KV path: secret/platform-auth/istio-gateway/platform
-# 投入 keys: client-id / client-secret / cookie-secret
-# 既存値があればそれを尊重 (再実行で session を破壊しない)。
-GATEWAY_VAULT_PATH="secret/platform-auth/istio-gateway/platform"   # KV v2 は mount prefix 必須
-
-vault_populate_gateway_kv() {
-  echo ""
-  echo "==> Populating Vault KV: $GATEWAY_VAULT_PATH"
-
-  # 既存 KV 取得 (失敗しても気にしない)
-  local existing_keys=""
-  local existing_cookie=""
-  if vault kv get -format=json "$GATEWAY_VAULT_PATH" >/dev/null 2>&1; then
-    existing_keys=$(vault kv get -format=json "$GATEWAY_VAULT_PATH" \
-      | jq -r '.data.data | keys | join(",")')
-    existing_cookie=$(vault kv get -format=json "$GATEWAY_VAULT_PATH" \
-      | jq -r '.data.data["cookie-secret"] // empty')
-    echo "    既存 KV あり (keys: $existing_keys)"
-  else
-    echo "    KV path 未存在、新規作成"
-  fi
-
-  # cookie-secret は既存があれば流用 (rotate したい場合は事前に kv delete する)
-  local cookie
-  if [ -n "$existing_cookie" ]; then
-    cookie="$existing_cookie"
-    echo "    cookie-secret: 既存値を流用"
-  else
-    # oauth2-proxy は AES key として 16/24/32 byte を要求。先に URL-safe base64
-    # decode を試み、長さ一致したら raw bytes として使う動作のため、URL-safe
-    # アルファベット (-_) で出力する必要がある。標準アルファベット (+/) だと
-    # decode 失敗 → 入力文字列 (44 byte) が raw 扱いされ AES key 長違反で起動失敗。
-    cookie=$(openssl rand -base64 32 | tr '+/' '-_' | tr -d '=' | tr -d '\n')
-    echo "    cookie-secret: 新規生成 (URL-safe base64)"
-  fi
-
-  vault kv put "$GATEWAY_VAULT_PATH" \
-    client-id=istio-gateway-platform \
-    client-secret="$GATEWAY_CLIENT_SECRET" \
-    cookie-secret="$cookie" > /dev/null
-  echo "    populated OK"
-
-  echo ""
-  echo "    確認 (keys のみ):"
-  vault kv get -format=json "$GATEWAY_VAULT_PATH" | jq -r '.data.data | keys | "      " + (. | tostring)'
-}
-
-# === Vault KV 投入 (Grafana auth.generic_oauth 用) ===
-# KV path: secret/observability/grafana/oidc
-# 投入 keys: client-id / client-secret
-# ESO の external-secrets policy が secret/data/* read 可能なので追加 policy 不要。
-GRAFANA_OIDC_VAULT_PATH="secret/observability/grafana/oidc"
-
-vault_populate_grafana_oidc_kv() {
-  echo ""
-  echo "==> Populating Vault KV: $GRAFANA_OIDC_VAULT_PATH"
-
-  if vault kv get -format=json "$GRAFANA_OIDC_VAULT_PATH" >/dev/null 2>&1; then
-    local existing_keys
-    existing_keys=$(vault kv get -format=json "$GRAFANA_OIDC_VAULT_PATH" \
-      | jq -r '.data.data | keys | join(",")')
-    echo "    既存 KV あり (keys: $existing_keys) — 上書き"
-  else
-    echo "    KV path 未存在、新規作成"
-  fi
-
-  vault kv put "$GRAFANA_OIDC_VAULT_PATH" \
-    client-id=grafana \
-    client-secret="$GRAFANA_CLIENT_SECRET" > /dev/null
-  echo "    populated OK"
-}
-
-# === Vault KV 投入 (ArgoCD argocd-cm.oidc.config 用) ===
-# KV path: secret/security/argocd/oidc
-# 投入 keys: client-id / client-secret
-# ESO の external-secrets-read policy で read 可能、追加 policy 不要。
-ARGOCD_OIDC_VAULT_PATH="secret/security/argocd/oidc"
-
-vault_populate_argocd_oidc_kv() {
-  echo ""
-  echo "==> Populating Vault KV: $ARGOCD_OIDC_VAULT_PATH"
-
-  if vault kv get -format=json "$ARGOCD_OIDC_VAULT_PATH" >/dev/null 2>&1; then
-    local existing_keys
-    existing_keys=$(vault kv get -format=json "$ARGOCD_OIDC_VAULT_PATH" \
-      | jq -r '.data.data | keys | join(",")')
-    echo "    既存 KV あり (keys: $existing_keys) — 上書き"
-  else
-    echo "    KV path 未存在、新規作成"
-  fi
-
-  vault kv put "$ARGOCD_OIDC_VAULT_PATH" \
-    client-id=argocd \
-    client-secret="$ARGOCD_CLIENT_SECRET" > /dev/null
-  echo "    populated OK"
-}
-
-# === Vault KV 投入 (Backstage native OIDC 用) ===
-# session-secret は既存値を維持し、Pod再起動やscript再実行でsessionを壊さない。
-BACKSTAGE_OIDC_VAULT_PATH="secret/backstage/oidc"
-
-vault_populate_backstage_oidc_kv() {
-  echo ""
-  echo "==> Populating Vault KV: $BACKSTAGE_OIDC_VAULT_PATH"
-
-  local session_secret=""
-  if vault kv get -format=json "$BACKSTAGE_OIDC_VAULT_PATH" >/dev/null 2>&1; then
-    session_secret=$(vault kv get -format=json "$BACKSTAGE_OIDC_VAULT_PATH" \
-      | jq -r '.data.data["session-secret"] // empty')
-    echo "    既存 KV あり — client credentialsを同期"
-  else
-    echo "    KV path 未存在、新規作成"
-  fi
-
-  if [ -z "$session_secret" ]; then
-    session_secret=$(openssl rand -hex 32)
-    echo "    session-secret: 新規生成"
-  else
-    echo "    session-secret: 既存値を流用"
-  fi
-
-  vault kv put "$BACKSTAGE_OIDC_VAULT_PATH" \
-    client-id=backstage \
-    client-secret="$BACKSTAGE_CLIENT_SECRET" \
-    session-secret="$session_secret" > /dev/null
-  echo "    populated OK"
-}
-
-print_gateway_vault_manual() {
-  cat <<MSG
-
-==> Vault 自動投入をスキップ ($1)。手動投入手順:
-
-    # 0. 必要なら Vault に login
-    export VAULT_ADDR=https://vault.platform.yu-min3.com
-    vault login -method=oidc
-
-    # 1. 各 secret 用意
-    COOKIE=\$(openssl rand -base64 32 | tr '+/' '-_' | tr -d '=' | tr -d '\\n')   # URL-safe
-    CSEC=\$(bw get item kensan-lab/keycloak/oidc-client-istio-gateway-platform | jq -r .login.password)
-    GSEC=\$(bw get item kensan-lab/keycloak/oidc-client-grafana | jq -r .login.password)
-    ASEC=\$(bw get item kensan-lab/keycloak/oidc-client-argocd | jq -r .login.password)
-    BSEC=\$(bw get item $BW_BACKSTAGE_CLIENT_ITEM | jq -r .login.password)
-    BSESSION=\$(openssl rand -hex 32)
-
-    # 2. Vault に投入 (Gateway oauth2-proxy 用)
-    vault kv put $GATEWAY_VAULT_PATH \\
-      client-id=istio-gateway-platform \\
-      client-secret="\$CSEC" \\
-      cookie-secret="\$COOKIE"
-
-    # 2'. Vault に投入 (Grafana 自前 OIDC 用)
-    vault kv put $GRAFANA_OIDC_VAULT_PATH \\
-      client-id=grafana \\
-      client-secret="\$GSEC"
-
-    # 2''. Vault に投入 (ArgoCD 自前 OIDC 用)
-    vault kv put $ARGOCD_OIDC_VAULT_PATH \\
-      client-id=argocd \\
-      client-secret="\$ASEC"
-
-    # 2'''. Vault に投入 (Backstage native OIDC 用)
-    vault kv put $BACKSTAGE_OIDC_VAULT_PATH \\
-      client-id=backstage \\
-      client-secret="\$BSEC" \\
-      session-secret="\$BSESSION"
-
-    # 3. 確認
-    vault kv get -format=json $GATEWAY_VAULT_PATH | jq '.data.data | keys'
-    vault kv get -format=json $GRAFANA_OIDC_VAULT_PATH | jq '.data.data | keys'
-    vault kv get -format=json $ARGOCD_OIDC_VAULT_PATH | jq '.data.data | keys'
-    vault kv get -format=json $BACKSTAGE_OIDC_VAULT_PATH | jq '.data.data | keys'
-MSG
-}
-
-if ! command -v vault &>/dev/null; then
-  print_gateway_vault_manual "vault CLI なし"
-elif [ -z "${VAULT_ADDR:-}" ]; then
-  print_gateway_vault_manual "VAULT_ADDR 未設定"
-elif ! vault token lookup &>/dev/null; then
-  print_gateway_vault_manual "vault token 無効"
-else
-  vault_populate_gateway_kv
-  vault_populate_grafana_oidc_kv
-  vault_populate_argocd_oidc_kv
-  vault_populate_backstage_oidc_kv
-fi
-
-# === 出力 ===
-echo ""
-echo "==> Done."
-echo ""
-echo "==> 確認:"
-echo "    OIDC discovery: https://auth.yu-mins.com/realms/$REALM/.well-known/openid-configuration"
-echo "    bw get item \"$BW_CLIENT_ITEM\" | jq '{name, login: {username: .login.username}}'"
-echo ""
-echo "==> 次のステップ (Vault Stage 1, 未実施なら):"
-echo "    1. vault operator init (manual)"
-echo "    2. root token + Recovery Keys を Bitwarden に保存"
-echo "    3. bootstrap/vault/ で terraform.tfvars に下記を書く:"
-echo "       keycloak_oidc_discovery_url = \"https://auth.yu-mins.com/realms/$REALM\""
-echo "       keycloak_oidc_client_id     = \"$CLIENT_ID\""
-echo "       keycloak_oidc_client_secret = \"<bw get item $BW_CLIENT_ITEM | jq -r .login.password>\""
-echo "    4. cd bootstrap/vault && terraform init && terraform apply"
-echo ""
-echo "==> 次のステップ (Gateway OIDC / oauth2-proxy, このスクリプト以後):"
-echo "    1. PR #269 を ready-for-review → merge"
-echo "    2. ArgoCD で oauth2-proxy Application が sync 完了するか確認"
-echo "       kubectl -n argocd get application oauth2-proxy"
-echo "       kubectl -n auth-system get pods -l app=oauth2-proxy"
-echo "    3. provider 登録確認:"
-echo "       kubectl -n istio-system get cm istio -o yaml | yq '.data.mesh' | yq '.extensionProviders'"
+vault token lookup >/dev/null
+sync_client_to_vault istio-gateway-platform "$GATEWAY_CLIENT_UUID" platform-auth/istio-gateway/platform cookie-secret
+sync_client_to_vault grafana "$GRAFANA_CLIENT_UUID" observability/grafana/oidc
+sync_client_to_vault argocd "$ARGOCD_CLIENT_UUID" security/argocd/oidc
+sync_client_to_vault backstage "$BACKSTAGE_CLIENT_UUID" backstage/oidc session-secret
+echo "==> Keycloak and app KV sync complete. Configure Vault login with bootstrap/vault/post-bootstrap-oidc-ux.sh."
