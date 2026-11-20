@@ -73,6 +73,20 @@ their existing Vault Kubernetes auth and ESO roles.
    drill. A live cluster does not need `init.sh` or either Terraform apply for
    this change.
 
+### Verify the two logins on a running cluster
+
+1. Open the normal Vault UI in a fresh private browser session. Choose OIDC,
+   sign in at Keycloak with the migrated human Login, and complete MFA if prompted.
+   Confirm that Vault opens with the expected operator identity and policies.
+   Sign out and close the private session.
+2. Open a new private session at the same Vault UI. Choose Username (userpass)
+   and sign in with the migrated emergency-admin Login. Confirm the `admin`
+   policy, then sign out. This is a break-glass drill and creates an audit event.
+
+Both checks issue a session token. They require no application restart, KV
+update or change to the existing operator's CLI token. Test recovery shares
+and backup restoration separately on isolated storage as described below.
+
 ## Empty cluster: establish trust in two phases
 
 The bootstrap Terraform creates Vault's Kubernetes auth roles, emergency
