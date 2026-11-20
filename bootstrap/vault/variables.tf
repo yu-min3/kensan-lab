@@ -1,5 +1,5 @@
 # Bootstrap TF inputs
-# 値は terraform.tfvars (gitignore 済み) で渡す
+# bootstrap-tf.sh supplies sensitive inputs only to the current Terraform process.
 
 variable "vault_address" {
   description = "Vault HTTP API URL. ローカルから kubectl port-forward 経由で繋ぐなら http://localhost:8200"
@@ -14,13 +14,15 @@ variable "vault_token" {
 
 # Keycloak 連携 (事前に Keycloak realm + OIDC client 作成済みの前提)
 variable "keycloak_realm_url" {
-  description = "Keycloak realm の OIDC discovery URL。例: https://auth.yu-mins.com/realms/kensan"
+  description = "Keycloak realm の OIDC discovery URL"
   type        = string
+  default     = "https://auth.yu-mins.com/realms/kensan"
 }
 
 variable "keycloak_oidc_client_id" {
   description = "Keycloak で作成した Vault 用 OIDC client の client_id"
   type        = string
+  default     = "vault"
 }
 
 variable "keycloak_oidc_client_secret" {
@@ -38,7 +40,7 @@ variable "vault_redirect_uris" {
   ]
 }
 
-# Break-glass credential (stored in Bitwarden)
+# Break-glass credential (human recovery vault in 1Password)
 variable "emergency_admin_password" {
   description = "userpass auth method の emergency-admin user の password"
   type        = string

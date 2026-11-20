@@ -58,17 +58,10 @@ Commit only the sealed YAML. The raw file can be discarded or left in `temp/` (i
 
 ## Post-deploy operations
 
-Once the Vault pods are up, run the following via bootstrap Terraform (`bootstrap/vault/`):
-
-- `vault operator init`
-- `vault audit enable file path=/vault/audit/audit.log`
-- Enable the auth methods (kubernetes / oidc)
-- Create the root policy
-
-Those steps, why a throwaway Terraform is needed at all (the chicken-and-egg
-problem between VCO and Vault's own auth methods), and the disaster-recovery path
-are written beside the Terraform itself and published here as
-[Vault root of trust](vault-root-of-trust.md).
+For new empty Raft storage, use the [two-phase bootstrap](vault-root-of-trust.md).
+The first phase establishes the KV mount and Kubernetes auth before Keycloak starts.
+Enable OIDC after the issuer is ready. An existing Vault or a snapshot restore
+follows the corresponding recovery path in the same guide.
 
 ## Troubleshooting
 
