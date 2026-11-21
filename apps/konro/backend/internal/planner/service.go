@@ -11,6 +11,10 @@ import (
 	"github.com/yu-min3/kensan-lab/apps/konro/backend/internal/agentclient"
 	"github.com/yu-min3/kensan-lab/apps/konro/backend/internal/mealfeedback"
 	"github.com/yu-min3/kensan-lab/apps/konro/backend/internal/mealplan"
+	"github.com/yu-min3/kensan-lab/apps/konro/backend/internal/telemetry"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/codes"
+	"go.opentelemetry.io/otel/trace"
 	"io"
 	"os"
 	"path/filepath"
@@ -41,6 +45,8 @@ type Proposal struct {
 	Preferences       any               `json:"preferences"`
 	Policy            any               `json:"policy"`
 	Adopted           map[string]string `json:"adopted"`
+	Trace             string            `json:"trace,omitempty"`
+	TracedJob         string            `json:"tracedJob,omitempty"`
 }
 type Service struct {
 	mu        sync.Mutex
@@ -246,7 +252,13 @@ func (s *Service) Create(ctx context.Context, c Conditions, mode string) (*Propo
 			return nil, fmt.Errorf("%w: 進行中の提案を開いて完了または中止してください", ErrConflict)
 		}
 	}
-	p := &Proposal{Schema: 1, ID: id, Revision: 1, CreatedAt: time.Now().UTC().Format(time.RFC3339), Conditions: c, Candidates: candidates, Mode: mode, PreferenceVersion: pv, PolicyVersion: sv, Preferences: preferences, Policy: policy, Adopted: map[string]string{}}
+	ctx, root := telemetry.Tracer().Start(ctx, "konro.menu", trace.WithNewRoot(), trace.WithAttributes(telemetry.KeyApp.String(telemetry.App), telemetry.KeyTask.String("menu"), telemetry.KeyTraceName.String("konro.menu"), telemetry.KeyRelease.String(telemetry.CodeVersion()), attribute.String("konro.menu.mode", mode), attribute.Int("konro.menu.candidates", len(candidates)), attribute.Int("konro.menu.count", c.Count), attribute.String("konro.menu.proposal", id)))
+	defer root.End()
+	if telemetry.CaptureContent() {
+		b, _ := json.Marshal(c)
+		root.SetAttributes(telemetry.KeyInput.String(telemetry.Content(string(b))))
+	}
+	p := &Proposal{Trace: telemetry.Traceparent(ctx), Schema: 1, ID: id, Revision: 1, CreatedAt: time.Now().UTC().Format(time.RFC3339), Conditions: c, Candidates: candidates, Mode: mode, PreferenceVersion: pv, PolicyVersion: sv, Preferences: preferences, Policy: policy, Adopted: map[string]string{}}
 	if mode == "rules" {
 		p.Menus, e = RuleMenus(c, Rank(c, candidates, policy))
 		if e != nil {
@@ -270,17 +282,56 @@ func (s *Service) Create(ctx context.Context, c Conditions, mode string) (*Propo
 	return p, nil
 }
 func (s *Service) submit(ctx context.Context, p *Proposal) error {
-	j, e := s.agent.Create(ctx, TextRequest("konro-menu-"+p.ID+fmt.Sprint(p.Repairs), p.Conditions, p.Candidates, p.Preferences, p.Policy))
+	req := TextRequest("konro-menu-"+p.ID+fmt.Sprint(p.Repairs), p.Conditions, p.Candidates, p.Preferences, p.Policy)
+	ctx, span := telemetry.Tracer().Start(telemetry.Resume(ctx, p.Trace), "konro.menu.submit", trace.WithAttributes(telemetry.KeyTask.String("menu"), telemetry.KeyPromptName.String("konro.menu"), telemetry.KeyPromptVersion.String(PromptVersion()), attribute.Int("konro.menu.repairs", p.Repairs)))
+	defer span.End()
+	if telemetry.CaptureContent() {
+		b, _ := json.Marshal(map[string]any{"prompt": req.Prompt, "input": req.Input})
+		span.SetAttributes(telemetry.KeyInput.String(telemetry.Content(string(b))))
+	}
+	j, e := s.agent.Create(ctx, req)
 	if e != nil {
+		span.RecordError(e)
+		span.SetStatus(codes.Error, "runtime unavailable")
 		return e
 	}
+	span.SetAttributes(telemetry.KeyJobID.String(j.ID), telemetry.KeyJobState.String(j.State))
 	p.Job = &j
 	p.Pending = false
 	p.Error = ""
-	s.apply(p)
+	s.apply(ctx, p)
 	return s.write(p)
 }
-func (s *Service) apply(p *Proposal) {
+
+// PromptVersion identifies the menu instruction and output schema.
+func PromptVersion() string {
+	r := TextRequest("", Conditions{}, nil, nil, nil)
+	return telemetry.Version(r.Prompt, OutputSchema)
+}
+
+func (s *Service) observe(ctx context.Context, p *Proposal, outcome string) {
+	if p.Job == nil || (p.Job.State != "succeeded" && p.Job.State != "failed" && p.Job.State != "cancelled") {
+		return
+	}
+	key := p.Job.ID + ":" + p.Job.State + ":" + p.Job.Reason
+	if p.TracedJob == key {
+		return
+	}
+	p.TracedJob = key
+	_, span := telemetry.Tracer().Start(telemetry.Resume(ctx, p.Trace), "konro.menu.apply", trace.WithAttributes(telemetry.KeyTask.String("menu"), telemetry.KeyJobID.String(p.Job.ID), telemetry.KeyJobState.String(p.Job.State), telemetry.KeyJobReason.String(p.Job.Reason), telemetry.KeyOutcome.String(outcome), telemetry.KeyPromptVersion.String(PromptVersion()), attribute.Int("konro.menu.menus", len(p.Menus))))
+	if outcome != "applied" {
+		span.SetStatus(codes.Error, outcome)
+	}
+	if telemetry.CaptureContent() && len(p.Job.Output) > 0 {
+		span.SetAttributes(telemetry.KeyOutput.String(telemetry.Content(string(p.Job.Output))))
+	}
+	span.End()
+}
+
+func (s *Service) apply(ctx context.Context, p *Proposal) {
+	if p.Job != nil && p.Job.State != "succeeded" {
+		s.observe(ctx, p, "job_"+p.Job.State)
+	}
 	if p.Job == nil || p.Job.State != "succeeded" {
 		return
 	}
@@ -294,6 +345,7 @@ func (s *Service) apply(p *Proposal) {
 		p.Job.State = "failed"
 		p.Job.Reason = "invalid_output"
 		p.Error = "提案の形式を確認できません。修正再試行できます。"
+		s.observe(ctx, p, "invalid_output")
 		return
 	}
 	menus, e := ValidateMenus(p.Conditions, p.Candidates, output.Menus)
@@ -301,11 +353,13 @@ func (s *Service) apply(p *Proposal) {
 		p.Job.State = "failed"
 		p.Job.Reason = "invalid_conditions"
 		p.Error = "必須条件に合わない案を受け取ったため、採用していません。"
+		s.observe(ctx, p, "invalid_conditions")
 		return
 	}
 	p.Menus = menus
 	p.Interpretation = output.Interpretation
 	p.Error = ""
+	s.observe(ctx, p, "applied")
 }
 func (s *Service) Get(ctx context.Context, id string) (*Proposal, error) {
 	s.mu.Lock()
@@ -329,7 +383,7 @@ func (s *Service) getLocked(ctx context.Context, id string) (*Proposal, error) {
 		} else {
 			p.Job = &j
 			p.Error = ""
-			s.apply(p)
+			s.apply(ctx, p)
 		}
 	}
 	if Digest(p) != before {
@@ -389,7 +443,7 @@ func (s *Service) Action(ctx context.Context, id string, revision int, action st
 	p.Job = &j
 	p.Pending = false
 	p.Revision++
-	s.apply(p)
+	s.apply(ctx, p)
 	return p, s.write(p)
 }
 func (s *Service) Adopt(id string, revision int, menuID, operation string) (mealplan.Plan, error) {

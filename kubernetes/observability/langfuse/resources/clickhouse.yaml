@@ -1,0 +1,87 @@
+## Single-node ClickHouse for Langfuse (no Keeper, CLICKHOUSE_CLUSTER_ENABLED=false).
+## Langfuse v4 requires ClickHouse >= 25.12 and UTC. Data is on Longhorn.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: langfuse-clickhouse-config
+  namespace: langfuse
+data:
+  users.xml: |
+    <clickhouse>
+      <users>
+        <default remove="remove"/>
+        <langfuse>
+          <password from_env="CLICKHOUSE_PASSWORD"/>
+          <networks><ip>::/0</ip></networks>
+          <profile>default</profile>
+          <quota>default</quota>
+          <access_management>1</access_management>
+          <named_collection_control>1</named_collection_control>
+        </langfuse>
+      </users>
+    </clickhouse>
+  server.xml: |
+    <clickhouse>
+      <timezone>UTC</timezone>
+      <logger><level>warning</level><console>1</console></logger>
+      <max_server_memory_usage_to_ram_ratio>0.8</max_server_memory_usage_to_ram_ratio>
+    </clickhouse>
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: langfuse-clickhouse
+  namespace: langfuse
+spec:
+  selector: {app.kubernetes.io/name: langfuse-clickhouse}
+  ports:
+    - {name: http, port: 8123, targetPort: 8123}
+    - {name: native, port: 9000, targetPort: 9000}
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: langfuse-clickhouse
+  namespace: langfuse
+spec:
+  serviceName: langfuse-clickhouse
+  replicas: 1
+  selector:
+    matchLabels: {app.kubernetes.io/name: langfuse-clickhouse}
+  template:
+    metadata:
+      labels: {app.kubernetes.io/name: langfuse-clickhouse}
+    spec:
+      nodeSelector: {kubernetes.io/arch: amd64}
+      securityContext: {fsGroup: 101}
+      containers:
+        - name: clickhouse
+          image: docker.io/clickhouse/clickhouse-server:26.3.62.3
+          env:
+            - name: CLICKHOUSE_PASSWORD
+              valueFrom: {secretKeyRef: {name: langfuse-clickhouse, key: password}}
+            - {name: TZ, value: UTC}
+          ports:
+            - {name: http, containerPort: 8123}
+            - {name: native, containerPort: 9000}
+          readinessProbe:
+            httpGet: {path: /ping, port: 8123}
+            periodSeconds: 10
+          resources:
+            requests: {cpu: 250m, memory: 1Gi}
+            limits: {memory: 3Gi}
+          volumeMounts:
+            - {name: data, mountPath: /var/lib/clickhouse}
+            - {name: config, mountPath: /etc/clickhouse-server/users.d/langfuse.xml, subPath: users.xml}
+            - {name: config, mountPath: /etc/clickhouse-server/config.d/langfuse.xml, subPath: server.xml}
+      volumes:
+        - name: config
+          configMap: {name: langfuse-clickhouse-config}
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+        annotations:
+          argocd.argoproj.io/sync-options: Prune=false
+      spec:
+        accessModes: [ReadWriteOnce]
+        resources: {requests: {storage: 20Gi}}

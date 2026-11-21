@@ -1,0 +1,21 @@
+## Langfuse is not in the mesh, so no default-deny applies. Restrict ingress to
+## the namespace itself (web/worker/stores) and the OTel collector, which is the
+## only writer of traces. The UI is reached with kubectl port-forward.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: langfuse-ingress
+  namespace: langfuse
+spec:
+  podSelector: {}
+  policyTypes: [Ingress]
+  ingress:
+    - from:
+        - podSelector: {}
+    - from:
+        - namespaceSelector:
+            matchLabels: {kubernetes.io/metadata.name: monitoring}
+          podSelector:
+            matchLabels: {app.kubernetes.io/name: opentelemetry-collector}
+      ports:
+        - {port: 3000, protocol: TCP}

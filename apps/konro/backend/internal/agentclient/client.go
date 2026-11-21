@@ -19,6 +19,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/yu-min3/kensan-lab/apps/konro/backend/internal/telemetry"
 	"golang.org/x/oauth2"
 	"golang.org/x/oauth2/clientcredentials"
 )
@@ -37,6 +38,10 @@ type Request struct {
 	Input          any             `json:"input"`
 	OutputSchema   json.RawMessage `json:"output_schema"`
 	IdempotencyKey string          `json:"idempotency_key"`
+	// Traceparent links the runtime's spans to Konro's trace. Sent only when
+	// KONRO_AGENT_TRACE=true, because runtimes before trace support reject
+	// unknown fields.
+	Traceparent string `json:"traceparent,omitempty"`
 }
 type Gateway interface {
 	Create(context.Context, Request) (Job, error)
@@ -47,6 +52,7 @@ type Client struct {
 	base  string
 	http  *http.Client
 	token func(context.Context) (string, error)
+	trace bool
 }
 
 func New(base string, token func(context.Context) (string, error)) (*Client, error) {
@@ -61,7 +67,7 @@ func New(base string, token func(context.Context) (string, error)) (*Client, err
 	if token == nil {
 		return nil, errors.New("agent authentication required")
 	}
-	return &Client{base: strings.TrimRight(base, "/"), http: &http.Client{Timeout: 15 * time.Second, CheckRedirect: func(*http.Request, []*http.Request) error { return errors.New("runtime redirect refused") }}, token: token}, nil
+	return &Client{trace: os.Getenv("KONRO_AGENT_TRACE") == "true", base: strings.TrimRight(base, "/"), http: &http.Client{Timeout: 15 * time.Second, CheckRedirect: func(*http.Request, []*http.Request) error { return errors.New("runtime redirect refused") }}, token: token}, nil
 }
 func privateFile(path string) (string, error) {
 	info, e := os.Stat(path) // Kubernetes projected volumes use a rotation symlink.
@@ -137,6 +143,10 @@ func FromEnvironment(ctx context.Context) (Gateway, error) {
 	return client, nil
 }
 func (c *Client) Create(ctx context.Context, r Request) (Job, error) {
+	r.Traceparent = ""
+	if c.trace {
+		r.Traceparent = telemetry.Traceparent(ctx)
+	}
 	return c.call(ctx, "POST", "/v1/jobs", r)
 }
 func (c *Client) Get(ctx context.Context, id string) (Job, error) {

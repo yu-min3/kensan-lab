@@ -58,6 +58,9 @@ spec:
               - argocd.yu-mins.com
               - grafana.yu-mins.com
               - backstage.yu-mins.com
+              # OTLP intake. Not an oauth2 host: the collector's otlp/external
+              # receiver requires a bearer token (OTLP clients cannot do OIDC).
+              - otel.platform.yu-min3.com
 
     # === Category 2: oauth2-proxy 強制 + admin or dev ===
     - to:

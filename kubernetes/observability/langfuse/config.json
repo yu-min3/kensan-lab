@@ -1,0 +1,9 @@
+{
+  "name": "langfuse",
+  "chart": "langfuse",
+  "chartRepo": "https://langfuse.github.io/langfuse-k8s",
+  "chartVersion": "2.2.4",
+  "namespace": "langfuse",
+  "hasResources": "true",
+  "createNamespace": "true"
+}
